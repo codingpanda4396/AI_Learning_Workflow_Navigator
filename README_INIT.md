@@ -43,19 +43,11 @@
 
 文件：`backend/src/main/resources/application.yml`
 
-- 已提供基础配置占位：
-  - `DB_URL`
-  - `DB_USERNAME`
-  - `DB_PASSWORD`
-  - `DB_DRIVER`
-- 默认值可直接本地启动（H2 内存库），不依赖真实数据库
-- 当前 `flyway.enabled=false`
-
-### 本地数据库配置（dev 环境）
-
-使用 dev profile 连接 PostgreSQL 时，可编辑 `backend/application-local.yml` 填写数据库密码（该文件已加入 .gitignore，不会提交）。
-
-首次使用：复制 `backend/application-local.yml.example` 为 `application-local.yml` 后填写。
+- 数据源：PostgreSQL（`localhost:5432/ai_learning`）
+- 已提供基础配置占位：`DB_URL`、`DB_USERNAME`、`DB_PASSWORD`
+- Flyway 已启用，迁移脚本位于 `classpath:db/migration`
+- 本地密码：编辑 `backend/application-local.yml` 填写（该文件已加入 .gitignore）
+- 首次使用：复制 `backend/application-local.yml.example` 为 `application-local.yml` 后填写
 
 ## 依赖现状（核心）
 
@@ -65,12 +57,13 @@
 - `spring-boot-starter-validation`
 - `spring-boot-starter-actuator`
 - `spring-boot-starter-jdbc`
-- `flyway-core`
+- `flyway-core`、`flyway-database-postgresql`
 - `postgresql`（runtime）
-- `h2`（runtime）
 - `springdoc-openapi-starter-webmvc-ui`
 
 ## 本地运行与验证
+
+**前置条件**：PostgreSQL 已启动，并已创建数据库 `ai_learning`；`backend/application-local.yml` 中已填写密码。
 
 在仓库根目录执行：
 
