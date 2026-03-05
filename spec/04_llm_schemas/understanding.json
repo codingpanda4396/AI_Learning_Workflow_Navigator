@@ -1,0 +1,63 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "TutorUnderstandingOutput",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["sections"],
+    "properties": {
+      "sections": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 10,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "title"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["concepts", "mechanism", "misconceptions", "summary", "examples", "checkpoints"]
+            },
+            "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "bullets": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "minItems": 1,
+              "maxItems": 12
+            },
+            "steps": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 220 },
+              "minItems": 1,
+              "maxItems": 12
+            },
+            "items": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 220 },
+              "minItems": 1,
+              "maxItems": 12
+            },
+            "text": { "type": "string", "minLength": 1, "maxLength": 1200 }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "type": { "const": "concepts" } } },
+              "then": { "required": ["bullets"] }
+            },
+            {
+              "if": { "properties": { "type": { "const": "mechanism" } } },
+              "then": { "required": ["steps"] }
+            },
+            {
+              "if": { "properties": { "type": { "const": "misconceptions" } } },
+              "then": { "required": ["items"] }
+            },
+            {
+              "if": { "properties": { "type": { "const": "summary" } } },
+              "then": { "required": ["text"] }
+            }
+          ]
+        }
+      }
+    }
+  }
