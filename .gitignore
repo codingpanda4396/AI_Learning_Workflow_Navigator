@@ -25,3 +25,9 @@ replay_pid*
 .m2repo/
 .mvn/
 target/
+
+# 本地敏感配置（不提交）
+**/application-local.yml
+**/application-local.properties
+**/.env
+**/.env.local

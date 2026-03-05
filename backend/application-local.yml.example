@@ -1,0 +1,16 @@
+# ============================================================
+# 本地配置模板
+# 复制此文件为 application-local.yml，然后填写真实配置
+# application-local.yml 已加入 .gitignore，不会被提交
+# ============================================================
+#
+# 复制命令：cp application-local.yml.example application-local.yml
+# Windows：copy application-local.yml.example application-local.yml
+#
+# ============================================================
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ai_learning
+    username: postgres
+    password: 填写你的数据库密码

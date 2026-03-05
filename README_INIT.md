@@ -1,4 +1,4 @@
-﻿# README_INIT
+# README_INIT
 
 ## 当前项目状态（2026-03-05）
 
@@ -50,6 +50,12 @@
   - `DB_DRIVER`
 - 默认值可直接本地启动（H2 内存库），不依赖真实数据库
 - 当前 `flyway.enabled=false`
+
+### 本地数据库配置（dev 环境）
+
+使用 dev profile 连接 PostgreSQL 时，可编辑 `backend/application-local.yml` 填写数据库密码（该文件已加入 .gitignore，不会提交）。
+
+首次使用：复制 `backend/application-local.yml.example` 为 `application-local.yml` 后填写。
 
 ## 依赖现状（核心）
 
