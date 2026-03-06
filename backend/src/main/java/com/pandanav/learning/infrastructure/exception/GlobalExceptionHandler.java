@@ -1,35 +1,53 @@
 package com.pandanav.learning.infrastructure.exception;
 
-import com.pandanav.learning.api.dto.ErrorResponse;
+import com.pandanav.learning.api.dto.ApiErrorResponse;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import jakarta.validation.ConstraintViolationException;
 
-import java.time.OffsetDateTime;
-
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(BizException.class)
-    public ResponseEntity<ErrorResponse> handleBizException(BizException ex) {
-        HttpStatus status = toHttpStatus(ex.getCode());
-        ErrorResponse body = new ErrorResponse(ex.getCode().name(), ex.getMessage(), OffsetDateTime.now());
-        return ResponseEntity.status(status).body(body);
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiErrorResponse> handleBadRequest(BadRequestException ex) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse("BAD_REQUEST", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse("BAD_REQUEST", "Invalid request payload."));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleConstraint(ConstraintViolationException ex) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse("BAD_REQUEST", "Invalid request payload."));
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNotFound(NotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiErrorResponse("NOT_FOUND", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleConflict(ConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiErrorResponse("CONFLICT", ex.getMessage()));
+    }
+
+    @ExceptionHandler(InternalServerException.class)
+    public ResponseEntity<ApiErrorResponse> handleInternal(InternalServerException ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(new ApiErrorResponse("INTERNAL_ERROR", ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(Exception ex) {
-        ErrorResponse body = new ErrorResponse(ErrorCode.INTERNAL_ERROR.name(), ex.getMessage(), OffsetDateTime.now());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
-    }
-
-    private HttpStatus toHttpStatus(ErrorCode code) {
-        return switch (code) {
-            case BAD_REQUEST, VALIDATION_ERROR -> HttpStatus.BAD_REQUEST;
-            case NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case CONFLICT -> HttpStatus.CONFLICT;
-            case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
-        };
+    public ResponseEntity<ApiErrorResponse> handleAny(Exception ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(new ApiErrorResponse("INTERNAL_ERROR", "Unexpected server error."));
     }
 }
