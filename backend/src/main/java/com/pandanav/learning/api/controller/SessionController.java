@@ -5,8 +5,9 @@ import com.pandanav.learning.api.dto.session.CreateSessionRequest;
 import com.pandanav.learning.api.dto.session.CreateSessionResponse;
 import com.pandanav.learning.api.dto.session.PlanSessionResponse;
 import com.pandanav.learning.api.dto.session.SessionOverviewResponse;
-import com.pandanav.learning.application.service.SessionApplicationService;
-import com.pandanav.learning.infrastructure.exception.NotFoundException;
+import com.pandanav.learning.application.usecase.CreateSessionUseCase;
+import com.pandanav.learning.application.usecase.GetSessionOverviewUseCase;
+import com.pandanav.learning.application.usecase.PlanSessionTasksUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,10 +28,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/session")
 public class SessionController {
 
-    private final SessionApplicationService sessionApplicationService;
+    private final CreateSessionUseCase createSessionUseCase;
+    private final PlanSessionTasksUseCase planSessionTasksUseCase;
+    private final GetSessionOverviewUseCase getSessionOverviewUseCase;
 
-    public SessionController(SessionApplicationService sessionApplicationService) {
-        this.sessionApplicationService = sessionApplicationService;
+    public SessionController(
+        CreateSessionUseCase createSessionUseCase,
+        PlanSessionTasksUseCase planSessionTasksUseCase,
+        GetSessionOverviewUseCase getSessionOverviewUseCase
+    ) {
+        this.createSessionUseCase = createSessionUseCase;
+        this.planSessionTasksUseCase = planSessionTasksUseCase;
+        this.getSessionOverviewUseCase = getSessionOverviewUseCase;
     }
 
     @Operation(summary = "Create learning session")
@@ -43,7 +52,7 @@ public class SessionController {
     })
     @PostMapping("/create")
     public CreateSessionResponse createSession(@Valid @RequestBody CreateSessionRequest request) {
-        return sessionApplicationService.createSession(request);
+        return createSessionUseCase.execute(request);
     }
 
     @Operation(summary = "Plan session tasks")
@@ -56,10 +65,7 @@ public class SessionController {
     })
     @PostMapping("/{sessionId}/plan")
     public PlanSessionResponse planSession(@PathVariable @Positive Long sessionId) {
-        if (sessionId == 404L) {
-            throw new NotFoundException("Session or task not found.");
-        }
-        return sessionApplicationService.planSession(sessionId);
+        return planSessionTasksUseCase.execute(sessionId);
     }
 
     @Operation(summary = "Get session overview")
@@ -72,9 +78,6 @@ public class SessionController {
     })
     @GetMapping("/{sessionId}/overview")
     public SessionOverviewResponse getOverview(@PathVariable @Positive Long sessionId) {
-        if (sessionId == 404L) {
-            throw new NotFoundException("Session or task not found.");
-        }
-        return sessionApplicationService.getOverview(sessionId);
+        return getSessionOverviewUseCase.execute(sessionId);
     }
 }

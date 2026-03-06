@@ -7,6 +7,7 @@ public class Mastery {
 
     private String userId;
     private Long nodeId;
+    private String nodeName;
     private BigDecimal masteryValue;
     private OffsetDateTime updatedAt;
 
@@ -24,6 +25,14 @@ public class Mastery {
 
     public void setNodeId(Long nodeId) {
         this.nodeId = nodeId;
+    }
+
+    public String getNodeName() {
+        return nodeName;
+    }
+
+    public void setNodeName(String nodeName) {
+        this.nodeName = nodeName;
     }
 
     public BigDecimal getMasteryValue() {

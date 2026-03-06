@@ -7,9 +7,9 @@ import java.util.Optional;
 
 public interface ConceptNodeRepository {
 
-    ConceptNode save(ConceptNode node);
-
     Optional<ConceptNode> findById(Long id);
 
-    List<ConceptNode> findByChapterId(String chapterId);
+    Optional<ConceptNode> findFirstByChapterIdOrderByOrderNoAsc(String chapterId);
+
+    List<ConceptNode> findByChapterIdOrderByOrderNoAsc(String chapterId);
 }
