@@ -67,7 +67,14 @@ public class JdbcTaskRepository implements TaskRepository {
                                WHERE ta.task_id = t.id
                                ORDER BY ta.created_at DESC
                                LIMIT 1
-                           ), 'PENDING') AS status
+                           ), 'PENDING') AS status,
+                           (
+                               SELECT ta.output_json
+                               FROM task_attempt ta
+                               WHERE ta.task_id = t.id
+                               ORDER BY ta.created_at DESC
+                               LIMIT 1
+                           ) AS output_json
                     FROM task t
                     WHERE t.id = ?
                     """,
@@ -91,13 +98,56 @@ public class JdbcTaskRepository implements TaskRepository {
                            WHERE ta.task_id = t.id
                            ORDER BY ta.created_at DESC
                            LIMIT 1
-                       ), 'PENDING') AS status
+                       ), 'PENDING') AS status,
+                       (
+                           SELECT ta.output_json
+                           FROM task_attempt ta
+                           WHERE ta.task_id = t.id
+                           ORDER BY ta.created_at DESC
+                           LIMIT 1
+                       ) AS output_json
                 FROM task t
                 WHERE t.session_id = ?
                 ORDER BY t.created_at ASC, t.id ASC
                 """,
             (rs, rowNum) -> mapTask(rs),
             sessionId
+        );
+    }
+
+    @Override
+    public Long createRunningAttempt(Long taskId) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(
+                """
+                    INSERT INTO task_attempt (task_id, status, started_at)
+                    VALUES (?, 'RUNNING'::run_status, now())
+                    """,
+                new String[]{"id"}
+            );
+            ps.setLong(1, taskId);
+            return ps;
+        }, keyHolder);
+        Number key = keyHolder.getKey();
+        if (key == null) {
+            throw new IllegalStateException("Failed to create task attempt.");
+        }
+        return key.longValue();
+    }
+
+    @Override
+    public void markAttemptSucceeded(Long attemptId, String outputJson) {
+        jdbcTemplate.update(
+            """
+                UPDATE task_attempt
+                SET status = 'SUCCEEDED'::run_status,
+                    output_json = CAST(? AS jsonb),
+                    finished_at = now()
+                WHERE id = ?
+                """,
+            outputJson,
+            attemptId
         );
     }
 
@@ -109,6 +159,7 @@ public class JdbcTaskRepository implements TaskRepository {
         task.setNodeId(rs.getLong("node_id"));
         task.setObjective(rs.getString("objective"));
         task.setStatus(TaskStatus.valueOf(rs.getString("status")));
+        task.setOutputJson(rs.getString("output_json"));
         task.setCreatedAt(rs.getObject("created_at", java.time.OffsetDateTime.class));
         task.setUpdatedAt(rs.getObject("updated_at", java.time.OffsetDateTime.class));
         return task;

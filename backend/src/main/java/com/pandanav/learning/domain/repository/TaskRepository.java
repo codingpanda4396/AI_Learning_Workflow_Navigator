@@ -14,4 +14,8 @@ public interface TaskRepository {
     Optional<Task> findById(Long id);
 
     List<Task> findBySessionIdWithStatus(Long sessionId);
+
+    Long createRunningAttempt(Long taskId);
+
+    void markAttemptSucceeded(Long attemptId, String outputJson);
 }

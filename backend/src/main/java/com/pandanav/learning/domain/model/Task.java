@@ -10,6 +10,7 @@ public class Task {
     private Long nodeId;
     private String objective;
     private TaskStatus status;
+    private String outputJson;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
@@ -59,6 +60,23 @@ public class Task {
 
     public void setStatus(TaskStatus status) {
         this.status = status;
+    }
+
+    public String getOutputJson() {
+        return outputJson;
+    }
+
+    public void setOutputJson(String outputJson) {
+        this.outputJson = outputJson;
+    }
+
+    public void markRunning() {
+        this.status = TaskStatus.RUNNING;
+    }
+
+    public void markSucceeded(String outputJson) {
+        this.status = TaskStatus.SUCCEEDED;
+        this.outputJson = outputJson;
     }
 
     public OffsetDateTime getCreatedAt() {
