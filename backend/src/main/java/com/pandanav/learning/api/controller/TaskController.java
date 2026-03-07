@@ -4,9 +4,8 @@ import com.pandanav.learning.api.dto.ApiErrorResponse;
 import com.pandanav.learning.api.dto.task.RunTaskResponse;
 import com.pandanav.learning.api.dto.task.SubmitTaskRequest;
 import com.pandanav.learning.api.dto.task.SubmitTaskResponse;
-import com.pandanav.learning.application.service.TaskApplicationService;
 import com.pandanav.learning.application.usecase.RunTaskUseCase;
-import com.pandanav.learning.infrastructure.exception.ConflictException;
+import com.pandanav.learning.application.usecase.SubmitTrainingAnswerUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,11 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class TaskController {
 
     private final RunTaskUseCase runTaskUseCase;
-    private final TaskApplicationService taskApplicationService;
+    private final SubmitTrainingAnswerUseCase submitTrainingAnswerUseCase;
 
-    public TaskController(RunTaskUseCase runTaskUseCase, TaskApplicationService taskApplicationService) {
+    public TaskController(RunTaskUseCase runTaskUseCase, SubmitTrainingAnswerUseCase submitTrainingAnswerUseCase) {
         this.runTaskUseCase = runTaskUseCase;
-        this.taskApplicationService = taskApplicationService;
+        this.submitTrainingAnswerUseCase = submitTrainingAnswerUseCase;
     }
 
     @Operation(summary = "Run task")
@@ -64,9 +63,6 @@ public class TaskController {
         @PathVariable @Positive Long taskId,
         @Valid @RequestBody SubmitTaskRequest request
     ) {
-        if (taskId == 409L) {
-            throw new ConflictException("Task is not in a submittable state.");
-        }
-        return taskApplicationService.submitTask(taskId, request);
+        return submitTrainingAnswerUseCase.submit(taskId, request);
     }
 }

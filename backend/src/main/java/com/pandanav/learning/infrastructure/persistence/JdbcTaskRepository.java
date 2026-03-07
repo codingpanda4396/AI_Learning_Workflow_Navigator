@@ -116,6 +116,40 @@ public class JdbcTaskRepository implements TaskRepository {
     }
 
     @Override
+    public Optional<Task> findFirstBySessionIdAndNodeIdAndStage(Long sessionId, Long nodeId, Stage stage) {
+        List<Task> tasks = jdbcTemplate.query(
+            """
+                SELECT t.id, t.session_id, t.stage, t.node_id, t.objective, t.created_at, t.updated_at,
+                       COALESCE((
+                           SELECT ta.status
+                           FROM task_attempt ta
+                           WHERE ta.task_id = t.id
+                           ORDER BY ta.created_at DESC
+                           LIMIT 1
+                       ), 'PENDING') AS status,
+                       (
+                           SELECT ta.output_json
+                           FROM task_attempt ta
+                           WHERE ta.task_id = t.id
+                           ORDER BY ta.created_at DESC
+                           LIMIT 1
+                       ) AS output_json
+                FROM task t
+                WHERE t.session_id = ?
+                  AND t.node_id = ?
+                  AND t.stage = ?::task_stage
+                ORDER BY t.created_at ASC, t.id ASC
+                LIMIT 1
+                """,
+            (rs, rowNum) -> mapTask(rs),
+            sessionId,
+            nodeId,
+            stage.name()
+        );
+        return tasks.stream().findFirst();
+    }
+
+    @Override
     public Long createRunningAttempt(Long taskId) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {

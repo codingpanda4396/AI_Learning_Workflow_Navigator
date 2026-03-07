@@ -10,7 +10,6 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
-import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -77,5 +76,21 @@ public class JdbcLearningSessionRepository implements SessionRepository {
         } catch (EmptyResultDataAccessException ex) {
             return Optional.empty();
         }
+    }
+
+    @Override
+    public void updateCurrentPosition(Long sessionId, Long currentNodeId, Stage currentStage) {
+        jdbcTemplate.update(
+            """
+                UPDATE learning_session
+                SET current_node_id = ?,
+                    current_stage = ?::task_stage,
+                    updated_at = now()
+                WHERE id = ?
+                """,
+            currentNodeId,
+            currentStage.name(),
+            sessionId
+        );
     }
 }
