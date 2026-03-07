@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 public record SubmitTaskRequest(
     @NotBlank
     @JsonProperty("user_answer")
-    @Schema(name = "user_answer", example = "我认为两次握手也行...")
+    @Schema(name = "user_answer", example = "I think two-way handshake is enough...")
     String userAnswer
 ) {
 }

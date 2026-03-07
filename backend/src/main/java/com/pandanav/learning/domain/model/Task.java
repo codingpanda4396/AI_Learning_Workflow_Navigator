@@ -1,5 +1,8 @@
 package com.pandanav.learning.domain.model;
 
+import com.pandanav.learning.domain.enums.Stage;
+import com.pandanav.learning.domain.enums.TaskStatus;
+
 import java.time.OffsetDateTime;
 
 public class Task {
@@ -11,6 +14,7 @@ public class Task {
     private String objective;
     private TaskStatus status;
     private String outputJson;
+    private String failureReason;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
@@ -70,13 +74,38 @@ public class Task {
         this.outputJson = outputJson;
     }
 
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    public void setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
+    }
+
+    public boolean canRun() {
+        return status == TaskStatus.PENDING || status == TaskStatus.FAILED;
+    }
+
+    public boolean canSubmit() {
+        return stage == Stage.TRAINING && (status == TaskStatus.SUCCEEDED || status == TaskStatus.PENDING);
+    }
+
     public void markRunning() {
+        if (status != TaskStatus.PENDING && status != TaskStatus.FAILED) {
+            throw new IllegalStateException("Task is not in a runnable state.");
+        }
         this.status = TaskStatus.RUNNING;
     }
 
     public void markSucceeded(String outputJson) {
         this.status = TaskStatus.SUCCEEDED;
         this.outputJson = outputJson;
+        this.failureReason = null;
+    }
+
+    public void markFailed(String reason) {
+        this.status = TaskStatus.FAILED;
+        this.failureReason = reason;
     }
 
     public OffsetDateTime getCreatedAt() {
@@ -95,3 +124,5 @@ public class Task {
         this.updatedAt = updatedAt;
     }
 }
+
+

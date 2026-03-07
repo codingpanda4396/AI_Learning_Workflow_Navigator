@@ -7,3 +7,5 @@ public interface SubmitTrainingAnswerUseCase {
 
     SubmitTaskResponse submit(Long taskId, SubmitTaskRequest request);
 }
+
+

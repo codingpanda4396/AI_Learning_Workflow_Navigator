@@ -1,9 +1,4 @@
 package com.pandanav.learning.domain.model;
 
-public enum TaskStatus {
-    PENDING,
-    RUNNING,
-    SUCCEEDED,
-    FAILED,
-    CANCELLED
-}
+// Moved to com.pandanav.learning.domain.enums.TaskStatus
+

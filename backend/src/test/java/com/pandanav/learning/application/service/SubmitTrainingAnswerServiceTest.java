@@ -6,12 +6,13 @@ import com.pandanav.learning.api.dto.task.SubmitTaskRequest;
 import com.pandanav.learning.api.dto.task.SubmitTaskResponse;
 import com.pandanav.learning.application.service.EvaluatorService.EvaluationResult;
 import com.pandanav.learning.application.service.MasteryUpdateService.MasteryUpdateResult;
-import com.pandanav.learning.application.service.NextActionPolicyService.NextAction;
+import com.pandanav.learning.domain.enums.ErrorTag;
+import com.pandanav.learning.domain.enums.NextAction;
+import com.pandanav.learning.domain.enums.Stage;
+import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningSession;
-import com.pandanav.learning.domain.model.Stage;
 import com.pandanav.learning.domain.model.Task;
-import com.pandanav.learning.domain.model.TaskStatus;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.EvidenceRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
@@ -77,12 +78,12 @@ class SubmitTrainingAnswerServiceTest {
         when(sessionRepository.findById(123L)).thenReturn(Optional.of(session));
         when(conceptNodeRepository.findById(101L)).thenReturn(Optional.of(node));
         when(evaluatorService.evaluate(any(), any(), any())).thenReturn(
-            new EvaluationResult(72, List.of("MISSING_STEPS"), new FeedbackResponse("diag", List.of("fix")))
+            new EvaluationResult(72, List.of(ErrorTag.MISSING_STEPS), new FeedbackResponse("diag", List.of("fix")))
         );
         when(masteryUpdateService.update("u1", 101L, "Three-way Handshake", 72)).thenReturn(
             new MasteryUpdateResult(new BigDecimal("0.550"), new BigDecimal("0.010"), new BigDecimal("0.560"))
         );
-        when(nextActionPolicyService.decide(72, List.of("MISSING_STEPS"))).thenReturn(NextAction.INSERT_TRAINING_VARIANTS);
+        when(nextActionPolicyService.decide(72, List.of(ErrorTag.MISSING_STEPS))).thenReturn(NextAction.INSERT_TRAINING_VARIANTS);
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> {
             Task t = invocation.getArgument(0);
             t.setId(2001L);

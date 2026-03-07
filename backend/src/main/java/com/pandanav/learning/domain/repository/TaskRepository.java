@@ -1,6 +1,6 @@
 package com.pandanav.learning.domain.repository;
 
-import com.pandanav.learning.domain.model.Stage;
+import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.model.Task;
 
 import java.util.List;
@@ -22,3 +22,5 @@ public interface TaskRepository {
 
     void markAttemptSucceeded(Long attemptId, String outputJson);
 }
+
+

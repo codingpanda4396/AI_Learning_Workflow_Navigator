@@ -7,14 +7,14 @@ import com.pandanav.learning.api.dto.task.SubmitTaskRequest;
 import com.pandanav.learning.api.dto.task.SubmitTaskResponse;
 import com.pandanav.learning.application.service.EvaluatorService.EvaluationResult;
 import com.pandanav.learning.application.service.MasteryUpdateService.MasteryUpdateResult;
-import com.pandanav.learning.application.service.NextActionPolicyService.NextAction;
 import com.pandanav.learning.application.usecase.SubmitTrainingAnswerUseCase;
+import com.pandanav.learning.domain.enums.NextAction;
+import com.pandanav.learning.domain.enums.Stage;
+import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.Evidence;
 import com.pandanav.learning.domain.model.LearningSession;
-import com.pandanav.learning.domain.model.Stage;
 import com.pandanav.learning.domain.model.Task;
-import com.pandanav.learning.domain.model.TaskStatus;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.EvidenceRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
@@ -70,11 +70,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         Task task = taskRepository.findById(taskId)
             .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
 
-        if (task.getStage() != Stage.TRAINING) {
-            throw new ConflictException(CONFLICT_MESSAGE);
-        }
-
-        if (!isSubmittable(task.getStatus())) {
+        if (!task.canSubmit()) {
             throw new ConflictException(CONFLICT_MESSAGE);
         }
 
@@ -108,7 +104,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             task.getStage().name(),
             task.getNodeId(),
             evaluation.score(),
-            evaluation.errorTags(),
+            evaluation.errorTags().stream().map(Enum::name).toList(),
             evaluation.feedback(),
             mastery.masteryBefore(),
             mastery.masteryDelta(),
@@ -118,17 +114,13 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         );
     }
 
-    private boolean isSubmittable(TaskStatus status) {
-        return status == TaskStatus.SUCCEEDED || status == TaskStatus.PENDING;
-    }
-
     private void persistEvidence(LearningSession session, Task task, EvaluationResult evaluation) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("session_id", session.getId());
         payload.put("task_id", task.getId());
         payload.put("node_id", task.getNodeId());
         payload.put("score", evaluation.score());
-        payload.put("error_tags", evaluation.errorTags());
+        payload.put("error_tags", evaluation.errorTags().stream().map(Enum::name).toList());
         payload.put("feedback_json", Map.of(
             "diagnosis", evaluation.feedback().diagnosis(),
             "fixes", evaluation.feedback().fixes()
@@ -213,3 +205,4 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         }
     }
 }
+

@@ -1,7 +1,7 @@
 package com.pandanav.learning.infrastructure.persistence;
 
 import com.pandanav.learning.domain.model.LearningSession;
-import com.pandanav.learning.domain.model.Stage;
+import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -94,3 +94,5 @@ public class JdbcLearningSessionRepository implements SessionRepository {
         );
     }
 }
+
+

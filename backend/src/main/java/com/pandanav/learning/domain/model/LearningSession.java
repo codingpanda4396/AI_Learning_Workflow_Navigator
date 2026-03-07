@@ -1,5 +1,7 @@
 package com.pandanav.learning.domain.model;
 
+import com.pandanav.learning.domain.enums.Stage;
+
 import java.time.OffsetDateTime;
 
 public class LearningSession {
@@ -86,3 +88,4 @@ public class LearningSession {
         this.updatedAt = updatedAt;
     }
 }
+

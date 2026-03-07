@@ -5,7 +5,7 @@ import com.pandanav.learning.api.dto.session.CreateSessionResponse;
 import com.pandanav.learning.application.usecase.CreateSessionUseCase;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningSession;
-import com.pandanav.learning.domain.model.Stage;
+import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.infrastructure.exception.ConflictException;
@@ -45,3 +45,5 @@ public class CreateSessionService implements CreateSessionUseCase {
         }
     }
 }
+
+

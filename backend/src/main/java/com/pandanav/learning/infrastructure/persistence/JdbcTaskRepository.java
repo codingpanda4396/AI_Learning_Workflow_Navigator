@@ -1,8 +1,8 @@
 package com.pandanav.learning.infrastructure.persistence;
 
-import com.pandanav.learning.domain.model.Stage;
+import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.model.Task;
-import com.pandanav.learning.domain.model.TaskStatus;
+import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -192,10 +192,13 @@ public class JdbcTaskRepository implements TaskRepository {
         task.setStage(Stage.valueOf(rs.getString("stage")));
         task.setNodeId(rs.getLong("node_id"));
         task.setObjective(rs.getString("objective"));
-        task.setStatus(TaskStatus.valueOf(rs.getString("status")));
+        task.setStatus(TaskStatus.fromDb(rs.getString("status")));
         task.setOutputJson(rs.getString("output_json"));
         task.setCreatedAt(rs.getObject("created_at", java.time.OffsetDateTime.class));
         task.setUpdatedAt(rs.getObject("updated_at", java.time.OffsetDateTime.class));
         return task;
     }
 }
+
+
+

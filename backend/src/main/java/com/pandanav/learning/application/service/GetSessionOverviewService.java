@@ -7,7 +7,7 @@ import com.pandanav.learning.api.dto.session.TimelineItemResponse;
 import com.pandanav.learning.application.usecase.GetSessionOverviewUseCase;
 import com.pandanav.learning.domain.model.Mastery;
 import com.pandanav.learning.domain.model.Task;
-import com.pandanav.learning.domain.model.TaskStatus;
+import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.MasteryRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
@@ -83,3 +83,5 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
         );
     }
 }
+
+

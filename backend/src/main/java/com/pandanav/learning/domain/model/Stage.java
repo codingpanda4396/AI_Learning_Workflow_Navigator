@@ -1,8 +1,4 @@
 package com.pandanav.learning.domain.model;
 
-public enum Stage {
-    STRUCTURE,
-    UNDERSTANDING,
-    TRAINING,
-    REFLECTION
-}
+// Moved to com.pandanav.learning.domain.enums.Stage
+

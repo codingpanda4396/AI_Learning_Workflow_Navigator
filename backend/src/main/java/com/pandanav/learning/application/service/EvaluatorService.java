@@ -1,6 +1,7 @@
 package com.pandanav.learning.application.service;
 
 import com.pandanav.learning.api.dto.task.FeedbackResponse;
+import com.pandanav.learning.domain.enums.ErrorTag;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -24,36 +25,36 @@ public class EvaluatorService {
             .toList();
 
         int score = 100;
-        Set<String> errorTags = new LinkedHashSet<>();
+        Set<ErrorTag> errorTags = new LinkedHashSet<>();
         List<String> fixes = new ArrayList<>();
 
         if (!missingTerms.isEmpty()) {
             score -= Math.min(48, missingTerms.size() * 12);
-            errorTags.add("MISSING_STEPS");
+            errorTags.add(ErrorTag.MISSING_STEPS);
             fixes.add("Add missing key points: " + String.join(", ", missingTerms) + ".");
         }
 
         if (answer.length() < MIN_REASONING_LENGTH) {
             score -= 15;
-            errorTags.add("SHALLOW_REASONING");
+            errorTags.add(ErrorTag.SHALLOW_REASONING);
             fixes.add("Expand reasoning with cause-effect chain and concrete steps.");
         }
 
         if (containsConfusion(answer)) {
             score -= 20;
-            errorTags.add("CONCEPT_CONFUSION");
+            errorTags.add(ErrorTag.CONCEPT_CONFUSION);
             fixes.add("Correct the misconception and explain why the correct mechanism is required.");
         }
 
         if (containsTerminologyIssue(answer)) {
             score -= 10;
-            errorTags.add("TERMINOLOGY");
+            errorTags.add(ErrorTag.TERMINOLOGY);
             fixes.add("Use precise protocol terminology (SYN/ACK/sequence number semantics).");
         }
 
         if (keyTerms.stream().noneMatch(term -> contains(answer, term))) {
             score -= 12;
-            errorTags.add("MEMORY_GAP");
+            errorTags.add(ErrorTag.MEMORY_GAP);
             fixes.add("Recall and restate the core concept definition before explaining.");
         }
 
@@ -65,7 +66,7 @@ public class EvaluatorService {
             && !contains(answer, "half-open")
             && !contains(answer, "\u534a\u5f00")) {
             score -= 8;
-            errorTags.add("BOUNDARY_CASE");
+            errorTags.add(ErrorTag.BOUNDARY_CASE);
             fixes.add("Include boundary case discussion: old SYN replay and half-open connection risk.");
         }
 
@@ -75,7 +76,7 @@ public class EvaluatorService {
         if (errorTags.isEmpty()) {
             diagnosis = "Answer is accurate and complete for current objective.";
         } else {
-            diagnosis = "Answer has gaps in " + String.join(", ", errorTags) + ".";
+            diagnosis = "Answer has gaps in " + errorTags.stream().map(Enum::name).reduce((a, b) -> a + ", " + b).orElse("") + ".";
         }
 
         return new EvaluationResult(
@@ -127,8 +128,9 @@ public class EvaluatorService {
 
     public record EvaluationResult(
         Integer score,
-        List<String> errorTags,
+        List<ErrorTag> errorTags,
         FeedbackResponse feedback
     ) {
     }
 }
+
