@@ -1,11 +1,13 @@
 package com.pandanav.learning.api.controller;
 
 import com.pandanav.learning.api.dto.ApiErrorResponse;
+import com.pandanav.learning.api.dto.session.CurrentSessionResponse;
 import com.pandanav.learning.api.dto.session.CreateSessionRequest;
 import com.pandanav.learning.api.dto.session.CreateSessionResponse;
 import com.pandanav.learning.api.dto.session.PlanSessionResponse;
 import com.pandanav.learning.api.dto.session.SessionOverviewResponse;
 import com.pandanav.learning.application.usecase.CreateSessionUseCase;
+import com.pandanav.learning.application.usecase.GetCurrentSessionUseCase;
 import com.pandanav.learning.application.usecase.GetSessionOverviewUseCase;
 import com.pandanav.learning.application.usecase.PlanSessionTasksUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,15 +34,18 @@ public class SessionController {
     private final CreateSessionUseCase createSessionUseCase;
     private final PlanSessionTasksUseCase planSessionTasksUseCase;
     private final GetSessionOverviewUseCase getSessionOverviewUseCase;
+    private final GetCurrentSessionUseCase getCurrentSessionUseCase;
 
     public SessionController(
         CreateSessionUseCase createSessionUseCase,
         PlanSessionTasksUseCase planSessionTasksUseCase,
-        GetSessionOverviewUseCase getSessionOverviewUseCase
+        GetSessionOverviewUseCase getSessionOverviewUseCase,
+        GetCurrentSessionUseCase getCurrentSessionUseCase
     ) {
         this.createSessionUseCase = createSessionUseCase;
         this.planSessionTasksUseCase = planSessionTasksUseCase;
         this.getSessionOverviewUseCase = getSessionOverviewUseCase;
+        this.getCurrentSessionUseCase = getCurrentSessionUseCase;
     }
 
     @Operation(summary = "Create learning session")
@@ -79,5 +85,16 @@ public class SessionController {
     @GetMapping("/{sessionId}/overview")
     public SessionOverviewResponse getOverview(@PathVariable @Positive Long sessionId) {
         return getSessionOverviewUseCase.execute(sessionId);
+    }
+
+    @Operation(summary = "Get current session by user id")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK"),
+        @ApiResponse(responseCode = "500", description = "Internal Error",
+            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    @GetMapping("/current")
+    public CurrentSessionResponse getCurrentSession(@RequestParam("user_id") String userId) {
+        return getCurrentSessionUseCase.execute(userId);
     }
 }
