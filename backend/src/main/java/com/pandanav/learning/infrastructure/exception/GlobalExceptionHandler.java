@@ -5,9 +5,12 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import jakarta.validation.ConstraintViolationException;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -24,9 +27,35 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(new ApiErrorResponse("BAD_REQUEST", "Invalid request payload."));
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleMalformedJson(HttpMessageNotReadableException ex) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse("BAD_REQUEST", "Invalid request payload."));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse("BAD_REQUEST", "Invalid request parameter."));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingParam(MissingServletRequestParameterException ex) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse("BAD_REQUEST", "Missing required request parameter."));
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiErrorResponse> handleConstraint(ConstraintViolationException ex) {
         return ResponseEntity.badRequest().body(new ApiErrorResponse("BAD_REQUEST", "Invalid request payload."));
+    }
+
+    @ExceptionHandler(BizException.class)
+    public ResponseEntity<ApiErrorResponse> handleBiz(BizException ex) {
+        HttpStatus status = switch (ex.getCode()) {
+            case BAD_REQUEST, VALIDATION_ERROR -> HttpStatus.BAD_REQUEST;
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case CONFLICT -> HttpStatus.CONFLICT;
+            case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
+        return ResponseEntity.status(status).body(new ApiErrorResponse(ex.getCode().name(), ex.getMessage()));
     }
 
     @ExceptionHandler(NotFoundException.class)
