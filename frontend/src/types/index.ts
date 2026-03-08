@@ -1,71 +1,79 @@
-// API Types based on spec/02_api_contract.md
-
 export type Stage = 'STRUCTURE' | 'UNDERSTANDING' | 'TRAINING' | 'REFLECTION'
 export type TaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'
-export type ErrorTag = 'CONCEPT_CONFUSION' | 'MISSING_STEPS' | 'BOUNDARY_CASE' | 'TERMINOLOGY' | 'SHALLOW_REASONING' | 'MEMORY_GAP'
-export type NextAction = 'INSERT_REMEDIAL_UNDERSTANDING' | 'INSERT_TRAINING_VARIANTS' | 'INSERT_TRAINING_REINFORCEMENT' | 'ADVANCE_TO_NEXT_NODE' | 'NOOP'
+export type ErrorTag =
+  | 'CONCEPT_CONFUSION'
+  | 'MISSING_STEPS'
+  | 'BOUNDARY_CASE'
+  | 'TERMINOLOGY'
+  | 'SHALLOW_REASONING'
+  | 'MEMORY_GAP'
+export type NextAction =
+  | 'INSERT_REMEDIAL_UNDERSTANDING'
+  | 'INSERT_TRAINING_VARIANTS'
+  | 'INSERT_TRAINING_REINFORCEMENT'
+  | 'ADVANCE_TO_NEXT_NODE'
+  | 'NOOP'
 
-// Create Session
 export interface CreateSessionRequest {
-  user_id: string
-  course_id: string
-  chapter_id: string
-  goal_text: string
+  userId: string
+  courseId: string
+  chapterId: string
+  goalText: string
 }
 
-export interface CreateSessionResponse {
-  session_id: number
-}
-
-// Plan Session
 export interface PlannedTask {
-  task_id: number
-  stage: Stage
-  node_id: number
+  taskId: number
+  stage: string
+  nodeId: number
   objective: string
-  status: TaskStatus
+  status: string
 }
 
 export interface PlanSessionResponse {
-  session_id: number
+  sessionId: number
   tasks: PlannedTask[]
 }
 
-// Session Overview
 export interface TimelineItem {
-  task_id: number
-  stage: Stage
-  node_id: number
-  status: TaskStatus
+  taskId: number
+  stage: string
+  nodeId: number
+  status: string
 }
 
 export interface NextTask {
-  task_id: number
-  stage: Stage
-  node_id: number
+  taskId: number
+  stage: string
+  nodeId: number
 }
 
 export interface MasterySummary {
-  node_id: number
-  node_name: string
-  mastery_value: number
+  nodeId: number
+  nodeName: string
+  masteryValue: number
+}
+
+export interface Progress {
+  completedTaskCount: number
+  totalTaskCount: number
+  completionRate: number
 }
 
 export interface SessionOverviewResponse {
-  session_id: number
-  course_id: string
-  chapter_id: string
-  goal_text: string
-  current_node_id: number
-  current_stage: Stage
+  sessionId: number
+  courseId: string
+  chapterId: string
+  goalText: string
+  currentNodeId: number
+  currentStage: string
   timeline: TimelineItem[]
-  next_task: NextTask
-  mastery_summary: MasterySummary[]
+  nextTask: NextTask | null
+  masterySummary: MasterySummary[]
+  progress: Progress | null
 }
 
-// Run Task
 export interface TaskOutputSection {
-  type: 'concepts' | 'mechanism' | 'misconceptions' | 'summary'
+  type: string
   title: string
   bullets?: string[]
   steps?: string[]
@@ -78,43 +86,66 @@ export interface TaskOutput {
 }
 
 export interface RunTaskResponse {
-  task_id: number
-  stage: Stage
-  node_id: number
-  status: TaskStatus
+  taskId: number
+  stage: string
+  nodeId: number
+  status: string
   output: TaskOutput
 }
 
-// Submit Task
-export interface SubmitTaskRequest {
-  user_answer: string
-}
-
-export interface FeedbackFix {
-  fix: string
-}
-
-export interface Feedback {
-  diagnosis: string
-  fixes: FeedbackFix[]
-}
-
 export interface SubmitTaskResponse {
-  task_id: number
-  stage: Stage
-  node_id: number
+  taskId: number
+  stage: string
+  nodeId: number
   score: number
-  error_tags: ErrorTag[]
-  feedback: Feedback
-  mastery_before: number
-  mastery_delta: number
-  mastery_after: number
-  next_action: NextAction
-  next_task: NextTask
+  errorTags: string[]
+  feedback: {
+    diagnosis: string
+    fixes: string[]
+  }
+  masteryBefore: number
+  masteryDelta: number
+  masteryAfter: number
+  nextAction: string
+  nextTask: NextTask | null
 }
 
-// Error Response
-export interface ApiError {
-  error: string
-  message: string
+export interface CurrentSessionInfo {
+  sessionId: number
+  userId: string
+  courseId: string
+  chapterId: string
+  goalText: string
+  currentNodeId: number
+  currentStage: string
+}
+
+export interface CurrentSessionResponse {
+  hasActiveSession: boolean
+  session: CurrentSessionInfo | null
+}
+
+export interface PathNode {
+  nodeId: number
+  nodeName: string
+  status: string
+  masteryValue: number
+}
+
+export interface PathResponse {
+  sessionId: number
+  currentNodeId: number
+  nodes: PathNode[]
+}
+
+export interface TaskDetailResponse {
+  taskId: number
+  sessionId: number
+  nodeId: number
+  nodeName: string
+  stage: string
+  objective: string
+  status: string
+  hasOutput: boolean
+  output: TaskOutput
 }

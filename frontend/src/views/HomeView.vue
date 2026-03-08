@@ -16,17 +16,18 @@ const workflowStore = useWorkflowStore()
 
 const defaultCourse = courseOptions[0]
 const defaultChapter = defaultCourse?.chapters[0]
+const defaultUserId = import.meta.env.VITE_DEFAULT_USER_ID || 'guest_user'
 
-const goal = ref('')
-const courseId = ref(defaultCourse?.id ?? '')
-const chapterId = ref(defaultChapter?.id ?? '')
+const goal = ref(workflowStore.goal || '')
+const courseId = ref(workflowStore.courseId || defaultCourse?.id || '')
+const chapterId = ref(workflowStore.chapterId || defaultChapter?.id || '')
 const goalError = ref('')
 const submitError = ref('')
-const isCreating = ref(false)
+const isCreating = computed(() => sessionStore.creatingSession || sessionStore.planning)
 
 const stepPreview = [
-  { step: 1 as const, title: '诊断目标' },
-  { step: 2 as const, title: '生成路径' },
+  { step: 1 as const, title: '目标诊断' },
+  { step: 2 as const, title: '路径规划' },
   { step: 3 as const, title: '分步学习' },
   { step: 4 as const, title: '总结反馈' },
 ]
@@ -56,80 +57,48 @@ function validateGoal() {
 }
 
 async function handleSubmit() {
-  if (!validateGoal()) {
+  if (!validateGoal() || isCreating.value) {
     return
   }
 
   submitError.value = ''
-  isCreating.value = true
-  workflowStore.setLoading(true)
 
+  const userId = localStorage.getItem('ai_learning_user_id') || defaultUserId
   const payload = {
-    user_id: 'mock_user_001',
-    course_id: courseId.value,
-    chapter_id: chapterId.value,
-    goal_text: goal.value.trim(),
+    userId,
+    courseId: courseId.value,
+    chapterId: chapterId.value,
+    goalText: goal.value.trim(),
   }
 
   workflowStore.startWorkflow({
-    goal: payload.goal_text,
-    courseId: payload.course_id,
-    chapterId: payload.chapter_id,
-  })
-
-  workflowStore.setStepState(1, {
-    status: 'running',
-    input: {
-      goal: payload.goal_text,
-      courseId: payload.course_id,
-      chapterId: payload.chapter_id,
-    },
-    output: {
-      summary: '准备开始目标诊断',
-    },
+    goal: payload.goalText,
+    courseId: payload.courseId,
+    chapterId: payload.chapterId,
   })
 
   try {
-    const sessionId = await sessionStore.createSession(payload)
-    await sessionStore.planSession(sessionId)
-    await sessionStore.fetchSessionOverview(sessionId)
+    const newSessionId = await sessionStore.createSession(payload)
+    await sessionStore.planSession(newSessionId)
+    await sessionStore.fetchSessionOverview(newSessionId)
 
-    workflowStore.setWorkflowId(String(sessionId))
+    workflowStore.setWorkflowId(String(newSessionId))
     workflowStore.setCurrentStep(1)
-    workflowStore.setStepState(1, {
-      status: 'done',
-      output: {
-        summary: '目标已提交，系统已准备诊断路径。',
-      },
-    })
-
-    router.push(`/session/${sessionId}`)
-  } catch (error) {
-    console.error('Failed to create session:', error)
-    submitError.value = '会话创建失败，请稍后重试。'
-    workflowStore.setStepState(1, {
-      status: 'error',
-      output: {
-        summary: '目标诊断初始化失败。',
-      },
-    })
-  } finally {
-    isCreating.value = false
-    workflowStore.setLoading(false)
+    router.push(`/session/${newSessionId}`)
+  } catch {
+    submitError.value = sessionStore.error || '会话创建失败，请稍后重试。'
   }
 }
 
-onMounted(() => {
-  workflowStore.loadFromStorage()
-
-  if (workflowStore.goal) {
-    goal.value = workflowStore.goal
-  }
-  if (workflowStore.courseId) {
-    courseId.value = workflowStore.courseId
-  }
-  if (workflowStore.chapterId) {
-    chapterId.value = workflowStore.chapterId
+onMounted(async () => {
+  const userId = localStorage.getItem('ai_learning_user_id') || defaultUserId
+  try {
+    const response = await sessionStore.fetchCurrentSession(userId)
+    if (response.hasActiveSession && response.session) {
+      router.replace(`/session/${response.session.sessionId}`)
+    }
+  } catch {
+    // Ignore recovery failure on entry page.
   }
 })
 </script>
@@ -139,8 +108,8 @@ onMounted(() => {
     <section class="hero-panel">
       <PageHeader
         eyebrow="AI Learning Navigator"
-        title="把模糊学习目标，拆成可执行学习流程"
-        subtitle="不是普通聊天，而是围绕你的目标自动完成诊断、路径规划、分步学习与总结反馈。"
+        title="把模糊学习目标拆成可执行流程"
+        subtitle="围绕你的目标自动完成诊断、路径规划、分步学习与总结反馈。"
       />
       <StepProgress :current-step="1" :steps="stepPreview" />
     </section>
@@ -157,12 +126,9 @@ onMounted(() => {
 
         <div class="action-block">
           <PrimaryButton type="submit" :disabled="!canSubmit" :loading="isCreating">
-            {{ isCreating ? '正在生成学习流程...' : '4. 开始学习流程' }}
+            {{ isCreating ? '正在生成学习流程...' : '开始学习流程' }}
           </PrimaryButton>
           <p v-if="submitError" class="submit-error">{{ submitError }}</p>
-          <p class="action-hint">
-            进入流程页后，你将看到每一步的输入、产出与进度状态，支持后续联调。
-          </p>
         </div>
       </form>
     </section>
@@ -212,11 +178,6 @@ onMounted(() => {
   gap: var(--space-sm);
 }
 
-.action-hint {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-}
-
 .submit-error {
   margin: 0;
   color: var(--color-error);
@@ -226,13 +187,6 @@ onMounted(() => {
 @media (max-width: 980px) {
   .home-page {
     grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .home-page {
-    padding: max(16px, env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
-    gap: 14px;
   }
 }
 </style>

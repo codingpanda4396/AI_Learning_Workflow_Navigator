@@ -27,14 +27,16 @@ const sessionId = computed(() => Number(route.params.id))
 const notes = ref('')
 
 const steps: StepMeta[] = [
-  { step: 1, title: '诊断目标', task: '明确目标边界和能力基线' },
-  { step: 2, title: '生成路径', task: '拆解学习节点和阶段路径' },
+  { step: 1, title: '目标诊断', task: '明确目标边界和能力基线' },
+  { step: 2, title: '路径规划', task: '拆解学习节点和阶段路径' },
   { step: 3, title: '分步学习', task: '执行任务并记录掌握度变化' },
   { step: 4, title: '总结反馈', task: '输出复盘建议与下一步行动' },
 ]
 
 const currentSession = computed(() => sessionStore.currentSession)
-const isLoading = computed(() => sessionStore.isLoading)
+const isLoading = computed(
+  () => sessionStore.fetchingSession || sessionStore.recoveringSession,
+)
 const error = computed(() => sessionStore.error)
 const currentStep = computed(() => workflowStore.currentStep)
 const workflowId = computed(() => workflowStore.workflowId)
@@ -97,26 +99,18 @@ function updateStepNotes() {
   })
 }
 
-function initializeBaseStepData() {
-  if (!workflowStore.goal && currentSession.value?.goal_text) {
-    workflowStore.startWorkflow({
-      goal: currentSession.value.goal_text,
-      courseId: currentSession.value.course_id,
-      chapterId: currentSession.value.chapter_id,
-    })
+function deriveCurrentStepFromSession(): WorkflowStepNumber {
+  const stage = currentSession.value?.currentStage
+  if (stage === 'TRAINING') {
+    return 3
   }
-
-  workflowStore.setStepState(1, {
-    input: {
-      goal: workflowStore.goal || currentSession.value?.goal_text || '',
-      courseId: workflowStore.courseId || currentSession.value?.course_id || '',
-      chapterId: workflowStore.chapterId || currentSession.value?.chapter_id || '',
-    },
-    output: {
-      summary: '已进入诊断流程，准备校准目标范围。',
-    },
-    status: 'done',
-  })
+  if (stage === 'REFLECTION') {
+    return 4
+  }
+  if (stage === 'UNDERSTANDING') {
+    return 2
+  }
+  return 1
 }
 
 function hydrateFromSessionOverview() {
@@ -124,28 +118,47 @@ function hydrateFromSessionOverview() {
     return
   }
 
-  const stageLabel = currentSession.value.current_stage
+  if (!workflowStore.goal && currentSession.value.goalText) {
+    workflowStore.startWorkflow({
+      goal: currentSession.value.goalText,
+      courseId: currentSession.value.courseId,
+      chapterId: currentSession.value.chapterId,
+    })
+  }
+
   const timeline = currentSession.value.timeline.map((item) => `${item.stage}:${item.status}`)
-  const mastery = currentSession.value.mastery_summary
+  const mastery = currentSession.value.masterySummary
     .slice(0, 3)
-    .map((item) => `${item.node_name} ${Math.round(item.mastery_value * 100)}%`)
+    .map((item) => `${item.nodeName} ${Math.round(item.masteryValue * 100)}%`)
+
+  workflowStore.setStepState(1, {
+    input: {
+      goal: workflowStore.goal || currentSession.value.goalText,
+      courseId: workflowStore.courseId || currentSession.value.courseId,
+      chapterId: workflowStore.chapterId || currentSession.value.chapterId,
+    },
+    output: {
+      summary: '已进入诊断流程，准备校准目标范围。',
+    },
+    status: 'done',
+  })
 
   workflowStore.setStepState(2, {
     input: {
-      goal: currentSession.value.goal_text,
-      stage: stageLabel,
+      goal: currentSession.value.goalText,
+      stage: currentSession.value.currentStage,
     },
     output: {
       timeline,
-      summary: '学习路径已拆分为结构、理解、训练、反思四段。',
+      summary: '学习路径已拆分为结构、理解、训练、反思四阶段。',
     },
     status: 'done',
   })
 
   workflowStore.setStepState(3, {
     input: {
-      stage: stageLabel,
-      nextTask: currentSession.value.next_task.task_id,
+      stage: currentSession.value.currentStage,
+      nextTask: currentSession.value.nextTask?.taskId ?? '暂无',
     },
     output: {
       mastery,
@@ -163,11 +176,13 @@ function hydrateFromSessionOverview() {
     },
     status: 'idle',
   })
+
+  workflowStore.setCurrentStep(deriveCurrentStepFromSession())
 }
 
 async function fetchSession() {
   await sessionStore.fetchSessionOverview(sessionId.value)
-  initializeBaseStepData()
+  await sessionStore.fetchSessionPath(sessionId.value)
   hydrateFromSessionOverview()
   syncStepNotes()
 }
@@ -190,9 +205,23 @@ function handleNext() {
     return
   }
 
-  workflowStore.setStepState(currentStep.value, { status: 'done' })
+  const nextTask = sessionStore.nextTask
+  if (nextTask) {
+    const targetPath =
+      nextTask.stage === 'TRAINING'
+        ? `/task/${nextTask.taskId}/submit`
+        : `/task/${nextTask.taskId}/run`
+
+    router.push({
+      path: targetPath,
+      query: {
+        sessionId: String(sessionId.value),
+      },
+    })
+    return
+  }
+
   const nextStep = (currentStep.value + 1) as WorkflowStepNumber
-  workflowStore.setStepState(nextStep, { status: 'running' })
   goToStep(nextStep)
 }
 
@@ -221,12 +250,7 @@ onMounted(async () => {
     </header>
 
     <SessionSkeleton v-if="isLoading && !currentSession" />
-
-    <ErrorMessage
-      v-else-if="error && !currentSession"
-      :message="error"
-      @retry="handleRetry"
-    />
+    <ErrorMessage v-else-if="error && !currentSession" :message="error" @retry="handleRetry" />
 
     <section v-else class="workflow-content">
       <PageHeader
@@ -273,7 +297,7 @@ onMounted(async () => {
             id="notes"
             v-model="notes"
             rows="3"
-            placeholder="记录本步的判断依据、问题或后续联调关注点。"
+            placeholder="记录本步判断依据、问题或后续联调关注点。"
             @blur="updateStepNotes"
           ></textarea>
         </section>
@@ -290,12 +314,7 @@ onMounted(async () => {
           >
             下一步
           </PrimaryButton>
-          <PrimaryButton
-            v-else
-            type="button"
-            :disabled="isLoading"
-            @click="handleFinish"
-          >
+          <PrimaryButton v-else type="button" :disabled="isLoading" @click="handleFinish">
             完成并返回首页
           </PrimaryButton>
         </nav>
@@ -348,10 +367,6 @@ onMounted(async () => {
   gap: var(--space-sm);
 }
 
-.step-head h2 {
-  font-size: var(--font-size-lg);
-}
-
 .status-tag {
   border: 1px solid var(--color-border);
   border-radius: 999px;
@@ -371,11 +386,6 @@ onMounted(async () => {
   border-radius: var(--radius-md);
   background: rgba(12, 20, 38, 0.8);
   padding: var(--space-md);
-}
-
-.panel h3 {
-  margin-bottom: var(--space-sm);
-  font-size: var(--font-size-md);
 }
 
 .entry-list {
@@ -408,11 +418,6 @@ onMounted(async () => {
   gap: var(--space-sm);
 }
 
-.notes label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-}
-
 .notes textarea {
   width: 100%;
   border: 1px solid var(--color-border);
@@ -420,11 +425,6 @@ onMounted(async () => {
   background: #0a1225;
   color: var(--color-text);
   padding: var(--space-md);
-}
-
-.notes textarea:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-alpha);
 }
 
 .actions {
@@ -439,32 +439,12 @@ onMounted(async () => {
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   background: rgba(12, 21, 42, 0.8);
-  transition: border-color 150ms ease, color 150ms ease;
-}
-
-.ghost-button:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  color: var(--color-text);
-}
-
-.ghost-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 @media (max-width: 900px) {
-  .step-grid {
-    grid-template-columns: 1fr;
-  }
-
+  .step-grid,
   .actions {
     grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .workflow-page {
-    padding: max(14px, env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
   }
 }
 </style>

@@ -1,126 +1,224 @@
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
 import type {
   CreateSessionRequest,
-  SessionOverviewResponse,
+  CurrentSessionResponse,
+  PathResponse,
   RunTaskResponse,
+  SessionOverviewResponse,
   SubmitTaskResponse,
 } from '@/types'
-import { sessionApi, taskApi } from '@/api/client'
+import type { NormalizedApiError } from '@/types/api'
+import {
+  createSession,
+  getCurrentSession,
+  getSessionOverview,
+  getSessionPath,
+  planSession,
+} from '@/api/session'
+import { getTaskDetail, runTask, submitTask } from '@/api/task'
+import { normalizeApiError } from '@/utils/apiError'
+
+const RETRY_DELAY_MS = 300
+
+function sleep(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
 
 export const useSessionStore = defineStore('session', () => {
-  // State
   const currentSession = ref<SessionOverviewResponse | null>(null)
+  const currentSessionPath = ref<PathResponse | null>(null)
   const currentTask = ref<RunTaskResponse | null>(null)
+  const currentTaskSessionId = ref<number | null>(null)
   const taskResult = ref<SubmitTaskResponse | null>(null)
-  const isLoading = ref(false)
-  const error = ref<string | null>(null)
+  const currentUserSession = ref<CurrentSessionResponse | null>(null)
+  const lastError = ref<NormalizedApiError | null>(null)
 
-  // Getters
-  const sessionId = computed(() => currentSession.value?.session_id ?? null)
+  const creatingSession = ref(false)
+  const planning = ref(false)
+  const fetchingSession = ref(false)
+  const runningTask = ref(false)
+  const submittingTask = ref(false)
+  const recoveringSession = ref(false)
+
+  const isLoading = computed(
+    () =>
+      creatingSession.value ||
+      planning.value ||
+      fetchingSession.value ||
+      runningTask.value ||
+      submittingTask.value ||
+      recoveringSession.value,
+  )
+
+  const sessionId = computed(() => currentSession.value?.sessionId ?? null)
   const timeline = computed(() => currentSession.value?.timeline ?? [])
-  const masterySummary = computed(() => currentSession.value?.mastery_summary ?? [])
-  const nextTask = computed(() => currentSession.value?.next_task ?? null)
-  const currentStage = computed(() => currentSession.value?.current_stage ?? null)
+  const masterySummary = computed(() => currentSession.value?.masterySummary ?? [])
+  const nextTask = computed(() => currentSession.value?.nextTask ?? null)
+  const currentStage = computed(() => currentSession.value?.currentStage ?? null)
+  const error = computed(() => lastError.value?.message ?? null)
 
-  // Actions
-  async function createSession(data: CreateSessionRequest) {
-    isLoading.value = true
-    error.value = null
+  function clearError() {
+    lastError.value = null
+  }
+
+  function setError(input: unknown) {
+    lastError.value = normalizeApiError(input)
+    return lastError.value
+  }
+
+  async function createSessionAction(data: CreateSessionRequest) {
+    creatingSession.value = true
+    clearError()
     try {
-      const response = await sessionApi.create(data)
-      return response.data.session_id
-    } catch (e) {
-      error.value = (e as Error).message
-      throw e
+      return await createSession(data)
+    } catch (input) {
+      throw setError(input)
     } finally {
-      isLoading.value = false
+      creatingSession.value = false
     }
   }
 
-  async function planSession(sessionId: number) {
-    isLoading.value = true
-    error.value = null
+  async function planSessionAction(inputSessionId: number) {
+    planning.value = true
+    clearError()
     try {
-      await sessionApi.plan(sessionId)
-    } catch (e) {
-      error.value = (e as Error).message
-      throw e
+      await planSession(inputSessionId)
+    } catch (input) {
+      throw setError(input)
     } finally {
-      isLoading.value = false
+      planning.value = false
     }
   }
 
-  async function fetchSessionOverview(sessionId: number) {
-    isLoading.value = true
-    error.value = null
+  async function fetchSessionOverviewAction(inputSessionId: number, retry = 1) {
+    fetchingSession.value = true
+    clearError()
     try {
-      const response = await sessionApi.getOverview(sessionId)
-      currentSession.value = response.data
-    } catch (e) {
-      error.value = (e as Error).message
-      throw e
+      const overview = await getSessionOverview(inputSessionId)
+      currentSession.value = overview
+      return overview
+    } catch (input) {
+      const normalized = setError(input)
+      if (retry > 0 && normalized.retryable) {
+        await sleep(RETRY_DELAY_MS)
+        return fetchSessionOverviewAction(inputSessionId, retry - 1)
+      }
+      throw normalized
     } finally {
-      isLoading.value = false
+      fetchingSession.value = false
     }
   }
 
-  async function runTask(taskId: number) {
-    isLoading.value = true
-    error.value = null
+  async function fetchSessionPathAction(inputSessionId: number) {
+    recoveringSession.value = true
+    clearError()
     try {
-      const response = await taskApi.run(taskId)
-      currentTask.value = response.data
-      return response.data
-    } catch (e) {
-      error.value = (e as Error).message
-      throw e
+      const path = await getSessionPath(inputSessionId)
+      currentSessionPath.value = path
+      return path
+    } catch (input) {
+      throw setError(input)
     } finally {
-      isLoading.value = false
+      recoveringSession.value = false
     }
   }
 
-  async function submitTask(taskId: number, userAnswer: string) {
-    isLoading.value = true
-    error.value = null
+  async function fetchCurrentSessionAction(userId: string) {
+    recoveringSession.value = true
+    clearError()
     try {
-      const response = await taskApi.submit(taskId, { user_answer: userAnswer })
-      taskResult.value = response.data
-      return response.data
-    } catch (e) {
-      error.value = (e as Error).message
-      throw e
+      const response = await getCurrentSession(userId)
+      currentUserSession.value = response
+      return response
+    } catch (input) {
+      throw setError(input)
     } finally {
-      isLoading.value = false
+      recoveringSession.value = false
     }
+  }
+
+  async function runTaskAction(taskId: number) {
+    runningTask.value = true
+    clearError()
+    try {
+      const detail = await getTaskDetail(taskId)
+      currentTaskSessionId.value = detail.sessionId
+      const response = await runTask(taskId)
+      currentTask.value = response
+      return response
+    } catch (input) {
+      throw setError(input)
+    } finally {
+      runningTask.value = false
+    }
+  }
+
+  async function submitTaskAction(taskId: number, userAnswer: string) {
+    submittingTask.value = true
+    clearError()
+    try {
+      const response = await submitTask(taskId, userAnswer)
+      taskResult.value = response
+      if (response.nextTask) {
+        currentTaskSessionId.value = currentTaskSessionId.value ?? currentSession.value?.sessionId ?? null
+      }
+      return response
+    } catch (input) {
+      throw setError(input)
+    } finally {
+      submittingTask.value = false
+    }
+  }
+
+  function resetTaskState() {
+    currentTask.value = null
+    taskResult.value = null
+    currentTaskSessionId.value = null
   }
 
   function reset() {
     currentSession.value = null
+    currentSessionPath.value = null
     currentTask.value = null
+    currentTaskSessionId.value = null
     taskResult.value = null
-    error.value = null
+    currentUserSession.value = null
+    clearError()
   }
 
   return {
-    // State
     currentSession,
+    currentSessionPath,
     currentTask,
+    currentTaskSessionId,
     taskResult,
+    currentUserSession,
+    lastError,
+    creatingSession,
+    planning,
+    fetchingSession,
+    runningTask,
+    submittingTask,
+    recoveringSession,
     isLoading,
     error,
-    // Getters
     sessionId,
     timeline,
     masterySummary,
     nextTask,
     currentStage,
-    // Actions
-    createSession,
-    planSession,
-    fetchSessionOverview,
-    runTask,
-    submitTask,
+    createSession: createSessionAction,
+    planSession: planSessionAction,
+    fetchSessionOverview: fetchSessionOverviewAction,
+    fetchSessionPath: fetchSessionPathAction,
+    fetchCurrentSession: fetchCurrentSessionAction,
+    runTask: runTaskAction,
+    submitTask: submitTaskAction,
+    clearError,
+    resetTaskState,
     reset,
   }
 })
