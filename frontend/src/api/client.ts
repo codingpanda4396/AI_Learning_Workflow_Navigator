@@ -3,7 +3,7 @@ import type { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios'
 import { normalizeApiError } from '@/utils/apiError'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
-const API_TIMEOUT_MS = 30000
+const API_TIMEOUT_MS = 90000
 const pendingControllers = new Map<string, AbortController>()
 
 type RequestConfigWithMeta = InternalAxiosRequestConfig & {

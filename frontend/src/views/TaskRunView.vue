@@ -57,7 +57,12 @@ function handleContinue() {
     router.push('/')
     return
   }
-  router.push(`/session/${targetSessionId}`)
+  const step = Number(route.query.step)
+  const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
+  router.push({
+    path: `/session/${targetSessionId}`,
+    query: { step: resolvedStep },
+  })
 }
 
 onMounted(async () => {

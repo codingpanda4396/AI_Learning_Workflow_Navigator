@@ -83,7 +83,12 @@ function handleContinue() {
     router.push('/')
     return
   }
-  router.push(`/session/${targetSessionId}`)
+  const step = Number(route.query.step)
+  const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
+  router.push({
+    path: `/session/${targetSessionId}`,
+    query: { step: resolvedStep },
+  })
 }
 
 function handleGoNextTask() {
@@ -91,9 +96,11 @@ function handleGoNextTask() {
   if (!nextTask) return
   const targetPath = nextTask.stage === 'TRAINING' ? `/task/${nextTask.taskId}/submit` : `/task/${nextTask.taskId}/run`
   const currentSessionId = resolveSessionId()
+  const step = Number(route.query.step)
+  const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
   router.push({
     path: targetPath,
-    ...(currentSessionId ? { query: { sessionId: String(currentSessionId) } } : {}),
+    ...(currentSessionId ? { query: { sessionId: String(currentSessionId), step: resolvedStep } } : { query: { step: resolvedStep } }),
   })
 }
 

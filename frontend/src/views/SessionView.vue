@@ -26,6 +26,14 @@ const sessionId = computed(() => Number(route.params.id))
 const browsingStep = ref<WorkflowStepNumber>(1)
 const expandedTaskIds = ref<number[]>([])
 
+function resolveStep(raw: unknown): WorkflowStepNumber {
+  const value = Number(raw)
+  if (Number.isFinite(value) && value >= 1 && value <= 4) {
+    return value as WorkflowStepNumber
+  }
+  return 1
+}
+
 const steps: StepMeta[] = [
   { step: 1, title: '目标诊断', task: '查看目标质量评价' },
   { step: 2, title: '路径规划', task: '选择学习路径' },
@@ -68,6 +76,16 @@ function resolveTaskPath(taskId: number, stage: string) {
   return stage === 'TRAINING' ? `/task/${taskId}/submit` : `/task/${taskId}/run`
 }
 
+function openTask(taskId: number, stage: string) {
+  router.push({
+    path: resolveTaskPath(taskId, stage),
+    query: {
+      sessionId: String(sessionId.value),
+      step: String(currentStep.value),
+    },
+  })
+}
+
 function toggleTask(taskId: number) {
   if (expandedTaskIds.value.includes(taskId)) {
     expandedTaskIds.value = expandedTaskIds.value.filter((id) => id !== taskId)
@@ -103,10 +121,7 @@ async function fetchSession() {
 
 function handleRunNextTask() {
   if (!sessionStore.nextTask) return
-  router.push({
-    path: resolveTaskPath(sessionStore.nextTask.taskId, sessionStore.nextTask.stage),
-    query: { sessionId: String(sessionId.value) },
-  })
+  openTask(sessionStore.nextTask.taskId, sessionStore.nextTask.stage)
 }
 
 async function handleRetry() {
@@ -131,6 +146,7 @@ async function goHome() {
 }
 
 onMounted(async () => {
+  browsingStep.value = resolveStep(route.query.step)
   await fetchSession()
 })
 </script>
@@ -202,7 +218,7 @@ onMounted(async () => {
                 <p><strong>该做什么：</strong>{{ stageGuide(item.stage) }}</p>
                 <PrimaryButton
                   type="button"
-                  @click="router.push({ path: resolveTaskPath(item.taskId, item.stage), query: { sessionId: String(sessionId) } })"
+                  @click="openTask(item.taskId, item.stage)"
                 >
                   打开该步骤任务
                 </PrimaryButton>
