@@ -1,5 +1,48 @@
-# Vue 3 + TypeScript + Vite
+# AI Learning Navigator - Frontend
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Vue 3 前端项目，自适应学习流程导航系统的用户界面。
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## 技术栈
+
+- Vue 3 (Composition API + `<script setup>`)
+- TypeScript
+- Pinia (状态管理)
+- Vue Router 4
+- Axios
+- Vite
+
+## 开发
+
+```bash
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm run dev
+
+# 构建生产版本
+npm run build
+
+# 预览生产版本
+npm run preview
+```
+
+## 配置
+
+环境变量配置在 `.env` 文件中（参考 `.env.example`）：
+
+```
+VITE_API_BASE_URL=http://localhost:8080/api
+```
+
+## 项目结构
+
+```
+src/
+├── api/          # API 客户端
+├── components/   # 公共组件
+├── router/       # 路由配置
+├── stores/       # Pinia 状态管理
+├── types/        # TypeScript 类型定义
+└── views/        # 页面组件
+```
