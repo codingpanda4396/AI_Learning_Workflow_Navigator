@@ -29,6 +29,7 @@ public record SessionOverviewResponse(
     @JsonProperty("next_task")
     NextTaskResponse nextTask,
     @JsonProperty("mastery_summary")
-    List<MasterySummaryResponse> masterySummary
+    List<MasterySummaryResponse> masterySummary,
+    ProgressResponse progress
 ) {
 }
