@@ -10,10 +10,12 @@ import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -44,13 +46,14 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
 
         JsonNode response;
         try {
-            response = restClient.post()
+            ResponseEntity<byte[]> entity = restClient.post()
                 .uri("/chat/completions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey())
                 .body(requestPayload)
                 .retrieve()
-                .body(JsonNode.class);
+                .toEntity(byte[].class);
+            response = parseResponse(entity);
         } catch (Exception ex) {
             throw new InternalServerException("LLM provider call failed: " + ex.getMessage());
         }
@@ -81,5 +84,22 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
             response
         );
     }
-}
 
+    private JsonNode parseResponse(ResponseEntity<byte[]> entity) {
+        byte[] body = entity.getBody();
+        if (body == null || body.length == 0) {
+            throw new InternalServerException("LLM provider returned empty response.");
+        }
+
+        String text = new String(body, StandardCharsets.UTF_8);
+        try {
+            return objectMapper.readTree(text);
+        } catch (Exception ex) {
+            String contentType = entity.getHeaders().getFirst(HttpHeaders.CONTENT_TYPE);
+            String preview = text.length() > 240 ? text.substring(0, 240) : text;
+            throw new InternalServerException(
+                "LLM provider response is not valid JSON. contentType=" + contentType + ", preview=" + preview
+            );
+        }
+    }
+}
