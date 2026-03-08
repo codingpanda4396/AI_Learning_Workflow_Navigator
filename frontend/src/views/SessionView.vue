@@ -1,333 +1,470 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
+import { useWorkflowStore } from '@/stores/workflow'
+import type { WorkflowStepNumber } from '@/types/workflow'
+import PageHeader from '@/components/PageHeader.vue'
+import StepProgress from '@/components/StepProgress.vue'
+import PrimaryButton from '@/components/PrimaryButton.vue'
 import SessionSkeleton from '@/components/SessionSkeleton.vue'
 import ErrorMessage from '@/components/ErrorMessage.vue'
+
+type StepKey = `step${WorkflowStepNumber}`
+
+interface StepMeta {
+  step: WorkflowStepNumber
+  title: string
+  task: string
+}
 
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
+const workflowStore = useWorkflowStore()
 
 const sessionId = computed(() => Number(route.params.id))
+const notes = ref('')
 
-onMounted(async () => {
-  await sessionStore.fetchSessionOverview(sessionId.value)
-})
+const steps: StepMeta[] = [
+  { step: 1, title: '诊断目标', task: '明确目标边界和能力基线' },
+  { step: 2, title: '生成路径', task: '拆解学习节点和阶段路径' },
+  { step: 3, title: '分步学习', task: '执行任务并记录掌握度变化' },
+  { step: 4, title: '总结反馈', task: '输出复盘建议与下一步行动' },
+]
 
 const currentSession = computed(() => sessionStore.currentSession)
-const timeline = computed(() => sessionStore.timeline)
-const masterySummary = computed(() => sessionStore.masterySummary)
-const nextTask = computed(() => sessionStore.nextTask)
 const isLoading = computed(() => sessionStore.isLoading)
 const error = computed(() => sessionStore.error)
+const currentStep = computed(() => workflowStore.currentStep)
+const workflowId = computed(() => workflowStore.workflowId)
 
-function getStageLabel(stage: string) {
-  const map: Record<string, string> = {
-    STRUCTURE: '结构',
-    UNDERSTANDING: '理解',
-    TRAINING: '训练',
-    REFLECTION: '反思',
+const currentStepMeta = computed<StepMeta>(
+  () => steps.find((item) => item.step === currentStep.value) ?? steps[0]!,
+)
+
+const currentStepState = computed(() => {
+  const key = `step${currentStep.value}` as StepKey
+  return workflowStore.stepData[key]
+})
+
+const stepInputEntries = computed(() => {
+  const input = currentStepState.value?.input ?? {}
+  return Object.entries(input)
+})
+
+const stepOutputEntries = computed(() => {
+  const output = currentStepState.value?.output ?? {}
+  return Object.entries(output).filter(([key]) => key !== 'notes')
+})
+
+function toLabel(key: string) {
+  const mapping: Record<string, string> = {
+    goal: '学习目标',
+    courseId: '课程 ID',
+    chapterId: '章节 ID',
+    stage: '当前阶段',
+    timeline: '路径摘要',
+    nextTask: '下一任务',
+    mastery: '掌握度',
+    summary: '摘要',
   }
-  return map[stage] || stage
+  return mapping[key] ?? key
 }
 
-function getStatusClass(status: string) {
-  const map: Record<string, string> = {
-    PENDING: 'status-pending',
-    RUNNING: 'status-running',
-    SUCCEEDED: 'status-succeeded',
-    FAILED: 'status-failed',
+function valueToText(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.join(' / ')
   }
-  return map[status] || ''
+  if (typeof value === 'object' && value !== null) {
+    return JSON.stringify(value)
+  }
+  return String(value)
 }
 
-function handleTaskClick(taskId: number, stage: string) {
-  if (stage === 'TRAINING') {
-    router.push(`/task/${taskId}/submit`)
-  } else {
-    router.push(`/task/${taskId}/run`)
-  }
+function syncStepNotes() {
+  const outputNotes = currentStepState.value?.output.notes
+  notes.value = typeof outputNotes === 'string' ? outputNotes : ''
 }
 
-function handleStartNext() {
-  if (nextTask.value) {
-    const taskId = nextTask.value.task_id
-    const stage = nextTask.value.stage
-    if (stage === 'TRAINING') {
-      router.push(`/task/${taskId}/submit`)
-    } else {
-      router.push(`/task/${taskId}/run`)
-    }
+function updateStepNotes() {
+  const key = currentStep.value
+  workflowStore.setStepState(key, {
+    output: {
+      ...(currentStepState.value?.output ?? {}),
+      notes: notes.value,
+    },
+  })
+}
+
+function initializeBaseStepData() {
+  if (!workflowStore.goal && currentSession.value?.goal_text) {
+    workflowStore.startWorkflow({
+      goal: currentSession.value.goal_text,
+      courseId: currentSession.value.course_id,
+      chapterId: currentSession.value.chapter_id,
+    })
   }
+
+  workflowStore.setStepState(1, {
+    input: {
+      goal: workflowStore.goal || currentSession.value?.goal_text || '',
+      courseId: workflowStore.courseId || currentSession.value?.course_id || '',
+      chapterId: workflowStore.chapterId || currentSession.value?.chapter_id || '',
+    },
+    output: {
+      summary: '已进入诊断流程，准备校准目标范围。',
+    },
+    status: 'done',
+  })
+}
+
+function hydrateFromSessionOverview() {
+  if (!currentSession.value) {
+    return
+  }
+
+  const stageLabel = currentSession.value.current_stage
+  const timeline = currentSession.value.timeline.map((item) => `${item.stage}:${item.status}`)
+  const mastery = currentSession.value.mastery_summary
+    .slice(0, 3)
+    .map((item) => `${item.node_name} ${Math.round(item.mastery_value * 100)}%`)
+
+  workflowStore.setStepState(2, {
+    input: {
+      goal: currentSession.value.goal_text,
+      stage: stageLabel,
+    },
+    output: {
+      timeline,
+      summary: '学习路径已拆分为结构、理解、训练、反思四段。',
+    },
+    status: 'done',
+  })
+
+  workflowStore.setStepState(3, {
+    input: {
+      stage: stageLabel,
+      nextTask: currentSession.value.next_task.task_id,
+    },
+    output: {
+      mastery,
+      summary: '可按任务顺序推进，每一步记录掌握度变化。',
+    },
+    status: 'running',
+  })
+
+  workflowStore.setStepState(4, {
+    input: {
+      mastery: mastery.length > 0 ? mastery.join(', ') : '暂无',
+    },
+    output: {
+      summary: '完成后可生成总结反馈并规划下一轮学习目标。',
+    },
+    status: 'idle',
+  })
+}
+
+async function fetchSession() {
+  await sessionStore.fetchSessionOverview(sessionId.value)
+  initializeBaseStepData()
+  hydrateFromSessionOverview()
+  syncStepNotes()
+}
+
+function goToStep(step: WorkflowStepNumber) {
+  workflowStore.setCurrentStep(step)
+  syncStepNotes()
+}
+
+function handlePrevious() {
+  if (currentStep.value <= 1) {
+    return
+  }
+  goToStep((currentStep.value - 1) as WorkflowStepNumber)
+}
+
+function handleNext() {
+  updateStepNotes()
+  if (currentStep.value >= 4) {
+    return
+  }
+
+  workflowStore.setStepState(currentStep.value, { status: 'done' })
+  const nextStep = (currentStep.value + 1) as WorkflowStepNumber
+  workflowStore.setStepState(nextStep, { status: 'running' })
+  goToStep(nextStep)
+}
+
+function handleFinish() {
+  updateStepNotes()
+  workflowStore.setStepState(4, { status: 'done' })
+  router.push('/')
 }
 
 async function handleRetry() {
-  await sessionStore.fetchSessionOverview(sessionId.value)
+  await fetchSession()
 }
+
+onMounted(async () => {
+  workflowStore.loadFromStorage()
+  workflowStore.setWorkflowId(String(sessionId.value))
+  await fetchSession()
+})
 </script>
 
 <template>
-  <div class="session-page">
-    <header class="header">
-      <button class="back-btn" @click="router.push('/')">← 返回</button>
-      <h1 class="session-title">学习会话</h1>
+  <main class="workflow-page">
+    <header class="toolbar">
+      <button class="ghost-button" @click="router.push('/')">返回首页</button>
+      <span class="workflow-id">Workflow #{{ workflowId || sessionId }}</span>
     </header>
 
-    <!-- Loading State -->
     <SessionSkeleton v-if="isLoading && !currentSession" />
 
-    <!-- Error State -->
     <ErrorMessage
       v-else-if="error && !currentSession"
       :message="error"
       @retry="handleRetry"
     />
 
-    <!-- Content -->
-    <div v-else-if="currentSession" class="session-content">
-      <!-- 目标 -->
-      <section class="goal-section">
-        <h2 class="section-title">学习目标</h2>
-        <p class="goal-text">{{ currentSession.goal_text }}</p>
-      </section>
+    <section v-else class="workflow-content">
+      <PageHeader
+        eyebrow="Learning Flow"
+        title="四步学习流程执行页"
+        :subtitle="`当前任务：${currentStepMeta.task}`"
+      />
 
-      <!-- 掌握度 -->
-      <section class="mastery-section">
-        <h2 class="section-title">掌握度</h2>
-        <div class="mastery-list">
-          <div v-for="item in masterySummary" :key="item.node_id" class="mastery-item">
-            <span class="node-name">{{ item.node_name }}</span>
-            <div class="mastery-bar">
-              <div
-                class="mastery-fill"
-                :style="{ width: `${item.mastery_value * 100}%` }"
-              ></div>
-            </div>
-            <span class="mastery-value">{{ Math.round(item.mastery_value * 100) }}%</span>
-          </div>
+      <StepProgress :steps="steps" :current-step="currentStep" />
+
+      <article class="step-card">
+        <div class="step-head">
+          <h2>{{ currentStepMeta.step }}. {{ currentStepMeta.title }}</h2>
+          <span class="status-tag">状态：{{ currentStepState?.status || 'idle' }}</span>
         </div>
-      </section>
 
-      <!-- 任务时间线 -->
-      <section class="timeline-section">
-        <h2 class="section-title">任务进度</h2>
-        <div class="timeline">
-          <div
-            v-for="item in timeline"
-            :key="item.task_id"
-            class="timeline-item"
-            :class="getStatusClass(item.status)"
-            @click="handleTaskClick(item.task_id, item.stage)"
+        <div class="step-grid">
+          <section class="panel">
+            <h3>当前输入</h3>
+            <p v-if="stepInputEntries.length === 0" class="empty-text">暂无输入</p>
+            <dl v-else class="entry-list">
+              <template v-for="[key, value] in stepInputEntries" :key="key">
+                <dt>{{ toLabel(key) }}</dt>
+                <dd>{{ valueToText(value) }}</dd>
+              </template>
+            </dl>
+          </section>
+
+          <section class="panel">
+            <h3>本步产出</h3>
+            <p v-if="stepOutputEntries.length === 0" class="empty-text">暂无产出</p>
+            <dl v-else class="entry-list">
+              <template v-for="[key, value] in stepOutputEntries" :key="key">
+                <dt>{{ toLabel(key) }}</dt>
+                <dd>{{ valueToText(value) }}</dd>
+              </template>
+            </dl>
+          </section>
+        </div>
+
+        <section class="notes">
+          <label for="notes">步骤备注（保存在前端状态中）</label>
+          <textarea
+            id="notes"
+            v-model="notes"
+            rows="3"
+            placeholder="记录本步的判断依据、问题或后续联调关注点。"
+            @blur="updateStepNotes"
+          ></textarea>
+        </section>
+
+        <nav class="actions">
+          <button class="ghost-button" :disabled="currentStep === 1" @click="handlePrevious">
+            上一步
+          </button>
+          <PrimaryButton
+            v-if="currentStep < 4"
+            type="button"
+            :disabled="isLoading"
+            @click="handleNext"
           >
-            <div class="task-status">
-              <span v-if="item.status === 'SUCCEEDED'" class="icon-success">✓</span>
-              <span v-else-if="item.status === 'FAILED'" class="icon-failed">✗</span>
-              <span v-else class="icon-pending">○</span>
-            </div>
-            <div class="task-info">
-              <span class="task-stage">{{ getStageLabel(item.stage) }}</span>
-              <span class="task-id">#{{ item.task_id }}</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 下一任务 -->
-      <section v-if="nextTask" class="next-action">
-        <button class="next-btn" @click="handleStartNext">
-          开始下一任务 →
-        </button>
-      </section>
-    </div>
-  </div>
+            下一步
+          </PrimaryButton>
+          <PrimaryButton
+            v-else
+            type="button"
+            :disabled="isLoading"
+            @click="handleFinish"
+          >
+            完成并返回首页
+          </PrimaryButton>
+        </nav>
+      </article>
+    </section>
+  </main>
 </template>
 
 <style scoped>
-.session-page {
-  min-height: 100vh;
-  padding: 1.5rem;
+.workflow-page {
+  min-height: 100dvh;
+  padding: clamp(16px, 2.8vw, 30px);
 }
 
-.header {
+.toolbar {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-lg);
 }
 
-.back-btn {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+.workflow-id {
   color: var(--color-text-secondary);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
+  font-size: var(--font-size-sm);
 }
 
-.back-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.session-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.session-content {
-  max-width: 640px;
+.workflow-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 960px;
   margin: 0 auto;
 }
 
-.section-title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 1rem;
-}
-
-.goal-section {
-  margin-bottom: 2rem;
-}
-
-.goal-text {
-  font-size: 1.125rem;
-  color: var(--color-text);
-  line-height: 1.6;
-}
-
-.mastery-section {
-  margin-bottom: 2rem;
-}
-
-.mastery-list {
+.step-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(165deg, rgba(16, 27, 50, 0.94), rgba(8, 14, 26, 0.96));
+  padding: clamp(16px, 2.8vw, 26px);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-lg);
 }
 
-.mastery-item {
+.step-head {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-sm);
 }
 
-.node-name {
-  width: 80px;
-  font-size: 0.875rem;
-  color: var(--color-text);
+.step-head h2 {
+  font-size: var(--font-size-lg);
 }
 
-.mastery-bar {
-  flex: 1;
-  height: 8px;
-  background: var(--color-border);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.mastery-fill {
-  height: 100%;
-  background: var(--color-primary);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-.mastery-value {
-  width: 40px;
-  font-size: 0.875rem;
+.status-tag {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 4px 10px;
   color: var(--color-text-secondary);
-  text-align: right;
+  font-size: var(--font-size-xs);
 }
 
-.timeline-section {
-  margin-bottom: 2rem;
+.step-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
 }
 
-.timeline {
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(12, 20, 38, 0.8);
+  padding: var(--space-md);
+}
+
+.panel h3 {
+  margin-bottom: var(--space-sm);
+  font-size: var(--font-size-md);
+}
+
+.entry-list {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.entry-list dt {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.entry-list dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  word-break: break-word;
+}
+
+.empty-text {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.notes {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 
-.timeline-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--color-bg-elevated);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.timeline-item:hover {
-  transform: translateX(4px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.task-status {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
-}
-
-.status-succeeded .icon-success {
-  color: #22c55e;
-}
-
-.status-failed .icon-failed {
-  color: #ef4444;
-}
-
-.status-pending .icon-pending,
-.status-running .icon-pending {
+.notes label {
+  font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
 }
 
-.task-info {
-  display: flex;
-  gap: 0.75rem;
+.notes textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #0a1225;
+  color: var(--color-text);
+  padding: var(--space-md);
 }
 
-.task-stage {
-  font-weight: 500;
+.notes textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-md);
+}
+
+.ghost-button {
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: rgba(12, 21, 42, 0.8);
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.ghost-button:hover:not(:disabled) {
+  border-color: var(--color-primary);
   color: var(--color-text);
 }
 
-.task-id {
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
+.ghost-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.next-action {
-  text-align: center;
+@media (max-width: 900px) {
+  .step-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
 }
 
-.next-btn {
-  padding: 1rem 2rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  background: var(--color-primary);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.next-btn:hover {
-  background: var(--color-primary-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px var(--color-primary-alpha);
+@media (max-width: 768px) {
+  .workflow-page {
+    padding: max(14px, env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
+  }
 }
 </style>
