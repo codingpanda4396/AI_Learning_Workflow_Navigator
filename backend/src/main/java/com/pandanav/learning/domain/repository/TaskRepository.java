@@ -21,6 +21,8 @@ public interface TaskRepository {
     Long createRunningAttempt(Long taskId);
 
     void markAttemptSucceeded(Long attemptId, String outputJson);
+
+    void createSubmissionAttempt(Long taskId, String userAnswer, Integer score, String errorTagsJson, String feedbackJson);
 }
 
 

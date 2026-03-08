@@ -185,6 +185,21 @@ public class JdbcTaskRepository implements TaskRepository {
         );
     }
 
+    @Override
+    public void createSubmissionAttempt(Long taskId, String userAnswer, Integer score, String errorTagsJson, String feedbackJson) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO task_attempt (task_id, status, user_answer, score, error_tags, feedback_json, created_at)
+                VALUES (?, 'SUCCEEDED'::run_status, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), now())
+                """,
+            taskId,
+            userAnswer,
+            score,
+            errorTagsJson,
+            feedbackJson
+        );
+    }
+
     private Task mapTask(java.sql.ResultSet rs) throws java.sql.SQLException {
         Task task = new Task();
         task.setId(rs.getLong("id"));
