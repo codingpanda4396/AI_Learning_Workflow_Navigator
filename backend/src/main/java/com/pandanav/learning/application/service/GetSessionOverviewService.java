@@ -2,6 +2,7 @@ package com.pandanav.learning.application.service;
 
 import com.pandanav.learning.api.dto.session.MasterySummaryResponse;
 import com.pandanav.learning.api.dto.session.NextTaskResponse;
+import com.pandanav.learning.api.dto.session.ProgressResponse;
 import com.pandanav.learning.api.dto.session.SessionOverviewResponse;
 import com.pandanav.learning.api.dto.session.TimelineItemResponse;
 import com.pandanav.learning.application.usecase.GetSessionOverviewUseCase;
@@ -70,6 +71,15 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
             ))
             .toList();
 
+        int totalTaskCount = timelineTasks.size();
+        int completedTaskCount = (int) timelineTasks.stream()
+            .filter(task -> task.getStatus() == TaskStatus.SUCCEEDED)
+            .count();
+        BigDecimal completionRate = totalTaskCount == 0
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(completedTaskCount)
+                .divide(BigDecimal.valueOf(totalTaskCount), 4, java.math.RoundingMode.HALF_UP);
+
         return new SessionOverviewResponse(
             session.getId(),
             session.getCourseId(),
@@ -79,7 +89,8 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
             session.getCurrentStage() == null ? null : session.getCurrentStage().name(),
             timeline,
             nextTask,
-            masterySummary
+            masterySummary,
+            new ProgressResponse(completedTaskCount, totalTaskCount, completionRate)
         );
     }
 }

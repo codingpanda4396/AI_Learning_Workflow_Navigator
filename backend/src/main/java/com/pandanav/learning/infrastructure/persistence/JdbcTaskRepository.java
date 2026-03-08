@@ -72,6 +72,7 @@ public class JdbcTaskRepository implements TaskRepository {
                                SELECT ta.output_json
                                FROM task_attempt ta
                                WHERE ta.task_id = t.id
+                                 AND ta.output_json IS NOT NULL
                                ORDER BY ta.created_at DESC
                                LIMIT 1
                            ) AS output_json
@@ -103,6 +104,7 @@ public class JdbcTaskRepository implements TaskRepository {
                            SELECT ta.output_json
                            FROM task_attempt ta
                            WHERE ta.task_id = t.id
+                             AND ta.output_json IS NOT NULL
                            ORDER BY ta.created_at DESC
                            LIMIT 1
                        ) AS output_json
@@ -131,6 +133,7 @@ public class JdbcTaskRepository implements TaskRepository {
                            SELECT ta.output_json
                            FROM task_attempt ta
                            WHERE ta.task_id = t.id
+                             AND ta.output_json IS NOT NULL
                            ORDER BY ta.created_at DESC
                            LIMIT 1
                        ) AS output_json
@@ -182,6 +185,21 @@ public class JdbcTaskRepository implements TaskRepository {
                 """,
             outputJson,
             attemptId
+        );
+    }
+
+    @Override
+    public void createSubmissionAttempt(Long taskId, String userAnswer, Integer score, String errorTagsJson, String feedbackJson) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO task_attempt (task_id, status, user_answer, score, error_tags, feedback_json, created_at)
+                VALUES (?, 'SUCCEEDED'::run_status, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), now())
+                """,
+            taskId,
+            userAnswer,
+            score,
+            errorTagsJson,
+            feedbackJson
         );
     }
 

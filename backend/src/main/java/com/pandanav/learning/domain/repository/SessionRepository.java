@@ -11,6 +11,8 @@ public interface SessionRepository {
 
     Optional<LearningSession> findById(Long id);
 
+    Optional<LearningSession> findLatestByUserId(String userId);
+
     void updateCurrentPosition(Long sessionId, Long currentNodeId, Stage currentStage);
 }
 

@@ -79,6 +79,39 @@ public class JdbcLearningSessionRepository implements SessionRepository {
     }
 
     @Override
+    public Optional<LearningSession> findLatestByUserId(String userId) {
+        try {
+            LearningSession session = jdbcTemplate.queryForObject(
+                """
+                    SELECT id, user_id, course_id, chapter_id, goal_text, current_node_id, current_stage, created_at, updated_at
+                    FROM learning_session
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 1
+                    """,
+                (rs, rowNum) -> {
+                    LearningSession item = new LearningSession();
+                    item.setId(rs.getLong("id"));
+                    item.setUserId(rs.getString("user_id"));
+                    item.setCourseId(rs.getString("course_id"));
+                    item.setChapterId(rs.getString("chapter_id"));
+                    item.setGoalText(rs.getString("goal_text"));
+                    item.setCurrentNodeId(rs.getLong("current_node_id"));
+                    String stage = rs.getString("current_stage");
+                    item.setCurrentStage(stage == null ? null : Stage.valueOf(stage));
+                    item.setCreatedAt(rs.getObject("created_at", java.time.OffsetDateTime.class));
+                    item.setUpdatedAt(rs.getObject("updated_at", java.time.OffsetDateTime.class));
+                    return item;
+                },
+                userId
+            );
+            return Optional.ofNullable(session);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
     public void updateCurrentPosition(Long sessionId, Long currentNodeId, Stage currentStage) {
         jdbcTemplate.update(
             """

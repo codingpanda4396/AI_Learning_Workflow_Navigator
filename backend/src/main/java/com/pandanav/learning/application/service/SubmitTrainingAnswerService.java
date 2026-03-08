@@ -82,6 +82,16 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
 
         EvaluationResult evaluation = evaluatorService.evaluate(node.getName(), task.getObjective(), request.userAnswer());
         MasteryUpdateResult mastery = masteryUpdateService.update(session.getUserId(), task.getNodeId(), node.getName(), evaluation.score());
+        taskRepository.createSubmissionAttempt(
+            task.getId(),
+            request.userAnswer(),
+            evaluation.score(),
+            toJson(evaluation.errorTags().stream().map(Enum::name).toList()),
+            toJson(Map.of(
+                "diagnosis", evaluation.feedback().diagnosis(),
+                "fixes", evaluation.feedback().fixes()
+            ))
+        );
 
         persistEvidence(session, task, evaluation);
 
@@ -197,11 +207,11 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         };
     }
 
-    private String toJson(Map<String, Object> value) {
+    private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException ex) {
-            throw new InternalServerException("Failed to serialize evidence payload.");
+            throw new InternalServerException("Failed to serialize submission payload.");
         }
     }
 }
