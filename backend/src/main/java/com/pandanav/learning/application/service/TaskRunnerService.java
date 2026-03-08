@@ -4,14 +4,26 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.dto.task.RunTaskResponse;
 import com.pandanav.learning.application.usecase.RunTaskUseCase;
+import com.pandanav.learning.domain.llm.StageContentGenerator;
+import com.pandanav.learning.domain.llm.model.StageContent;
+import com.pandanav.learning.domain.llm.model.StageGenerationContext;
 import com.pandanav.learning.domain.enums.TaskStatus;
+import com.pandanav.learning.domain.model.AttemptLlmMetadata;
+import com.pandanav.learning.domain.model.ConceptNode;
+import com.pandanav.learning.domain.model.LearningSession;
+import com.pandanav.learning.domain.model.LlmCallLog;
+import com.pandanav.learning.domain.model.Mastery;
 import com.pandanav.learning.domain.model.Task;
+import com.pandanav.learning.domain.repository.ConceptNodeRepository;
+import com.pandanav.learning.domain.repository.LlmCallLogRepository;
+import com.pandanav.learning.domain.repository.MasteryRepository;
+import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
+import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.ConflictException;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -20,15 +32,35 @@ import java.util.Map;
 public class TaskRunnerService implements RunTaskUseCase {
 
     private final TaskRepository taskRepository;
+    private final SessionRepository sessionRepository;
+    private final ConceptNodeRepository conceptNodeRepository;
+    private final MasteryRepository masteryRepository;
+    private final StageContentGenerator stageContentGenerator;
+    private final LlmCallLogRepository llmCallLogRepository;
+    private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
 
-    public TaskRunnerService(TaskRepository taskRepository, ObjectMapper objectMapper) {
+    public TaskRunnerService(
+        TaskRepository taskRepository,
+        SessionRepository sessionRepository,
+        ConceptNodeRepository conceptNodeRepository,
+        MasteryRepository masteryRepository,
+        StageContentGenerator stageContentGenerator,
+        LlmCallLogRepository llmCallLogRepository,
+        LlmProperties llmProperties,
+        ObjectMapper objectMapper
+    ) {
         this.taskRepository = taskRepository;
+        this.sessionRepository = sessionRepository;
+        this.conceptNodeRepository = conceptNodeRepository;
+        this.masteryRepository = masteryRepository;
+        this.stageContentGenerator = stageContentGenerator;
+        this.llmCallLogRepository = llmCallLogRepository;
+        this.llmProperties = llmProperties;
         this.objectMapper = objectMapper;
     }
 
     @Override
-    @Transactional
     public RunTaskResponse run(Long taskId) {
         Task task = taskRepository.findById(taskId)
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
@@ -48,10 +80,54 @@ public class TaskRunnerService implements RunTaskUseCase {
         Long attemptId = taskRepository.createRunningAttempt(taskId);
         task.markRunning();
 
-        JsonNode generated = generateByStage(task);
+        JsonNode generated;
+        AttemptLlmMetadata metadata;
+        try {
+            StageContent stageContent = generateByLlm(task);
+            generated = stageContent.content();
+            metadata = new AttemptLlmMetadata(
+                stageContent.provider(),
+                stageContent.model(),
+                stageContent.promptVersion(),
+                stageContent.usage() == null ? null : stageContent.usage().tokenInput(),
+                stageContent.usage() == null ? null : stageContent.usage().tokenOutput(),
+                stageContent.usage() == null ? null : stageContent.usage().latencyMs(),
+                stageContent.generationMode()
+            );
+        } catch (Exception ex) {
+            if (!llmProperties.isFallbackToRule()) {
+                taskRepository.markAttemptFailed(attemptId, ex.getMessage(), AttemptLlmMetadata.none("LLM"));
+                llmCallLogRepository.save(new LlmCallLog(
+                    attemptId, "TASK_RUN", llmProperties.getProvider(), llmProperties.getModel(),
+                    task.getStage().name() + "_PROMPT_V1", "v1", "{}", "{\"error\":\"" + ex.getMessage() + "\"}",
+                    "{}", "FAILED", null, null, null
+                ));
+                throw ex;
+            }
+            generated = generateByStage(task);
+            metadata = AttemptLlmMetadata.none("TEMPLATE_FALLBACK");
+        }
+
         String outputJson = writeJson(generated);
 
-        taskRepository.markAttemptSucceeded(attemptId, outputJson);
+        taskRepository.markAttemptSucceeded(attemptId, outputJson, metadata);
+        if ("LLM".equals(metadata.generationMode())) {
+            llmCallLogRepository.save(new LlmCallLog(
+                attemptId,
+                "TASK_RUN",
+                metadata.llmProvider(),
+                metadata.llmModel(),
+                task.getStage().name() + "_PROMPT_V1",
+                metadata.promptVersion(),
+                "{}",
+                "{}",
+                outputJson,
+                "SUCCEEDED",
+                metadata.latencyMs(),
+                metadata.tokenInput(),
+                metadata.tokenOutput()
+            ));
+        }
         task.markSucceeded(outputJson);
 
         return toResponse(task, generated);
@@ -85,6 +161,29 @@ public class TaskRunnerService implements RunTaskUseCase {
             TaskStatus.SUCCEEDED.name(),
             output
         );
+    }
+
+    private StageContent generateByLlm(Task task) {
+        if (!llmProperties.isReady() || !llmProperties.isEnabled()) {
+            throw new InternalServerException("LLM is disabled.");
+        }
+        LearningSession session = sessionRepository.findById(task.getSessionId())
+            .orElseThrow(() -> new NotFoundException("Session or task not found."));
+        ConceptNode node = conceptNodeRepository.findById(task.getNodeId())
+            .orElseThrow(() -> new NotFoundException("Session or task not found."));
+        Mastery mastery = masteryRepository.findByUserIdAndNodeId(session.getUserId(), node.getId()).orElse(null);
+        StageGenerationContext context = new StageGenerationContext(
+            task.getId(),
+            task.getSessionId(),
+            session.getChapterId(),
+            node.getId(),
+            node.getName(),
+            task.getStage(),
+            task.getObjective(),
+            null,
+            mastery == null ? null : mastery.getMasteryValue()
+        );
+        return stageContentGenerator.generate(context);
     }
 
     private JsonNode generateByStage(Task task) {

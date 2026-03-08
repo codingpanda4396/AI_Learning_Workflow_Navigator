@@ -19,9 +19,14 @@ public record SubmitTaskResponse(
     Long nodeId,
     @Schema(example = "72")
     Integer score,
+    @JsonProperty("normalized_score")
+    @Schema(example = "0.720")
+    BigDecimal normalizedScore,
     @JsonProperty("error_tags")
     List<String> errorTags,
     FeedbackResponse feedback,
+    List<String> strengths,
+    List<String> weaknesses,
     @JsonProperty("mastery_before")
     BigDecimal masteryBefore,
     @JsonProperty("mastery_delta")

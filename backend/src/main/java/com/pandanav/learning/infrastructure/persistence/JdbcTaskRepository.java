@@ -1,6 +1,7 @@
 package com.pandanav.learning.infrastructure.persistence;
 
 import com.pandanav.learning.domain.enums.Stage;
+import com.pandanav.learning.domain.model.AttemptLlmMetadata;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.repository.TaskRepository;
@@ -174,32 +175,92 @@ public class JdbcTaskRepository implements TaskRepository {
     }
 
     @Override
-    public void markAttemptSucceeded(Long attemptId, String outputJson) {
+    public void markAttemptSucceeded(Long attemptId, String outputJson, AttemptLlmMetadata metadata) {
         jdbcTemplate.update(
             """
                 UPDATE task_attempt
                 SET status = 'SUCCEEDED'::run_status,
                     output_json = CAST(? AS jsonb),
+                    llm_provider = ?,
+                    llm_model = ?,
+                    prompt_version = ?,
+                    token_input = ?,
+                    token_output = ?,
+                    latency_ms = ?,
+                    generation_mode = ?,
                     finished_at = now()
                 WHERE id = ?
                 """,
             outputJson,
+            metadata.llmProvider(),
+            metadata.llmModel(),
+            metadata.promptVersion(),
+            metadata.tokenInput(),
+            metadata.tokenOutput(),
+            metadata.latencyMs(),
+            metadata.generationMode(),
             attemptId
         );
     }
 
     @Override
-    public void createSubmissionAttempt(Long taskId, String userAnswer, Integer score, String errorTagsJson, String feedbackJson) {
+    public void markAttemptFailed(Long attemptId, String reason, AttemptLlmMetadata metadata) {
         jdbcTemplate.update(
             """
-                INSERT INTO task_attempt (task_id, status, user_answer, score, error_tags, feedback_json, created_at)
-                VALUES (?, 'SUCCEEDED'::run_status, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), now())
+                UPDATE task_attempt
+                SET status = 'FAILED'::run_status,
+                    feedback_json = CAST(? AS jsonb),
+                    llm_provider = ?,
+                    llm_model = ?,
+                    prompt_version = ?,
+                    token_input = ?,
+                    token_output = ?,
+                    latency_ms = ?,
+                    generation_mode = ?,
+                    finished_at = now()
+                WHERE id = ?
+                """,
+            "{\"reason\":\"" + (reason == null ? "unknown" : reason.replace("\"", "'")) + "\"}",
+            metadata.llmProvider(),
+            metadata.llmModel(),
+            metadata.promptVersion(),
+            metadata.tokenInput(),
+            metadata.tokenOutput(),
+            metadata.latencyMs(),
+            metadata.generationMode(),
+            attemptId
+        );
+    }
+
+    @Override
+    public void createSubmissionAttempt(
+        Long taskId,
+        String userAnswer,
+        Integer score,
+        String errorTagsJson,
+        String feedbackJson,
+        AttemptLlmMetadata metadata
+    ) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO task_attempt (
+                    task_id, status, user_answer, score, error_tags, feedback_json,
+                    llm_provider, llm_model, prompt_version, token_input, token_output, latency_ms, generation_mode, created_at
+                )
+                VALUES (?, 'SUCCEEDED'::run_status, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, now())
                 """,
             taskId,
             userAnswer,
             score,
             errorTagsJson,
-            feedbackJson
+            feedbackJson,
+            metadata.llmProvider(),
+            metadata.llmModel(),
+            metadata.promptVersion(),
+            metadata.tokenInput(),
+            metadata.tokenOutput(),
+            metadata.latencyMs(),
+            metadata.generationMode()
         );
     }
 

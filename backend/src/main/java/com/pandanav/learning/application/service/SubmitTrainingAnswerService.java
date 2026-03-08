@@ -3,20 +3,27 @@ package com.pandanav.learning.application.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.dto.session.NextTaskResponse;
+import com.pandanav.learning.api.dto.task.FeedbackResponse;
 import com.pandanav.learning.api.dto.task.SubmitTaskRequest;
 import com.pandanav.learning.api.dto.task.SubmitTaskResponse;
-import com.pandanav.learning.application.service.EvaluatorService.EvaluationResult;
 import com.pandanav.learning.application.service.MasteryUpdateService.MasteryUpdateResult;
+import com.pandanav.learning.domain.llm.AnswerEvaluator;
+import com.pandanav.learning.domain.llm.model.EvaluationContext;
+import com.pandanav.learning.domain.llm.model.EvaluationResult;
 import com.pandanav.learning.application.usecase.SubmitTrainingAnswerUseCase;
+import com.pandanav.learning.domain.enums.ErrorTag;
 import com.pandanav.learning.domain.enums.NextAction;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
+import com.pandanav.learning.domain.model.AttemptLlmMetadata;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.Evidence;
 import com.pandanav.learning.domain.model.LearningSession;
+import com.pandanav.learning.domain.model.LlmCallLog;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.EvidenceRepository;
+import com.pandanav.learning.domain.repository.LlmCallLogRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.exception.ConflictException;
@@ -28,6 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase {
@@ -39,7 +49,8 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
     private final SessionRepository sessionRepository;
     private final ConceptNodeRepository conceptNodeRepository;
     private final EvidenceRepository evidenceRepository;
-    private final EvaluatorService evaluatorService;
+    private final LlmCallLogRepository llmCallLogRepository;
+    private final AnswerEvaluator answerEvaluator;
     private final MasteryUpdateService masteryUpdateService;
     private final NextActionPolicyService nextActionPolicyService;
     private final ObjectMapper objectMapper;
@@ -49,7 +60,8 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         SessionRepository sessionRepository,
         ConceptNodeRepository conceptNodeRepository,
         EvidenceRepository evidenceRepository,
-        EvaluatorService evaluatorService,
+        LlmCallLogRepository llmCallLogRepository,
+        AnswerEvaluator answerEvaluator,
         MasteryUpdateService masteryUpdateService,
         NextActionPolicyService nextActionPolicyService,
         ObjectMapper objectMapper
@@ -58,7 +70,8 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
         this.evidenceRepository = evidenceRepository;
-        this.evaluatorService = evaluatorService;
+        this.llmCallLogRepository = llmCallLogRepository;
+        this.answerEvaluator = answerEvaluator;
         this.masteryUpdateService = masteryUpdateService;
         this.nextActionPolicyService = nextActionPolicyService;
         this.objectMapper = objectMapper;
@@ -80,22 +93,66 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         ConceptNode node = conceptNodeRepository.findById(task.getNodeId())
             .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
 
-        EvaluationResult evaluation = evaluatorService.evaluate(node.getName(), task.getObjective(), request.userAnswer());
+        EvaluationResult evaluation = answerEvaluator.evaluate(new EvaluationContext(
+            task.getId(),
+            task.getSessionId(),
+            task.getNodeId(),
+            task.getObjective(),
+            task.getOutputJson(),
+            request.userAnswer(),
+            null,
+            task.getStage()
+        ));
+
         MasteryUpdateResult mastery = masteryUpdateService.update(session.getUserId(), task.getNodeId(), node.getName(), evaluation.score());
+        List<ErrorTag> parsedErrorTags = mapErrorTags(evaluation.errorTags());
+        FeedbackResponse feedbackResponse = new FeedbackResponse(
+            evaluation.feedback(),
+            evaluation.weaknesses()
+        );
+
         taskRepository.createSubmissionAttempt(
             task.getId(),
             request.userAnswer(),
             evaluation.score(),
-            toJson(evaluation.errorTags().stream().map(Enum::name).toList()),
+            toJson(parsedErrorTags.stream().map(Enum::name).toList()),
             toJson(Map.of(
-                "diagnosis", evaluation.feedback().diagnosis(),
-                "fixes", evaluation.feedback().fixes()
-            ))
+                "diagnosis", feedbackResponse.diagnosis(),
+                "fixes", feedbackResponse.fixes(),
+                "strengths", evaluation.strengths(),
+                "suggested_next_action", evaluation.suggestedNextAction()
+            )),
+            new AttemptLlmMetadata(
+                evaluation.provider(),
+                evaluation.model(),
+                evaluation.promptVersion(),
+                evaluation.usage() == null ? null : evaluation.usage().tokenInput(),
+                evaluation.usage() == null ? null : evaluation.usage().tokenOutput(),
+                evaluation.usage() == null ? null : evaluation.usage().latencyMs(),
+                evaluation.provider() == null ? "RULE_FALLBACK" : "LLM"
+            )
         );
+        if (evaluation.provider() != null) {
+            llmCallLogRepository.save(new LlmCallLog(
+                null,
+                "TASK_SUBMIT",
+                evaluation.provider(),
+                evaluation.model(),
+                "EVALUATE_PROMPT_V1",
+                evaluation.promptVersion(),
+                "{}",
+                "{}",
+                toJson(evaluation.rawJson() == null ? Map.of() : evaluation.rawJson()),
+                "SUCCEEDED",
+                evaluation.usage() == null ? null : evaluation.usage().latencyMs(),
+                evaluation.usage() == null ? null : evaluation.usage().tokenInput(),
+                evaluation.usage() == null ? null : evaluation.usage().tokenOutput()
+            ));
+        }
 
-        persistEvidence(session, task, evaluation);
+        persistEvidence(session, task, evaluation.score(), parsedErrorTags, feedbackResponse, evaluation.strengths());
 
-        NextAction action = nextActionPolicyService.decide(evaluation.score(), evaluation.errorTags());
+        NextAction action = nextActionPolicyService.decide(evaluation.score(), parsedErrorTags);
         Task nextTask = null;
 
         if (action == NextAction.ADVANCE_TO_NEXT_NODE) {
@@ -114,8 +171,11 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             task.getStage().name(),
             task.getNodeId(),
             evaluation.score(),
-            evaluation.errorTags().stream().map(Enum::name).toList(),
-            evaluation.feedback(),
+            evaluation.normalizedScore(),
+            parsedErrorTags.stream().map(Enum::name).toList(),
+            feedbackResponse,
+            evaluation.strengths(),
+            evaluation.weaknesses(),
             mastery.masteryBefore(),
             mastery.masteryDelta(),
             mastery.masteryAfter(),
@@ -124,16 +184,24 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         );
     }
 
-    private void persistEvidence(LearningSession session, Task task, EvaluationResult evaluation) {
+    private void persistEvidence(
+        LearningSession session,
+        Task task,
+        Integer score,
+        List<ErrorTag> errorTags,
+        FeedbackResponse feedback,
+        List<String> strengths
+    ) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("session_id", session.getId());
         payload.put("task_id", task.getId());
         payload.put("node_id", task.getNodeId());
-        payload.put("score", evaluation.score());
-        payload.put("error_tags", evaluation.errorTags().stream().map(Enum::name).toList());
+        payload.put("score", score);
+        payload.put("error_tags", errorTags.stream().map(Enum::name).toList());
         payload.put("feedback_json", Map.of(
-            "diagnosis", evaluation.feedback().diagnosis(),
-            "fixes", evaluation.feedback().fixes()
+            "diagnosis", feedback.diagnosis(),
+            "fixes", feedback.fixes(),
+            "strengths", strengths
         ));
 
         Evidence evidence = new Evidence();
@@ -213,6 +281,18 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         } catch (JsonProcessingException ex) {
             throw new InternalServerException("Failed to serialize submission payload.");
         }
+    }
+
+    private List<ErrorTag> mapErrorTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return List.of();
+        }
+        Set<String> allowed = java.util.Arrays.stream(ErrorTag.values()).map(Enum::name).collect(Collectors.toSet());
+        return tags.stream()
+            .map(v -> v == null ? "" : v.trim().toUpperCase(Locale.ROOT))
+            .filter(allowed::contains)
+            .map(ErrorTag::valueOf)
+            .toList();
     }
 }
 

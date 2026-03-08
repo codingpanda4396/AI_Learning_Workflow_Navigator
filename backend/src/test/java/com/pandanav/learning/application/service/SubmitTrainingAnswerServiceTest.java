@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.dto.task.FeedbackResponse;
 import com.pandanav.learning.api.dto.task.SubmitTaskRequest;
 import com.pandanav.learning.api.dto.task.SubmitTaskResponse;
-import com.pandanav.learning.application.service.EvaluatorService.EvaluationResult;
 import com.pandanav.learning.application.service.MasteryUpdateService.MasteryUpdateResult;
-import com.pandanav.learning.domain.enums.ErrorTag;
+import com.pandanav.learning.domain.llm.AnswerEvaluator;
+import com.pandanav.learning.domain.llm.model.EvaluationResult;
 import com.pandanav.learning.domain.enums.NextAction;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
@@ -15,6 +15,7 @@ import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.EvidenceRepository;
+import com.pandanav.learning.domain.repository.LlmCallLogRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,9 @@ class SubmitTrainingAnswerServiceTest {
     @Mock
     private EvidenceRepository evidenceRepository;
     @Mock
-    private EvaluatorService evaluatorService;
+    private LlmCallLogRepository llmCallLogRepository;
+    @Mock
+    private AnswerEvaluator answerEvaluator;
     @Mock
     private MasteryUpdateService masteryUpdateService;
     @Mock
@@ -61,7 +64,8 @@ class SubmitTrainingAnswerServiceTest {
             sessionRepository,
             conceptNodeRepository,
             evidenceRepository,
-            evaluatorService,
+            llmCallLogRepository,
+            answerEvaluator,
             masteryUpdateService,
             nextActionPolicyService,
             new ObjectMapper()
@@ -77,13 +81,26 @@ class SubmitTrainingAnswerServiceTest {
         when(taskRepository.findById(1003L)).thenReturn(Optional.of(currentTask));
         when(sessionRepository.findById(123L)).thenReturn(Optional.of(session));
         when(conceptNodeRepository.findById(101L)).thenReturn(Optional.of(node));
-        when(evaluatorService.evaluate(any(), any(), any())).thenReturn(
-            new EvaluationResult(72, List.of(ErrorTag.MISSING_STEPS), new FeedbackResponse("diag", List.of("fix")))
+        when(answerEvaluator.evaluate(any())).thenReturn(
+            new EvaluationResult(
+                72,
+                new BigDecimal("0.720"),
+                "diag",
+                List.of("MISSING_STEPS"),
+                List.of("s1"),
+                List.of("fix"),
+                "INSERT_TRAINING_VARIANTS",
+                null,
+                null,
+                null,
+                "rule-v1",
+                null
+            )
         );
         when(masteryUpdateService.update("u1", 101L, "Three-way Handshake", 72)).thenReturn(
             new MasteryUpdateResult(new BigDecimal("0.550"), new BigDecimal("0.010"), new BigDecimal("0.560"))
         );
-        when(nextActionPolicyService.decide(72, List.of(ErrorTag.MISSING_STEPS))).thenReturn(NextAction.INSERT_TRAINING_VARIANTS);
+        when(nextActionPolicyService.decide(any(), any())).thenReturn(NextAction.INSERT_TRAINING_VARIANTS);
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> {
             Task t = invocation.getArgument(0);
             t.setId(2001L);
@@ -96,6 +113,7 @@ class SubmitTrainingAnswerServiceTest {
         assertEquals("TRAINING", response.stage());
         assertEquals(101L, response.nodeId());
         assertEquals(72, response.score());
+        assertEquals(new BigDecimal("0.720"), response.normalizedScore());
         assertEquals("INSERT_TRAINING_VARIANTS", response.nextAction());
         assertNotNull(response.nextTask());
         assertEquals(2001L, response.nextTask().taskId());

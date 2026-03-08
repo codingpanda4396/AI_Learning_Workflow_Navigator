@@ -7,3 +7,8 @@ spring:
 logging:
   level:
     com.panda.ainavigator: INFO
+
+app:
+  llm:
+    enabled: ${LLM_ENABLED:false}
+    fallback-to-rule: true
