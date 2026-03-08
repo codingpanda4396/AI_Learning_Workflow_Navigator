@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useWorkflowStore } from '@/stores/workflow'
+import { getSessionHistory, resumeSession } from '@/api/session'
+import type { SessionHistoryItem } from '@/types'
+import { normalizeApiError } from '@/utils/apiError'
 import PageHeader from '@/components/PageHeader.vue'
 import GoalInputCard from '@/components/GoalInputCard.vue'
 import CourseSelector from '@/components/CourseSelector.vue'
@@ -26,18 +29,15 @@ const goalError = ref('')
 const courseError = ref('')
 const chapterError = ref('')
 const submitError = ref('')
-const diagnosisError = ref('')
-const pathOptionsError = ref('')
+const checkingResume = ref(true)
+
+const historyLoading = ref(false)
+const historyError = ref('')
+const recentHistory = ref<SessionHistoryItem[]>([])
+const resumingSessionId = ref<number | null>(null)
 
 const isCreating = computed(() => sessionStore.creatingSession || sessionStore.planning)
-const isDiagnosing = computed(() => sessionStore.diagnosingGoal)
-const isFetchingPaths = computed(() => sessionStore.fetchingPathOptions)
-const isAnalyzing = computed(() => isDiagnosing.value || isFetchingPaths.value)
-const diagnosis = computed(() => sessionStore.goalDiagnosis)
-const pathOptions = computed(() => sessionStore.pathOptions)
-const selectedPathId = computed(() => sessionStore.selectedPathId)
 const username = computed(() => authStore.currentUser?.username ?? '')
-const checkingResume = ref(true)
 
 const stepPreview = [
   { step: 1 as const, title: '目标诊断' },
@@ -51,7 +51,6 @@ const canSubmit = computed(
     goal.value.trim().length > 0 &&
     courseId.value.trim().length > 0 &&
     chapterId.value.trim().length > 0 &&
-    !!selectedPathId.value &&
     !isCreating.value,
 )
 
@@ -61,7 +60,7 @@ const hasDraftInput = computed(
 
 const goalHint = computed(() =>
   goal.value.trim().length > 0
-    ? '先诊断目标质量，再从候选路径中选择一条。'
+    ? '提交后进入会话页进行目标诊断和路径规划。'
     : '请描述你想学什么、希望达到什么程度。',
 )
 
@@ -102,64 +101,8 @@ function validateInputs() {
   return valid
 }
 
-async function handleAnalyze() {
-  if (!validateInputs()) return
-  await Promise.allSettled([handleDiagnose(), handleFetchPaths()])
-}
-
-function buildAnalyzePayload() {
-  return {
-    courseId: courseId.value.trim(),
-    chapterId: chapterId.value.trim(),
-    goalText: goal.value.trim(),
-  }
-}
-
-async function handleDiagnose() {
-  if (!validateInputs() || isDiagnosing.value) return
-  diagnosisError.value = ''
-  submitError.value = ''
-
-  try {
-    await sessionStore.diagnoseGoal(buildAnalyzePayload())
-  } catch {
-    diagnosisError.value = sessionStore.error || '目标诊断失败，请重试。'
-  }
-}
-
-async function handleFetchPaths() {
-  if (!validateInputs() || isFetchingPaths.value) return
-  pathOptionsError.value = ''
-  submitError.value = ''
-
-  try {
-    await sessionStore.fetchPathOptions(buildAnalyzePayload())
-  } catch {
-    pathOptionsError.value = sessionStore.error || '路径生成失败，请重试。'
-  }
-}
-
-function pickPath(pathId: string) {
-  sessionStore.setSelectedPath(pathId)
-}
-
-function applyRewrittenGoal() {
-  const rewritten = diagnosis.value?.feedback.rewrittenGoal?.trim()
-  if (!rewritten) return
-  goal.value = rewritten
-}
-
 async function handleSubmit() {
   if (!validateInputs() || isCreating.value) return
-
-  if (!diagnosis.value || pathOptions.value.length === 0) {
-    await handleAnalyze()
-  }
-
-  if (!selectedPathId.value) {
-    submitError.value = '请先选择一条学习路径。'
-    return
-  }
 
   submitError.value = ''
 
@@ -186,6 +129,50 @@ async function handleSubmit() {
   }
 }
 
+function formatTime(raw: string) {
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) {
+    return raw
+  }
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatProgress(item: SessionHistoryItem) {
+  if (!item.progress) return '-'
+  const percent = Math.round(item.progress.completionRate * 100)
+  return `${percent}% (${item.progress.completedTaskCount}/${item.progress.totalTaskCount})`
+}
+
+async function loadRecentHistory() {
+  historyLoading.value = true
+  historyError.value = ''
+  try {
+    const response = await getSessionHistory({ page: 1, pageSize: 5 })
+    recentHistory.value = response.items
+  } catch (input) {
+    historyError.value = normalizeApiError(input).message
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function openHistorySession(item: SessionHistoryItem) {
+  resumingSessionId.value = item.sessionId
+  try {
+    await resumeSession(item.sessionId)
+    await router.push(`/session/${item.sessionId}`)
+  } catch (input) {
+    historyError.value = normalizeApiError(input).message
+  } finally {
+    resumingSessionId.value = null
+  }
+}
+
 async function goHistory() {
   await router.push('/history')
 }
@@ -206,15 +193,19 @@ onMounted(async () => {
       if (skipByQuery) {
         await router.replace({ name: 'home' })
       }
+      await loadRecentHistory()
       return
     }
 
     const response = await sessionStore.fetchCurrentSession()
     if (response.hasActiveSession && response.session && !hasDraftInput.value && route.name === 'home') {
       await router.replace(`/session/${response.session.sessionId}`)
+      return
     }
+
+    await loadRecentHistory()
   } catch {
-    // ignore
+    await loadRecentHistory()
   } finally {
     checkingResume.value = false
   }
@@ -243,10 +234,43 @@ onMounted(async () => {
     <section class="hero-panel">
       <PageHeader
         eyebrow="AI Learning Navigator"
-        title="先诊断目标，再开始学习"
-        subtitle="输入课程、章节和目标，获取目标评估与可选学习路径。"
+        title="开始学习会话"
+        subtitle="首页不再做路径生成；创建会话后在流程页完成诊断与路径规划。"
       />
       <StepProgress :current-step="1" :steps="stepPreview" />
+
+      <section class="history-card">
+        <div class="history-head">
+          <h3>最近 5 条历史记录</h3>
+          <button type="button" class="ghost-btn" @click="goHistory">查看全部</button>
+        </div>
+
+        <p v-if="historyLoading" class="history-tip">加载中...</p>
+        <p v-else-if="historyError" class="history-error">{{ historyError }}</p>
+        <p v-else-if="recentHistory.length === 0" class="history-tip">暂无历史记录。</p>
+
+        <div v-else class="history-list">
+          <article v-for="item in recentHistory" :key="item.sessionId" class="history-item">
+            <div class="history-item-head">
+              <span>Session #{{ item.sessionId }}</span>
+              <span>{{ item.status }}</span>
+            </div>
+            <p class="history-goal">{{ item.goal }}</p>
+            <p class="history-meta">{{ item.course }} / {{ item.chapter }} · {{ formatProgress(item) }}</p>
+            <div class="history-actions">
+              <span class="history-time">{{ formatTime(item.lastActiveAt) }}</span>
+              <button
+                type="button"
+                class="ghost-btn"
+                :disabled="resumingSessionId === item.sessionId"
+                @click="openHistorySession(item)"
+              >
+                {{ resumingSessionId === item.sessionId ? '进入中...' : '继续' }}
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
     </section>
 
     <section class="form-panel">
@@ -263,68 +287,9 @@ onMounted(async () => {
         <p v-if="chapterError" class="submit-error">{{ chapterError }}</p>
 
         <div class="action-block">
-          <div class="analyze-actions">
-            <PrimaryButton type="button" :disabled="isFetchingPaths" :loading="isFetchingPaths" @click="handleFetchPaths">
-              生成学习路径
-            </PrimaryButton>
-            <PrimaryButton type="button" :disabled="isDiagnosing" :loading="isDiagnosing" @click="handleDiagnose">
-              诊断目标
-            </PrimaryButton>
-          </div>
-
-          <PrimaryButton type="button" :disabled="isAnalyzing" :loading="isAnalyzing" @click="handleAnalyze">
-            诊断目标并生成路径
-          </PrimaryButton>
-
-          <section v-if="isDiagnosing && !diagnosis" class="diagnosis-card">
-            <h3>目标诊断中...</h3>
-            <p>诊断请求可能需要 10~60 秒，路径生成不受此步骤阻塞。</p>
-          </section>
-
-          <section v-if="diagnosis" class="diagnosis-card">
-            <h3>目标评估：{{ diagnosis.goalScore }}/100</h3>
-            <p>{{ diagnosis.feedback.summary }}</p>
-            <p><strong>优势：</strong>{{ diagnosis.feedback.strengths.join('；') }}</p>
-            <p><strong>风险：</strong>{{ diagnosis.feedback.risks.join('；') }}</p>
-            <button type="button" class="ghost-btn" @click="applyRewrittenGoal">采用建议目标</button>
-          </section>
-
-          <section v-else-if="diagnosisError" class="diagnosis-card">
-            <h3>目标诊断失败</h3>
-            <p>{{ diagnosisError }}</p>
-            <button type="button" class="ghost-btn" @click="handleDiagnose">重试诊断</button>
-          </section>
-
-          <section v-if="pathOptions.length > 0" class="paths-card">
-            <h3>选择学习路径</h3>
-            <div class="path-grid">
-              <article
-                v-for="path in pathOptions"
-                :key="path.pathId"
-                class="path-item"
-                :class="{ selected: selectedPathId === path.pathId }"
-                @click="pickPath(path.pathId)"
-              >
-                <h4>{{ path.name }}</h4>
-                <p>{{ path.description }}</p>
-                <p>难度：{{ path.difficulty }} | 预计 {{ path.estimatedMinutes }} 分钟</p>
-                <ul>
-                  <li v-for="(step, idx) in path.steps" :key="`${path.pathId}-${idx}`">{{ step }}</li>
-                </ul>
-              </article>
-            </div>
-          </section>
-
-          <section v-else-if="pathOptionsError" class="paths-card">
-            <h3>路径生成失败</h3>
-            <p>{{ pathOptionsError }}</p>
-            <button type="button" class="ghost-btn" @click="handleFetchPaths">重试生成路径</button>
-          </section>
-
           <PrimaryButton type="submit" :disabled="!canSubmit" :loading="isCreating">
-            开始分步学习
+            创建并开始学习
           </PrimaryButton>
-
           <p v-if="submitError" class="submit-error">{{ submitError }}</p>
         </div>
       </form>
@@ -337,17 +302,22 @@ onMounted(async () => {
 .home-toolbar { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: var(--space-md); }
 .username { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
 .hero-panel, .form-panel { border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: linear-gradient(160deg, rgba(16, 27, 50, 0.92), rgba(10, 16, 30, 0.95)); box-shadow: var(--shadow-md); }
-.hero-panel { padding: clamp(20px, 4vw, 40px); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-xxl); }
+.hero-panel { padding: clamp(20px, 4vw, 40px); display: flex; flex-direction: column; gap: var(--space-xl); }
 .form-panel { padding: clamp(18px, 3vw, 28px); }
 .start-form { display: flex; flex-direction: column; gap: var(--space-lg); }
 .action-block { border-top: 1px solid var(--color-border); padding-top: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-sm); }
-.analyze-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
-.diagnosis-card, .paths-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); background: rgba(12, 21, 42, 0.8); }
-.path-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-sm); }
-.path-item { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px; cursor: pointer; }
-.path-item.selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-alpha); }
+.history-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); background: rgba(12, 21, 42, 0.8); display: grid; gap: var(--space-sm); }
+.history-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-sm); }
+.history-list { display: grid; gap: 10px; }
+.history-item { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 10px; display: grid; gap: 6px; }
+.history-item-head { display: flex; justify-content: space-between; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.history-goal { color: var(--color-text); }
+.history-meta { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.history-actions { display: flex; justify-content: space-between; align-items: center; }
+.history-time { color: var(--color-text-secondary); font-size: var(--font-size-xs); }
+.history-tip { margin: 0; color: var(--color-text-secondary); }
+.history-error { margin: 0; color: var(--color-error); }
 .ghost-btn { border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: transparent; color: var(--color-text); padding: 6px 10px; }
 .submit-error { margin: 0; color: var(--color-error); font-size: var(--font-size-sm); }
-@media (max-width: 680px) { .analyze-actions { grid-template-columns: 1fr; } }
 @media (max-width: 980px) { .home-page { grid-template-columns: 1fr; } }
 </style>
