@@ -27,6 +27,10 @@ const chapterError = ref('')
 const submitError = ref('')
 
 const isCreating = computed(() => sessionStore.creatingSession || sessionStore.planning)
+const isAnalyzing = computed(() => sessionStore.diagnosingGoal || sessionStore.fetchingPathOptions)
+const diagnosis = computed(() => sessionStore.goalDiagnosis)
+const pathOptions = computed(() => sessionStore.pathOptions)
+const selectedPathId = computed(() => sessionStore.selectedPathId)
 
 const stepPreview = [
   { step: 1 as const, title: '目标诊断' },
@@ -40,27 +44,24 @@ const canSubmit = computed(
     goal.value.trim().length > 0 &&
     courseId.value.trim().length > 0 &&
     chapterId.value.trim().length > 0 &&
+    !!selectedPathId.value &&
     !isCreating.value,
 )
 
 const goalHint = computed(() =>
   goal.value.trim().length > 0
-    ? '系统会先诊断目标清晰度，再生成可执行学习路径。'
+    ? '先做目标诊断，再从候选路径中选择一条。'
     : '请描述你想学什么、希望达到什么程度。',
 )
 
 function setCourse(nextCourseId: string) {
   courseId.value = nextCourseId
-  if (courseError.value) {
-    courseError.value = ''
-  }
+  if (courseError.value) courseError.value = ''
 }
 
 function setChapter(nextChapterId: string) {
   chapterId.value = nextChapterId
-  if (chapterError.value) {
-    chapterError.value = ''
-  }
+  if (chapterError.value) chapterError.value = ''
 }
 
 function validateInputs() {
@@ -90,8 +91,46 @@ function validateInputs() {
   return valid
 }
 
+async function handleAnalyze() {
+  if (!validateInputs() || isAnalyzing.value) {
+    return
+  }
+  const payload = {
+    userId: defaultUserId,
+    courseId: courseId.value.trim(),
+    chapterId: chapterId.value.trim(),
+    goalText: goal.value.trim(),
+  }
+  submitError.value = ''
+
+  try {
+    await Promise.all([sessionStore.diagnoseGoal(payload), sessionStore.fetchPathOptions(payload)])
+  } catch {
+    submitError.value = sessionStore.error || '目标诊断失败，请稍后重试。'
+  }
+}
+
+function pickPath(pathId: string) {
+  sessionStore.setSelectedPath(pathId)
+}
+
+function applyRewrittenGoal() {
+  const rewritten = diagnosis.value?.feedback.rewrittenGoal?.trim()
+  if (!rewritten) return
+  goal.value = rewritten
+}
+
 async function handleSubmit() {
   if (!validateInputs() || isCreating.value) {
+    return
+  }
+
+  if (!diagnosis.value || pathOptions.value.length === 0) {
+    await handleAnalyze()
+  }
+
+  if (!selectedPathId.value) {
+    submitError.value = '请先选择一条学习路径。'
     return
   }
 
@@ -140,7 +179,7 @@ onMounted(async () => {
       await router.replace(`/session/${response.session.sessionId}`)
     }
   } catch {
-    // Ignore resume failure.
+    // ignore resume failure
   }
 })
 </script>
@@ -150,8 +189,8 @@ onMounted(async () => {
     <section class="hero-panel">
       <PageHeader
         eyebrow="AI Learning Navigator"
-        title="把模糊学习目标拆成可执行流程"
-        subtitle="围绕你的目标自动完成诊断、规划、训练与反馈。"
+        title="目标诊断 + 路径选择"
+        subtitle="先评估目标质量，再从候选路径中选择一条开始学习。"
       />
       <StepProgress :current-step="1" :steps="stepPreview" />
     </section>
@@ -159,7 +198,6 @@ onMounted(async () => {
     <section class="form-panel">
       <form class="start-form" @submit.prevent="handleSubmit">
         <GoalInputCard v-model="goal" :hint="goalHint" :error="goalError" />
-
         <CourseSelector
           :course-id="courseId"
           :chapter-id="chapterId"
@@ -171,9 +209,42 @@ onMounted(async () => {
         <p v-if="chapterError" class="submit-error">{{ chapterError }}</p>
 
         <div class="action-block">
-          <PrimaryButton type="submit" :disabled="!canSubmit" :loading="isCreating">
-            {{ isCreating ? '正在生成学习流程...' : '开始学习流程' }}
+          <PrimaryButton type="button" :disabled="isAnalyzing" :loading="isAnalyzing" @click="handleAnalyze">
+            {{ isAnalyzing ? '诊断中...' : '1) 诊断目标并生成路径' }}
           </PrimaryButton>
+
+          <section v-if="diagnosis" class="diagnosis-card">
+            <h3>目标评价：{{ diagnosis.goalScore }}/100</h3>
+            <p>{{ diagnosis.feedback.summary }}</p>
+            <p><strong>优势：</strong>{{ diagnosis.feedback.strengths.join('；') }}</p>
+            <p><strong>风险：</strong>{{ diagnosis.feedback.risks.join('；') }}</p>
+            <button type="button" class="ghost-btn" @click="applyRewrittenGoal">使用建议目标</button>
+          </section>
+
+          <section v-if="pathOptions.length > 0" class="paths-card">
+            <h3>2) 选择学习路径</h3>
+            <div class="path-grid">
+              <article
+                v-for="path in pathOptions"
+                :key="path.pathId"
+                class="path-item"
+                :class="{ selected: selectedPathId === path.pathId }"
+                @click="pickPath(path.pathId)"
+              >
+                <h4>{{ path.name }}</h4>
+                <p>{{ path.description }}</p>
+                <p>难度：{{ path.difficulty }} | 预计 {{ path.estimatedMinutes }} 分钟</p>
+                <ul>
+                  <li v-for="(step, idx) in path.steps" :key="`${path.pathId}-${idx}`">{{ step }}</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <PrimaryButton type="submit" :disabled="!canSubmit" :loading="isCreating">
+            {{ isCreating ? '正在生成学习流程...' : '3) 开始分步学习' }}
+          </PrimaryButton>
+
           <p v-if="submitError" class="submit-error">{{ submitError }}</p>
         </div>
       </form>
@@ -188,6 +259,11 @@ onMounted(async () => {
 .form-panel { padding: clamp(18px, 3vw, 28px); }
 .start-form { display: flex; flex-direction: column; gap: var(--space-lg); }
 .action-block { border-top: 1px solid var(--color-border); padding-top: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-sm); }
+.diagnosis-card, .paths-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); background: rgba(12, 21, 42, 0.8); }
+.path-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-sm); }
+.path-item { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px; cursor: pointer; }
+.path-item.selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-alpha); }
+.ghost-btn { border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: transparent; color: var(--color-text); padding: 6px 10px; }
 .submit-error { margin: 0; color: var(--color-error); font-size: var(--font-size-sm); }
 @media (max-width: 980px) { .home-page { grid-template-columns: 1fr; } }
 </style>

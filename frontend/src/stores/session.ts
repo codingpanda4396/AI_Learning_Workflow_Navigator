@@ -3,7 +3,9 @@ import { defineStore } from 'pinia'
 import type {
   CreateSessionRequest,
   CurrentSessionResponse,
+  GoalDiagnosisResponse,
   PathResponse,
+  PathOption,
   RunTaskResponse,
   SessionOverviewResponse,
   SubmitTaskResponse,
@@ -11,7 +13,9 @@ import type {
 import type { NormalizedApiError } from '@/types/api'
 import {
   createSession,
+  diagnoseGoal,
   getCurrentSession,
+  getPathOptions,
   getSessionOverview,
   getSessionPath,
   planSession,
@@ -34,6 +38,9 @@ export const useSessionStore = defineStore('session', () => {
   const currentTaskSessionId = ref<number | null>(null)
   const taskResult = ref<SubmitTaskResponse | null>(null)
   const currentUserSession = ref<CurrentSessionResponse | null>(null)
+  const goalDiagnosis = ref<GoalDiagnosisResponse | null>(null)
+  const pathOptions = ref<PathOption[]>([])
+  const selectedPathId = ref<string | null>(null)
   const lastError = ref<NormalizedApiError | null>(null)
 
   const creatingSession = ref(false)
@@ -42,6 +49,8 @@ export const useSessionStore = defineStore('session', () => {
   const runningTask = ref(false)
   const submittingTask = ref(false)
   const recoveringSession = ref(false)
+  const diagnosingGoal = ref(false)
+  const fetchingPathOptions = ref(false)
 
   const isLoading = computed(
     () =>
@@ -50,7 +59,9 @@ export const useSessionStore = defineStore('session', () => {
       fetchingSession.value ||
       runningTask.value ||
       submittingTask.value ||
-      recoveringSession.value,
+      recoveringSession.value ||
+      diagnosingGoal.value ||
+      fetchingPathOptions.value,
   )
 
   const sessionId = computed(() => currentSession.value?.sessionId ?? null)
@@ -78,6 +89,42 @@ export const useSessionStore = defineStore('session', () => {
       throw setError(input)
     } finally {
       creatingSession.value = false
+    }
+  }
+
+  async function diagnoseGoalAction(data: CreateSessionRequest) {
+    diagnosingGoal.value = true
+    clearError()
+    try {
+      const response = await diagnoseGoal(data)
+      goalDiagnosis.value = response
+      return response
+    } catch (input) {
+      throw setError(input)
+    } finally {
+      diagnosingGoal.value = false
+    }
+  }
+
+  async function fetchPathOptionsAction(data: CreateSessionRequest) {
+    fetchingPathOptions.value = true
+    clearError()
+    try {
+      const response = await getPathOptions(data)
+      pathOptions.value = response
+      const stillValid = response.some((item) => item.pathId === selectedPathId.value)
+      if (!stillValid) {
+        selectedPathId.value = null
+      }
+      if (!selectedPathId.value && response.length > 0) {
+        const first = response[0]
+        selectedPathId.value = first ? first.pathId : null
+      }
+      return response
+    } catch (input) {
+      throw setError(input)
+    } finally {
+      fetchingPathOptions.value = false
     }
   }
 
@@ -179,6 +226,10 @@ export const useSessionStore = defineStore('session', () => {
     currentTaskSessionId.value = null
   }
 
+  function setSelectedPath(pathId: string | null) {
+    selectedPathId.value = pathId
+  }
+
   function reset() {
     currentSession.value = null
     currentSessionPath.value = null
@@ -186,6 +237,9 @@ export const useSessionStore = defineStore('session', () => {
     currentTaskSessionId.value = null
     taskResult.value = null
     currentUserSession.value = null
+    goalDiagnosis.value = null
+    pathOptions.value = []
+    selectedPathId.value = null
     clearError()
   }
 
@@ -196,6 +250,9 @@ export const useSessionStore = defineStore('session', () => {
     currentTaskSessionId,
     taskResult,
     currentUserSession,
+    goalDiagnosis,
+    pathOptions,
+    selectedPathId,
     lastError,
     creatingSession,
     planning,
@@ -203,6 +260,8 @@ export const useSessionStore = defineStore('session', () => {
     runningTask,
     submittingTask,
     recoveringSession,
+    diagnosingGoal,
+    fetchingPathOptions,
     isLoading,
     error,
     sessionId,
@@ -215,8 +274,11 @@ export const useSessionStore = defineStore('session', () => {
     fetchSessionOverview: fetchSessionOverviewAction,
     fetchSessionPath: fetchSessionPathAction,
     fetchCurrentSession: fetchCurrentSessionAction,
+    diagnoseGoal: diagnoseGoalAction,
+    fetchPathOptions: fetchPathOptionsAction,
     runTask: runTaskAction,
     submitTask: submitTaskAction,
+    setSelectedPath,
     clearError,
     resetTaskState,
     reset,

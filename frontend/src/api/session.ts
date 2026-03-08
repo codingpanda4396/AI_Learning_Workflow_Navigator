@@ -2,13 +2,17 @@ import client from '@/api/client'
 import type {
   CreateSessionRequest,
   CurrentSessionResponse,
+  GoalDiagnosisResponse,
   PathResponse,
+  PathOption,
   PlanSessionResponse,
   SessionOverviewResponse,
 } from '@/types'
 import {
   mapCurrentSessionDto,
+  mapGoalDiagnosisDto,
   mapPathDto,
+  mapPathOptionsDto,
   mapPlanSessionDto,
   mapSessionOverviewDto,
 } from '@/mappers/sessionMapper'
@@ -27,6 +31,26 @@ export async function createSession(request: CreateSessionRequest): Promise<numb
 
   const { data } = await client.post<CreateSessionResponseDto>('/session/create', payload)
   return data.session_id
+}
+
+export async function diagnoseGoal(request: CreateSessionRequest): Promise<GoalDiagnosisResponse> {
+  const payload = {
+    course_id: request.courseId,
+    chapter_id: request.chapterId,
+    goal_text: request.goalText,
+  }
+  const { data } = await client.post('/session/goal-diagnose', payload)
+  return mapGoalDiagnosisDto(data)
+}
+
+export async function getPathOptions(request: CreateSessionRequest): Promise<PathOption[]> {
+  const payload = {
+    course_id: request.courseId,
+    chapter_id: request.chapterId,
+    goal_text: request.goalText,
+  }
+  const { data } = await client.post('/session/path-options', payload)
+  return mapPathOptionsDto(data)
 }
 
 export async function planSession(sessionId: number): Promise<PlanSessionResponse> {

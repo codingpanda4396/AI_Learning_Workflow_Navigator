@@ -21,6 +21,25 @@ export interface CreateSessionRequest {
   goalText: string
 }
 
+export interface GoalDiagnosisResponse {
+  goalScore: number
+  feedback: {
+    summary: string
+    strengths: string[]
+    risks: string[]
+    rewrittenGoal: string
+  }
+}
+
+export interface PathOption {
+  pathId: string
+  name: string
+  description: string
+  difficulty: string
+  estimatedMinutes: number
+  steps: string[]
+}
+
 export interface PlannedTask {
   taskId: number
   stage: string

@@ -37,14 +37,14 @@ function onChapterInput(event: Event) {
 <template>
   <section class="selector-card">
     <div class="field-group">
-      <label for="course-input" class="label">2. 课程（可自定义）</label>
+      <label for="course-input" class="label">2. 璇剧▼锛堝彲鑷畾涔夛級</label>
       <input
         id="course-input"
         class="input"
         type="text"
         :value="courseId"
         list="course-suggestions"
-        placeholder="例如：computer_network / linear_algebra"
+        placeholder="渚嬪锛歝omputer_network / linear_algebra"
         @input="onCourseInput"
       />
       <datalist id="course-suggestions">
@@ -53,14 +53,14 @@ function onChapterInput(event: Event) {
     </div>
 
     <div class="field-group">
-      <label for="chapter-input" class="label">3. 章节（可自定义）</label>
+      <label for="chapter-input" class="label">3. 绔犺妭锛堝彲鑷畾涔夛級</label>
       <input
         id="chapter-input"
         class="input"
         type="text"
         :value="chapterId"
         list="chapter-suggestions"
-        placeholder="例如：tcp / vector_space"
+        placeholder="渚嬪锛歵cp / vector_space"
         @input="onChapterInput"
       />
       <datalist id="chapter-suggestions">
