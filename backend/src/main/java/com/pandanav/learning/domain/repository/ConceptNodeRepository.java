@@ -12,4 +12,6 @@ public interface ConceptNodeRepository {
     Optional<ConceptNode> findFirstByChapterIdOrderByOrderNoAsc(String chapterId);
 
     List<ConceptNode> findByChapterIdOrderByOrderNoAsc(String chapterId);
+
+    ConceptNode save(ConceptNode node);
 }

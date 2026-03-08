@@ -98,11 +98,14 @@ export interface SubmitTaskResponse {
   stage: string
   nodeId: number
   score: number
+  normalizedScore: number
   errorTags: string[]
   feedback: {
     diagnosis: string
     fixes: string[]
   }
+  strengths: string[]
+  weaknesses: string[]
   masteryBefore: number
   masteryDelta: number
   masteryAfter: number

@@ -17,6 +17,10 @@ const isLoading = computed(() => sessionStore.runningTask)
 const isSubmitting = computed(() => sessionStore.submittingTask)
 const loadError = computed(() => sessionStore.error)
 const objectiveTitle = computed(() => task.value?.output.sections[0]?.title || '请回答以下问题')
+const normalizedScorePercent = computed(() => {
+  if (!result.value) return 0
+  return Math.round(result.value.normalizedScore * 100)
+})
 
 function getStageLabel(stage: string) {
   const map: Record<string, string> = {
@@ -32,7 +36,7 @@ function getErrorTagLabel(tag: string) {
   const map: Record<string, string> = {
     CONCEPT_CONFUSION: '概念混淆',
     MISSING_STEPS: '步骤缺失',
-    BOUNDARY_CASE: '边界条件',
+    BOUNDARY_CASE: '边界问题',
     TERMINOLOGY: '术语不准',
     SHALLOW_REASONING: '推理浅',
     MEMORY_GAP: '记忆缺口',
@@ -88,6 +92,19 @@ function handleContinue() {
   router.push(`/session/${targetSessionId}`)
 }
 
+function handleGoNextTask() {
+  const nextTask = result.value?.nextTask
+  if (!nextTask) {
+    return
+  }
+  const targetPath = nextTask.stage === 'TRAINING' ? `/task/${nextTask.taskId}/submit` : `/task/${nextTask.taskId}/run`
+  const currentSessionId = resolveSessionId()
+  router.push({
+    path: targetPath,
+    ...(currentSessionId ? { query: { sessionId: String(currentSessionId) } } : {}),
+  })
+}
+
 onMounted(async () => {
   sessionStore.resetTaskState()
   await loadTask()
@@ -114,6 +131,7 @@ onMounted(async () => {
         <div class="score-display">
           <span class="score-label">得分</span>
           <span class="score-value">{{ result.score }}</span>
+          <span class="score-subtitle">标准化分：{{ normalizedScorePercent }}%</span>
         </div>
 
         <div v-if="result.errorTags.length > 0" class="error-tags">
@@ -129,6 +147,20 @@ onMounted(async () => {
           <ul class="fixes-list">
             <li v-for="(fix, idx) in result.feedback.fixes" :key="idx">{{ fix }}</li>
           </ul>
+
+          <template v-if="result.strengths.length > 0">
+            <h3 class="feedback-title">优势</h3>
+            <ul class="fixes-list">
+              <li v-for="(item, idx) in result.strengths" :key="`s-${idx}`">{{ item }}</li>
+            </ul>
+          </template>
+
+          <template v-if="result.weaknesses.length > 0">
+            <h3 class="feedback-title">薄弱点</h3>
+            <ul class="fixes-list">
+              <li v-for="(item, idx) in result.weaknesses" :key="`w-${idx}`">{{ item }}</li>
+            </ul>
+          </template>
         </div>
 
         <div class="mastery-change">
@@ -147,6 +179,13 @@ onMounted(async () => {
         </div>
 
         <div class="actions">
+          <button
+            v-if="result.nextTask"
+            class="continue-btn secondary"
+            @click="handleGoNextTask"
+          >
+            开始下一任务
+          </button>
           <button class="continue-btn" @click="handleContinue">继续 →</button>
         </div>
       </div>
@@ -199,6 +238,7 @@ onMounted(async () => {
 .score-display { display: flex; flex-direction: column; align-items: center; padding: 2rem; background: var(--color-bg-elevated); border-radius: 12px; }
 .score-label { font-size: 0.875rem; color: var(--color-text-secondary); }
 .score-value { font-size: 4rem; font-weight: 700; color: var(--color-primary); }
+.score-subtitle { font-size: 0.875rem; color: var(--color-text-secondary); }
 .error-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .error-tag { padding: 0.25rem 0.75rem; font-size: 0.75rem; color: #dc2626; background: #fef2f2; border-radius: 4px; }
 .feedback { background: var(--color-bg-elevated); border-radius: 12px; padding: 1.5rem; }
@@ -216,4 +256,5 @@ onMounted(async () => {
 .action-value { font-size: 0.875rem; font-weight: 600; color: var(--color-primary); }
 .actions { text-align: center; }
 .continue-btn { padding: 1rem 2rem; font-weight: 600; color: #fff; background: var(--color-primary); border: none; border-radius: 8px; }
+.secondary { margin-right: 12px; background: transparent; border: 1px solid var(--color-border); color: var(--color-text); }
 </style>

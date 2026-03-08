@@ -13,42 +13,59 @@ const emit = defineEmits<{
   'update:chapterId': [value: string]
 }>()
 
-const chapterOptions = computed(() => {
-  const selectedCourse = courseOptions.find((course) => course.id === props.courseId)
-  return selectedCourse?.chapters ?? []
+const suggestedCourses = computed(() => courseOptions.map((course) => course.id))
+const suggestedChapters = computed(() => {
+  const ids = new Set<string>()
+  for (const course of courseOptions) {
+    if (props.courseId && course.id !== props.courseId) continue
+    for (const chapter of course.chapters) {
+      ids.add(chapter.id)
+    }
+  }
+  return Array.from(ids)
 })
 
-function onCourseChange(event: Event) {
-  const nextCourseId = (event.target as HTMLSelectElement).value
-  emit('update:courseId', nextCourseId)
-  const fallbackChapterId =
-    courseOptions.find((course) => course.id === nextCourseId)?.chapters[0]?.id ?? ''
-  emit('update:chapterId', fallbackChapterId)
+function onCourseInput(event: Event) {
+  emit('update:courseId', (event.target as HTMLInputElement).value)
 }
 
-function onChapterChange(event: Event) {
-  emit('update:chapterId', (event.target as HTMLSelectElement).value)
+function onChapterInput(event: Event) {
+  emit('update:chapterId', (event.target as HTMLInputElement).value)
 }
 </script>
 
 <template>
   <section class="selector-card">
     <div class="field-group">
-      <label for="course-select" class="label">2. 课程</label>
-      <select id="course-select" class="select" :value="courseId" @change="onCourseChange">
-        <option v-for="course in courseOptions" :key="course.id" :value="course.id">
-          {{ course.name }}
-        </option>
-      </select>
+      <label for="course-input" class="label">2. 课程（可自定义）</label>
+      <input
+        id="course-input"
+        class="input"
+        type="text"
+        :value="courseId"
+        list="course-suggestions"
+        placeholder="例如：computer_network / linear_algebra"
+        @input="onCourseInput"
+      />
+      <datalist id="course-suggestions">
+        <option v-for="course in suggestedCourses" :key="course" :value="course" />
+      </datalist>
     </div>
 
     <div class="field-group">
-      <label for="chapter-select" class="label">3. 章节</label>
-      <select id="chapter-select" class="select" :value="chapterId" @change="onChapterChange">
-        <option v-for="chapter in chapterOptions" :key="chapter.id" :value="chapter.id">
-          {{ chapter.name }}
-        </option>
-      </select>
+      <label for="chapter-input" class="label">3. 章节（可自定义）</label>
+      <input
+        id="chapter-input"
+        class="input"
+        type="text"
+        :value="chapterId"
+        list="chapter-suggestions"
+        placeholder="例如：tcp / vector_space"
+        @input="onChapterInput"
+      />
+      <datalist id="chapter-suggestions">
+        <option v-for="chapter in suggestedChapters" :key="chapter" :value="chapter" />
+      </datalist>
     </div>
   </section>
 </template>
@@ -71,7 +88,7 @@ function onChapterChange(event: Event) {
   font-weight: 600;
 }
 
-.select {
+.input {
   width: 100%;
   min-height: 44px;
   border-radius: var(--radius-md);
@@ -81,7 +98,7 @@ function onChapterChange(event: Event) {
   padding: 0 var(--space-md);
 }
 
-.select:focus {
+.input:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-alpha);
 }

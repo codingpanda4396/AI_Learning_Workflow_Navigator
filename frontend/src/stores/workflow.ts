@@ -13,8 +13,8 @@ const WORKFLOW_STORAGE_KEY = 'ai-learning-workflow-state'
 function initialState(): WorkflowState {
   return {
     goal: '',
-    courseId: 'computer_network',
-    chapterId: 'tcp',
+    courseId: '',
+    chapterId: '',
     workflowId: null,
     currentStep: 1,
     stepData: {},

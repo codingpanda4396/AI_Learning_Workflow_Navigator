@@ -4,8 +4,12 @@ import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
 
@@ -64,6 +68,31 @@ public class JdbcConceptNodeRepository implements ConceptNodeRepository {
             (rs, rowNum) -> mapNode(rs),
             chapterId
         );
+    }
+
+    @Override
+    public ConceptNode save(ConceptNode node) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                """
+                    INSERT INTO concept_node (chapter_id, name, outline, order_no)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                Statement.RETURN_GENERATED_KEYS
+            );
+            statement.setString(1, node.getChapterId());
+            statement.setString(2, node.getName());
+            statement.setString(3, node.getOutline());
+            statement.setInt(4, node.getOrderNo() == null ? 0 : node.getOrderNo());
+            return statement;
+        }, keyHolder);
+
+        Number id = keyHolder.getKey();
+        if (id != null) {
+            node.setId(id.longValue());
+        }
+        return node;
     }
 
     private ConceptNode mapNode(java.sql.ResultSet rs) throws java.sql.SQLException {

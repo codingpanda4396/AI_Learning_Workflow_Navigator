@@ -49,10 +49,10 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
 
         List<Task> tasksToSave = new ArrayList<>();
         for (ConceptNode node : nodes) {
-            tasksToSave.add(buildTask(sessionId, node, Stage.STRUCTURE));
-            tasksToSave.add(buildTask(sessionId, node, Stage.UNDERSTANDING));
-            tasksToSave.add(buildTask(sessionId, node, Stage.TRAINING));
-            tasksToSave.add(buildTask(sessionId, node, Stage.REFLECTION));
+            tasksToSave.add(buildTask(session.getCourseId(), session.getChapterId(), session.getGoalText(), sessionId, node, Stage.STRUCTURE));
+            tasksToSave.add(buildTask(session.getCourseId(), session.getChapterId(), session.getGoalText(), sessionId, node, Stage.UNDERSTANDING));
+            tasksToSave.add(buildTask(session.getCourseId(), session.getChapterId(), session.getGoalText(), sessionId, node, Stage.TRAINING));
+            tasksToSave.add(buildTask(session.getCourseId(), session.getChapterId(), session.getGoalText(), sessionId, node, Stage.REFLECTION));
         }
 
         List<Task> saved = taskRepository.saveAll(tasksToSave);
@@ -69,14 +69,23 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
         return new PlanSessionResponse(sessionId, responseTasks);
     }
 
-    private Task buildTask(Long sessionId, ConceptNode node, Stage stage) {
+    private Task buildTask(String courseId, String chapterId, String goalText, Long sessionId, ConceptNode node, Stage stage) {
         Task task = new Task();
         task.setSessionId(sessionId);
         task.setNodeId(node.getId());
         task.setStage(stage);
         task.setStatus(TaskStatus.PENDING);
-        task.setObjective(taskObjectiveTemplateStrategy.buildObjective(stage, node.getName()));
+        task.setObjective(buildObjectiveWithContext(courseId, chapterId, goalText, stage, node.getName()));
         return task;
+    }
+
+    private String buildObjectiveWithContext(String courseId, String chapterId, String goalText, Stage stage, String conceptName) {
+        String base = taskObjectiveTemplateStrategy.buildObjective(stage, conceptName);
+        String goalPart = (goalText == null || goalText.isBlank()) ? "N/A" : goalText;
+        return base
+            + " [Course: " + courseId + "]"
+            + " [Chapter: " + chapterId + "]"
+            + " [Goal: " + goalPart + "]";
     }
 }
 

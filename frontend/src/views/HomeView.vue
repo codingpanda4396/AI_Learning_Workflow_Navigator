@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useWorkflowStore } from '@/stores/workflow'
-import { courseOptions } from '@/constants/courses'
 import PageHeader from '@/components/PageHeader.vue'
 import GoalInputCard from '@/components/GoalInputCard.vue'
 import CourseSelector from '@/components/CourseSelector.vue'
@@ -11,21 +10,22 @@ import StepProgress from '@/components/StepProgress.vue'
 import PrimaryButton from '@/components/PrimaryButton.vue'
 
 const SKIP_RESUME_ONCE_KEY = 'ai_learning_skip_resume_once'
+const defaultUserId = import.meta.env.VITE_DEFAULT_USER_ID || 'guest_user'
 
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
 const workflowStore = useWorkflowStore()
 
-const defaultCourse = courseOptions[0]
-const defaultChapter = defaultCourse?.chapters[0]
-const defaultUserId = import.meta.env.VITE_DEFAULT_USER_ID || 'guest_user'
-
 const goal = ref(workflowStore.goal || '')
-const courseId = ref(workflowStore.courseId || defaultCourse?.id || '')
-const chapterId = ref(workflowStore.chapterId || defaultChapter?.id || '')
+const courseId = ref(workflowStore.courseId || '')
+const chapterId = ref(workflowStore.chapterId || '')
+
 const goalError = ref('')
+const courseError = ref('')
+const chapterError = ref('')
 const submitError = ref('')
+
 const isCreating = computed(() => sessionStore.creatingSession || sessionStore.planning)
 
 const stepPreview = [
@@ -35,32 +35,63 @@ const stepPreview = [
   { step: 4 as const, title: '总结反馈' },
 ]
 
-const canSubmit = computed(() => goal.value.trim().length > 0 && !isCreating.value)
+const canSubmit = computed(
+  () =>
+    goal.value.trim().length > 0 &&
+    courseId.value.trim().length > 0 &&
+    chapterId.value.trim().length > 0 &&
+    !isCreating.value,
+)
+
 const goalHint = computed(() =>
   goal.value.trim().length > 0
-    ? '系统将先诊断你的目标清晰度，再生成可执行学习路径。'
-    : '请用一句话描述你想掌握什么、达到什么程度。',
+    ? '系统会先诊断目标清晰度，再生成可执行学习路径。'
+    : '请描述你想学什么、希望达到什么程度。',
 )
 
 function setCourse(nextCourseId: string) {
   courseId.value = nextCourseId
+  if (courseError.value) {
+    courseError.value = ''
+  }
 }
 
 function setChapter(nextChapterId: string) {
   chapterId.value = nextChapterId
+  if (chapterError.value) {
+    chapterError.value = ''
+  }
 }
 
-function validateGoal() {
+function validateInputs() {
+  let valid = true
+
   if (!goal.value.trim()) {
-    goalError.value = '请先输入学习目标，才能开始流程导航。'
-    return false
+    goalError.value = '请先输入学习目标。'
+    valid = false
+  } else {
+    goalError.value = ''
   }
-  goalError.value = ''
-  return true
+
+  if (!courseId.value.trim()) {
+    courseError.value = '请输入课程标识（支持自定义）。'
+    valid = false
+  } else {
+    courseError.value = ''
+  }
+
+  if (!chapterId.value.trim()) {
+    chapterError.value = '请输入章节标识（支持自定义）。'
+    valid = false
+  } else {
+    chapterError.value = ''
+  }
+
+  return valid
 }
 
 async function handleSubmit() {
-  if (!validateGoal() || isCreating.value) {
+  if (!validateInputs() || isCreating.value) {
     return
   }
 
@@ -69,8 +100,8 @@ async function handleSubmit() {
   const userId = localStorage.getItem('ai_learning_user_id') || defaultUserId
   const payload = {
     userId,
-    courseId: courseId.value,
-    chapterId: chapterId.value,
+    courseId: courseId.value.trim(),
+    chapterId: chapterId.value.trim(),
     goalText: goal.value.trim(),
   }
 
@@ -120,7 +151,7 @@ onMounted(async () => {
       <PageHeader
         eyebrow="AI Learning Navigator"
         title="把模糊学习目标拆成可执行流程"
-        subtitle="围绕你的目标自动完成诊断、路径规划、分步学习与总结反馈。"
+        subtitle="围绕你的目标自动完成诊断、规划、训练与反馈。"
       />
       <StepProgress :current-step="1" :steps="stepPreview" />
     </section>
@@ -128,12 +159,16 @@ onMounted(async () => {
     <section class="form-panel">
       <form class="start-form" @submit.prevent="handleSubmit">
         <GoalInputCard v-model="goal" :hint="goalHint" :error="goalError" />
+
         <CourseSelector
           :course-id="courseId"
           :chapter-id="chapterId"
           @update:courseId="setCourse"
           @update:chapterId="setChapter"
         />
+
+        <p v-if="courseError" class="submit-error">{{ courseError }}</p>
+        <p v-if="chapterError" class="submit-error">{{ chapterError }}</p>
 
         <div class="action-block">
           <PrimaryButton type="submit" :disabled="!canSubmit" :loading="isCreating">

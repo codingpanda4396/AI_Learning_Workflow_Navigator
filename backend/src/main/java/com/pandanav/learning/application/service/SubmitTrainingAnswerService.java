@@ -163,7 +163,15 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
                 nextTask = advanced;
             }
         } else if (action != NextAction.NOOP) {
-            nextTask = createAdaptiveTask(task.getSessionId(), task.getNodeId(), node.getName(), action);
+            nextTask = createAdaptiveTask(
+                session.getCourseId(),
+                session.getChapterId(),
+                session.getGoalText(),
+                task.getSessionId(),
+                task.getNodeId(),
+                node.getName(),
+                action
+            );
         }
 
         return new SubmitTaskResponse(
@@ -211,14 +219,22 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         evidenceRepository.save(evidence);
     }
 
-    private Task createAdaptiveTask(Long sessionId, Long nodeId, String conceptName, NextAction action) {
+    private Task createAdaptiveTask(
+        String courseId,
+        String chapterId,
+        String goalText,
+        Long sessionId,
+        Long nodeId,
+        String conceptName,
+        NextAction action
+    ) {
         Stage stage = mapStage(action);
         Task task = new Task();
         task.setSessionId(sessionId);
         task.setNodeId(nodeId);
         task.setStage(stage);
         task.setStatus(TaskStatus.PENDING);
-        task.setObjective(buildObjective(action, conceptName));
+        task.setObjective(buildObjective(action, conceptName, courseId, chapterId, goalText));
         return taskRepository.save(task);
     }
 
@@ -263,8 +279,8 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         };
     }
 
-    private String buildObjective(NextAction action, String conceptName) {
-        return switch (action) {
+    private String buildObjective(NextAction action, String conceptName, String courseId, String chapterId, String goalText) {
+        String base = switch (action) {
             case INSERT_REMEDIAL_UNDERSTANDING ->
                 "Remedial understanding for " + conceptName + ": explain mechanism and correct misconceptions.";
             case INSERT_TRAINING_VARIANTS ->
@@ -273,6 +289,11 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
                 "Reinforcement training for " + conceptName + ": complete one advanced mixed-case drill.";
             default -> "";
         };
+        String goalPart = (goalText == null || goalText.isBlank()) ? "N/A" : goalText;
+        return base
+            + " [Course: " + courseId + "]"
+            + " [Chapter: " + chapterId + "]"
+            + " [Goal: " + goalPart + "]";
     }
 
     private String toJson(Object value) {
