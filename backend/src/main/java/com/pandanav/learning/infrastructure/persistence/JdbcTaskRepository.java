@@ -72,6 +72,7 @@ public class JdbcTaskRepository implements TaskRepository {
                                SELECT ta.output_json
                                FROM task_attempt ta
                                WHERE ta.task_id = t.id
+                                 AND ta.output_json IS NOT NULL
                                ORDER BY ta.created_at DESC
                                LIMIT 1
                            ) AS output_json
@@ -103,6 +104,7 @@ public class JdbcTaskRepository implements TaskRepository {
                            SELECT ta.output_json
                            FROM task_attempt ta
                            WHERE ta.task_id = t.id
+                             AND ta.output_json IS NOT NULL
                            ORDER BY ta.created_at DESC
                            LIMIT 1
                        ) AS output_json
@@ -131,6 +133,7 @@ public class JdbcTaskRepository implements TaskRepository {
                            SELECT ta.output_json
                            FROM task_attempt ta
                            WHERE ta.task_id = t.id
+                             AND ta.output_json IS NOT NULL
                            ORDER BY ta.created_at DESC
                            LIMIT 1
                        ) AS output_json
