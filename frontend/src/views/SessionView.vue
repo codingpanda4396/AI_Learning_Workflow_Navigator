@@ -38,37 +38,18 @@ function resolveStep(raw: unknown): WorkflowStepNumber {
 }
 
 const steps: StepMeta[] = [
-  { step: 1, title: 'Goal diagnosis', task: 'Review goal quality feedback' },
-  { step: 2, title: 'Path planning', task: 'Choose a learning path' },
-  { step: 3, title: 'Step-by-step tasks', task: 'Execute tasks in order' },
-  { step: 4, title: 'Summary', task: 'Review progress and next action' },
+  { step: 1, title: '目标诊断', task: '查看目标质量评估' },
+  { step: 2, title: '路径规划', task: '选择学习路径' },
+  { step: 3, title: '分步学习', task: '按步骤执行任务' },
+  { step: 4, title: '总结反馈', task: '查看进度和下一步建议' },
 ]
 
 const currentSession = computed(() => sessionStore.currentSession)
 const isLoading = computed(() => sessionStore.fetchingSession || sessionStore.recoveringSession)
 const error = computed(() => sessionStore.error)
 const diagnosis = computed(() => sessionStore.goalDiagnosis)
-const diagnosisData = computed(() => ({
-  goalScore: diagnosis.value?.goalScore ?? 0,
-  feedback: {
-    summary: diagnosis.value?.feedback.summary ?? '',
-    strengths: diagnosis.value?.feedback.strengths ?? [],
-    risks: diagnosis.value?.feedback.risks ?? [],
-    rewrittenGoal: diagnosis.value?.feedback.rewrittenGoal ?? '',
-  },
-}))
 const pathOptions = computed(() => sessionStore.pathOptions)
 const selectedPathId = computed(() => sessionStore.selectedPathId)
-const sessionData = computed(() => ({
-  courseId: currentSession.value?.courseId ?? '',
-  chapterId: currentSession.value?.chapterId ?? '',
-  goalText: currentSession.value?.goalText ?? '',
-  currentStage: currentSession.value?.currentStage ?? '',
-  timeline: currentSession.value?.timeline ?? [],
-  masterySummary: currentSession.value?.masterySummary ?? [],
-  progress: currentSession.value?.progress ?? null,
-}))
-
 const currentStep = computed(() => browsingStep.value)
 const currentStepMeta = computed(() => steps.find((item) => item.step === currentStep.value) ?? steps[0]!)
 const selectedPath = computed(() => pathOptions.value.find((item) => item.pathId === selectedPathId.value) ?? null)
@@ -76,22 +57,22 @@ const username = computed(() => authStore.currentUser?.username ?? '')
 
 function stageLabel(stage: string) {
   const map: Record<string, string> = {
-    STRUCTURE: '缁撴瀯鏋勫缓',
-    UNDERSTANDING: '鐞嗚В娣卞寲',
-    TRAINING: '璁粌瀹炶返',
-    REFLECTION: '鍙嶆€濇€荤粨',
+    STRUCTURE: '结构构建',
+    UNDERSTANDING: '理解深化',
+    TRAINING: '训练实战',
+    REFLECTION: '复盘总结',
   }
   return map[stage] || stage
 }
 
 function stageGuide(stage: string) {
   const map: Record<string, string> = {
-    STRUCTURE: 'Organize key concepts and their relationships.',
-    UNDERSTANDING: 'Explain mechanisms and fix misunderstandings.',
-    TRAINING: 'Complete exercises and iterate from feedback.',
-    REFLECTION: 'Summarize mistakes and plan next improvements.',
+    STRUCTURE: '梳理关键概念、边界与关系，形成知识框架。',
+    UNDERSTANDING: '解释机制和因果链，识别并纠正常见误区。',
+    TRAINING: '完成训练题并提交答案，根据反馈修正。',
+    REFLECTION: '复盘错误模式，提炼下一步改进动作。',
   }
-  return map[stage] || 'Follow the task guidance for this stage.'
+  return map[stage] || '按任务提示完成学习。'
 }
 
 function resolveTaskPath(taskId: number, stage: string) {
@@ -166,6 +147,10 @@ async function goHome() {
   await router.replace({ name: 'home', query: { skipResume: '1' } })
 }
 
+async function goHistory() {
+  await router.push('/history')
+}
+
 async function handleLogout() {
   authStore.clearAuth()
   sessionStore.reset()
@@ -182,7 +167,8 @@ onMounted(async () => {
 <template>
   <main class="workflow-page">
     <header class="toolbar">
-      <button class="ghost-button" @click="goHome">杩斿洖棣栭〉</button>
+      <button class="ghost-button" @click="goHome">返回首页</button>
+      <button class="ghost-button" @click="goHistory">历史记录</button>
       <span class="workflow-id">Session #{{ sessionId }}</span>
       <span class="workflow-id">{{ username }}</span>
       <button type="button" class="ghost-button" @click="handleLogout">退出登录</button>
@@ -192,29 +178,29 @@ onMounted(async () => {
     <ErrorMessage v-else-if="error && !currentSession" :message="error" @retry="handleRetry" />
 
     <section v-else class="workflow-content">
-      <PageHeader eyebrow="Learning Flow" title="鍥涙瀛︿範娴佺▼" :subtitle="`褰撳墠鍏虫敞锛?{currentStepMeta.task}`" />
+      <PageHeader eyebrow="Learning Flow" title="四步学习流程" :subtitle="`当前关注：${currentStepMeta.task}`" />
       <StepProgress :steps="steps" :current-step="currentStep" />
 
       <article class="step-card">
         <div class="step-head">
           <h2>{{ currentStepMeta.step }}. {{ currentStepMeta.title }}</h2>
-          <span class="status-tag">鍙垏鎹㈡煡鐪嬪叏閮ㄦ楠</span>
+          <span class="status-tag">可切换查看全部步骤</span>
         </div>
 
         <section v-if="currentStep === 1" class="panel">
-          <h3>鐩爣璇婃柇缁撴灉</h3>
-          <p v-if="!diagnosis">鏆傛棤璇婃柇缁撴灉锛岃鍒锋柊銆</p>
+          <h3>目标诊断结果</h3>
+          <p v-if="!diagnosis">暂无诊断结果，请刷新。</p>
           <template v-else>
-            <p><strong>璇勫垎锛</strong>{{ diagnosisData.goalScore }}/100</p>
-            <p><strong>缁撹锛</strong>{{ diagnosisData.feedback.summary }}</p>
-            <p><strong>浼樺娍锛</strong>{{ diagnosisData.feedback.strengths.join(', ') }}</p>
-            <p><strong>椋庨櫓锛</strong>{{ diagnosisData.feedback.risks.join(', ') }}</p>
-            <p><strong>寤鸿鐩爣锛</strong>{{ diagnosisData.feedback.rewrittenGoal }}</p>
+            <p><strong>评分：</strong>{{ diagnosis.goalScore }}/100</p>
+            <p><strong>结论：</strong>{{ diagnosis.feedback.summary }}</p>
+            <p><strong>优势：</strong>{{ diagnosis.feedback.strengths.join('；') }}</p>
+            <p><strong>风险：</strong>{{ diagnosis.feedback.risks.join('；') }}</p>
+            <p><strong>建议目标：</strong>{{ diagnosis.feedback.rewrittenGoal }}</p>
           </template>
         </section>
 
         <section v-if="currentStep === 2" class="panel">
-          <h3>璺緞閫夐」</h3>
+          <h3>路径选项</h3>
           <div class="path-grid">
             <article
               v-for="path in pathOptions"
@@ -225,65 +211,64 @@ onMounted(async () => {
             >
               <h4>{{ path.name }}</h4>
               <p>{{ path.description }}</p>
-              <p>闅惧害锛歿{ path.difficulty }}锛岄璁?{{ path.estimatedMinutes }} 鍒嗛挓</p>
+              <p>难度：{{ path.difficulty }}，预计 {{ path.estimatedMinutes }} 分钟</p>
               <ul>
                 <li v-for="(s, idx) in path.steps" :key="`${path.pathId}-${idx}`">{{ s }}</li>
               </ul>
             </article>
           </div>
-          <p v-if="selectedPath"><strong>宸查€夛細</strong>{{ selectedPath.name }}</p>
+          <p v-if="selectedPath"><strong>已选：</strong>{{ selectedPath.name }}</p>
         </section>
 
         <section v-if="currentStep === 3" class="panel">
-          <h3>鍒嗘瀛︿範娓呭崟</h3>
-          <p v-if="!currentSession || sessionData.timeline.length === 0">鏆傛棤瀛︿範姝ラ銆</p>
+          <h3>分步学习清单</h3>
+          <p v-if="!currentSession || currentSession.timeline.length === 0">暂无学习步骤。</p>
           <div v-else class="task-list">
-            <article v-for="item in sessionData.timeline" :key="item.taskId" class="task-item">
+            <article v-for="item in currentSession.timeline" :key="item.taskId" class="task-item">
               <button class="task-toggle" @click="toggleTask(item.taskId)">
-                <span>浠诲姟 #{{ item.taskId }} - {{ stageLabel(item.stage) }}</span>
-                <span>{{ isTaskExpanded(item.taskId) ? '鏀惰捣' : '灞曞紑' }}</span>
+                <span>任务 #{{ item.taskId }} - {{ stageLabel(item.stage) }}</span>
+                <span>{{ isTaskExpanded(item.taskId) ? '收起' : '展开' }}</span>
               </button>
               <div v-if="isTaskExpanded(item.taskId)" class="task-body">
-                <p><strong>鐘舵€侊細</strong>{{ item.status }}</p>
-                <p><strong>璇ュ仛浠€涔堬細</strong>{{ stageGuide(item.stage) }}</p>
-                <PrimaryButton
-                  type="button"
-                  @click="openTask(item.taskId, item.stage)"
-                >
-                  鎵撳紑璇ユ楠や换鍔?                </PrimaryButton>
+                <p><strong>状态：</strong>{{ item.status }}</p>
+                <p><strong>该做什么：</strong>{{ stageGuide(item.stage) }}</p>
+                <PrimaryButton type="button" @click="openTask(item.taskId, item.stage)">
+                  打开该步骤任务
+                </PrimaryButton>
               </div>
             </article>
           </div>
-          <PrimaryButton v-if="sessionStore.nextTask" type="button" @click="handleRunNextTask">缁х画褰撳墠鎺ㄨ崘浠诲姟</PrimaryButton>
+          <PrimaryButton v-if="sessionStore.nextTask" type="button" @click="handleRunNextTask">继续当前推荐任务</PrimaryButton>
         </section>
 
         <section v-if="currentStep === 4" class="panel">
-          <h3>瀛︿範鎬荤粨</h3>
-          <p v-if="!currentSession">鏆傛棤鎬荤粨鏁版嵁銆</p>
+          <h3>学习总结</h3>
+          <p v-if="!currentSession">暂无总结数据。</p>
           <template v-else>
-            <p><strong>璇剧▼锛</strong>{{ sessionData.courseId }} / {{ sessionData.chapterId }}</p>
-            <p><strong>鐩爣锛</strong>{{ sessionData.goalText }}</p>
+            <p><strong>课程：</strong>{{ currentSession.courseId }} / {{ currentSession.chapterId }}</p>
+            <p><strong>目标：</strong>{{ currentSession.goalText }}</p>
             <p>
-              <strong>瀹屾垚杩涘害锛</strong>
-              {{ Math.round((sessionData.progress?.completionRate ?? 0) * 100) }}%
-              ({{ sessionData.progress?.completedTaskCount ?? 0 }}/{{ sessionData.progress?.totalTaskCount ?? 0 }})
+              <strong>完成进度：</strong>
+              {{ Math.round((currentSession.progress?.completionRate ?? 0) * 100) }}%
+              ({{ currentSession.progress?.completedTaskCount ?? 0 }}/{{ currentSession.progress?.totalTaskCount ?? 0 }})
             </p>
-            <p><strong>褰撳墠闃舵锛</strong>{{ stageLabel(sessionData.currentStage) }}</p>
+            <p><strong>当前阶段：</strong>{{ stageLabel(currentSession.currentStage) }}</p>
             <div class="mastery-list">
-              <p v-for="item in sessionData.masterySummary" :key="item.nodeId">
-                {{ item.nodeName }}锛歿{ Math.round(item.masteryValue * 100) }}%
+              <p v-for="item in currentSession.masterySummary" :key="item.nodeId">
+                {{ item.nodeName }}：{{ Math.round(item.masteryValue * 100) }}%
               </p>
             </div>
             <p v-if="sessionStore.nextTask">
-              <strong>涓嬩竴寤鸿锛</strong>
-              杩涘叆浠诲姟 #{{ sessionStore.nextTask.taskId }}锛坽{ stageLabel(sessionStore.nextTask.stage) }}锛?            </p>
+              <strong>下一建议：</strong>
+              进入任务 #{{ sessionStore.nextTask.taskId }}（{{ stageLabel(sessionStore.nextTask.stage) }}）
+            </p>
           </template>
         </section>
 
         <nav class="actions">
-          <button class="ghost-button" :disabled="currentStep === 1" @click="handlePrevious">涓婁竴姝</button>
-          <PrimaryButton v-if="currentStep < 4" type="button" @click="handleNext">涓嬩竴姝</PrimaryButton>
-          <PrimaryButton v-else type="button" @click="goHome">瀹屾垚骞惰繑鍥為椤</PrimaryButton>
+          <button class="ghost-button" :disabled="currentStep === 1" @click="handlePrevious">上一步</button>
+          <PrimaryButton v-if="currentStep < 4" type="button" @click="handleNext">下一步</PrimaryButton>
+          <PrimaryButton v-else type="button" @click="goHome">完成并返回首页</PrimaryButton>
         </nav>
       </article>
     </section>
@@ -311,8 +296,3 @@ onMounted(async () => {
 .ghost-button { min-height: 44px; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-secondary); background: rgba(12, 21, 42, 0.8); }
 @media (max-width: 900px) { .actions { grid-template-columns: 1fr; } }
 </style>
-
-
-
-
-

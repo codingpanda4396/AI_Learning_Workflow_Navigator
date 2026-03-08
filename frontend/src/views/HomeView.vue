@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -54,6 +54,7 @@ const canSubmit = computed(
     !!selectedPathId.value &&
     !isCreating.value,
 )
+
 const hasDraftInput = computed(
   () => goal.value.trim().length > 0 || courseId.value.trim().length > 0 || chapterId.value.trim().length > 0,
 )
@@ -122,7 +123,7 @@ async function handleDiagnose() {
   try {
     await sessionStore.diagnoseGoal(buildAnalyzePayload())
   } catch {
-    diagnosisError.value = sessionStore.error || 'Goal diagnosis failed. Please retry.'
+    diagnosisError.value = sessionStore.error || '目标诊断失败，请重试。'
   }
 }
 
@@ -134,7 +135,7 @@ async function handleFetchPaths() {
   try {
     await sessionStore.fetchPathOptions(buildAnalyzePayload())
   } catch {
-    pathOptionsError.value = sessionStore.error || 'Path generation failed. Please retry.'
+    pathOptionsError.value = sessionStore.error || '路径生成失败，请重试。'
   }
 }
 
@@ -185,6 +186,10 @@ async function handleSubmit() {
   }
 }
 
+async function goHistory() {
+  await router.push('/history')
+}
+
 async function handleLogout() {
   authStore.clearAuth()
   sessionStore.reset()
@@ -205,12 +210,7 @@ onMounted(async () => {
     }
 
     const response = await sessionStore.fetchCurrentSession()
-    if (
-      response.hasActiveSession &&
-      response.session &&
-      !hasDraftInput.value &&
-      route.name === 'home'
-    ) {
+    if (response.hasActiveSession && response.session && !hasDraftInput.value && route.name === 'home') {
       await router.replace(`/session/${response.session.sessionId}`)
     }
   } catch {
@@ -236,8 +236,10 @@ onMounted(async () => {
   <main v-else class="home-page">
     <header class="home-toolbar">
       <span class="username">{{ username }}</span>
+      <button type="button" class="ghost-btn" @click="goHistory">历史记录</button>
       <button type="button" class="ghost-btn" @click="handleLogout">退出登录</button>
     </header>
+
     <section class="hero-panel">
       <PageHeader
         eyebrow="AI Learning Navigator"
@@ -259,6 +261,7 @@ onMounted(async () => {
 
         <p v-if="courseError" class="submit-error">{{ courseError }}</p>
         <p v-if="chapterError" class="submit-error">{{ chapterError }}</p>
+
         <div class="action-block">
           <div class="analyze-actions">
             <PrimaryButton type="button" :disabled="isFetchingPaths" :loading="isFetchingPaths" @click="handleFetchPaths">
@@ -285,6 +288,7 @@ onMounted(async () => {
             <p><strong>风险：</strong>{{ diagnosis.feedback.risks.join('；') }}</p>
             <button type="button" class="ghost-btn" @click="applyRewrittenGoal">采用建议目标</button>
           </section>
+
           <section v-else-if="diagnosisError" class="diagnosis-card">
             <h3>目标诊断失败</h3>
             <p>{{ diagnosisError }}</p>
@@ -310,6 +314,7 @@ onMounted(async () => {
               </article>
             </div>
           </section>
+
           <section v-else-if="pathOptionsError" class="paths-card">
             <h3>路径生成失败</h3>
             <p>{{ pathOptionsError }}</p>

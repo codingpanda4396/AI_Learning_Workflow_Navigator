@@ -187,3 +187,21 @@ export interface RegisterRequest {
   username: string
   password: string
 }
+
+export interface SessionHistoryItem {
+  sessionId: number
+  course: string
+  chapter: string
+  goal: string
+  status: string
+  progress: Progress | null
+  lastActiveAt: string
+}
+
+export interface SessionHistoryResponse {
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+  items: SessionHistoryItem[]
+}

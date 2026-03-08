@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
@@ -19,8 +19,8 @@ function getStageLabel(stage: string) {
   const map: Record<string, string> = {
     STRUCTURE: '结构构建',
     UNDERSTANDING: '理解深化',
-    TRAINING: '训练实践',
-    REFLECTION: '反思总结',
+    TRAINING: '训练实战',
+    REFLECTION: '复盘总结',
   }
   return map[stage] || stage
 }

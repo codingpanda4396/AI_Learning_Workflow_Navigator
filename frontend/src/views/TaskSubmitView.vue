@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
@@ -23,8 +23,8 @@ function getStageLabel(stage: string) {
   const map: Record<string, string> = {
     STRUCTURE: '结构构建',
     UNDERSTANDING: '理解深化',
-    TRAINING: '训练实践',
-    REFLECTION: '反思总结',
+    TRAINING: '训练实战',
+    REFLECTION: '复盘总结',
   }
   return map[stage] || stage
 }
@@ -100,7 +100,9 @@ function handleGoNextTask() {
   const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
   router.push({
     path: targetPath,
-    ...(currentSessionId ? { query: { sessionId: String(currentSessionId), step: resolvedStep } } : { query: { step: resolvedStep } }),
+    ...(currentSessionId
+      ? { query: { sessionId: String(currentSessionId), step: resolvedStep } }
+      : { query: { step: resolvedStep } }),
   })
 }
 
@@ -175,7 +177,7 @@ onMounted(async () => {
         </div>
 
         <div class="actions">
-          <button v-if="result.nextTask" class="continue-btn secondary" @click="handleGoNextTask">开始下一任务</button>
+          <button v-if="result.nextTask" class="continue-btn secondary" @click="handleGoNextTask">开始下一个任务</button>
           <button class="continue-btn" @click="handleContinue">返回会话</button>
         </div>
       </div>
