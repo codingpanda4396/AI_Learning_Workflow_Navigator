@@ -87,16 +87,16 @@ async function handleSubmit() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 1.5rem;
 }
 
 .hero {
   text-align: center;
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
 }
 
 .title {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 700;
   color: var(--color-text);
   margin: 0;
@@ -104,7 +104,7 @@ async function handleSubmit() {
 }
 
 .subtitle {
-  font-size: 1.25rem;
+  font-size: 1rem;
   color: var(--color-text-secondary);
   margin-top: 0.5rem;
 }
@@ -114,12 +114,12 @@ async function handleSubmit() {
   max-width: 480px;
   background: var(--color-bg-elevated);
   border-radius: 16px;
-  padding: 2rem;
+  padding: 1.5rem;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .form-group label {
@@ -178,5 +178,31 @@ async function handleSubmit() {
 .submit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (min-width: 768px) {
+  .home {
+    padding: 2rem;
+  }
+
+  .hero {
+    margin-bottom: 3rem;
+  }
+
+  .title {
+    font-size: 3rem;
+  }
+
+  .subtitle {
+    font-size: 1.25rem;
+  }
+
+  .create-form {
+    padding: 2rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
 }
 </style>
