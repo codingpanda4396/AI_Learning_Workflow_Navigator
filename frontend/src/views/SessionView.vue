@@ -2,6 +2,8 @@
 import { onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
+import SessionSkeleton from '@/components/SessionSkeleton.vue'
+import ErrorMessage from '@/components/ErrorMessage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,6 +20,7 @@ const timeline = computed(() => sessionStore.timeline)
 const masterySummary = computed(() => sessionStore.masterySummary)
 const nextTask = computed(() => sessionStore.nextTask)
 const isLoading = computed(() => sessionStore.isLoading)
+const error = computed(() => sessionStore.error)
 
 function getStageLabel(stage: string) {
   const map: Record<string, string> = {
@@ -58,6 +61,10 @@ function handleStartNext() {
     }
   }
 }
+
+async function handleRetry() {
+  await sessionStore.fetchSessionOverview(sessionId.value)
+}
 </script>
 
 <template>
@@ -67,8 +74,17 @@ function handleStartNext() {
       <h1 class="session-title">学习会话</h1>
     </header>
 
-    <div v-if="isLoading" class="loading">加载中...</div>
+    <!-- Loading State -->
+    <SessionSkeleton v-if="isLoading && !currentSession" />
 
+    <!-- Error State -->
+    <ErrorMessage
+      v-else-if="error && !currentSession"
+      :message="error"
+      @retry="handleRetry"
+    />
+
+    <!-- Content -->
     <div v-else-if="currentSession" class="session-content">
       <!-- 目标 -->
       <section class="goal-section">
@@ -160,12 +176,6 @@ function handleStartNext() {
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--color-text);
-}
-
-.loading {
-  text-align: center;
-  padding: 3rem;
-  color: var(--color-text-secondary);
 }
 
 .session-content {
