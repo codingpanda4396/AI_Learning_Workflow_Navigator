@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useWorkflowStore } from '@/stores/workflow'
 import { courseOptions } from '@/constants/courses'
@@ -10,6 +10,9 @@ import CourseSelector from '@/components/CourseSelector.vue'
 import StepProgress from '@/components/StepProgress.vue'
 import PrimaryButton from '@/components/PrimaryButton.vue'
 
+const SKIP_RESUME_ONCE_KEY = 'ai_learning_skip_resume_once'
+
+const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
 const workflowStore = useWorkflowStore()
@@ -81,24 +84,32 @@ async function handleSubmit() {
     const newSessionId = await sessionStore.createSession(payload)
     await sessionStore.planSession(newSessionId)
     await sessionStore.fetchSessionOverview(newSessionId)
-
     workflowStore.setWorkflowId(String(newSessionId))
-    workflowStore.setCurrentStep(1)
-    router.push(`/session/${newSessionId}`)
+    await router.push(`/session/${newSessionId}`)
   } catch {
     submitError.value = sessionStore.error || '会话创建失败，请稍后重试。'
   }
 }
 
 onMounted(async () => {
+  const skipByQuery = route.query.skipResume === '1'
+  const skipByFlag = localStorage.getItem(SKIP_RESUME_ONCE_KEY) === '1'
+  if (skipByQuery || skipByFlag) {
+    localStorage.removeItem(SKIP_RESUME_ONCE_KEY)
+    if (skipByQuery) {
+      await router.replace({ name: 'home' })
+    }
+    return
+  }
+
   const userId = localStorage.getItem('ai_learning_user_id') || defaultUserId
   try {
     const response = await sessionStore.fetchCurrentSession(userId)
     if (response.hasActiveSession && response.session) {
-      router.replace(`/session/${response.session.sessionId}`)
+      await router.replace(`/session/${response.session.sessionId}`)
     }
   } catch {
-    // Ignore recovery failure on entry page.
+    // Ignore resume failure.
   }
 })
 </script>
@@ -136,57 +147,12 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.home-page {
-  min-height: 100dvh;
-  padding: clamp(20px, 4vw, 40px);
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: clamp(18px, 3vw, 32px);
-}
-
-.hero-panel,
-.form-panel {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(160deg, rgba(16, 27, 50, 0.92), rgba(10, 16, 30, 0.95));
-  box-shadow: var(--shadow-md);
-}
-
-.hero-panel {
-  padding: clamp(20px, 4vw, 40px);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: var(--space-xxl);
-}
-
-.form-panel {
-  padding: clamp(18px, 3vw, 28px);
-}
-
-.start-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-}
-
-.action-block {
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.submit-error {
-  margin: 0;
-  color: var(--color-error);
-  font-size: var(--font-size-sm);
-}
-
-@media (max-width: 980px) {
-  .home-page {
-    grid-template-columns: 1fr;
-  }
-}
+.home-page { min-height: 100dvh; padding: clamp(20px, 4vw, 40px); display: grid; grid-template-columns: 1.1fr 1fr; gap: clamp(18px, 3vw, 32px); }
+.hero-panel, .form-panel { border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: linear-gradient(160deg, rgba(16, 27, 50, 0.92), rgba(10, 16, 30, 0.95)); box-shadow: var(--shadow-md); }
+.hero-panel { padding: clamp(20px, 4vw, 40px); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-xxl); }
+.form-panel { padding: clamp(18px, 3vw, 28px); }
+.start-form { display: flex; flex-direction: column; gap: var(--space-lg); }
+.action-block { border-top: 1px solid var(--color-border); padding-top: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-sm); }
+.submit-error { margin: 0; color: var(--color-error); font-size: var(--font-size-sm); }
+@media (max-width: 980px) { .home-page { grid-template-columns: 1fr; } }
 </style>

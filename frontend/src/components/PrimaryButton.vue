@@ -10,10 +10,18 @@ withDefaults(defineProps<PrimaryButtonProps>(), {
   loading: false,
   type: 'button',
 })
+
+const emit = defineEmits<{
+  click: [event: MouseEvent]
+}>()
+
+function handleClick(event: MouseEvent) {
+  emit('click', event)
+}
 </script>
 
 <template>
-  <button class="primary-button" :type="type" :disabled="disabled || loading">
+  <button class="primary-button" :type="type" :disabled="disabled || loading" @click="handleClick">
     <span v-if="loading" class="spinner" aria-hidden="true"></span>
     <span><slot /></span>
   </button>
