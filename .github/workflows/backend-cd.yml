@@ -75,10 +75,10 @@ jobs:
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             echo ">>> 拉取最新镜像..."
-            docker compose -f docker-compose.prod.yml pull
+            docker compose --env-file .env.prod -f docker-compose.prod.yml pull
 
             echo ">>> 重启服务..."
-            docker compose -f docker-compose.prod.yml up -d
+            docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
 
             echo ">>> 清理无用镜像..."
             docker image prune -f
