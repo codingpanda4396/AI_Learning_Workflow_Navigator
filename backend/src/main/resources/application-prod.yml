@@ -20,6 +20,14 @@ logging:
     com.pandanav.learning: INFO
 
 app:
+  tutor:
+    llm:
+      enabled: ${TUTOR_LLM_ENABLED:true}
+      provider: ${TUTOR_LLM_PROVIDER:deepseek}
+      api-key: ${DEEPSEEK_API_KEY}
+      base-url: ${TUTOR_LLM_BASE_URL:https://api.deepseek.com/v1}
+      model: ${TUTOR_LLM_MODEL:deepseek-chat}
+      timeout-ms: ${TUTOR_LLM_TIMEOUT_MS:10000}
   llm:
     enabled: ${LLM_ENABLED:true}
     provider: ${LLM_PROVIDER:openai-compatible}

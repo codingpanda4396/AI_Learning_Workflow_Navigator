@@ -36,6 +36,14 @@ app:
   auth:
     jwt-secret: ${APP_AUTH_JWT_SECRET:change-me-please-change-me-please-change-me}
     token-expire-days: ${APP_AUTH_TOKEN_EXPIRE_DAYS:7}
+  tutor:
+    llm:
+      enabled: ${TUTOR_LLM_ENABLED:false}
+      provider: ${TUTOR_LLM_PROVIDER:deepseek}
+      api-key: ${DEEPSEEK_API_KEY:}
+      base-url: ${TUTOR_LLM_BASE_URL:https://api.deepseek.com/v1}
+      model: ${TUTOR_LLM_MODEL:deepseek-chat}
+      timeout-ms: ${TUTOR_LLM_TIMEOUT_MS:10000}
   llm:
     enabled: ${LLM_ENABLED:false}
     provider: ${LLM_PROVIDER:openai-compatible}

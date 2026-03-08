@@ -173,6 +173,30 @@ export interface TaskDetailResponse {
   output: TaskOutput
 }
 
+export type TutorMessageRole = 'user' | 'assistant'
+
+export interface TutorMessage {
+  id: number
+  sessionId: number
+  taskId: number
+  role: TutorMessageRole
+  content: string
+  createdAt: string
+}
+
+export interface TutorMessageListResponse {
+  sessionId: number
+  taskId: number
+  messages: TutorMessage[]
+}
+
+export interface TutorSendMessageResponse {
+  sessionId: number
+  taskId: number
+  userMessage: TutorMessage
+  assistantMessage: TutorMessage
+}
+
 export interface AuthUser {
   id: number
   username: string
