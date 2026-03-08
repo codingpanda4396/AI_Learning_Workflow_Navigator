@@ -26,7 +26,9 @@ app:
     base-url: ${LLM_BASE_URL}
     api-key: ${LLM_API_KEY}
     model: ${LLM_MODEL}
-    timeout-ms: ${LLM_TIMEOUT_MS:10000}
+    timeout-ms: ${LLM_TIMEOUT_MS:30000}
+    max-retries: ${LLM_MAX_RETRIES:2}
+    retry-backoff-ms: ${LLM_RETRY_BACKOFF_MS:500}
     fallback-to-rule: ${LLM_FALLBACK_TO_RULE:true}
     log-request: ${LLM_LOG_REQUEST:false}
     log-response: ${LLM_LOG_RESPONSE:false}

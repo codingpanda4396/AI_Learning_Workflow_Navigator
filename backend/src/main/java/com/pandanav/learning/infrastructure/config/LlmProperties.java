@@ -11,6 +11,8 @@ public class LlmProperties {
     private String apiKey;
     private String model;
     private int timeoutMs = 10000;
+    private int maxRetries = 2;
+    private int retryBackoffMs = 500;
     private boolean fallbackToRule = true;
     private boolean logRequest = false;
     private boolean logResponse = false;
@@ -63,6 +65,22 @@ public class LlmProperties {
         this.timeoutMs = timeoutMs;
     }
 
+    public int getMaxRetries() {
+        return maxRetries;
+    }
+
+    public void setMaxRetries(int maxRetries) {
+        this.maxRetries = Math.max(0, maxRetries);
+    }
+
+    public int getRetryBackoffMs() {
+        return retryBackoffMs;
+    }
+
+    public void setRetryBackoffMs(int retryBackoffMs) {
+        this.retryBackoffMs = Math.max(0, retryBackoffMs);
+    }
+
     public boolean isFallbackToRule() {
         return fallbackToRule;
     }
@@ -94,4 +112,3 @@ public class LlmProperties {
             && model != null && !model.isBlank();
     }
 }
-

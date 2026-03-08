@@ -34,3 +34,5 @@ target/
 **/.env.prod
 deploy/.env.prod
 secrets.md
+
+node_modules

@@ -25,9 +25,13 @@ const goalError = ref('')
 const courseError = ref('')
 const chapterError = ref('')
 const submitError = ref('')
+const diagnosisError = ref('')
+const pathOptionsError = ref('')
 
 const isCreating = computed(() => sessionStore.creatingSession || sessionStore.planning)
-const isAnalyzing = computed(() => sessionStore.diagnosingGoal || sessionStore.fetchingPathOptions)
+const isDiagnosing = computed(() => sessionStore.diagnosingGoal)
+const isFetchingPaths = computed(() => sessionStore.fetchingPathOptions)
+const isAnalyzing = computed(() => isDiagnosing.value || isFetchingPaths.value)
 const diagnosis = computed(() => sessionStore.goalDiagnosis)
 const pathOptions = computed(() => sessionStore.pathOptions)
 const selectedPathId = computed(() => sessionStore.selectedPathId)
@@ -96,20 +100,40 @@ function validateInputs() {
 }
 
 async function handleAnalyze() {
-  if (!validateInputs() || isAnalyzing.value) return
+  if (!validateInputs()) return
+  await Promise.allSettled([handleDiagnose(), handleFetchPaths()])
+}
 
-  const payload = {
+function buildAnalyzePayload() {
+  return {
     userId: defaultUserId,
     courseId: courseId.value.trim(),
     chapterId: chapterId.value.trim(),
     goalText: goal.value.trim(),
   }
+}
+
+async function handleDiagnose() {
+  if (!validateInputs() || isDiagnosing.value) return
+  diagnosisError.value = ''
   submitError.value = ''
 
   try {
-    await Promise.all([sessionStore.diagnoseGoal(payload), sessionStore.fetchPathOptions(payload)])
+    await sessionStore.diagnoseGoal(buildAnalyzePayload())
   } catch {
-    submitError.value = sessionStore.error || '目标诊断失败，请稍后重试。'
+    diagnosisError.value = sessionStore.error || 'Goal diagnosis failed. Please retry.'
+  }
+}
+
+async function handleFetchPaths() {
+  if (!validateInputs() || isFetchingPaths.value) return
+  pathOptionsError.value = ''
+  submitError.value = ''
+
+  try {
+    await sessionStore.fetchPathOptions(buildAnalyzePayload())
+  } catch {
+    pathOptionsError.value = sessionStore.error || 'Path generation failed. Please retry.'
   }
 }
 
@@ -195,7 +219,11 @@ onMounted(async () => {
 <template>
   <main v-if="checkingResume" class="home-page">
     <section class="hero-panel">
-      <PageHeader eyebrow="AI Learning Navigator" title="加载中..." subtitle="正在检查是否需要恢复上次学习会话。" />
+      <PageHeader
+        eyebrow="AI Learning Navigator"
+        title="加载中..."
+        subtitle="正在检查是否需要恢复上次学习会话。"
+      />
     </section>
     <section class="form-panel"></section>
   </main>
@@ -205,7 +233,7 @@ onMounted(async () => {
       <PageHeader
         eyebrow="AI Learning Navigator"
         title="先诊断目标，再开始学习"
-        subtitle="输入课程、章节和目标，获取目标评价与可选学习路径。"
+        subtitle="输入课程、章节和目标，获取目标评估与可选学习路径。"
       />
       <StepProgress :current-step="1" :steps="stepPreview" />
     </section>
@@ -222,18 +250,36 @@ onMounted(async () => {
 
         <p v-if="courseError" class="submit-error">{{ courseError }}</p>
         <p v-if="chapterError" class="submit-error">{{ chapterError }}</p>
-
         <div class="action-block">
+          <div class="analyze-actions">
+            <PrimaryButton type="button" :disabled="isFetchingPaths" :loading="isFetchingPaths" @click="handleFetchPaths">
+              生成学习路径
+            </PrimaryButton>
+            <PrimaryButton type="button" :disabled="isDiagnosing" :loading="isDiagnosing" @click="handleDiagnose">
+              诊断目标
+            </PrimaryButton>
+          </div>
+
           <PrimaryButton type="button" :disabled="isAnalyzing" :loading="isAnalyzing" @click="handleAnalyze">
             诊断目标并生成路径
           </PrimaryButton>
 
+          <section v-if="isDiagnosing && !diagnosis" class="diagnosis-card">
+            <h3>目标诊断中...</h3>
+            <p>诊断请求可能需要 10~60 秒，路径生成不受此步骤阻塞。</p>
+          </section>
+
           <section v-if="diagnosis" class="diagnosis-card">
-            <h3>目标评价：{{ diagnosis.goalScore }}/100</h3>
+            <h3>目标评估：{{ diagnosis.goalScore }}/100</h3>
             <p>{{ diagnosis.feedback.summary }}</p>
             <p><strong>优势：</strong>{{ diagnosis.feedback.strengths.join('；') }}</p>
             <p><strong>风险：</strong>{{ diagnosis.feedback.risks.join('；') }}</p>
             <button type="button" class="ghost-btn" @click="applyRewrittenGoal">采用建议目标</button>
+          </section>
+          <section v-else-if="diagnosisError" class="diagnosis-card">
+            <h3>目标诊断失败</h3>
+            <p>{{ diagnosisError }}</p>
+            <button type="button" class="ghost-btn" @click="handleDiagnose">重试诊断</button>
           </section>
 
           <section v-if="pathOptions.length > 0" class="paths-card">
@@ -255,6 +301,11 @@ onMounted(async () => {
               </article>
             </div>
           </section>
+          <section v-else-if="pathOptionsError" class="paths-card">
+            <h3>路径生成失败</h3>
+            <p>{{ pathOptionsError }}</p>
+            <button type="button" class="ghost-btn" @click="handleFetchPaths">重试生成路径</button>
+          </section>
 
           <PrimaryButton type="submit" :disabled="!canSubmit" :loading="isCreating">
             开始分步学习
@@ -274,11 +325,17 @@ onMounted(async () => {
 .form-panel { padding: clamp(18px, 3vw, 28px); }
 .start-form { display: flex; flex-direction: column; gap: var(--space-lg); }
 .action-block { border-top: 1px solid var(--color-border); padding-top: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-sm); }
+.analyze-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
 .diagnosis-card, .paths-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); background: rgba(12, 21, 42, 0.8); }
 .path-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-sm); }
 .path-item { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px; cursor: pointer; }
 .path-item.selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-alpha); }
 .ghost-btn { border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: transparent; color: var(--color-text); padding: 6px 10px; }
 .submit-error { margin: 0; color: var(--color-error); font-size: var(--font-size-sm); }
+@media (max-width: 680px) { .analyze-actions { grid-template-columns: 1fr; } }
 @media (max-width: 980px) { .home-page { grid-template-columns: 1fr; } }
 </style>
+
+
+
+

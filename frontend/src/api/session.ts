@@ -39,7 +39,7 @@ export async function diagnoseGoal(request: CreateSessionRequest): Promise<GoalD
     chapter_id: request.chapterId,
     goal_text: request.goalText,
   }
-  const { data } = await client.post('/session/goal-diagnose', payload)
+  const { data } = await client.post('/session/goal-diagnose', payload, { timeout: 90000 })
   return mapGoalDiagnosisDto(data)
 }
 

@@ -1,0 +1,12 @@
+{
+  "name": "ai-learning-workflow-navigator",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n fe,be -c blue,green \"npm run dev --prefix frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "cd backend && mvn spring-boot:run"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

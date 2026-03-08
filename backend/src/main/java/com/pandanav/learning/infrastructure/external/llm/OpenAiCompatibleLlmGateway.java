@@ -9,13 +9,16 @@ import com.pandanav.learning.domain.llm.model.LlmUsage;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -44,23 +47,7 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
             "response_format", Map.of("type", "json_object")
         ));
 
-        JsonNode response;
-        try {
-            ResponseEntity<byte[]> entity = restClient.post()
-                .uri("/chat/completions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey())
-                .body(requestPayload)
-                .retrieve()
-                .toEntity(byte[].class);
-            response = parseResponse(entity);
-        } catch (Exception ex) {
-            throw new InternalServerException("LLM provider call failed: " + ex.getMessage());
-        }
-
-        if (response == null) {
-            throw new InternalServerException("LLM provider returned empty response.");
-        }
+        JsonNode response = invokeWithRetry(requestPayload);
 
         JsonNode contentNode = response.path("choices").path(0).path("message").path("content");
         if (contentNode.isMissingNode() || contentNode.isNull() || contentNode.asText().isBlank()) {
@@ -85,6 +72,59 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
         );
     }
 
+    private JsonNode invokeWithRetry(JsonNode requestPayload) {
+        int attempts = properties.getMaxRetries() + 1;
+        Exception lastError = null;
+
+        for (int i = 1; i <= attempts; i++) {
+            try {
+                ResponseEntity<byte[]> entity = callProvider(requestPayload);
+                return parseResponse(entity);
+            } catch (Exception ex) {
+                lastError = ex;
+                boolean shouldRetry = i < attempts && isRetryable(ex);
+                if (!shouldRetry) {
+                    break;
+                }
+                sleepBackoff();
+            }
+        }
+
+        if (lastError instanceof InternalServerException internalServerException) {
+            throw internalServerException;
+        }
+        throw new InternalServerException("LLM provider call failed: " + (lastError == null ? "unknown" : lastError.getMessage()));
+    }
+
+    private ResponseEntity<byte[]> callProvider(JsonNode requestPayload) {
+        try {
+            return restClient.post()
+                .uri("/chat/completions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON, MediaType.ALL)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey())
+                .body(requestPayload)
+                .exchange((req, res) -> {
+                    HttpStatusCode status = res.getStatusCode();
+                    if (status.is4xxClientError() || status.is5xxServerError()) {
+                        throw new InternalServerException(
+                            "LLM provider returned " + status + ": " + readBodyAsString(res.getBody()));
+                    }
+                    byte[] body;
+                    try (InputStream in = res.getBody()) {
+                        body = in.readAllBytes();
+                    }
+                    return ResponseEntity.status(status)
+                        .headers(res.getHeaders())
+                        .body(body);
+                });
+        } catch (InternalServerException e) {
+            throw e;
+        } catch (Exception ex) {
+            throw new InternalServerException("LLM provider call failed: " + ex.getMessage());
+        }
+    }
+
     private JsonNode parseResponse(ResponseEntity<byte[]> entity) {
         byte[] body = entity.getBody();
         if (body == null || body.length == 0) {
@@ -100,6 +140,35 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
             throw new InternalServerException(
                 "LLM provider response is not valid JSON. contentType=" + contentType + ", preview=" + preview
             );
+        }
+    }
+
+    private boolean isRetryable(Exception ex) {
+        if (ex instanceof ResourceAccessException) {
+            String msg = ex.getMessage();
+            return msg != null && (msg.contains("Read timed out") || msg.contains("Connection reset") || msg.contains("I/O error"));
+        }
+        String msg = ex.getMessage();
+        return msg != null && (msg.contains(" 429 ") || msg.contains(" 500 ") || msg.contains(" 502 ") || msg.contains(" 503 "));
+    }
+
+    private void sleepBackoff() {
+        if (properties.getRetryBackoffMs() <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(properties.getRetryBackoffMs());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static String readBodyAsString(InputStream in) {
+        if (in == null) return "";
+        try {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "(unable to read body: " + e.getMessage() + ")";
         }
     }
 }
