@@ -19,6 +19,9 @@ public record RunTaskResponse(
     @JsonProperty("generation_mode")
     @Schema(name = "generation_mode", example = "LLM")
     String generationMode,
+    @JsonProperty("generation_reason")
+    @Schema(name = "generation_reason", example = "LLM request timed out")
+    String generationReason,
     JsonNode output
 ) {
 }

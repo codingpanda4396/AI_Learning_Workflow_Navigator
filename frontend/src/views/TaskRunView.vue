@@ -13,6 +13,7 @@ const loadError = computed(() => sessionStore.error)
 const task = computed(() => sessionStore.currentTask)
 const isLoading = computed(() => sessionStore.runningTask)
 const sections = computed(() => task.value?.output.sections ?? [])
+const generationReason = computed(() => task.value?.generationReason?.trim() ?? '')
 
 function getStageLabel(stage: string) {
   const map: Record<string, string> = {
@@ -81,6 +82,7 @@ onMounted(async () => {
         <span class="task-id">任务 #{{ task.taskId }}</span>
         <span class="task-source">来源：{{ getGenerationLabel(task.generationMode) }}</span>
       </div>
+      <p v-if="generationReason" class="generation-reason">原因：{{ generationReason }}</p>
 
       <div v-if="sections.length > 0" class="output-sections">
         <div v-for="section in sections" :key="section.title" class="output-section">
@@ -123,6 +125,7 @@ onMounted(async () => {
 .task-stage { padding: 0.25rem 0.75rem; font-size: 0.75rem; font-weight: 600; color: var(--color-primary); background: var(--color-primary-alpha); border-radius: 4px; }
 .task-id { font-size: 0.875rem; color: var(--color-text-secondary); }
 .task-source { font-size: 0.875rem; color: var(--color-text-secondary); }
+.generation-reason { margin: -1rem 0 1.5rem; color: var(--color-text-secondary); font-size: 0.875rem; }
 .output-sections { display: flex; flex-direction: column; gap: 2rem; margin-bottom: 2rem; }
 .output-section { background: var(--color-bg-elevated); border-radius: 12px; padding: 1.5rem; }
 .section-title { font-size: 1rem; font-weight: 600; color: var(--color-text); margin-bottom: 1rem; }

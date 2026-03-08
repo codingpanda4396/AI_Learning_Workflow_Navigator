@@ -110,6 +110,7 @@ export interface RunTaskResponse {
   nodeId: number
   status: string
   generationMode?: string
+  generationReason?: string
   output: TaskOutput
 }
 

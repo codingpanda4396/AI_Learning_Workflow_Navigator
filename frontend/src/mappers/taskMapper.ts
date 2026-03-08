@@ -6,6 +6,7 @@ interface RunTaskResponseDto {
   node_id: number
   status: string
   generation_mode?: string
+  generation_reason?: string
   output?: unknown
 }
 
@@ -198,6 +199,7 @@ export function mapRunTaskDto(dto: RunTaskResponseDto): RunTaskResponse {
     nodeId: dto.node_id,
     status: dto.status,
     generationMode: dto.generation_mode,
+    generationReason: dto.generation_reason,
     output: {
       sections: parseSections(dto.output),
     },

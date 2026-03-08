@@ -31,6 +31,7 @@ const isAnalyzing = computed(() => sessionStore.diagnosingGoal || sessionStore.f
 const diagnosis = computed(() => sessionStore.goalDiagnosis)
 const pathOptions = computed(() => sessionStore.pathOptions)
 const selectedPathId = computed(() => sessionStore.selectedPathId)
+const checkingResume = ref(true)
 
 const stepPreview = [
   { step: 1 as const, title: '目标诊断' },
@@ -46,6 +47,9 @@ const canSubmit = computed(
     chapterId.value.trim().length > 0 &&
     !!selectedPathId.value &&
     !isCreating.value,
+)
+const hasDraftInput = computed(
+  () => goal.value.trim().length > 0 || courseId.value.trim().length > 0 || chapterId.value.trim().length > 0,
 )
 
 const goalHint = computed(() =>
@@ -159,30 +163,44 @@ async function handleSubmit() {
 }
 
 onMounted(async () => {
-  const skipByQuery = route.query.skipResume === '1'
-  const skipByFlag = localStorage.getItem(SKIP_RESUME_ONCE_KEY) === '1'
-  if (skipByQuery || skipByFlag) {
-    localStorage.removeItem(SKIP_RESUME_ONCE_KEY)
-    if (skipByQuery) {
-      await router.replace({ name: 'home' })
-    }
-    return
-  }
-
-  const userId = localStorage.getItem('ai_learning_user_id') || defaultUserId
   try {
+    const skipByQuery = route.query.skipResume === '1'
+    const skipByFlag = localStorage.getItem(SKIP_RESUME_ONCE_KEY) === '1'
+    if (skipByQuery || skipByFlag) {
+      localStorage.removeItem(SKIP_RESUME_ONCE_KEY)
+      if (skipByQuery) {
+        await router.replace({ name: 'home' })
+      }
+      return
+    }
+
+    const userId = localStorage.getItem('ai_learning_user_id') || defaultUserId
     const response = await sessionStore.fetchCurrentSession(userId)
-    if (response.hasActiveSession && response.session) {
+    if (
+      response.hasActiveSession &&
+      response.session &&
+      !hasDraftInput.value &&
+      route.name === 'home'
+    ) {
       await router.replace(`/session/${response.session.sessionId}`)
     }
   } catch {
     // ignore
+  } finally {
+    checkingResume.value = false
   }
 })
 </script>
 
 <template>
-  <main class="home-page">
+  <main v-if="checkingResume" class="home-page">
+    <section class="hero-panel">
+      <PageHeader eyebrow="AI Learning Navigator" title="加载中..." subtitle="正在检查是否需要恢复上次学习会话。" />
+    </section>
+    <section class="form-panel"></section>
+  </main>
+
+  <main v-else class="home-page">
     <section class="hero-panel">
       <PageHeader
         eyebrow="AI Learning Navigator"
