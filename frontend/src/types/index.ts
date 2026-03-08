@@ -15,7 +15,6 @@ export type NextAction =
   | 'NOOP'
 
 export interface CreateSessionRequest {
-  userId: string
   courseId: string
   chapterId: string
   goalText: string
@@ -172,4 +171,19 @@ export interface TaskDetailResponse {
   status: string
   hasOutput: boolean
   output: TaskOutput
+}
+
+export interface AuthUser {
+  id: number
+  username: string
+}
+
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface RegisterRequest {
+  username: string
+  password: string
 }

@@ -16,13 +16,13 @@ public class GetCurrentSessionService implements GetCurrentSessionUseCase {
     }
 
     @Override
-    public CurrentSessionResponse execute(String userId) {
-        return sessionRepository.findLatestByUserId(userId)
+    public CurrentSessionResponse execute(Long userId) {
+        return sessionRepository.findLatestActiveByUserPk(userId)
             .map(session -> new CurrentSessionResponse(
                 true,
                 new CurrentSessionInfoResponse(
                     session.getId(),
-                    session.getUserId(),
+                    session.getUserPk() == null ? null : String.valueOf(session.getUserPk()),
                     session.getCourseId(),
                     session.getChapterId(),
                     session.getGoalText(),

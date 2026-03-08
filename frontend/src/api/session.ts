@@ -23,7 +23,6 @@ interface CreateSessionResponseDto {
 
 export async function createSession(request: CreateSessionRequest): Promise<number> {
   const payload = {
-    user_id: request.userId,
     course_id: request.courseId,
     chapter_id: request.chapterId,
     goal_text: request.goalText,
@@ -63,10 +62,8 @@ export async function getSessionOverview(sessionId: number): Promise<SessionOver
   return mapSessionOverviewDto(data)
 }
 
-export async function getCurrentSession(userId: string): Promise<CurrentSessionResponse> {
-  const { data } = await client.get('/session/current', {
-    params: { user_id: userId },
-  })
+export async function getCurrentSession(): Promise<CurrentSessionResponse> {
+  const { data } = await client.get('/session/current')
   return mapCurrentSessionDto(data)
 }
 

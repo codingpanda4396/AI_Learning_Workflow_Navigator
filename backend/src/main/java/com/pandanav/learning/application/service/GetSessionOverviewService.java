@@ -6,6 +6,7 @@ import com.pandanav.learning.api.dto.session.ProgressResponse;
 import com.pandanav.learning.api.dto.session.SessionOverviewResponse;
 import com.pandanav.learning.api.dto.session.TimelineItemResponse;
 import com.pandanav.learning.application.usecase.GetSessionOverviewUseCase;
+import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.model.Mastery;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.enums.TaskStatus;
@@ -41,7 +42,10 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
 
     @Override
     public SessionOverviewResponse execute(Long sessionId) {
-        var session = sessionRepository.findById(sessionId)
+        Long userId = UserContextHolder.getUserId();
+        var session = (userId == null
+            ? sessionRepository.findById(sessionId)
+            : sessionRepository.findByIdAndUserPk(sessionId, userId))
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
 
         List<Task> timelineTasks = taskRepository.findBySessionIdWithStatus(sessionId);

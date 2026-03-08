@@ -3,6 +3,7 @@ package com.pandanav.learning.application.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.dto.task.TaskDetailResponse;
+import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
@@ -29,7 +30,10 @@ public class TaskQueryService {
     }
 
     public TaskDetailResponse getTaskDetail(Long taskId) {
-        Task task = taskRepository.findById(taskId)
+        Long userId = UserContextHolder.getUserId();
+        Task task = (userId == null
+            ? taskRepository.findById(taskId)
+            : taskRepository.findByIdAndUserPk(taskId, userId))
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
 
         ConceptNode conceptNode = conceptNodeRepository.findById(task.getNodeId())

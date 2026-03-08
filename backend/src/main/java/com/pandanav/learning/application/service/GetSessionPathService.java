@@ -3,6 +3,7 @@ package com.pandanav.learning.application.service;
 import com.pandanav.learning.api.dto.session.PathNodeResponse;
 import com.pandanav.learning.api.dto.session.PathResponse;
 import com.pandanav.learning.application.usecase.GetSessionPathUseCase;
+import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.Mastery;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
@@ -39,7 +40,10 @@ public class GetSessionPathService implements GetSessionPathUseCase {
 
     @Override
     public PathResponse execute(Long sessionId) {
-        var session = sessionRepository.findById(sessionId)
+        Long userId = UserContextHolder.getUserId();
+        var session = (userId == null
+            ? sessionRepository.findById(sessionId)
+            : sessionRepository.findByIdAndUserPk(sessionId, userId))
             .orElseThrow(() -> new NotFoundException("Session not found."));
 
         List<ConceptNode> nodes = conceptNodeRepository.findByChapterIdOrderByOrderNoAsc(session.getChapterId());

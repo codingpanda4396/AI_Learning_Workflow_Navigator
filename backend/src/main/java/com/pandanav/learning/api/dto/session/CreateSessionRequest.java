@@ -1,15 +1,13 @@
 package com.pandanav.learning.api.dto.session;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
 @Schema(name = "CreateSessionRequest")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record CreateSessionRequest(
-    @NotBlank
-    @JsonProperty("user_id")
-    @Schema(name = "user_id", example = "mock_openid_001")
-    String userId,
     @NotBlank
     @JsonProperty("course_id")
     @Schema(name = "course_id", example = "computer_network")

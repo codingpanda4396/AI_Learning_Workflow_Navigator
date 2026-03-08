@@ -8,11 +8,15 @@ public class LearningSession {
 
     private Long id;
     private String userId;
+    private Long userPk;
     private String courseId;
     private String chapterId;
     private String goalText;
     private Long currentNodeId;
     private Stage currentStage;
+    private String status;
+    private OffsetDateTime completedAt;
+    private OffsetDateTime lastActiveAt;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
@@ -34,6 +38,14 @@ public class LearningSession {
 
     public String getCourseId() {
         return courseId;
+    }
+
+    public Long getUserPk() {
+        return userPk;
+    }
+
+    public void setUserPk(Long userPk) {
+        this.userPk = userPk;
     }
 
     public void setCourseId(String courseId) {
@@ -70,6 +82,30 @@ public class LearningSession {
 
     public void setCurrentStage(Stage currentStage) {
         this.currentStage = currentStage;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public OffsetDateTime getCompletedAt() {
+        return completedAt;
+    }
+
+    public void setCompletedAt(OffsetDateTime completedAt) {
+        this.completedAt = completedAt;
+    }
+
+    public OffsetDateTime getLastActiveAt() {
+        return lastActiveAt;
+    }
+
+    public void setLastActiveAt(OffsetDateTime lastActiveAt) {
+        this.lastActiveAt = lastActiveAt;
     }
 
     public OffsetDateTime getCreatedAt() {

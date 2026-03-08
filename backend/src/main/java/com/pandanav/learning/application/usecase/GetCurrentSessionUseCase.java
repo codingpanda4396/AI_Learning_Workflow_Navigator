@@ -4,5 +4,5 @@ import com.pandanav.learning.api.dto.session.CurrentSessionResponse;
 
 public interface GetCurrentSessionUseCase {
 
-    CurrentSessionResponse execute(String userId);
+    CurrentSessionResponse execute(Long userId);
 }

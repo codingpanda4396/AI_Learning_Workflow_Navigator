@@ -90,6 +90,42 @@ public class JdbcTaskRepository implements TaskRepository {
     }
 
     @Override
+    public Optional<Task> findByIdAndUserPk(Long id, Long userPk) {
+        try {
+            Task task = jdbcTemplate.queryForObject(
+                """
+                    SELECT t.id, t.session_id, t.stage, t.node_id, t.objective, t.created_at, t.updated_at,
+                           COALESCE((
+                               SELECT ta.status
+                               FROM task_attempt ta
+                               WHERE ta.task_id = t.id
+                               ORDER BY ta.created_at DESC
+                               LIMIT 1
+                           ), 'PENDING') AS status,
+                           (
+                               SELECT ta.output_json
+                               FROM task_attempt ta
+                               WHERE ta.task_id = t.id
+                                 AND ta.output_json IS NOT NULL
+                               ORDER BY ta.created_at DESC
+                               LIMIT 1
+                           ) AS output_json
+                    FROM task t
+                    JOIN learning_session ls ON ls.id = t.session_id
+                    WHERE t.id = ?
+                      AND ls.user_pk = ?
+                    """,
+                (rs, rowNum) -> mapTask(rs),
+                id,
+                userPk
+            );
+            return Optional.ofNullable(task);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
     public List<Task> findBySessionIdWithStatus(Long sessionId) {
         return jdbcTemplate.query(
             """

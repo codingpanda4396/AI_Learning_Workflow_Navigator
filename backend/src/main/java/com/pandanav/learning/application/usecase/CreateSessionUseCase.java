@@ -5,5 +5,5 @@ import com.pandanav.learning.api.dto.session.CreateSessionResponse;
 
 public interface CreateSessionUseCase {
 
-    CreateSessionResponse execute(CreateSessionRequest request);
+    CreateSessionResponse execute(CreateSessionRequest request, Long userId);
 }

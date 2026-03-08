@@ -173,11 +173,11 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
-  async function fetchCurrentSessionAction(userId: string) {
+  async function fetchCurrentSessionAction() {
     recoveringSession.value = true
     clearError()
     try {
-      const response = await getCurrentSession(userId)
+      const response = await getCurrentSession()
       currentUserSession.value = response
       return response
     } catch (input) {

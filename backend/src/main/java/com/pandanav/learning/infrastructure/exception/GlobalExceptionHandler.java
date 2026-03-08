@@ -1,6 +1,7 @@
 package com.pandanav.learning.infrastructure.exception;
 
 import com.pandanav.learning.api.dto.ApiErrorResponse;
+import com.pandanav.learning.auth.UnauthorizedException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -66,6 +67,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(ConflictException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiErrorResponse("CONFLICT", ex.getMessage()));
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnauthorized(UnauthorizedException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(new ApiErrorResponse("UNAUTHORIZED", ex.getMessage()));
     }
 
     @ExceptionHandler(InternalServerException.class)

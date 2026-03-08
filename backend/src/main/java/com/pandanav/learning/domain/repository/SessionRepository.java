@@ -3,6 +3,7 @@ package com.pandanav.learning.domain.repository;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.enums.Stage;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface SessionRepository {
@@ -13,7 +14,17 @@ public interface SessionRepository {
 
     Optional<LearningSession> findLatestByUserId(String userId);
 
+    Optional<LearningSession> findByIdAndUserPk(Long id, Long userPk);
+
+    Optional<LearningSession> findLatestActiveByUserPk(Long userPk);
+
+    List<LearningSession> findHistoryByUserPk(Long userPk, String status, int limit, int offset);
+
+    long countHistoryByUserPk(Long userPk, String status);
+
     void updateCurrentPosition(Long sessionId, Long currentNodeId, Stage currentStage);
+
+    void touchLastActive(Long sessionId);
 }
 
 

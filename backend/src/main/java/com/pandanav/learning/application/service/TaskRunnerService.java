@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.dto.task.RunTaskResponse;
 import com.pandanav.learning.application.usecase.RunTaskUseCase;
+import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.llm.StageContentGenerator;
 import com.pandanav.learning.domain.llm.model.StageContent;
 import com.pandanav.learning.domain.llm.model.StageGenerationContext;
@@ -62,7 +63,10 @@ public class TaskRunnerService implements RunTaskUseCase {
 
     @Override
     public RunTaskResponse run(Long taskId) {
-        Task task = taskRepository.findById(taskId)
+        Long userId = UserContextHolder.getUserId();
+        Task task = (userId == null
+            ? taskRepository.findById(taskId)
+            : taskRepository.findByIdAndUserPk(taskId, userId))
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
 
         if (task.getStatus() == TaskStatus.SUCCEEDED && hasOutput(task.getOutputJson())) {
@@ -84,7 +88,7 @@ public class TaskRunnerService implements RunTaskUseCase {
         AttemptLlmMetadata metadata;
         String generationReason;
         try {
-            StageContent stageContent = generateByLlm(task);
+            StageContent stageContent = generateByLlm(task, userId);
             generated = stageContent.content();
             metadata = new AttemptLlmMetadata(
                 stageContent.provider(),
@@ -176,11 +180,13 @@ public class TaskRunnerService implements RunTaskUseCase {
         return reason.replace("\"", "'");
     }
 
-    private StageContent generateByLlm(Task task) {
+    private StageContent generateByLlm(Task task, Long userId) {
         if (!llmProperties.isReady() || !llmProperties.isEnabled()) {
             throw new InternalServerException("LLM is disabled.");
         }
-        LearningSession session = sessionRepository.findById(task.getSessionId())
+        LearningSession session = (userId == null
+            ? sessionRepository.findById(task.getSessionId())
+            : sessionRepository.findByIdAndUserPk(task.getSessionId(), userId))
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
         ConceptNode node = conceptNodeRepository.findById(task.getNodeId())
             .orElseThrow(() -> new NotFoundException("Session or task not found."));

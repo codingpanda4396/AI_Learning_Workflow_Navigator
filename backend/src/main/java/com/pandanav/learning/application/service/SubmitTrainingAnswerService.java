@@ -7,6 +7,7 @@ import com.pandanav.learning.api.dto.task.FeedbackResponse;
 import com.pandanav.learning.api.dto.task.SubmitTaskRequest;
 import com.pandanav.learning.api.dto.task.SubmitTaskResponse;
 import com.pandanav.learning.application.service.MasteryUpdateService.MasteryUpdateResult;
+import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.llm.AnswerEvaluator;
 import com.pandanav.learning.domain.llm.model.EvaluationContext;
 import com.pandanav.learning.domain.llm.model.EvaluationResult;
@@ -80,14 +81,19 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
     @Override
     @Transactional
     public SubmitTaskResponse submit(Long taskId, SubmitTaskRequest request) {
-        Task task = taskRepository.findById(taskId)
+        Long userId = UserContextHolder.getUserId();
+        Task task = (userId == null
+            ? taskRepository.findById(taskId)
+            : taskRepository.findByIdAndUserPk(taskId, userId))
             .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
 
         if (!task.canSubmit()) {
             throw new ConflictException(CONFLICT_MESSAGE);
         }
 
-        LearningSession session = sessionRepository.findById(task.getSessionId())
+        LearningSession session = (userId == null
+            ? sessionRepository.findById(task.getSessionId())
+            : sessionRepository.findByIdAndUserPk(task.getSessionId(), userId))
             .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
 
         ConceptNode node = conceptNodeRepository.findById(task.getNodeId())

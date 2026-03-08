@@ -33,6 +33,9 @@ logging:
     com.pandanav.learning: DEBUG
 
 app:
+  auth:
+    jwt-secret: ${APP_AUTH_JWT_SECRET:change-me-please-change-me-please-change-me}
+    token-expire-days: ${APP_AUTH_TOKEN_EXPIRE_DAYS:7}
   llm:
     enabled: ${LLM_ENABLED:false}
     provider: ${LLM_PROVIDER:openai-compatible}

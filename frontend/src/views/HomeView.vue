@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useWorkflowStore } from '@/stores/workflow'
 import PageHeader from '@/components/PageHeader.vue'
@@ -10,10 +11,10 @@ import StepProgress from '@/components/StepProgress.vue'
 import PrimaryButton from '@/components/PrimaryButton.vue'
 
 const SKIP_RESUME_ONCE_KEY = 'ai_learning_skip_resume_once'
-const defaultUserId = import.meta.env.VITE_DEFAULT_USER_ID || 'guest_user'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const sessionStore = useSessionStore()
 const workflowStore = useWorkflowStore()
 
@@ -35,6 +36,7 @@ const isAnalyzing = computed(() => isDiagnosing.value || isFetchingPaths.value)
 const diagnosis = computed(() => sessionStore.goalDiagnosis)
 const pathOptions = computed(() => sessionStore.pathOptions)
 const selectedPathId = computed(() => sessionStore.selectedPathId)
+const username = computed(() => authStore.currentUser?.username ?? '')
 const checkingResume = ref(true)
 
 const stepPreview = [
@@ -106,7 +108,6 @@ async function handleAnalyze() {
 
 function buildAnalyzePayload() {
   return {
-    userId: defaultUserId,
     courseId: courseId.value.trim(),
     chapterId: chapterId.value.trim(),
     goalText: goal.value.trim(),
@@ -161,9 +162,7 @@ async function handleSubmit() {
 
   submitError.value = ''
 
-  const userId = localStorage.getItem('ai_learning_user_id') || defaultUserId
   const payload = {
-    userId,
     courseId: courseId.value.trim(),
     chapterId: chapterId.value.trim(),
     goalText: goal.value.trim(),
@@ -186,6 +185,13 @@ async function handleSubmit() {
   }
 }
 
+async function handleLogout() {
+  authStore.clearAuth()
+  sessionStore.reset()
+  workflowStore.reset()
+  await router.replace('/auth')
+}
+
 onMounted(async () => {
   try {
     const skipByQuery = route.query.skipResume === '1'
@@ -198,8 +204,7 @@ onMounted(async () => {
       return
     }
 
-    const userId = localStorage.getItem('ai_learning_user_id') || defaultUserId
-    const response = await sessionStore.fetchCurrentSession(userId)
+    const response = await sessionStore.fetchCurrentSession()
     if (
       response.hasActiveSession &&
       response.session &&
@@ -229,6 +234,10 @@ onMounted(async () => {
   </main>
 
   <main v-else class="home-page">
+    <header class="home-toolbar">
+      <span class="username">{{ username }}</span>
+      <button type="button" class="ghost-btn" @click="handleLogout">退出登录</button>
+    </header>
     <section class="hero-panel">
       <PageHeader
         eyebrow="AI Learning Navigator"
@@ -320,6 +329,8 @@ onMounted(async () => {
 
 <style scoped>
 .home-page { min-height: 100dvh; padding: clamp(20px, 4vw, 40px); display: grid; grid-template-columns: 1.1fr 1fr; gap: clamp(18px, 3vw, 32px); }
+.home-toolbar { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: var(--space-md); }
+.username { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
 .hero-panel, .form-panel { border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: linear-gradient(160deg, rgba(16, 27, 50, 0.92), rgba(10, 16, 30, 0.95)); box-shadow: var(--shadow-md); }
 .hero-panel { padding: clamp(20px, 4vw, 40px); display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-xxl); }
 .form-panel { padding: clamp(18px, 3vw, 28px); }
@@ -335,7 +346,3 @@ onMounted(async () => {
 @media (max-width: 680px) { .analyze-actions { grid-template-columns: 1fr; } }
 @media (max-width: 980px) { .home-page { grid-template-columns: 1fr; } }
 </style>
-
-
-
-

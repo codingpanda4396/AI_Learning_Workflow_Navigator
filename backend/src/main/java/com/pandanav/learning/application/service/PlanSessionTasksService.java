@@ -3,6 +3,7 @@ package com.pandanav.learning.application.service;
 import com.pandanav.learning.api.dto.session.PlanSessionResponse;
 import com.pandanav.learning.api.dto.session.PlannedTaskResponse;
 import com.pandanav.learning.application.usecase.PlanSessionTasksUseCase;
+import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.ConceptNode;
@@ -39,7 +40,10 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
 
     @Override
     public PlanSessionResponse execute(Long sessionId) {
-        var session = sessionRepository.findById(sessionId)
+        Long userId = UserContextHolder.getUserId();
+        var session = (userId == null
+            ? sessionRepository.findById(sessionId)
+            : sessionRepository.findByIdAndUserPk(sessionId, userId))
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
 
         List<ConceptNode> nodes = conceptNodeRepository.findByChapterIdOrderByOrderNoAsc(session.getChapterId());

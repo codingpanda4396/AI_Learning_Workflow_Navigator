@@ -4,9 +4,11 @@ import com.pandanav.learning.api.dto.session.CreateSessionRequest;
 import com.pandanav.learning.api.dto.session.CreateSessionResponse;
 import com.pandanav.learning.application.usecase.CreateSessionUseCase;
 import com.pandanav.learning.domain.model.ConceptNode;
+import com.pandanav.learning.domain.model.LearningEvent;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
+import com.pandanav.learning.domain.repository.LearningEventRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.exception.ConflictException;
@@ -21,14 +23,20 @@ public class CreateSessionService implements CreateSessionUseCase {
 
     private final SessionRepository sessionRepository;
     private final ConceptNodeRepository conceptNodeRepository;
+    private final LearningEventRepository learningEventRepository;
 
-    public CreateSessionService(SessionRepository sessionRepository, ConceptNodeRepository conceptNodeRepository) {
+    public CreateSessionService(
+        SessionRepository sessionRepository,
+        ConceptNodeRepository conceptNodeRepository,
+        LearningEventRepository learningEventRepository
+    ) {
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
+        this.learningEventRepository = learningEventRepository;
     }
 
     @Override
-    public CreateSessionResponse execute(CreateSessionRequest request) {
+    public CreateSessionResponse execute(CreateSessionRequest request, Long userId) {
         String normalizedCourseId = normalizeRequired(request.courseId(), "course_id");
         String normalizedChapterId = normalizeRequired(request.chapterId(), "chapter_id");
         String normalizedGoal = normalizeGoal(request.goalText());
@@ -37,15 +45,23 @@ public class CreateSessionService implements CreateSessionUseCase {
             .orElseGet(() -> bootstrapConceptNodes(normalizedChapterId, normalizedCourseId, normalizedGoal).get(0));
 
         LearningSession session = new LearningSession();
-        session.setUserId(request.userId());
+        session.setUserId("user-" + userId);
+        session.setUserPk(userId);
         session.setCourseId(normalizedCourseId);
         session.setChapterId(normalizedChapterId);
         session.setGoalText(normalizedGoal);
         session.setCurrentStage(Stage.STRUCTURE);
         session.setCurrentNodeId(firstNode.getId());
+        session.setStatus("ACTIVE");
 
         try {
             LearningSession saved = sessionRepository.save(session);
+            LearningEvent event = new LearningEvent();
+            event.setSessionId(saved.getId());
+            event.setUserId(userId);
+            event.setEventType("SESSION_CREATED");
+            event.setEventData("{}");
+            learningEventRepository.save(event);
             return new CreateSessionResponse(saved.getId());
         } catch (DataIntegrityViolationException ex) {
             throw new ConflictException("Session already exists for user and chapter.");

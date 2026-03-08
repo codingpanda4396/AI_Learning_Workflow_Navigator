@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios'
+import { clearAccessToken, clearStoredUser, getAccessToken } from '@/auth/storage'
 import { normalizeApiError } from '@/utils/apiError'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -37,6 +38,11 @@ const client = axios.create({
 })
 
 client.interceptors.request.use((config) => {
+  const token = getAccessToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
   const dedupeKey = buildRequestKey(config)
   const existingController = pendingControllers.get(dedupeKey)
   if (existingController) {
@@ -59,6 +65,10 @@ client.interceptors.response.use(
   (error: unknown) => {
     if (axios.isAxiosError(error)) {
       cleanupPendingRequest(error.config)
+      if (error.response?.status === 401) {
+        clearAccessToken()
+        clearStoredUser()
+      }
     }
     return Promise.reject(normalizeApiError(error))
   },

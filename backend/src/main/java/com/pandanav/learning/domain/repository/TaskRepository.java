@@ -15,6 +15,8 @@ public interface TaskRepository {
 
     Optional<Task> findById(Long id);
 
+    Optional<Task> findByIdAndUserPk(Long id, Long userPk);
+
     List<Task> findBySessionIdWithStatus(Long sessionId);
 
     Optional<Task> findFirstBySessionIdAndNodeIdAndStage(Long sessionId, Long nodeId, Stage stage);
