@@ -33,3 +33,4 @@ target/
 **/.env.local
 **/.env.prod
 deploy/.env.prod
+secrets.md
