@@ -25,6 +25,15 @@ type StepMeta = {
   task: string
 }
 
+type StepProgressItem = {
+  step: WorkflowStepNumber
+  title: string
+  doneCount: number
+  totalCount: number
+  percent: number
+  status: 'pending' | 'running' | 'done' | 'blocked'
+}
+
 const sessionId = computed(() => Number(route.params.id))
 const browsingStep = ref<WorkflowStepNumber>(1)
 const expandedTaskIds = ref<number[]>([])
@@ -54,6 +63,60 @@ const currentStep = computed(() => browsingStep.value)
 const currentStepMeta = computed(() => steps.find((item) => item.step === currentStep.value) ?? steps[0]!)
 const selectedPath = computed(() => pathOptions.value.find((item) => item.pathId === selectedPathId.value) ?? null)
 const username = computed(() => authStore.currentUser?.username ?? '')
+
+const stepProgressData = computed<StepProgressItem[]>(() => {
+  const timeline = currentSession.value?.timeline ?? []
+  const failedCount = timeline.filter((item) => item.status === 'FAILED').length
+  const doneTaskCount = timeline.filter((item) => item.status === 'SUCCEEDED').length
+  const totalTaskCount = timeline.length
+  const step1Done = !!diagnosis.value
+  const step2Done = !!selectedPathId.value && pathOptions.value.length > 0
+  const finalDone = (currentSession.value?.progress?.completionRate ?? 0) >= 1
+
+  const items: StepProgressItem[] = [
+    {
+      step: 1,
+      title: steps[0]!.title,
+      doneCount: step1Done ? 1 : 0,
+      totalCount: 1,
+      percent: step1Done ? 100 : 0,
+      status: step1Done ? 'done' : 'pending',
+    },
+    {
+      step: 2,
+      title: steps[1]!.title,
+      doneCount: step2Done ? 1 : 0,
+      totalCount: 1,
+      percent: step2Done ? 100 : 0,
+      status: step2Done ? 'done' : (step1Done ? 'running' : 'pending'),
+    },
+    {
+      step: 3,
+      title: steps[2]!.title,
+      doneCount: doneTaskCount,
+      totalCount: totalTaskCount,
+      percent: totalTaskCount === 0 ? 0 : Math.round((doneTaskCount / totalTaskCount) * 100),
+      status:
+        totalTaskCount === 0
+          ? 'pending'
+          : doneTaskCount === totalTaskCount
+            ? 'done'
+            : failedCount > 0
+              ? 'blocked'
+              : 'running',
+    },
+    {
+      step: 4,
+      title: steps[3]!.title,
+      doneCount: finalDone ? 1 : 0,
+      totalCount: 1,
+      percent: finalDone ? 100 : 0,
+      status: finalDone ? 'done' : (totalTaskCount > 0 ? 'running' : 'pending'),
+    },
+  ]
+
+  return items
+})
 
 function stageLabel(stage: string) {
   const map: Record<string, string> = {
@@ -179,7 +242,7 @@ onMounted(async () => {
 
     <section v-else class="workflow-content">
       <PageHeader eyebrow="Learning Flow" title="四步学习流程" :subtitle="`当前关注：${currentStepMeta.task}`" />
-      <StepProgress :steps="steps" :current-step="currentStep" />
+      <StepProgress :steps="stepProgressData" :current-step="currentStep" />
 
       <article class="step-card">
         <div class="step-head">
