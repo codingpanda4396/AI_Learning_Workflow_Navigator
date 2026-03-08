@@ -1,0 +1,48 @@
+# ============================================================
+# 生产环境 Docker Compose
+# 使用方式：在 deploy 目录下执行
+#   docker compose -f docker-compose.prod.yml up -d
+# ============================================================
+# 注意：本配置将 PostgreSQL 与 backend 放在同一 compose 中，
+# 适合新手快速起步。生产稳定后，建议将数据库独立部署到
+# 云 RDS 或专用服务器，再修改 backend 的 DB_URL 指向新地址。
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-learning-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_learning}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${POSTGRES_DB:-ai_learning}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/your-github-username/ai-learning-backend:latest}
+    container_name: ai-learning-backend
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ai_learning}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

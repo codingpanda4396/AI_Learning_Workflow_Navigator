@@ -31,3 +31,5 @@ target/
 **/application-local.properties
 **/.env
 **/.env.local
+**/.env.prod
+deploy/.env.prod

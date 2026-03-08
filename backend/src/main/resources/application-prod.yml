@@ -1,0 +1,20 @@
+# ============================================================
+# 生产环境配置
+# 通过环境变量注入敏感信息，不要在此文件写密码
+# ============================================================
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    com.pandanav.learning: INFO
