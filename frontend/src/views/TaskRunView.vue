@@ -16,12 +16,22 @@ const sections = computed(() => task.value?.output.sections ?? [])
 
 function getStageLabel(stage: string) {
   const map: Record<string, string> = {
-    STRUCTURE: '结构',
-    UNDERSTANDING: '理解',
-    TRAINING: '训练',
-    REFLECTION: '反思',
+    STRUCTURE: '结构构建',
+    UNDERSTANDING: '理解深化',
+    TRAINING: '训练实践',
+    REFLECTION: '反思总结',
   }
   return map[stage] || stage
+}
+
+function getGenerationLabel(mode?: string) {
+  const map: Record<string, string> = {
+    LLM: 'LLM 生成',
+    TEMPLATE_FALLBACK: '模板降级生成',
+    RULE_FALLBACK: '规则降级生成',
+    CACHED: '历史缓存结果',
+  }
+  return mode ? map[mode] || mode : '未知来源'
 }
 
 function resolveSessionId() {
@@ -69,6 +79,7 @@ onMounted(async () => {
       <div class="task-meta">
         <span class="task-stage">{{ getStageLabel(task.stage) }}</span>
         <span class="task-id">任务 #{{ task.taskId }}</span>
+        <span class="task-source">来源：{{ getGenerationLabel(task.generationMode) }}</span>
       </div>
 
       <div v-if="sections.length > 0" class="output-sections">
@@ -92,10 +103,10 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-else class="summary-text">任务输出为空，请返回会话页重试。</div>
+      <div v-else class="summary-text">当前任务输出为空，请返回会话页重试。</div>
 
       <div class="actions">
-        <button class="continue-btn" @click="handleContinue">继续 →</button>
+        <button class="continue-btn" @click="handleContinue">返回会话</button>
       </div>
     </div>
   </div>
@@ -108,9 +119,10 @@ onMounted(async () => {
 .task-title { font-size: 1.5rem; font-weight: 600; color: var(--color-text); }
 .loading { text-align: center; padding: 3rem; color: var(--color-text-secondary); }
 .task-content { max-width: 720px; margin: 0 auto; }
-.task-meta { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+.task-meta { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
 .task-stage { padding: 0.25rem 0.75rem; font-size: 0.75rem; font-weight: 600; color: var(--color-primary); background: var(--color-primary-alpha); border-radius: 4px; }
 .task-id { font-size: 0.875rem; color: var(--color-text-secondary); }
+.task-source { font-size: 0.875rem; color: var(--color-text-secondary); }
 .output-sections { display: flex; flex-direction: column; gap: 2rem; margin-bottom: 2rem; }
 .output-section { background: var(--color-bg-elevated); border-radius: 12px; padding: 1.5rem; }
 .section-title { font-size: 1rem; font-weight: 600; color: var(--color-text); margin-bottom: 1rem; }

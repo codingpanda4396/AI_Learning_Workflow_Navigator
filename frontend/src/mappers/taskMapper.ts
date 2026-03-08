@@ -5,6 +5,7 @@ interface RunTaskResponseDto {
   stage: string
   node_id: number
   status: string
+  generation_mode?: string
   output?: unknown
 }
 
@@ -45,6 +46,30 @@ interface TaskDetailResponseDto {
 }
 
 function prettifyKey(input: string): string {
+  const dictionary: Record<string, string> = {
+    title: '标题',
+    summary: '总结',
+    key_points: '关键要点',
+    common_misconceptions: '常见误区',
+    suggested_sequence: '建议顺序',
+    concept_explanation: '概念解释',
+    analogy: '类比说明',
+    step_by_step_reasoning: '分步推理',
+    common_errors: '常见错误',
+    check_questions: '检查问题',
+    questions: '训练题目',
+    reflection_prompt: '反思提示',
+    review_checklist: '复盘清单',
+    next_step_suggestion: '下一步建议',
+    variants: '训练变式',
+    rubric: '评分标准',
+    diagnosis: '诊断',
+    reflection_points: '反思要点',
+    next_steps: '后续行动',
+  }
+  if (dictionary[input]) {
+    return dictionary[input]
+  }
   return input
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -102,7 +127,7 @@ function parseSections(output: unknown) {
         title:
           typeof section.title === 'string' && section.title.trim().length > 0
             ? section.title
-            : `Section ${index + 1}`,
+            : `模块 ${index + 1}`,
         bullets: Array.isArray(section.bullets) ? section.bullets.filter((item): item is string => typeof item === 'string') : undefined,
         steps: Array.isArray(section.steps) ? section.steps.filter((item): item is string => typeof item === 'string') : undefined,
         items: Array.isArray(section.items) ? section.items.filter((item): item is string => typeof item === 'string') : undefined,
@@ -172,6 +197,7 @@ export function mapRunTaskDto(dto: RunTaskResponseDto): RunTaskResponse {
     stage: dto.stage,
     nodeId: dto.node_id,
     status: dto.status,
+    generationMode: dto.generation_mode,
     output: {
       sections: parseSections(dto.output),
     },

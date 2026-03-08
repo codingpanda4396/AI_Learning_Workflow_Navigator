@@ -50,7 +50,7 @@ const canSubmit = computed(
 
 const goalHint = computed(() =>
   goal.value.trim().length > 0
-    ? '先做目标诊断，再从候选路径中选择一条。'
+    ? '先诊断目标质量，再从候选路径中选择一条。'
     : '请描述你想学什么、希望达到什么程度。',
 )
 
@@ -92,9 +92,8 @@ function validateInputs() {
 }
 
 async function handleAnalyze() {
-  if (!validateInputs() || isAnalyzing.value) {
-    return
-  }
+  if (!validateInputs() || isAnalyzing.value) return
+
   const payload = {
     userId: defaultUserId,
     courseId: courseId.value.trim(),
@@ -121,9 +120,7 @@ function applyRewrittenGoal() {
 }
 
 async function handleSubmit() {
-  if (!validateInputs() || isCreating.value) {
-    return
-  }
+  if (!validateInputs() || isCreating.value) return
 
   if (!diagnosis.value || pathOptions.value.length === 0) {
     await handleAnalyze()
@@ -179,7 +176,7 @@ onMounted(async () => {
       await router.replace(`/session/${response.session.sessionId}`)
     }
   } catch {
-    // ignore resume failure
+    // ignore
   }
 })
 </script>
@@ -189,8 +186,8 @@ onMounted(async () => {
     <section class="hero-panel">
       <PageHeader
         eyebrow="AI Learning Navigator"
-        title="目标诊断 + 路径选择"
-        subtitle="先评估目标质量，再从候选路径中选择一条开始学习。"
+        title="先诊断目标，再开始学习"
+        subtitle="输入课程、章节和目标，获取目标评价与可选学习路径。"
       />
       <StepProgress :current-step="1" :steps="stepPreview" />
     </section>
@@ -210,7 +207,7 @@ onMounted(async () => {
 
         <div class="action-block">
           <PrimaryButton type="button" :disabled="isAnalyzing" :loading="isAnalyzing" @click="handleAnalyze">
-            {{ isAnalyzing ? '诊断中...' : '1) 诊断目标并生成路径' }}
+            诊断目标并生成路径
           </PrimaryButton>
 
           <section v-if="diagnosis" class="diagnosis-card">
@@ -218,11 +215,11 @@ onMounted(async () => {
             <p>{{ diagnosis.feedback.summary }}</p>
             <p><strong>优势：</strong>{{ diagnosis.feedback.strengths.join('；') }}</p>
             <p><strong>风险：</strong>{{ diagnosis.feedback.risks.join('；') }}</p>
-            <button type="button" class="ghost-btn" @click="applyRewrittenGoal">使用建议目标</button>
+            <button type="button" class="ghost-btn" @click="applyRewrittenGoal">采用建议目标</button>
           </section>
 
           <section v-if="pathOptions.length > 0" class="paths-card">
-            <h3>2) 选择学习路径</h3>
+            <h3>选择学习路径</h3>
             <div class="path-grid">
               <article
                 v-for="path in pathOptions"
@@ -242,7 +239,7 @@ onMounted(async () => {
           </section>
 
           <PrimaryButton type="submit" :disabled="!canSubmit" :loading="isCreating">
-            {{ isCreating ? '正在生成学习流程...' : '3) 开始分步学习' }}
+            开始分步学习
           </PrimaryButton>
 
           <p v-if="submitError" class="submit-error">{{ submitError }}</p>

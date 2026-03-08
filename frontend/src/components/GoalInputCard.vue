@@ -16,12 +16,12 @@ function onInput(event: Event) {
 
 <template>
   <section class="goal-card">
-    <label for="goal-input" class="label">1. 学习目标</label>
+    <label for="goal-input" class="label">学习目标</label>
     <textarea
       id="goal-input"
       class="input"
       :value="props.modelValue"
-      placeholder="例如：理解 TCP 可靠传输机制，并能分析握手/挥手相关题目。"
+      placeholder="例如：在一周内掌握 TCP 可靠传输机制，并能完成 3 道相关训练题。"
       rows="4"
       @input="onInput"
     />

@@ -27,10 +27,10 @@ const browsingStep = ref<WorkflowStepNumber>(1)
 const expandedTaskIds = ref<number[]>([])
 
 const steps: StepMeta[] = [
-  { step: 1, title: '目标诊断', task: '查看目标评价并确认改写建议' },
-  { step: 2, title: '路径规划', task: '从候选路径中选择一条执行方案' },
-  { step: 3, title: '分步学习', task: '按步骤执行任务并逐步推进' },
-  { step: 4, title: '总结反馈', task: '查看整体结果与下一步建议' },
+  { step: 1, title: '目标诊断', task: '查看目标质量评价' },
+  { step: 2, title: '路径规划', task: '选择学习路径' },
+  { step: 3, title: '分步学习', task: '按步骤执行任务' },
+  { step: 4, title: '总结反馈', task: '查看阶段总结与下一步建议' },
 ]
 
 const currentSession = computed(() => sessionStore.currentSession)
@@ -57,7 +57,7 @@ function stageLabel(stage: string) {
 function stageGuide(stage: string) {
   const map: Record<string, string> = {
     STRUCTURE: '梳理关键概念、边界与关系，形成知识框架。',
-    UNDERSTANDING: '解释机制和因果链，识别并纠正误区。',
+    UNDERSTANDING: '解释机制和因果链，识别并纠正常见误区。',
     TRAINING: '完成训练题并提交答案，根据反馈修正。',
     REFLECTION: '复盘错误模式，提炼下一步改进动作。',
   }
@@ -103,7 +103,10 @@ async function fetchSession() {
 
 function handleRunNextTask() {
   if (!sessionStore.nextTask) return
-  router.push({ path: resolveTaskPath(sessionStore.nextTask.taskId, sessionStore.nextTask.stage), query: { sessionId: String(sessionId.value) } })
+  router.push({
+    path: resolveTaskPath(sessionStore.nextTask.taskId, sessionStore.nextTask.stage),
+    query: { sessionId: String(sessionId.value) },
+  })
 }
 
 async function handleRetry() {
@@ -115,15 +118,11 @@ function goToStep(step: WorkflowStepNumber) {
 }
 
 function handlePrevious() {
-  if (currentStep.value > 1) {
-    goToStep((currentStep.value - 1) as WorkflowStepNumber)
-  }
+  if (currentStep.value > 1) goToStep((currentStep.value - 1) as WorkflowStepNumber)
 }
 
 function handleNext() {
-  if (currentStep.value < 4) {
-    goToStep((currentStep.value + 1) as WorkflowStepNumber)
-  }
+  if (currentStep.value < 4) goToStep((currentStep.value + 1) as WorkflowStepNumber)
 }
 
 async function goHome() {
@@ -201,7 +200,10 @@ onMounted(async () => {
               <div v-if="isTaskExpanded(item.taskId)" class="task-body">
                 <p><strong>状态：</strong>{{ item.status }}</p>
                 <p><strong>该做什么：</strong>{{ stageGuide(item.stage) }}</p>
-                <PrimaryButton type="button" @click="router.push({ path: resolveTaskPath(item.taskId, item.stage), query: { sessionId: String(sessionId) } })">
+                <PrimaryButton
+                  type="button"
+                  @click="router.push({ path: resolveTaskPath(item.taskId, item.stage), query: { sessionId: String(sessionId) } })"
+                >
                   打开该步骤任务
                 </PrimaryButton>
               </div>

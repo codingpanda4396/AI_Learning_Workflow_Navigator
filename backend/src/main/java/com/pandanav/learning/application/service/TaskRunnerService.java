@@ -66,7 +66,7 @@ public class TaskRunnerService implements RunTaskUseCase {
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
 
         if (task.getStatus() == TaskStatus.SUCCEEDED && hasOutput(task.getOutputJson())) {
-            return toResponse(task, parseOutput(task.getOutputJson()));
+            return toResponse(task, "CACHED", parseOutput(task.getOutputJson()));
         }
 
         if (task.getStatus() == TaskStatus.RUNNING) {
@@ -130,7 +130,7 @@ public class TaskRunnerService implements RunTaskUseCase {
         }
         task.markSucceeded(outputJson);
 
-        return toResponse(task, generated);
+        return toResponse(task, metadata.generationMode(), generated);
     }
 
     private boolean hasOutput(String outputJson) {
@@ -153,12 +153,13 @@ public class TaskRunnerService implements RunTaskUseCase {
         }
     }
 
-    private RunTaskResponse toResponse(Task task, JsonNode output) {
+    private RunTaskResponse toResponse(Task task, String generationMode, JsonNode output) {
         return new RunTaskResponse(
             task.getId(),
             task.getStage().name(),
             task.getNodeId(),
             TaskStatus.SUCCEEDED.name(),
+            generationMode,
             output
         );
     }
@@ -190,42 +191,42 @@ public class TaskRunnerService implements RunTaskUseCase {
         return switch (task.getStage()) {
             case STRUCTURE -> objectMapper.valueToTree(Map.of(
                 "sections", List.of(
-                    Map.of("type", "concepts", "title", "core concepts", "bullets", List.of("definition", "terms", "boundaries")),
-                    Map.of("type", "structure", "title", "structure", "items", List.of("part A", "part B", "io relation")),
-                    Map.of("type", "relations", "title", "relations", "items", List.of("prerequisite relation", "next relation")),
-                    Map.of("type", "summary", "title", "summary", "text", "Build structure first, then mechanism understanding.")
+                    Map.of("type", "concepts", "title", "核心概念", "bullets", List.of("定义", "关键术语", "适用边界")),
+                    Map.of("type", "structure", "title", "结构拆解", "items", List.of("核心组成 A", "核心组成 B", "输入输出关系")),
+                    Map.of("type", "relations", "title", "关联关系", "items", List.of("前置知识依赖", "后续延伸方向")),
+                    Map.of("type", "summary", "title", "总结", "text", "先建立结构框架，再进入机制理解与训练。")
                 )
             ));
             case UNDERSTANDING -> objectMapper.valueToTree(Map.of(
                 "sections", List.of(
-                    Map.of("type", "concepts", "title", "concepts", "bullets", List.of("key definition", "required condition", "trigger condition")),
-                    Map.of("type", "mechanism", "title", "mechanism", "steps", List.of("step 1 input", "step 2 state transition", "step 3 output")),
-                    Map.of("type", "misconceptions", "title", "misconceptions", "items", List.of("misconception 1", "misconception 2")),
-                    Map.of("type", "summary", "title", "summary", "text", "Understanding causal links matters more than memorizing steps.")
+                    Map.of("type", "concepts", "title", "关键知识点", "bullets", List.of("核心定义", "必要条件", "触发条件")),
+                    Map.of("type", "mechanism", "title", "机制流程", "steps", List.of("步骤一：输入条件", "步骤二：状态变化", "步骤三：输出结果")),
+                    Map.of("type", "misconceptions", "title", "常见误区", "items", List.of("误区一：概念混淆", "误区二：忽略边界条件")),
+                    Map.of("type", "summary", "title", "总结", "text", "理解因果链路比死记步骤更重要。")
                 )
             ));
             case TRAINING -> objectMapper.valueToTree(Map.of(
                 "questions", List.of(
-                    Map.of("id", "q1", "type", "short_answer", "prompt", "Explain the core principle."),
-                    Map.of("id", "q2", "type", "scenario", "prompt", "Infer state transition from the scenario.")
+                    Map.of("id", "q1", "type", "short_answer", "prompt", "请解释该知识点的核心原理。"),
+                    Map.of("id", "q2", "type", "scenario", "prompt", "根据给定场景推导关键状态变化。")
                 ),
                 "variants", List.of(
-                    Map.of("name", "basic", "focus", "concept accuracy"),
-                    Map.of("name", "advanced", "focus", "boundary cases")
+                    Map.of("name", "基础版", "focus", "概念准确性"),
+                    Map.of("name", "进阶版", "focus", "边界条件处理")
                 ),
                 "rubric", Map.of(
                     "full_score", 100,
                     "dimensions", List.of(
-                        Map.of("name", "concept", "weight", 40),
-                        Map.of("name", "reasoning", "weight", 40),
-                        Map.of("name", "clarity", "weight", 20)
+                        Map.of("name", "概念理解", "weight", 40),
+                        Map.of("name", "推理过程", "weight", 40),
+                        Map.of("name", "表达清晰度", "weight", 20)
                     )
                 )
             ));
             case REFLECTION -> objectMapper.valueToTree(Map.of(
-                "diagnosis", "Main path completed, boundary-case mastery still needs reinforcement.",
-                "reflection_points", List.of("can restate concept", "can explain causal chain", "can identify misconceptions"),
-                "next_steps", List.of("review wrong questions", "finish one variant set", "3-minute oral recap")
+                "diagnosis", "主路径已完成，但边界场景掌握仍需加强。",
+                "reflection_points", List.of("是否能复述核心概念", "是否能解释因果链路", "是否能识别常见误区"),
+                "next_steps", List.of("复盘错题", "完成一组变式训练", "进行 3 分钟口头总结")
             ));
         };
     }

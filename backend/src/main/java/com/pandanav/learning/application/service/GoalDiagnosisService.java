@@ -39,17 +39,18 @@ public class GoalDiagnosisService {
 
     private GoalDiagnosisResponse diagnoseByLlm(GoalDiagnosisRequest request) throws Exception {
         String systemPrompt = """
-            You are a learning coach. Evaluate learning goals for clarity and executability.
-            Return strict JSON only.
+            你是学习目标诊断助手。
+            仅返回 JSON，不要输出 markdown。
+            字段值必须是简体中文。
             """;
         String userPrompt = """
-            Evaluate this goal and return JSON with fields:
-            goal_score (0-100),
+            请评估学习目标质量并输出 JSON 字段：
+            goal_score（0-100）,
             summary,
-            strengths (string array, 2-3 items),
-            risks (string array, 2-3 items),
-            rewritten_goal (single concise sentence)
-            Context:
+            strengths（字符串数组，2-3 条）,
+            risks（字符串数组，2-3 条）,
+            rewritten_goal（一句话，可执行、可衡量）
+            上下文：
             course_id=%s
             chapter_id=%s
             goal_text=%s
@@ -63,9 +64,9 @@ public class GoalDiagnosisService {
         ));
         JsonNode parsed = objectMapper.readTree(result.text());
         int score = parsed.path("goal_score").isNumber() ? parsed.path("goal_score").asInt() : 70;
-        String summary = parsed.path("summary").asText("Goal is usable but can be sharpened.");
-        List<String> strengths = toStringList(parsed.path("strengths"), List.of("Learning intent is clear."));
-        List<String> risks = toStringList(parsed.path("risks"), List.of("Success criteria are not explicit."));
+        String summary = parsed.path("summary").asText("目标可执行，但仍可进一步收敛。");
+        List<String> strengths = toStringList(parsed.path("strengths"), List.of("学习方向明确。"));
+        List<String> risks = toStringList(parsed.path("risks"), List.of("成功标准尚不够明确。"));
         String rewrittenGoal = parsed.path("rewritten_goal").asText(request.goalText());
         return new GoalDiagnosisResponse(score, new GoalDiagnosisResponse.SummaryResponse(summary, strengths, risks, rewrittenGoal));
     }
@@ -81,20 +82,13 @@ public class GoalDiagnosisService {
         }
         score = Math.min(score, 100);
 
-        List<String> strengths = List.of(
-            "Topic direction is stated.",
-            "Learning motivation is explicit."
-        );
-        List<String> risks = List.of(
-            "Scope may still be broad.",
-            "Outcome criteria are not fully quantified."
-        );
-        String rewritten = "Within 7 days, master " + request.chapterId()
-            + " in " + request.courseId()
-            + ", and complete 3 practice tasks with score >= 80.";
+        List<String> strengths = List.of("学习主题明确。", "目标动机清晰。");
+        List<String> risks = List.of("学习范围可能偏大。", "结果衡量标准还可更具体。");
+        String rewritten = "在 7 天内掌握 " + request.courseId() + " / " + request.chapterId()
+            + " 的核心机制，完成 3 道训练题，且得分不低于 80 分。";
         String summary = score >= 75
-            ? "Goal is actionable with minor refinement."
-            : "Goal needs clearer scope and measurable outcome.";
+            ? "目标总体可执行，建议补充更明确的验收标准。"
+            : "目标需要进一步收敛范围，并补充可衡量结果。";
         return new GoalDiagnosisResponse(score, new GoalDiagnosisResponse.SummaryResponse(summary, strengths, risks, rewritten));
     }
 
@@ -119,4 +113,3 @@ public class GoalDiagnosisService {
         return values.isEmpty() ? fallback : values;
     }
 }
-

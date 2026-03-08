@@ -16,6 +16,9 @@ public record RunTaskResponse(
     Long nodeId,
     @Schema(example = "SUCCEEDED")
     String status,
+    @JsonProperty("generation_mode")
+    @Schema(name = "generation_mode", example = "LLM")
+    String generationMode,
     JsonNode output
 ) {
 }

@@ -109,6 +109,7 @@ export interface RunTaskResponse {
   stage: string
   nodeId: number
   status: string
+  generationMode?: string
   output: TaskOutput
 }
 

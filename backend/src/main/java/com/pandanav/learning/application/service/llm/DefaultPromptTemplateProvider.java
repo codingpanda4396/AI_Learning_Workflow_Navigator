@@ -15,7 +15,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         String systemPrompt = """
             你是面向大学生学习流程的智能导师系统。
             你只能返回 JSON，禁止输出 markdown code fence，禁止输出额外字段。
-            所有字段内容使用中文，必须紧扣知识点与任务目标。
+            字段值必须使用简体中文，内容紧扣知识点与任务目标。
             """;
 
         String userPrompt = switch (key) {
@@ -38,8 +38,8 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                 任务目标：%s
                 知识点：%s
                 输出字段：questions
-                questions 为 3~5 道题，每题包含 id,type,question,reference_points,difficulty。
-                不要脱离题目和知识点本身。
+                questions 包含 3~5 道题，每题包含 id,type,question,reference_points,difficulty。
+                字段名保持英文，字段值必须中文。
                 仅输出 JSON。
                 """.formatted(context.objective(), context.nodeTitle());
             case REFLECTION_PROMPT_V1 -> """
@@ -47,6 +47,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                 任务目标：%s
                 知识点：%s
                 输出字段：reflection_prompt,review_checklist,next_step_suggestion
+                字段名保持英文，字段值必须中文。
                 仅输出 JSON。
                 """.formatted(context.objective(), context.nodeTitle());
             default -> throw new IllegalArgumentException("Unsupported prompt key: " + key);
@@ -63,17 +64,17 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         String systemPrompt = """
             你是面向大学生学习流程的智能导师系统。
             你只能返回 JSON，禁止输出 markdown code fence，禁止输出额外字段。
-            所有字段内容使用中文，必须紧扣题目与知识点。
+            字段值必须使用简体中文，内容紧扣题目与知识点。
             """;
 
         String userPrompt = """
             任务目标：%s
             题目内容：%s
             用户答案：%s
-            请给出结构化评估，输出字段：
+            请输出字段：
             score,normalized_score,feedback,error_tags,strengths,weaknesses,suggested_next_action
-            其中 score 在 0~100，normalized_score 在 0~1。
-            不要脱离题目和知识点本身。
+            其中 score 范围 0~100，normalized_score 范围 0~1。
+            字段名保持英文，字段值必须中文。
             仅输出 JSON。
             """.formatted(
             safe(context.taskObjective()),
@@ -88,4 +89,3 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         return text == null ? "" : text;
     }
 }
-

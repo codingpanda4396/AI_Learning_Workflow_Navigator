@@ -16,18 +16,15 @@ const result = computed(() => sessionStore.taskResult)
 const isLoading = computed(() => sessionStore.runningTask)
 const isSubmitting = computed(() => sessionStore.submittingTask)
 const loadError = computed(() => sessionStore.error)
-const objectiveTitle = computed(() => task.value?.output.sections[0]?.title || '请回答以下问题')
-const normalizedScorePercent = computed(() => {
-  if (!result.value) return 0
-  return Math.round(result.value.normalizedScore * 100)
-})
+const objectiveTitle = computed(() => task.value?.output.sections[0]?.title || '请回答以下训练问题')
+const normalizedScorePercent = computed(() => (result.value ? Math.round(result.value.normalizedScore * 100) : 0))
 
 function getStageLabel(stage: string) {
   const map: Record<string, string> = {
-    STRUCTURE: '结构',
-    UNDERSTANDING: '理解',
-    TRAINING: '训练',
-    REFLECTION: '反思',
+    STRUCTURE: '结构构建',
+    UNDERSTANDING: '理解深化',
+    TRAINING: '训练实践',
+    REFLECTION: '反思总结',
   }
   return map[stage] || stage
 }
@@ -37,8 +34,8 @@ function getErrorTagLabel(tag: string) {
     CONCEPT_CONFUSION: '概念混淆',
     MISSING_STEPS: '步骤缺失',
     BOUNDARY_CASE: '边界问题',
-    TERMINOLOGY: '术语不准',
-    SHALLOW_REASONING: '推理浅',
+    TERMINOLOGY: '术语不准确',
+    SHALLOW_REASONING: '推理深度不足',
     MEMORY_GAP: '记忆缺口',
   }
   return map[tag] || tag
@@ -50,7 +47,7 @@ function getNextActionLabel(action: string) {
     INSERT_TRAINING_VARIANTS: '训练变式',
     INSERT_TRAINING_REINFORCEMENT: '强化训练',
     ADVANCE_TO_NEXT_NODE: '进入下一节点',
-    NOOP: '完成',
+    NOOP: '完成当前节点',
   }
   return map[action] || action
 }
@@ -68,14 +65,11 @@ async function loadTask() {
 }
 
 async function handleSubmit() {
-  if (!userAnswer.value.trim() || isSubmitting.value) {
-    return
-  }
-
+  if (!userAnswer.value.trim() || isSubmitting.value) return
   try {
     await sessionStore.submitTask(taskId.value, userAnswer.value.trim())
   } catch (error) {
-    console.error('Failed to submit:', error)
+    console.error('提交失败:', error)
   }
 }
 
@@ -94,9 +88,7 @@ function handleContinue() {
 
 function handleGoNextTask() {
   const nextTask = result.value?.nextTask
-  if (!nextTask) {
-    return
-  }
+  if (!nextTask) return
   const targetPath = nextTask.stage === 'TRAINING' ? `/task/${nextTask.taskId}/submit` : `/task/${nextTask.taskId}/run`
   const currentSessionId = resolveSessionId()
   router.push({
@@ -135,14 +127,13 @@ onMounted(async () => {
         </div>
 
         <div v-if="result.errorTags.length > 0" class="error-tags">
-          <span v-for="tag in result.errorTags" :key="tag" class="error-tag">
-            {{ getErrorTagLabel(tag) }}
-          </span>
+          <span v-for="tag in result.errorTags" :key="tag" class="error-tag">{{ getErrorTagLabel(tag) }}</span>
         </div>
 
         <div class="feedback">
           <h3 class="feedback-title">诊断</h3>
           <p class="diagnosis">{{ result.feedback.diagnosis }}</p>
+
           <h3 class="feedback-title">改进建议</h3>
           <ul class="fixes-list">
             <li v-for="(fix, idx) in result.feedback.fixes" :key="idx">{{ fix }}</li>
@@ -168,9 +159,7 @@ onMounted(async () => {
           <span class="mastery-before">{{ Math.round(result.masteryBefore * 100) }}%</span>
           <span class="mastery-arrow">→</span>
           <span class="mastery-after">{{ Math.round(result.masteryAfter * 100) }}%</span>
-          <span class="mastery-delta">
-            ({{ result.masteryDelta > 0 ? '+' : '' }}{{ Math.round(result.masteryDelta * 100) }}%)
-          </span>
+          <span class="mastery-delta">({{ result.masteryDelta > 0 ? '+' : '' }}{{ Math.round(result.masteryDelta * 100) }}%)</span>
         </div>
 
         <div class="next-action">
@@ -179,14 +168,8 @@ onMounted(async () => {
         </div>
 
         <div class="actions">
-          <button
-            v-if="result.nextTask"
-            class="continue-btn secondary"
-            @click="handleGoNextTask"
-          >
-            开始下一任务
-          </button>
-          <button class="continue-btn" @click="handleContinue">继续 →</button>
+          <button v-if="result.nextTask" class="continue-btn secondary" @click="handleGoNextTask">开始下一任务</button>
+          <button class="continue-btn" @click="handleContinue">返回会话</button>
         </div>
       </div>
 
