@@ -1,12 +1,10 @@
 package com.pandanav.learning.application.service;
 
 import com.pandanav.learning.api.dto.session.PlanSessionResponse;
-import com.pandanav.learning.api.dto.session.PlanPreviewResponse;
 import com.pandanav.learning.api.dto.session.PlannedTaskResponse;
 import com.pandanav.learning.application.service.pathplan.PersonalizedPathPlannerService;
 import com.pandanav.learning.application.service.pathplan.PersonalizedPlanResult;
 import com.pandanav.learning.application.usecase.PlanSessionTasksUseCase;
-import com.pandanav.learning.application.usecase.PreviewSessionPlanUseCase;
 import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.enums.PlanMode;
 import com.pandanav.learning.domain.enums.Stage;
@@ -27,7 +25,7 @@ import java.util.List;
 import java.util.Set;
 
 @Service
-public class PlanSessionTasksService implements PlanSessionTasksUseCase, PreviewSessionPlanUseCase {
+public class PlanSessionTasksService implements PlanSessionTasksUseCase {
 
     private final SessionRepository sessionRepository;
     private final ConceptNodeRepository conceptNodeRepository;
@@ -85,38 +83,7 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase, Preview
 
         return new PlanSessionResponse(
             sessionId,
-            responseTasks,
-            planResult.source().name(),
-            planResult.planReasoningSummary(),
-            planResult.riskFlags()
-        );
-    }
-
-    @Override
-    public PlanPreviewResponse preview(Long sessionId, PlanMode mode) {
-        Long userId = UserContextHolder.getUserId();
-        var session = (userId == null
-            ? sessionRepository.findById(sessionId)
-            : sessionRepository.findByIdAndUserPk(sessionId, userId))
-            .orElseThrow(() -> new NotFoundException("Session or task not found."));
-
-        PersonalizedPlanResult planResult = personalizedPathPlannerService.plan(session, mode, true);
-        List<PlanPreviewResponse.InsertedRemedialTaskResponse> insertedTasks = planResult.insertedTasks().stream()
-            .map(task -> new PlanPreviewResponse.InsertedRemedialTaskResponse(
-                task.nodeId(),
-                task.stage(),
-                task.trigger()
-            ))
-            .toList();
-        return new PlanPreviewResponse(
-            sessionId,
-            mode.name(),
-            planResult.source().name(),
-            planResult.planReasoningSummary(),
-            planResult.riskFlags(),
-            planResult.advancedNodeIds(),
-            insertedTasks,
-            planResult.riskFlags().isEmpty() ? "LOW_RISK" : String.join(", ", planResult.riskFlags())
+            responseTasks
         );
     }
 

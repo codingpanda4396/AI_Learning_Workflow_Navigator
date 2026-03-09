@@ -10,14 +10,6 @@ public record PlanSessionResponse(
     @JsonProperty("session_id")
     @Schema(name = "session_id", example = "123")
     Long sessionId,
-    List<PlannedTaskResponse> tasks,
-    @JsonProperty("plan_source")
-    @Schema(name = "plan_source", example = "RULE")
-    String planSource,
-    @JsonProperty("plan_reasoning_summary")
-    @Schema(name = "plan_reasoning_summary", example = "Rule planner baseline applied.")
-    String planReasoningSummary,
-    @JsonProperty("risk_flags")
-    List<String> riskFlags
+    List<PlannedTaskResponse> tasks
 ) {
 }

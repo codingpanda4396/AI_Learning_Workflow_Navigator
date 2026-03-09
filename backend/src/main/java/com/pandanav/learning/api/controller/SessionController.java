@@ -4,21 +4,14 @@ import com.pandanav.learning.api.dto.ApiErrorResponse;
 import com.pandanav.learning.api.dto.session.CurrentSessionResponse;
 import com.pandanav.learning.api.dto.session.CreateSessionRequest;
 import com.pandanav.learning.api.dto.session.CreateSessionResponse;
-import com.pandanav.learning.api.dto.session.GoalDiagnosisRequest;
-import com.pandanav.learning.api.dto.session.GoalDiagnosisResponse;
 import com.pandanav.learning.api.dto.session.PathResponse;
-import com.pandanav.learning.api.dto.session.PathOptionsResponse;
-import com.pandanav.learning.api.dto.session.PlanPreviewResponse;
 import com.pandanav.learning.api.dto.session.PlanSessionResponse;
 import com.pandanav.learning.api.dto.session.SessionOverviewResponse;
-import com.pandanav.learning.application.service.GoalDiagnosisService;
-import com.pandanav.learning.application.service.PathOptionsService;
 import com.pandanav.learning.application.usecase.CreateSessionUseCase;
 import com.pandanav.learning.application.usecase.GetCurrentSessionUseCase;
 import com.pandanav.learning.application.usecase.GetSessionOverviewUseCase;
 import com.pandanav.learning.application.usecase.GetSessionPathUseCase;
 import com.pandanav.learning.application.usecase.PlanSessionTasksUseCase;
-import com.pandanav.learning.application.usecase.PreviewSessionPlanUseCase;
 import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.enums.PlanMode;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
@@ -48,28 +41,19 @@ public class SessionController {
     private final GetSessionOverviewUseCase getSessionOverviewUseCase;
     private final GetCurrentSessionUseCase getCurrentSessionUseCase;
     private final GetSessionPathUseCase getSessionPathUseCase;
-    private final PreviewSessionPlanUseCase previewSessionPlanUseCase;
-    private final GoalDiagnosisService goalDiagnosisService;
-    private final PathOptionsService pathOptionsService;
 
     public SessionController(
         CreateSessionUseCase createSessionUseCase,
         PlanSessionTasksUseCase planSessionTasksUseCase,
         GetSessionOverviewUseCase getSessionOverviewUseCase,
         GetCurrentSessionUseCase getCurrentSessionUseCase,
-        GetSessionPathUseCase getSessionPathUseCase,
-        PreviewSessionPlanUseCase previewSessionPlanUseCase,
-        GoalDiagnosisService goalDiagnosisService,
-        PathOptionsService pathOptionsService
+        GetSessionPathUseCase getSessionPathUseCase
     ) {
         this.createSessionUseCase = createSessionUseCase;
         this.planSessionTasksUseCase = planSessionTasksUseCase;
         this.getSessionOverviewUseCase = getSessionOverviewUseCase;
         this.getCurrentSessionUseCase = getCurrentSessionUseCase;
         this.getSessionPathUseCase = getSessionPathUseCase;
-        this.previewSessionPlanUseCase = previewSessionPlanUseCase;
-        this.goalDiagnosisService = goalDiagnosisService;
-        this.pathOptionsService = pathOptionsService;
     }
 
     @Operation(summary = "Create learning session")
@@ -83,18 +67,6 @@ public class SessionController {
     @PostMapping("/create")
     public CreateSessionResponse createSession(@Valid @RequestBody CreateSessionRequest request) {
         return createSessionUseCase.execute(request, UserContextHolder.getRequiredUserId());
-    }
-
-    @Operation(summary = "Diagnose learning goal quality")
-    @PostMapping("/goal-diagnose")
-    public GoalDiagnosisResponse diagnoseGoal(@Valid @RequestBody GoalDiagnosisRequest request) {
-        return goalDiagnosisService.diagnose(request);
-    }
-
-    @Operation(summary = "Get learning path options")
-    @PostMapping("/path-options")
-    public PathOptionsResponse pathOptions(@Valid @RequestBody GoalDiagnosisRequest request) {
-        return pathOptionsService.buildOptions(request);
     }
 
     @Operation(summary = "Plan session tasks")
@@ -111,15 +83,6 @@ public class SessionController {
         @RequestParam(name = "mode", required = false, defaultValue = "auto") String mode
     ) {
         return planSessionTasksUseCase.execute(sessionId, parseMode(mode));
-    }
-
-    @Operation(summary = "Preview session plan source and risks")
-    @GetMapping("/{sessionId}/plan-preview")
-    public PlanPreviewResponse previewPlan(
-        @PathVariable @Positive Long sessionId,
-        @RequestParam(name = "mode", required = false, defaultValue = "auto") String mode
-    ) {
-        return previewSessionPlanUseCase.preview(sessionId, parseMode(mode));
     }
 
     private PlanMode parseMode(String mode) {
