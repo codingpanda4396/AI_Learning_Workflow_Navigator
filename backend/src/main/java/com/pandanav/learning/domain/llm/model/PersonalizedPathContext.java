@@ -10,6 +10,7 @@ public record PersonalizedPathContext(
     Map<Long, BigDecimal> masteryByNode,
     List<String> recentErrorTags,
     List<Integer> recentScores,
+    String weakPointsSummary,
     List<ChapterNodeSnapshot> chapterNodes
 ) {
     public record GoalDiagnosisSnapshot(

@@ -155,6 +155,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         variables.put("mastery_by_node", safe(context.masteryByNode().toString()));
         variables.put("recent_error_tags", safe(context.recentErrorTags().toString()));
         variables.put("recent_scores", safe(context.recentScores().toString()));
+        variables.put("weak_points_summary", safe(context.weakPointsSummary()));
         variables.put("chapter_nodes", safe(context.chapterNodes().toString()));
         return toPrompt(definition, variables);
     }
@@ -453,10 +454,12 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                     mastery_by_node={{mastery_by_node}}
                     recent_error_tags={{recent_error_tags}}
                     recent_scores={{recent_scores}}
+                    weak_points_summary={{weak_points_summary}}
                     chapter_nodes={{chapter_nodes}}
                     Constraints:
                     - Only use node_id from chapter_nodes.
                     - stage in inserted_tasks must be UNDERSTANDING or TRAINING.
+                    - Prioritize low mastery and MISSING_STEPS/CONCEPT_CONFUSION nodes.
                     - Prefer concise reasons and objectives.
                     """,
                 """

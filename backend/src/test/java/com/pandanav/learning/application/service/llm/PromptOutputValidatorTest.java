@@ -65,4 +65,26 @@ class PromptOutputValidatorTest {
             """;
         assertTrue(validator.validatePersonalizedPathPlan(mapper.readTree(json)).isEmpty());
     }
+
+    @Test
+    void shouldAllowStageTextAndLeaveStageValidationToBusinessValidator() throws Exception {
+        String json = """
+            {
+              "ordered_nodes": [
+                {"node_id": 101, "priority": 1, "reason": "Start from weak concept."}
+              ],
+              "inserted_tasks": [
+                {
+                  "node_id": 101,
+                  "stage": "REFLECTION",
+                  "objective": "Provide additional reflective notes for this node.",
+                  "trigger": "CONCEPT_CONFUSION"
+                }
+              ],
+              "plan_reasoning_summary": "Prioritize weak node and attach one remediation task for confusion diagnosis.",
+              "risk_flags": []
+            }
+            """;
+        assertTrue(validator.validatePersonalizedPathPlan(mapper.readTree(json)).isEmpty());
+    }
 }

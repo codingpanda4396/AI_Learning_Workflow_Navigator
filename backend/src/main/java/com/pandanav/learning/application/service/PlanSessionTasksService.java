@@ -101,11 +101,22 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase, Preview
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
 
         PersonalizedPlanResult planResult = personalizedPathPlannerService.plan(session, mode, true);
+        List<PlanPreviewResponse.InsertedRemedialTaskResponse> insertedTasks = planResult.insertedTasks().stream()
+            .map(task -> new PlanPreviewResponse.InsertedRemedialTaskResponse(
+                task.nodeId(),
+                task.stage(),
+                task.trigger()
+            ))
+            .toList();
         return new PlanPreviewResponse(
             sessionId,
+            mode.name(),
             planResult.source().name(),
             planResult.planReasoningSummary(),
-            planResult.riskFlags()
+            planResult.riskFlags(),
+            planResult.advancedNodeIds(),
+            insertedTasks,
+            planResult.riskFlags().isEmpty() ? "LOW_RISK" : String.join(", ", planResult.riskFlags())
         );
     }
 

@@ -12,6 +12,7 @@ public record PersonalizedPlanResult(
     List<PersonalizedPathPlan.InsertedTask> insertedTasks,
     String planReasoningSummary,
     List<String> riskFlags,
+    List<Long> advancedNodeIds,
     String promptKey,
     String promptVersion,
     String provider,
