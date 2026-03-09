@@ -44,6 +44,7 @@ app:
       base-url: ${TUTOR_LLM_BASE_URL:https://api.deepseek.com/v1}
       model: ${TUTOR_LLM_MODEL:deepseek-chat}
       timeout-ms: ${TUTOR_LLM_TIMEOUT_MS:10000}
+      max-output-tokens: ${TUTOR_LLM_MAX_OUTPUT_TOKENS:700}
   llm:
     enabled: ${LLM_ENABLED:false}
     provider: ${LLM_PROVIDER:openai-compatible}
@@ -51,8 +52,12 @@ app:
     api-key: ${LLM_API_KEY:}
     model: ${LLM_MODEL:}
     timeout-ms: ${LLM_TIMEOUT_MS:90000}
-    max-retries: ${LLM_MAX_RETRIES:2}
+    max-retries: ${LLM_MAX_RETRIES:1}
     retry-backoff-ms: ${LLM_RETRY_BACKOFF_MS:500}
+    structure-max-output-tokens: ${LLM_STRUCTURE_MAX_OUTPUT_TOKENS:500}
+    training-max-output-tokens: ${LLM_TRAINING_MAX_OUTPUT_TOKENS:500}
+    evaluation-max-output-tokens: ${LLM_EVALUATION_MAX_OUTPUT_TOKENS:600}
+    tutor-max-output-tokens: ${LLM_TUTOR_MAX_OUTPUT_TOKENS:700}
     fallback-to-rule: ${LLM_FALLBACK_TO_RULE:true}
     log-request: ${LLM_LOG_REQUEST:false}
     log-response: ${LLM_LOG_RESPONSE:false}

@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,15 +46,19 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
             ? properties.getModel()
             : prompt.modelHint().trim();
         log.info("LLM invoke: promptKey={}, promptVersion={}, model={}", prompt.promptKey(), prompt.promptVersion(), model);
-        JsonNode requestPayload = objectMapper.valueToTree(Map.of(
-            "model", model,
-            "messages", List.of(
-                Map.of("role", "system", "content", prompt.systemPrompt()),
-                Map.of("role", "user", "content", prompt.userPrompt())
-            ),
-            "temperature", 0.2,
-            "response_format", Map.of("type", "json_object")
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", model);
+        payload.put("messages", List.of(
+            Map.of("role", "system", "content", prompt.systemPrompt()),
+            Map.of("role", "user", "content", prompt.userPrompt())
         ));
+        payload.put("temperature", 0.2);
+        payload.put("response_format", Map.of("type", "json_object"));
+        Integer maxOutputTokens = prompt.maxOutputTokens() != null ? prompt.maxOutputTokens() : resolveMaxOutputTokens(prompt.promptKey());
+        if (maxOutputTokens != null && maxOutputTokens > 0) {
+            payload.put("max_tokens", maxOutputTokens);
+        }
+        JsonNode requestPayload = objectMapper.valueToTree(payload);
 
         JsonNode response = invokeWithRetry(requestPayload);
 
@@ -178,5 +183,18 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
         } catch (Exception e) {
             return "(unable to read body: " + e.getMessage() + ")";
         }
+    }
+
+    private Integer resolveMaxOutputTokens(String promptKey) {
+        if (promptKey == null) {
+            return null;
+        }
+        return switch (promptKey) {
+            case "STRUCTURE" -> properties.getStructureMaxOutputTokens();
+            case "TRAINING" -> properties.getTrainingMaxOutputTokens();
+            case "EVALUATE" -> properties.getEvaluationMaxOutputTokens();
+            case "TUTOR" -> properties.getTutorMaxOutputTokens();
+            default -> null;
+        };
     }
 }

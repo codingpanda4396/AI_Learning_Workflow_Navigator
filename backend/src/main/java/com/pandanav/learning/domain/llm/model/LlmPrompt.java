@@ -8,6 +8,7 @@ public record LlmPrompt(
     String userPrompt,
     String expectedJsonSchemaText,
     String outputRules,
-    String modelHint
+    String modelHint,
+    Integer maxOutputTokens
 ) {
 }

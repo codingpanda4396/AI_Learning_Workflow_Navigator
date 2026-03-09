@@ -37,11 +37,11 @@ public class PromptOutputValidator {
 
         switch (stage) {
             case STRUCTURE -> {
-                validateText(node, "title", 8, 30, errors);
-                validateText(node, "summary", 40, 120, errors);
-                validateStringArray(node, "key_points", 3, 5, 10, 40, errors);
-                validateStringArray(node, "common_misconceptions", 2, 3, 10, 40, errors);
-                validateStringArray(node, "suggested_sequence", 3, 5, 8, 30, errors);
+                validateText(node, "title", 1, 30, errors);
+                validateText(node, "summary", 1, 80, errors);
+                validateStringArray(node, "key_points", 1, 4, 1, 20, errors);
+                validateStringArray(node, "common_misconceptions", 0, 2, 1, 20, errors);
+                validateStringArray(node, "suggested_sequence", 1, 4, 1, 16, errors);
             }
             case UNDERSTANDING -> {
                 validateText(node, "concept_explanation", 80, 220, errors);
@@ -76,9 +76,9 @@ public class PromptOutputValidator {
         Integer score = readInt(node, "score", errors);
         BigDecimal normalized = readDecimal(node, "normalized_score", errors);
         validateText(node, "feedback", 10, 300, errors);
-        validateStringArray(node, "error_tags", 2, 4, 2, 50, errors);
-        validateStringArray(node, "strengths", 2, 3, 2, 80, errors);
-        validateStringArray(node, "weaknesses", 2, 3, 2, 80, errors);
+        validateStringArray(node, "error_tags", 1, 4, 1, 50, errors);
+        validateStringArray(node, "strengths", 1, 3, 1, 80, errors);
+        validateStringArray(node, "weaknesses", 1, 3, 1, 80, errors);
         validateText(node, "suggested_next_action", 4, 50, errors);
 
         JsonNode rubric = node.path("rubric");
@@ -363,8 +363,8 @@ public class PromptOutputValidator {
             errors.add("questions must be array");
             return;
         }
-        if (questions.size() < 3 || questions.size() > 5) {
-            errors.add("questions size must be 3-5");
+        if (questions.size() != 3) {
+            errors.add("questions size must be 3");
         }
 
         int basic = 0;
@@ -377,8 +377,8 @@ public class PromptOutputValidator {
             }
             validateText(question, "id", 2, 20, errors);
             validateText(question, "type", 4, 20, errors);
-            validateText(question, "question", 20, 120, errors);
-            validateStringArray(question, "reference_points", 2, 4, 8, 35, errors);
+            validateText(question, "question", 1, 60, errors);
+            validateStringArray(question, "reference_points", 1, 2, 1, 16, errors);
             validateText(question, "difficulty", 4, 10, errors);
 
             String type = question.path("type").asText("");

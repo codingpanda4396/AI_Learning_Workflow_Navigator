@@ -22,15 +22,17 @@ import java.util.Map;
 public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
 
     private static final String STAGE_SYSTEM_PROMPT = """
-        你是面向大学生学习流程的教学型 AI 引擎。
-        你只允许输出 JSON，不允许输出 markdown code fence，不允许输出 schema 外字段。
-        所有字段值必须使用简体中文，且内容必须紧扣当前知识点与任务目标，禁止泛化空谈。
+        你是学习任务生成器。
+        仅输出一个 JSON 对象。
+        不要解释、不要 markdown、不要代码块、不要额外字段。
+        全部文本用简体中文，内容紧扣当前知识点与任务目标。
         """;
 
     private static final String EVAL_SYSTEM_PROMPT = """
-        你是学习任务评估器，只负责根据题目与学生答案输出结构化评估 JSON。
-        你只允许输出 JSON，不允许输出 markdown code fence，不允许输出 schema 外字段。
-        所有字段值必须使用简体中文，评分必须严格遵循给定 rubric。
+        你是训练答案评估器。
+        仅输出一个 JSON 对象。
+        不要解释、不要 markdown、不要代码块、不要额外字段。
+        评分必须严格按 rubric。
         """;
 
     private static final String GOAL_DIAGNOSE_SYSTEM_PROMPT = """
@@ -40,19 +42,10 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         """;
 
     private static final String TUTOR_SYSTEM_PROMPT_TEMPLATE = """
-        你是“学习流程导师”，不是普通问答助手。
-
-        教学策略：
-        1) 优先引导，不直接给最终答案。
-        2) 先判断学生卡点；能提问就先提问。
-        3) 学生连续卡住时给 hint；必要时给 partial answer。
-        4) 学生理解正确时，推进到更高一级问题。
-        5) 单次回复控制在 120 字以内，避免长篇大论。
-
-        幻觉约束：
-        1) 不编造课程上下文中不存在的事实。
-        2) 不假设学生已经掌握未提供的前置知识。
-
+        你是“学习流程导师”，优先引导，不直接给最终答案。
+        先提问定位卡点，再给短提示；必要时再给局部答案。
+        单次回复控制在 80 字以内，禁止长篇解释。
+        不编造上下文外信息。
         模式开关：
         - hint_mode: {{hint_mode}}
         - direct_answer_mode: {{direct_answer_mode}}
@@ -210,7 +203,8 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
             userPrompt,
             spec.expectedJsonSchemaText(),
             spec.outputRules(),
-            spec.modelHint()
+            spec.modelHint(),
+            null
         );
     }
 
@@ -225,22 +219,22 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                     任务阶段：STRUCTURE
                     任务目标：{{objective}}
                     知识点：{{node_title}}
-                    请根据任务目标输出结构化学习地图。
+                    输出精简学习结构。
                     """,
                 """
                     {
-                      "title": "string(8-30字)",
-                      "summary": "string(40-120字)",
-                      "key_points": ["string(10-40字)", "3-5项"],
-                      "common_misconceptions": ["string(10-40字)", "2-3项"],
-                      "suggested_sequence": ["string(8-30字)", "3-5项"]
+                      "title": "string(1-30字)",
+                      "summary": "string(1-80字)",
+                      "key_points": ["string(1-20字), 最多4条"],
+                      "common_misconceptions": ["string(1-20字), 最多2条"],
+                      "suggested_sequence": ["string(1-16字), 最多4条"]
                     }
                     """,
                 """
-                    - 只输出一个 JSON 对象，且字段必须严格等于 schema。
-                    - 禁止输出 schema 外字段、解释性前后缀、markdown。
-                    - 所有字段值必须为简体中文。
-                    - 内容必须围绕当前知识点与任务目标，禁止泛泛而谈。
+                    - 只输出 JSON。
+                    - 不要解释，不要 markdown，不要代码块。
+                    - 字段必须与 schema 完全一致，不得新增字段。
+                    - 文本必须短句、可执行、贴合知识点。
                     """,
                 null
             )
@@ -288,28 +282,28 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                     任务阶段：TRAINING
                     任务目标：{{objective}}
                     知识点：{{node_title}}
-                    请输出训练题集合，覆盖基础理解、概念应用、推理题。
+                    仅生成 3 道简短训练题。
                     """,
                 """
                     {
                       "questions": [
                         {
-                          "id": "string(例如q1)",
+                          "id": "string(如q1)",
                           "type": "BASIC|APPLICATION|REASONING",
-                          "question": "string(20-120字)",
-                          "reference_points": ["string(8-35字)", "2-4项"],
+                          "question": "string(1-60字)",
+                          "reference_points": ["string(1-16字), 最多2条"],
                           "difficulty": "EASY|MEDIUM|HARD"
                         }
                       ]
                     }
-                    约束：questions 数量 3-5。
+                    约束：questions 数量固定 3。
                     """,
                 """
-                    - 只输出一个 JSON 对象，字段必须严格等于 schema。
-                    - 禁止输出 schema 外字段、解释性前后缀、markdown。
-                    - questions 至少包含 1 道 BASIC、1 道 APPLICATION、1 道 REASONING。
-                    - 所有字段值必须为简体中文（id/type/difficulty 除外）。
-                    - 题目必须紧扣当前知识点与任务目标。
+                    - 只输出 JSON。
+                    - 不要解释，不要 markdown，不要代码块。
+                    - 字段必须与 schema 完全一致，不得新增字段。
+                    - 题干简短，不写长解析。
+                    - questions 必须包含 BASIC/APPLICATION/REASONING 各 1 题。
                     """,
                 null
             )
@@ -356,31 +350,31 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                     任务目标：{{task_objective}}
                     题目内容：{{generated_question_content}}
                     学生答案：{{user_answer}}
-                    请按 rubric 评估并输出 JSON。
+                    按 rubric 输出评估 JSON。
                     """,
                 """
                     {
                       "score": "number(0-100)",
-                      "normalized_score": "number(0-1, 且 = score / 100)",
+                      "normalized_score": "number(0-1, = score/100)",
                       "rubric": {
                         "concept_correctness": "number(0-40)",
                         "reasoning_quality": "number(0-30)",
                         "completeness": "number(0-20)",
                         "clarity": "number(0-10)"
                       },
-                      "feedback": "string(40-180字)",
-                      "error_tags": ["string", "2-4项"],
-                      "strengths": ["string", "2-3项"],
-                      "weaknesses": ["string", "2-3项"],
+                      "feedback": "string(1-120字)",
+                      "error_tags": ["string, 1-4条"],
+                      "strengths": ["string, 1-3条"],
+                      "weaknesses": ["string, 1-3条"],
                       "suggested_next_action": "INSERT_REMEDIAL_UNDERSTANDING|INSERT_TRAINING_VARIANTS|INSERT_TRAINING_REINFORCEMENT|ADVANCE_TO_NEXT_NODE"
                     }
                     """,
                 """
-                    - 只输出一个 JSON 对象，字段必须严格等于 schema。
-                    - 禁止输出 schema 外字段、解释性前后缀、markdown。
-                    - rubric 四个维度求和必须等于 score。
-                    - normalized_score 必须等于 score / 100（保留 3 位小数）。
-                    - 所有文本字段值必须为简体中文。
+                    - 只输出 JSON。
+                    - 不要解释，不要 markdown，不要代码块。
+                    - 字段必须与 schema 完全一致，不得新增字段。
+                    - rubric 四项和必须等于 score。
+                    - normalized_score 必须等于 score/100（保留 3 位小数）。
                     """,
                 null
             )

@@ -11,8 +11,12 @@ public class LlmProperties {
     private String apiKey;
     private String model;
     private int timeoutMs = 10000;
-    private int maxRetries = 2;
+    private int maxRetries = 1;
     private int retryBackoffMs = 500;
+    private int structureMaxOutputTokens = 500;
+    private int trainingMaxOutputTokens = 500;
+    private int evaluationMaxOutputTokens = 600;
+    private int tutorMaxOutputTokens = 700;
     private boolean fallbackToRule = true;
     private boolean logRequest = false;
     private boolean logResponse = false;
@@ -79,6 +83,38 @@ public class LlmProperties {
 
     public void setRetryBackoffMs(int retryBackoffMs) {
         this.retryBackoffMs = Math.max(0, retryBackoffMs);
+    }
+
+    public int getStructureMaxOutputTokens() {
+        return structureMaxOutputTokens;
+    }
+
+    public void setStructureMaxOutputTokens(int structureMaxOutputTokens) {
+        this.structureMaxOutputTokens = Math.max(1, structureMaxOutputTokens);
+    }
+
+    public int getTrainingMaxOutputTokens() {
+        return trainingMaxOutputTokens;
+    }
+
+    public void setTrainingMaxOutputTokens(int trainingMaxOutputTokens) {
+        this.trainingMaxOutputTokens = Math.max(1, trainingMaxOutputTokens);
+    }
+
+    public int getEvaluationMaxOutputTokens() {
+        return evaluationMaxOutputTokens;
+    }
+
+    public void setEvaluationMaxOutputTokens(int evaluationMaxOutputTokens) {
+        this.evaluationMaxOutputTokens = Math.max(1, evaluationMaxOutputTokens);
+    }
+
+    public int getTutorMaxOutputTokens() {
+        return tutorMaxOutputTokens;
+    }
+
+    public void setTutorMaxOutputTokens(int tutorMaxOutputTokens) {
+        this.tutorMaxOutputTokens = Math.max(1, tutorMaxOutputTokens);
     }
 
     public boolean isFallbackToRule() {

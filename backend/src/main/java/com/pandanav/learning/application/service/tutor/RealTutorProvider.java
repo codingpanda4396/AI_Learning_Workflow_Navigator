@@ -44,6 +44,7 @@ public class RealTutorProvider implements TutorProvider {
             payload.put("model", properties.getModel());
             payload.put("messages", buildMessages(request));
             payload.put("temperature", 0.2);
+            payload.put("max_tokens", properties.getMaxOutputTokens());
 
             JsonNode response = restClient.post()
                 .uri("/chat/completions")
