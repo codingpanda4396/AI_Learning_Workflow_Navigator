@@ -15,6 +15,7 @@ import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.LearningEventRepository;
 import com.pandanav.learning.domain.repository.PracticeRepository;
+import com.pandanav.learning.domain.repository.PracticeSubmissionRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
@@ -40,6 +41,8 @@ class PracticeServiceImplTest {
     @Mock
     private PracticeRepository practiceRepository;
     @Mock
+    private PracticeSubmissionRepository practiceSubmissionRepository;
+    @Mock
     private TaskRepository taskRepository;
     @Mock
     private SessionRepository sessionRepository;
@@ -60,6 +63,7 @@ class PracticeServiceImplTest {
         llmProperties = new LlmProperties();
         practiceService = new PracticeServiceImpl(
             practiceRepository,
+            practiceSubmissionRepository,
             taskRepository,
             sessionRepository,
             conceptNodeRepository,
