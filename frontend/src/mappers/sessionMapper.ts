@@ -1,8 +1,6 @@
 import type {
   CurrentSessionResponse,
-  GoalDiagnosisResponse,
   PathResponse,
-  PathOption,
   PlanSessionResponse,
   SessionOverviewResponse,
 } from '@/types'
@@ -86,29 +84,6 @@ interface PathResponseDto {
   nodes?: PathNodeDto[]
 }
 
-interface GoalDiagnosisResponseDto {
-  goal_score: number
-  feedback?: {
-    summary?: string
-    strengths?: string[]
-    risks?: string[]
-    rewritten_goal?: string
-  }
-}
-
-interface PathOptionDto {
-  path_id: string
-  name: string
-  description: string
-  difficulty: string
-  estimated_minutes: number
-  steps?: string[]
-}
-
-interface PathOptionsResponseDto {
-  path_options?: PathOptionDto[]
-}
-
 export function mapPlanSessionDto(dto: PlanSessionResponseDto): PlanSessionResponse {
   return {
     sessionId: dto.session_id,
@@ -186,27 +161,4 @@ export function mapPathDto(dto: PathResponseDto): PathResponse {
       masteryValue: node.mastery_value,
     })),
   }
-}
-
-export function mapGoalDiagnosisDto(dto: GoalDiagnosisResponseDto): GoalDiagnosisResponse {
-  return {
-    goalScore: dto.goal_score,
-    feedback: {
-      summary: dto.feedback?.summary ?? '',
-      strengths: dto.feedback?.strengths ?? [],
-      risks: dto.feedback?.risks ?? [],
-      rewrittenGoal: dto.feedback?.rewritten_goal ?? '',
-    },
-  }
-}
-
-export function mapPathOptionsDto(dto: PathOptionsResponseDto): PathOption[] {
-  return (dto.path_options ?? []).map((item) => ({
-    pathId: item.path_id,
-    name: item.name,
-    description: item.description,
-    difficulty: item.difficulty,
-    estimatedMinutes: item.estimated_minutes,
-    steps: item.steps ?? [],
-  }))
 }

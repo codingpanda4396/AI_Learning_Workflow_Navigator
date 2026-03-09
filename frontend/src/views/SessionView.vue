@@ -56,12 +56,8 @@ const steps: StepMeta[] = [
 const currentSession = computed(() => sessionStore.currentSession)
 const isLoading = computed(() => sessionStore.fetchingSession || sessionStore.recoveringSession)
 const error = computed(() => sessionStore.error)
-const diagnosis = computed(() => sessionStore.goalDiagnosis)
-const pathOptions = computed(() => sessionStore.pathOptions)
-const selectedPathId = computed(() => sessionStore.selectedPathId)
 const currentStep = computed(() => browsingStep.value)
 const currentStepMeta = computed(() => steps.find((item) => item.step === currentStep.value) ?? steps[0]!)
-const selectedPath = computed(() => pathOptions.value.find((item) => item.pathId === selectedPathId.value) ?? null)
 const username = computed(() => authStore.currentUser?.username ?? '')
 
 const stepProgressData = computed<StepProgressItem[]>(() => {
@@ -69,8 +65,8 @@ const stepProgressData = computed<StepProgressItem[]>(() => {
   const failedCount = timeline.filter((item) => item.status === 'FAILED').length
   const doneTaskCount = timeline.filter((item) => item.status === 'SUCCEEDED').length
   const totalTaskCount = timeline.length
-  const step1Done = !!diagnosis.value
-  const step2Done = !!selectedPathId.value && pathOptions.value.length > 0
+  const step1Done = true
+  const step2Done = true
   const finalDone = (currentSession.value?.progress?.completionRate ?? 0) >= 1
 
   const items: StepProgressItem[] = [
@@ -164,24 +160,9 @@ function isTaskExpanded(taskId: number) {
   return expandedTaskIds.value.includes(taskId)
 }
 
-function selectPath(pathId: string) {
-  sessionStore.setSelectedPath(pathId)
-}
-
-async function refreshModuleData() {
-  if (!currentSession.value) return
-  const payload = {
-    courseId: currentSession.value.courseId,
-    chapterId: currentSession.value.chapterId,
-    goalText: currentSession.value.goalText,
-  }
-  await Promise.all([sessionStore.diagnoseGoal(payload), sessionStore.fetchPathOptions(payload)])
-}
-
 async function fetchSession() {
   await sessionStore.fetchSessionOverview(sessionId.value)
   await sessionStore.fetchSessionPath(sessionId.value)
-  await refreshModuleData()
 }
 
 function handleRunNextTask() {
@@ -252,35 +233,12 @@ onMounted(async () => {
 
         <section v-if="currentStep === 1" class="panel">
           <h3>目标诊断结果</h3>
-          <p v-if="!diagnosis">暂无诊断结果，请刷新。</p>
-          <template v-else>
-            <p><strong>评分：</strong>{{ diagnosis.goalScore }}/100</p>
-            <p><strong>结论：</strong>{{ diagnosis.feedback.summary }}</p>
-            <p><strong>优势：</strong>{{ diagnosis.feedback.strengths.join('；') }}</p>
-            <p><strong>风险：</strong>{{ diagnosis.feedback.risks.join('；') }}</p>
-            <p><strong>建议目标：</strong>{{ diagnosis.feedback.rewrittenGoal }}</p>
-          </template>
+          <p>该能力已下线，MVP 阶段改为直接进入计划生成与任务执行。</p>
         </section>
 
         <section v-if="currentStep === 2" class="panel">
           <h3>路径选项</h3>
-          <div class="path-grid">
-            <article
-              v-for="path in pathOptions"
-              :key="path.pathId"
-              class="path-item"
-              :class="{ selected: path.pathId === selectedPathId }"
-              @click="selectPath(path.pathId)"
-            >
-              <h4>{{ path.name }}</h4>
-              <p>{{ path.description }}</p>
-              <p>难度：{{ path.difficulty }}，预计 {{ path.estimatedMinutes }} 分钟</p>
-              <ul>
-                <li v-for="(s, idx) in path.steps" :key="`${path.pathId}-${idx}`">{{ s }}</li>
-              </ul>
-            </article>
-          </div>
-          <p v-if="selectedPath"><strong>已选：</strong>{{ selectedPath.name }}</p>
+          <p>该能力已下线，路径由后端主链路计划器统一生成。</p>
         </section>
 
         <section v-if="currentStep === 3" class="panel">
