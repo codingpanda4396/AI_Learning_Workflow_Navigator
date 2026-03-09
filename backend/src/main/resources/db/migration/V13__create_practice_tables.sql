@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS practice_item (
   CONSTRAINT ck_practice_item_status
     CHECK (status IN ('GENERATED', 'ACTIVE', 'ANSWERED', 'ARCHIVED')),
   CONSTRAINT ck_practice_item_question_type
-    CHECK (question_type IN ('SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'FILL_BLANK', 'SHORT_ANSWER')),
+    CHECK (question_type IN ('SINGLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER')),
   CONSTRAINT ck_practice_item_stage
     CHECK (stage = 'TRAINING')
 );

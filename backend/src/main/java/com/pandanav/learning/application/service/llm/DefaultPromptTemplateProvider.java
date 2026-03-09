@@ -6,6 +6,7 @@ import com.pandanav.learning.domain.llm.model.EvaluationContext;
 import com.pandanav.learning.domain.llm.model.GoalDiagnosisContext;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.PersonalizedPathContext;
+import com.pandanav.learning.domain.llm.model.PracticeGenerationContext;
 import com.pandanav.learning.domain.llm.model.PromptDefinition;
 import com.pandanav.learning.domain.llm.model.PromptSpec;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
@@ -75,6 +76,13 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         Do not output fields outside schema.
         """;
 
+    private static final String PRACTICE_GENERATION_SYSTEM_PROMPT = """
+        You are a training-question generator.
+        Output only one JSON object and do not use markdown code fences.
+        Do not output fields outside schema.
+        Questions must stay aligned with the given node and task objective.
+        """;
+
     private final PromptTemplateRenderer renderer = new PromptTemplateRenderer();
     private final Map<PromptTemplateKey, PromptDefinition> definitions = new EnumMap<>(PromptTemplateKey.class);
 
@@ -83,6 +91,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         registerEvaluatePrompt();
         registerGoalDiagnosePrompt();
         registerPathPlanPrompt();
+        registerPracticeGenerationPrompt();
         registerTutorPrompt();
         registerConceptDecomposePrompt();
     }
@@ -157,6 +166,17 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
             "chapter_id", safe(context.chapterId()),
             "concept", safe(context.concept()),
             "goal", safe(context.goal())
+        );
+        return toPrompt(definition, variables);
+    }
+
+    @Override
+    public LlmPrompt buildPracticeGenerationPrompt(PracticeGenerationContext context) {
+        PromptDefinition definition = definitions.get(PromptTemplateKey.PRACTICE_GENERATION_V1);
+        Map<String, String> variables = Map.of(
+            "task_objective", safe(context.taskObjective()),
+            "node_title", safe(context.nodeTitle()),
+            "stage_content_json", safe(context.stageContentJson())
         );
         return toPrompt(definition, variables);
     }
@@ -459,6 +479,48 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                 """
                     - Output exactly one JSON object.
                     - Do not output markdown code fences.
+                    - No fields outside schema.
+                    """,
+                null
+            )
+        ));
+    }
+
+    private void registerPracticeGenerationPrompt() {
+        definitions.put(PromptTemplateKey.PRACTICE_GENERATION_V1, new PromptDefinition(
+            PromptTemplateKey.PRACTICE_GENERATION_V1,
+            new PromptSpec(
+                PromptTemplateKey.PRACTICE_GENERATION_V1.promptKey(),
+                PromptTemplateKey.PRACTICE_GENERATION_V1.promptVersion(),
+                PRACTICE_GENERATION_SYSTEM_PROMPT,
+                """
+                    Generate training questions from current context.
+                    task_objective={{task_objective}}
+                    node_title={{node_title}}
+                    stage_content_json={{stage_content_json}}
+                    """,
+                """
+                    {
+                      "items": [
+                        {
+                          "question_type": "SINGLE_CHOICE|TRUE_FALSE|SHORT_ANSWER",
+                          "stem": "string(20-240)",
+                          "options": ["string(1-100)"],
+                          "standard_answer": "string(1-200)",
+                          "explanation": "string(10-240)",
+                          "difficulty": "EASY|MEDIUM|HARD"
+                        }
+                      ]
+                    }
+                    Constraints:
+                    - items size must be 3.
+                    - must include at least one SINGLE_CHOICE, one TRUE_FALSE, and one SHORT_ANSWER.
+                    - for SHORT_ANSWER, options must be [].
+                    - for TRUE_FALSE, options must be ["True","False"].
+                    """,
+                """
+                    - Output exactly one JSON object.
+                    - No markdown code fence.
                     - No fields outside schema.
                     """,
                 null

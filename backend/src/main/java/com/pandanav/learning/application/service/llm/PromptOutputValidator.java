@@ -220,6 +220,65 @@ public class PromptOutputValidator {
         return errors;
     }
 
+    public List<String> validatePracticeGeneration(JsonNode node) {
+        List<String> errors = new ArrayList<>();
+        if (node == null || !node.isObject()) {
+            errors.add("practice generation output must be a JSON object");
+            return errors;
+        }
+
+        Set<String> required = Set.of("items");
+        validateNoExtraFields(node, required, errors);
+        JsonNode items = node.path("items");
+        if (!items.isArray()) {
+            errors.add("items must be array");
+            return errors;
+        }
+        if (items.size() != 3) {
+            errors.add("items size must be 3");
+        }
+
+        int singleChoice = 0;
+        int trueFalse = 0;
+        int shortAnswer = 0;
+        for (JsonNode item : items) {
+            if (!item.isObject()) {
+                errors.add("each item must be object");
+                continue;
+            }
+            validateNoExtraFields(item, Set.of(
+                "question_type", "stem", "options", "standard_answer", "explanation", "difficulty"
+            ), errors);
+            validateText(item, "question_type", 5, 20, errors);
+            validateText(item, "stem", 20, 240, errors);
+            validateText(item, "standard_answer", 1, 200, errors);
+            validateText(item, "explanation", 10, 240, errors);
+            validateText(item, "difficulty", 4, 10, errors);
+            validateStringArray(item, "options", 0, 6, 1, 100, errors);
+
+            String type = item.path("question_type").asText("");
+            if ("SINGLE_CHOICE".equals(type)) {
+                singleChoice++;
+                if (item.path("options").size() < 2) {
+                    errors.add("SINGLE_CHOICE options must have at least 2 choices");
+                }
+            } else if ("TRUE_FALSE".equals(type)) {
+                trueFalse++;
+                if (item.path("options").size() != 2) {
+                    errors.add("TRUE_FALSE options must have 2 choices");
+                }
+            } else if ("SHORT_ANSWER".equals(type)) {
+                shortAnswer++;
+            } else {
+                errors.add("unsupported question_type: " + type);
+            }
+        }
+        if (singleChoice == 0 || trueFalse == 0 || shortAnswer == 0) {
+            errors.add("items must include SINGLE_CHOICE/TRUE_FALSE/SHORT_ANSWER");
+        }
+        return errors;
+    }
+
     private int readBoundedInt(JsonNode node, String field, int min, int max, List<String> errors) {
         Integer value = readInt(node, field, errors);
         if (value == null) {
