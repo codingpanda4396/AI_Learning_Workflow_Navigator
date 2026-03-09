@@ -2,6 +2,7 @@ package com.pandanav.learning.application.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.pandanav.learning.api.dto.session.NextTaskResponse;
 import com.pandanav.learning.api.dto.task.FeedbackResponse;
 import com.pandanav.learning.api.dto.task.SubmitTaskRequest;
@@ -147,8 +148,8 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
                 evaluation.model(),
                 evaluation.promptKey(),
                 evaluation.promptVersion(),
-                "{}",
-                "{}",
+                toJsonOrPlaceholder(evaluation.requestPayload(), "request payload missing"),
+                toJsonOrPlaceholder(buildResponseSummary(evaluation.responsePayload()), "response payload missing"),
                 toJson(evaluation.rawJson() == null ? Map.of() : evaluation.rawJson()),
                 "SUCCEEDED",
                 evaluation.usage() == null ? null : evaluation.usage().latencyMs(),
@@ -310,6 +311,30 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         } catch (JsonProcessingException ex) {
             throw new InternalServerException("Failed to serialize submission payload.");
         }
+    }
+
+    private String toJsonOrPlaceholder(JsonNode value, String placeholder) {
+        if (value == null || value.isNull() || value.isMissingNode()) {
+            return toJson(Map.of("note", placeholder));
+        }
+        return toJson(value);
+    }
+
+    private JsonNode buildResponseSummary(JsonNode responsePayload) {
+        if (responsePayload == null || responsePayload.isNull() || responsePayload.isMissingNode()) {
+            return objectMapper.valueToTree(Map.of("note", "response payload missing"));
+        }
+        JsonNode usage = responsePayload.path("usage");
+        String finishReason = responsePayload.path("choices").path(0).path("finish_reason").asText("");
+        String content = responsePayload.path("choices").path(0).path("message").path("content").asText("");
+        if (content.length() > 1000) {
+            content = content.substring(0, 1000);
+        }
+        return objectMapper.valueToTree(Map.of(
+            "usage", usage.isMissingNode() ? objectMapper.createObjectNode() : usage,
+            "finish_reason", finishReason,
+            "choices", List.of(Map.of("message", Map.of("content", content)))
+        ));
     }
 
     private List<ErrorTag> mapErrorTags(List<String> tags) {

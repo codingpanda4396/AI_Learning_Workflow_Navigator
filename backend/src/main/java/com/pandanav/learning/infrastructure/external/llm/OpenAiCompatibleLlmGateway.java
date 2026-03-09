@@ -45,7 +45,6 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
         String model = (prompt.modelHint() == null || prompt.modelHint().isBlank())
             ? properties.getModel()
             : prompt.modelHint().trim();
-        log.info("LLM invoke: promptKey={}, promptVersion={}, model={}", prompt.promptKey(), prompt.promptVersion(), model);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", model);
         payload.put("messages", List.of(
@@ -59,6 +58,13 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
             payload.put("max_tokens", maxOutputTokens);
         }
         JsonNode requestPayload = objectMapper.valueToTree(payload);
+        log.info(
+            "LLM request: promptKey={}, model={}, resolvedMaxOutputTokens={}, payload={}",
+            prompt.promptKey(),
+            model,
+            maxOutputTokens,
+            toCompactJson(requestPayload)
+        );
 
         JsonNode response = invokeWithRetry(requestPayload);
 
@@ -69,9 +75,19 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
 
         int latency = (int) Duration.between(start, Instant.now()).toMillis();
         JsonNode usageNode = response.path("usage");
+        String finishReason = response.path("choices").path(0).path("finish_reason").asText("");
+        Integer promptTokens = usageNode.path("prompt_tokens").isNumber() ? usageNode.path("prompt_tokens").asInt() : null;
+        Integer completionTokens = usageNode.path("completion_tokens").isNumber() ? usageNode.path("completion_tokens").asInt() : null;
+        log.info(
+            "LLM response: finish_reason={}, usage.prompt_tokens={}, usage.completion_tokens={}, latency_ms={}",
+            finishReason,
+            promptTokens,
+            completionTokens,
+            latency
+        );
         LlmUsage usage = new LlmUsage(
-            usageNode.path("prompt_tokens").isNumber() ? usageNode.path("prompt_tokens").asInt() : null,
-            usageNode.path("completion_tokens").isNumber() ? usageNode.path("completion_tokens").asInt() : null,
+            promptTokens,
+            completionTokens,
             latency
         );
 
@@ -196,5 +212,13 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
             case "TUTOR" -> properties.getTutorMaxOutputTokens();
             default -> null;
         };
+    }
+
+    private String toCompactJson(JsonNode node) {
+        try {
+            return objectMapper.writeValueAsString(node);
+        } catch (Exception ex) {
+            return "{\"error\":\"failed to serialize request payload\"}";
+        }
     }
 }

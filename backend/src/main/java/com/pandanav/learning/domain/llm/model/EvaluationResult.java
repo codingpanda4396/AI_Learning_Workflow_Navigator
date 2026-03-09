@@ -19,6 +19,8 @@ public record EvaluationResult(
     String model,
     String promptKey,
     String promptVersion,
-    LlmUsage usage
+    LlmUsage usage,
+    JsonNode requestPayload,
+    JsonNode responsePayload
 ) {
 }

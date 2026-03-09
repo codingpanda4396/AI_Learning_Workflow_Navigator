@@ -10,9 +10,9 @@ public class LlmProperties {
     private String baseUrl;
     private String apiKey;
     private String model;
-    private int timeoutMs = 10000;
-    private int maxRetries = 1;
-    private int retryBackoffMs = 500;
+    private int timeoutMs = 20000;
+    private int maxRetries = 0;
+    private int retryBackoffMs = 200;
     private int structureMaxOutputTokens = 500;
     private int trainingMaxOutputTokens = 500;
     private int evaluationMaxOutputTokens = 600;

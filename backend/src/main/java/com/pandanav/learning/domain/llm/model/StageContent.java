@@ -11,6 +11,8 @@ public record StageContent(
     String promptVersion,
     String provider,
     String model,
-    LlmUsage usage
+    LlmUsage usage,
+    JsonNode requestPayload,
+    JsonNode responsePayload
 ) {
 }

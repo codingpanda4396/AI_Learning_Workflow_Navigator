@@ -105,6 +105,8 @@ public class RuleBasedAnswerEvaluator implements AnswerEvaluator {
             null,
             "EVALUATE",
             "rule-v1",
+            null,
+            null,
             null
         );
     }
@@ -129,6 +131,8 @@ public class RuleBasedAnswerEvaluator implements AnswerEvaluator {
             null,
             "EVALUATE",
             "rule-v1",
+            null,
+            null,
             null
         );
     }

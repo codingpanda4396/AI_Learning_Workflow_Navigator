@@ -70,7 +70,9 @@ public class LlmAnswerEvaluator implements AnswerEvaluator {
             result.model(),
             prompt.promptKey(),
             prompt.promptVersion(),
-            result.usage()
+            result.usage(),
+            result.requestPayload(),
+            result.responsePayload()
         );
     }
 

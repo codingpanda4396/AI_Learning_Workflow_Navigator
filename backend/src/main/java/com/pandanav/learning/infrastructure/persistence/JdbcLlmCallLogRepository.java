@@ -30,9 +30,9 @@ public class JdbcLlmCallLogRepository implements LlmCallLogRepository {
             log.model(),
             log.promptTemplateKey(),
             log.promptVersion(),
-            jsonOrEmpty(log.requestPayload()),
-            jsonOrEmpty(log.responsePayload()),
-            jsonOrEmpty(log.parsedJson()),
+            jsonOrNull(log.requestPayload()),
+            jsonOrNull(log.responsePayload()),
+            jsonOrNull(log.parsedJson()),
             log.status(),
             log.latencyMs(),
             log.tokenInput(),
@@ -40,8 +40,8 @@ public class JdbcLlmCallLogRepository implements LlmCallLogRepository {
         );
     }
 
-    private String jsonOrEmpty(String value) {
-        return (value == null || value.isBlank()) ? "{}" : value;
+    private String jsonOrNull(String value) {
+        return (value == null || value.isBlank()) ? null : value;
     }
 }
 

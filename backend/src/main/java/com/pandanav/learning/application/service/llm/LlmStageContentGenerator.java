@@ -55,7 +55,9 @@ public class LlmStageContentGenerator implements StageContentGenerator {
             prompt.promptVersion(),
             result.provider(),
             result.model(),
-            result.usage()
+            result.usage(),
+            result.requestPayload(),
+            result.responsePayload()
         );
     }
 
