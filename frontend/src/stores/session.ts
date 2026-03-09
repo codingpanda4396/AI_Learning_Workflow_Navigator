@@ -4,6 +4,7 @@ import type {
   CreateSessionRequest,
   CurrentSessionResponse,
   GoalDiagnosisResponse,
+  LearningFeedbackResponse,
   PathResponse,
   PathOption,
   RunTaskResponse,
@@ -20,6 +21,7 @@ import {
   getSessionPath,
   planSession,
 } from '@/api/session'
+import { getLearningFeedback } from '@/api/learningFeedback'
 import { getTaskDetail, runTask, submitTask } from '@/api/task'
 import { normalizeApiError } from '@/utils/apiError'
 
@@ -38,6 +40,7 @@ export const useSessionStore = defineStore('session', () => {
   const currentTaskSessionId = ref<number | null>(null)
   const taskResult = ref<SubmitTaskResponse | null>(null)
   const currentUserSession = ref<CurrentSessionResponse | null>(null)
+  const learningFeedback = ref<LearningFeedbackResponse | null>(null)
   const goalDiagnosis = ref<GoalDiagnosisResponse | null>(null)
   const pathOptions = ref<PathOption[]>([])
   const selectedPathId = ref<string | null>(null)
@@ -51,6 +54,7 @@ export const useSessionStore = defineStore('session', () => {
   const recoveringSession = ref(false)
   const diagnosingGoal = ref(false)
   const fetchingPathOptions = ref(false)
+  const fetchingLearningFeedback = ref(false)
 
   const isLoading = computed(
     () =>
@@ -61,7 +65,8 @@ export const useSessionStore = defineStore('session', () => {
       submittingTask.value ||
       recoveringSession.value ||
       diagnosingGoal.value ||
-      fetchingPathOptions.value,
+      fetchingPathOptions.value ||
+      fetchingLearningFeedback.value,
   )
 
   const sessionId = computed(() => currentSession.value?.sessionId ?? null)
@@ -125,6 +130,20 @@ export const useSessionStore = defineStore('session', () => {
       throw setError(input)
     } finally {
       fetchingPathOptions.value = false
+    }
+  }
+
+  async function fetchLearningFeedbackAction(inputSessionId: number) {
+    fetchingLearningFeedback.value = true
+    clearError()
+    try {
+      const response = await getLearningFeedback(inputSessionId)
+      learningFeedback.value = response
+      return response
+    } catch (input) {
+      throw setError(input)
+    } finally {
+      fetchingLearningFeedback.value = false
     }
   }
 
@@ -237,6 +256,7 @@ export const useSessionStore = defineStore('session', () => {
     currentTaskSessionId.value = null
     taskResult.value = null
     currentUserSession.value = null
+    learningFeedback.value = null
     goalDiagnosis.value = null
     pathOptions.value = []
     selectedPathId.value = null
@@ -250,6 +270,7 @@ export const useSessionStore = defineStore('session', () => {
     currentTaskSessionId,
     taskResult,
     currentUserSession,
+    learningFeedback,
     goalDiagnosis,
     pathOptions,
     selectedPathId,
@@ -262,6 +283,7 @@ export const useSessionStore = defineStore('session', () => {
     recoveringSession,
     diagnosingGoal,
     fetchingPathOptions,
+    fetchingLearningFeedback,
     isLoading,
     error,
     sessionId,
@@ -276,6 +298,7 @@ export const useSessionStore = defineStore('session', () => {
     fetchCurrentSession: fetchCurrentSessionAction,
     diagnoseGoal: diagnoseGoalAction,
     fetchPathOptions: fetchPathOptionsAction,
+    fetchLearningFeedback: fetchLearningFeedbackAction,
     runTask: runTaskAction,
     submitTask: submitTaskAction,
     setSelectedPath,

@@ -229,3 +229,68 @@ export interface SessionHistoryResponse {
   totalPages: number
   items: SessionHistoryItem[]
 }
+
+export interface PracticeItem {
+  itemId: number
+  questionType: string
+  stem: string
+  options: unknown
+  difficulty: string
+  source: string
+  status: string
+}
+
+export interface PracticeItemsResponse {
+  sessionId: number
+  taskId: number
+  itemCount: number
+  items: PracticeItem[]
+}
+
+export interface PracticeSubmission {
+  submissionId: number
+  practiceItemId: number
+  userAnswer: string
+  score: number | null
+  isCorrect: boolean | null
+  feedback: string
+  errorTags: string[]
+  submittedAt: string
+}
+
+export interface PracticeSubmissionsResponse {
+  sessionId: number
+  taskId: number
+  submissionCount: number
+  submissions: PracticeSubmission[]
+}
+
+export interface PracticeJudgement {
+  score: number | null
+  isCorrect: boolean | null
+  feedback: string
+  errorTags: string[]
+}
+
+export interface SubmitPracticeAnswerResponse {
+  submission: PracticeSubmission
+  practiceItem: PracticeItem
+  judgement: PracticeJudgement
+}
+
+export interface WeakPointNode {
+  nodeId: number
+  nodeName: string
+  masteryScore: number
+  trainingAccuracy: number
+  latestEvaluationScore: number | null
+  attemptCount: number
+  recentErrorTags: string[]
+  reasons: string[]
+}
+
+export interface LearningFeedbackResponse {
+  sessionId: number
+  diagnosisSummary: string
+  weakNodes: WeakPointNode[]
+}

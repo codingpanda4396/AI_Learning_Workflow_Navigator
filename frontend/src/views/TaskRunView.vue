@@ -3,12 +3,14 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useTutorStore } from '@/stores/tutor'
+import { usePracticeStore } from '@/stores/practice'
 import ErrorMessage from '@/components/ErrorMessage.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
 const tutorStore = useTutorStore()
+const practiceStore = usePracticeStore()
 
 const taskId = computed(() => Number(route.params.id))
 const loadError = computed(() => sessionStore.error)
@@ -16,9 +18,18 @@ const task = computed(() => sessionStore.currentTask)
 const isLoading = computed(() => sessionStore.runningTask)
 const sections = computed(() => task.value?.output.sections ?? [])
 const generationReason = computed(() => task.value?.generationReason?.trim() ?? '')
+const isTrainingTask = computed(() => task.value?.stage === 'TRAINING')
+const nonTrainingTip = computed(() => {
+  if (!task.value || isTrainingTask.value) {
+    return ''
+  }
+  return `当前阶段为 ${getStageLabel(task.value.stage)}，训练作答面板仅在训练实战阶段开放。`
+})
 
 const tutorInput = ref('')
 const tutorMessagesContainerRef = ref<HTMLElement | null>(null)
+const answerDrafts = ref<Record<number, string>>({})
+const submittingPracticeItemId = ref<number | null>(null)
 
 const tutorMessages = computed(() => tutorStore.messages)
 const tutorLoading = computed(() => tutorStore.loadingMessages)
@@ -26,6 +37,28 @@ const tutorSending = computed(() => tutorStore.sendingMessage)
 const tutorLoadError = computed(() => tutorStore.loadError)
 const tutorSendError = computed(() => tutorStore.sendError)
 const canSendTutorMessage = computed(() => tutorInput.value.trim().length > 0 && !tutorSending.value)
+const practiceItems = computed(() => practiceStore.items)
+const practiceSubmissions = computed(() => practiceStore.submissions)
+const practiceLoading = computed(() => practiceStore.loadingItems || practiceStore.loadingSubmissions)
+const practiceError = computed(() => practiceStore.itemsError || practiceStore.submissionsError)
+const practiceGenerating = computed(() => practiceStore.generatingItems)
+const practiceSubmitting = computed(() => practiceStore.submittingAnswer)
+const practiceSubmitError = computed(() => practiceStore.submitError)
+const learningFeedback = computed(() => sessionStore.learningFeedback)
+const feedbackLoading = computed(() => sessionStore.fetchingLearningFeedback)
+
+const latestSubmissionByItem = computed(() => {
+  const ordered = [...practiceSubmissions.value].sort(
+    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+  )
+  const map = new Map<number, (typeof ordered)[number]>()
+  for (const item of ordered) {
+    if (!map.has(item.practiceItemId)) {
+      map.set(item.practiceItemId, item)
+    }
+  }
+  return map
+})
 
 function getStageLabel(stage: string) {
   const map: Record<string, string> = {
@@ -66,6 +99,84 @@ async function loadTask() {
   await sessionStore.runTask(taskId.value)
 }
 
+function normalizeOptionLine(option: unknown): string {
+  if (typeof option === 'string') {
+    return option
+  }
+  if (typeof option === 'number' || typeof option === 'boolean') {
+    return String(option)
+  }
+  if (option && typeof option === 'object') {
+    const record = option as Record<string, unknown>
+    const label = typeof record.label === 'string' ? record.label : ''
+    const value = typeof record.value === 'string' ? record.value : ''
+    if (label && value) {
+      return `${label}: ${value}`
+    }
+    if (label) {
+      return label
+    }
+    if (value) {
+      return value
+    }
+    return Object.entries(record)
+      .map(([key, val]) => `${key}: ${typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean' ? String(val) : '[object]'}`)
+      .join(' | ')
+  }
+  return ''
+}
+
+function resolveOptionLines(options: unknown): string[] {
+  if (!Array.isArray(options)) {
+    return []
+  }
+  return options.map(normalizeOptionLine).filter((line) => line.trim().length > 0)
+}
+
+function toPercent(value: number) {
+  const normalized = value <= 1 ? value * 100 : value
+  return Math.round(normalized)
+}
+
+function getItemDraft(itemId: number) {
+  return answerDrafts.value[itemId] ?? ''
+}
+
+function setItemDraft(itemId: number, value: string) {
+  answerDrafts.value = {
+    ...answerDrafts.value,
+    [itemId]: value,
+  }
+}
+
+function canSubmitPractice(itemId: number) {
+  const answer = answerDrafts.value[itemId]?.trim() ?? ''
+  return answer.length > 0 && !practiceSubmitting.value
+}
+
+function getLatestSubmission(itemId: number) {
+  return latestSubmissionByItem.value.get(itemId) ?? null
+}
+
+async function loadTrainingClosure(generate = false) {
+  if (!isTrainingTask.value) {
+    return
+  }
+  const targetSessionId = resolveSessionId()
+  if (!targetSessionId) {
+    return
+  }
+  if (generate) {
+    await practiceStore.generateItems(targetSessionId, taskId.value)
+  } else {
+    await practiceStore.loadItems(targetSessionId, taskId.value)
+  }
+  await Promise.all([
+    practiceStore.loadSubmissions(targetSessionId, taskId.value),
+    sessionStore.fetchLearningFeedback(targetSessionId),
+  ])
+}
+
 async function loadTutorMessages() {
   const targetSessionId = resolveSessionId()
   if (!targetSessionId) {
@@ -77,7 +188,36 @@ async function loadTutorMessages() {
 
 async function handleRetry() {
   await loadTask()
+  await loadTrainingClosure()
   await loadTutorMessages()
+}
+
+async function handleRetryPractice() {
+  await loadTrainingClosure()
+}
+
+async function handleGeneratePractice() {
+  await loadTrainingClosure(true)
+}
+
+async function handleSubmitPractice(itemId: number) {
+  const answer = answerDrafts.value[itemId]?.trim() ?? ''
+  const targetSessionId = resolveSessionId()
+  if (!targetSessionId || !answer || practiceSubmitting.value) {
+    return
+  }
+  submittingPracticeItemId.value = itemId
+  try {
+    await practiceStore.submitAnswer(targetSessionId, taskId.value, itemId, answer)
+    await Promise.all([
+      practiceStore.loadSubmissions(targetSessionId, taskId.value),
+      sessionStore.fetchLearningFeedback(targetSessionId),
+    ])
+  } catch (error) {
+    console.error('提交训练答案失败:', error)
+  } finally {
+    submittingPracticeItemId.value = null
+  }
 }
 
 async function handleSendTutorMessage() {
@@ -131,7 +271,9 @@ function handleContinue() {
 onMounted(async () => {
   sessionStore.resetTaskState()
   tutorStore.reset()
+  practiceStore.reset()
   await loadTask()
+  await loadTrainingClosure()
   await loadTutorMessages()
 })
 
@@ -183,6 +325,126 @@ watch(
       </div>
 
       <div v-else class="summary-text">当前任务输出为空，请返回会话页重试。</div>
+
+      <section class="training-panel">
+        <div class="training-header">
+          <h3 class="training-title">训练驱动闭环</h3>
+          <span v-if="isTrainingTask" class="training-hint">查看题目 -> 作答 -> 判题 -> 反馈建议</span>
+          <span v-else class="training-hint">仅 TRAINING 阶段开放</span>
+        </div>
+
+        <div v-if="!isTrainingTask" class="training-note">{{ nonTrainingTip }}</div>
+
+        <template v-else>
+          <div class="training-actions">
+            <button class="training-btn" :disabled="practiceLoading || practiceGenerating" @click="handleRetryPractice">
+              {{ practiceLoading ? '加载中...' : '刷新题目' }}
+            </button>
+            <button class="training-btn primary" :disabled="practiceGenerating" @click="handleGeneratePractice">
+              {{ practiceGenerating ? '生成中...' : '生成训练题' }}
+            </button>
+          </div>
+
+          <div v-if="practiceError" class="training-error-row">
+            <span class="training-error">{{ practiceError }}</span>
+            <button class="training-link-btn" @click="handleRetryPractice">重试</button>
+          </div>
+
+          <div v-else-if="practiceLoading" class="training-loading">正在加载训练题与提交记录...</div>
+          <div v-else-if="practiceItems.length === 0" class="training-empty">暂无训练题，点击“生成训练题”开始练习。</div>
+
+          <div v-else class="training-item-list">
+            <article v-for="item in practiceItems" :key="item.itemId" class="training-item">
+              <div class="training-item-head">
+                <span class="training-item-type">{{ item.questionType }}</span>
+                <span class="training-item-meta">难度 {{ item.difficulty }} · {{ item.source }}</span>
+              </div>
+              <p class="training-item-stem">{{ item.stem }}</p>
+
+              <ul v-if="resolveOptionLines(item.options).length > 0" class="training-options">
+                <li v-for="(line, idx) in resolveOptionLines(item.options)" :key="`${item.itemId}-${idx}`">{{ line }}</li>
+              </ul>
+
+              <textarea
+                :value="getItemDraft(item.itemId)"
+                class="training-answer"
+                rows="3"
+                :disabled="practiceSubmitting"
+                placeholder="输入你的答案..."
+                @input="setItemDraft(item.itemId, ($event.target as HTMLTextAreaElement).value)"
+              ></textarea>
+
+              <div class="training-submit-row">
+                <button
+                  class="training-btn primary"
+                  :disabled="!canSubmitPractice(item.itemId)"
+                  @click="handleSubmitPractice(item.itemId)"
+                >
+                  {{ submittingPracticeItemId === item.itemId ? '提交中...' : '提交答案' }}
+                </button>
+              </div>
+
+              <div v-if="getLatestSubmission(item.itemId)" class="training-result">
+                <p class="training-result-title">
+                  判题结果：
+                  <strong>
+                    {{ getLatestSubmission(item.itemId)?.isCorrect ? '正确' : '待改进' }}
+                  </strong>
+                  <span v-if="getLatestSubmission(item.itemId)?.score !== null">
+                    （{{ getLatestSubmission(item.itemId)?.score }} 分）
+                  </span>
+                </p>
+                <p v-if="getLatestSubmission(item.itemId)?.feedback" class="training-result-text">
+                  {{ getLatestSubmission(item.itemId)?.feedback }}
+                </p>
+                <div
+                  v-if="(getLatestSubmission(item.itemId)?.errorTags ?? []).length > 0"
+                  class="training-tags"
+                >
+                  <span
+                    v-for="tag in getLatestSubmission(item.itemId)?.errorTags ?? []"
+                    :key="`${item.itemId}-${tag}`"
+                    class="training-tag"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div v-if="practiceSubmitError" class="training-error-row">
+            <span class="training-error">{{ practiceSubmitError }}</span>
+          </div>
+
+          <section class="feedback-panel">
+            <div class="feedback-head">
+              <h4>学习反馈摘要</h4>
+              <span v-if="feedbackLoading" class="feedback-loading">更新中...</span>
+            </div>
+            <div v-if="learningFeedback">
+              <p class="feedback-summary">{{ learningFeedback.diagnosisSummary || '暂无诊断总结。' }}</p>
+              <div v-if="learningFeedback.weakNodes.length > 0" class="weak-node-list">
+                <article v-for="node in learningFeedback.weakNodes.slice(0, 3)" :key="node.nodeId" class="weak-node">
+                  <p class="weak-node-title">{{ node.nodeName }}</p>
+                  <p class="weak-node-meta">
+                    掌握度 {{ toPercent(node.masteryScore) }}% · 训练正确率 {{ toPercent(node.trainingAccuracy) }}%
+                  </p>
+                  <p v-if="node.reasons.length > 0" class="weak-node-reason">原因：{{ node.reasons.join('；') }}</p>
+                  <div v-if="node.recentErrorTags.length > 0" class="training-tags">
+                    <span v-for="tag in node.recentErrorTags" :key="`${node.nodeId}-${tag}`" class="training-tag">
+                      {{ tag }}
+                    </span>
+                  </div>
+                </article>
+              </div>
+              <p v-else class="training-note">暂无明显薄弱点，继续保持当前训练节奏。</p>
+            </div>
+            <div v-else-if="feedbackLoading" class="feedback-loading">正在加载学习反馈...</div>
+            <div v-else class="training-note">暂无学习反馈，请先完成训练题提交。</div>
+          </section>
+        </template>
+      </section>
 
       <section class="tutor-panel">
         <div class="tutor-header">
@@ -258,6 +520,82 @@ watch(
 .bullet-list, .step-list { padding-left: 1.25rem; margin: 0; }
 .bullet-list li, .step-list li { line-height: 1.7; color: var(--color-text); margin-bottom: 0.5rem; }
 .summary-text { line-height: 1.7; color: var(--color-text); padding: 1rem; background: var(--color-bg); border-radius: 8px; border-left: 3px solid var(--color-primary); }
+
+.training-panel {
+  margin-top: 2rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: rgba(12, 21, 42, 0.7);
+}
+.training-header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.training-title { font-size: 1rem; color: var(--color-text); }
+.training-hint { font-size: 0.8125rem; color: var(--color-text-secondary); }
+.training-actions { display: flex; gap: 0.625rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.training-btn {
+  min-height: 36px;
+  padding: 0 0.875rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  background: rgba(9, 17, 34, 0.9);
+}
+.training-btn.primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.training-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.training-loading, .training-empty, .training-note {
+  padding: 0.875rem;
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+}
+.training-item-list { display: flex; flex-direction: column; gap: 0.875rem; margin-top: 0.75rem; }
+.training-item { border: 1px solid var(--color-border); border-radius: 10px; padding: 0.875rem; background: rgba(10, 17, 33, 0.85); }
+.training-item-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.training-item-type { font-size: 0.8125rem; font-weight: 600; color: var(--color-primary); }
+.training-item-meta { font-size: 0.75rem; color: var(--color-text-secondary); }
+.training-item-stem { line-height: 1.6; color: var(--color-text); margin-bottom: 0.625rem; }
+.training-options { padding-left: 1.25rem; margin: 0 0 0.625rem; color: var(--color-text); }
+.training-options li { margin-bottom: 0.375rem; }
+.training-answer {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  resize: vertical;
+}
+.training-submit-row { display: flex; justify-content: flex-end; margin-top: 0.625rem; }
+.training-result {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: rgba(13, 24, 46, 0.88);
+}
+.training-result-title { color: var(--color-text); font-size: 0.875rem; margin-bottom: 0.375rem; }
+.training-result-text { color: var(--color-text-secondary); line-height: 1.6; }
+.training-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.5rem; }
+.training-tag {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(243, 102, 102, 0.35);
+  background: rgba(243, 102, 102, 0.15);
+  color: #ffd6d6;
+}
+.training-error-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.625rem; }
+.training-error { color: var(--color-error); font-size: 0.875rem; }
+.training-link-btn { color: var(--color-primary); text-decoration: underline; font-size: 0.875rem; }
+
+.feedback-panel { margin-top: 0.875rem; border: 1px solid var(--color-border); border-radius: 10px; padding: 0.75rem; }
+.feedback-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
+.feedback-loading { color: var(--color-text-secondary); font-size: 0.8125rem; }
+.feedback-summary { color: var(--color-text); line-height: 1.6; margin-bottom: 0.5rem; }
+.weak-node-list { display: grid; gap: 0.5rem; }
+.weak-node { border: 1px solid var(--color-border); border-radius: 8px; padding: 0.625rem; background: rgba(8, 15, 28, 0.9); }
+.weak-node-title { color: var(--color-text); font-weight: 600; }
+.weak-node-meta, .weak-node-reason { color: var(--color-text-secondary); font-size: 0.8125rem; line-height: 1.5; }
 
 .tutor-panel {
   margin-top: 2rem;
