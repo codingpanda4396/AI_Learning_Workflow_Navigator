@@ -56,6 +56,8 @@ class PracticeSubmissionServiceTest {
     private RulePracticeGenerator rulePracticeGenerator;
     @Mock
     private LlmPracticeGenerator llmPracticeGenerator;
+    @Mock
+    private MasteryService masteryService;
 
     private PracticeServiceImpl practiceService;
 
@@ -70,6 +72,7 @@ class PracticeSubmissionServiceTest {
             learningEventRepository,
             rulePracticeGenerator,
             llmPracticeGenerator,
+            masteryService,
             new LlmProperties(),
             new ObjectMapper()
         );

@@ -24,6 +24,8 @@ public interface TaskRepository {
 
     List<TrainingAttemptSummary> findRecentTrainingAttempts(Long sessionId, int limit);
 
+    Optional<Integer> findLatestScoreByTaskId(Long taskId);
+
     Long createRunningAttempt(Long taskId);
 
     void markAttemptSucceeded(Long attemptId, String outputJson, AttemptLlmMetadata metadata);

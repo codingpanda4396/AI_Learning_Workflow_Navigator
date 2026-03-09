@@ -224,6 +224,23 @@ public class JdbcTaskRepository implements TaskRepository {
     }
 
     @Override
+    public Optional<Integer> findLatestScoreByTaskId(Long taskId) {
+        Integer score = jdbcTemplate.query(
+            """
+                SELECT ta.score
+                FROM task_attempt ta
+                WHERE ta.task_id = ?
+                  AND ta.score IS NOT NULL
+                ORDER BY ta.created_at DESC, ta.id DESC
+                LIMIT 1
+                """,
+            (rs, rowNum) -> rs.getInt("score"),
+            taskId
+        ).stream().findFirst().orElse(null);
+        return Optional.ofNullable(score);
+    }
+
+    @Override
     public Long createRunningAttempt(Long taskId) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {

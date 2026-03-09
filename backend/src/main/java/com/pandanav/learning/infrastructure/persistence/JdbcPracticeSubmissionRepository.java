@@ -117,6 +117,25 @@ public class JdbcPracticeSubmissionRepository implements PracticeSubmissionRepos
     }
 
     @Override
+    public List<PracticeSubmission> findBySessionIdAndUserPk(Long sessionId, Long userPk) {
+        return jdbcTemplate.query(
+            """
+                SELECT ps.id, ps.practice_item_id, ps.session_id, ps.task_id, ps.user_id, ps.user_answer,
+                       ps.score, ps.is_correct, ps.error_tags_json, ps.feedback, ps.judge_mode,
+                       ps.prompt_version, ps.token_input, ps.token_output, ps.latency_ms, ps.trace_id, ps.submitted_at
+                FROM practice_submission ps
+                JOIN learning_session ls ON ls.id = ps.session_id
+                WHERE ps.session_id = ?
+                  AND ls.user_pk = ?
+                ORDER BY ps.submitted_at DESC, ps.id DESC
+                """,
+            (rs, rowNum) -> mapSubmission(rs),
+            sessionId,
+            userPk
+        );
+    }
+
+    @Override
     public Optional<PracticeSubmission> findLatestByPracticeItemIdAndUserPk(Long practiceItemId, Long userPk) {
         try {
             PracticeSubmission submission = jdbcTemplate.queryForObject(

@@ -55,6 +55,7 @@ public class PracticeServiceImpl implements PracticeService {
     private final LearningEventRepository learningEventRepository;
     private final RulePracticeGenerator rulePracticeGenerator;
     private final LlmPracticeGenerator llmPracticeGenerator;
+    private final MasteryService masteryService;
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
 
@@ -67,6 +68,7 @@ public class PracticeServiceImpl implements PracticeService {
         LearningEventRepository learningEventRepository,
         RulePracticeGenerator rulePracticeGenerator,
         LlmPracticeGenerator llmPracticeGenerator,
+        MasteryService masteryService,
         LlmProperties llmProperties,
         ObjectMapper objectMapper
     ) {
@@ -78,6 +80,7 @@ public class PracticeServiceImpl implements PracticeService {
         this.learningEventRepository = learningEventRepository;
         this.rulePracticeGenerator = rulePracticeGenerator;
         this.llmPracticeGenerator = llmPracticeGenerator;
+        this.masteryService = masteryService;
         this.llmProperties = llmProperties;
         this.objectMapper = objectMapper;
     }
@@ -159,6 +162,7 @@ public class PracticeServiceImpl implements PracticeService {
 
         PracticeSubmission saved = practiceSubmissionRepository.save(submission);
         practiceRepository.updateStatus(practiceItemId, PracticeItemStatus.ANSWERED);
+        masteryService.recalculateNodeMastery(sessionId, taskId, userId);
         logSubmission(sessionId, userId, item, saved, previous.isPresent());
         return saved;
     }
