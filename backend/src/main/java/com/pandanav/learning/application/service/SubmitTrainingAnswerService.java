@@ -125,6 +125,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             toJson(Map.of(
                 "diagnosis", feedbackResponse.diagnosis(),
                 "fixes", feedbackResponse.fixes(),
+                "rubric", evaluation.rubric(),
                 "strengths", evaluation.strengths(),
                 "suggested_next_action", evaluation.suggestedNextAction()
             )),
@@ -144,7 +145,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
                 "TASK_SUBMIT",
                 evaluation.provider(),
                 evaluation.model(),
-                "EVALUATE_PROMPT_V1",
+                evaluation.promptKey(),
                 evaluation.promptVersion(),
                 "{}",
                 "{}",
@@ -188,6 +189,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             evaluation.normalizedScore(),
             parsedErrorTags.stream().map(Enum::name).toList(),
             feedbackResponse,
+            evaluation.rubric(),
             evaluation.strengths(),
             evaluation.weaknesses(),
             mastery.masteryBefore(),

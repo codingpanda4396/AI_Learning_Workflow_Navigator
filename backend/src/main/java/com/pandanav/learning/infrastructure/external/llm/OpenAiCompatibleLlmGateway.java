@@ -8,6 +8,8 @@ import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.LlmUsage;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -24,6 +26,8 @@ import java.util.Map;
 
 public class OpenAiCompatibleLlmGateway implements LlmGateway {
 
+    private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmGateway.class);
+
     private final RestClient restClient;
     private final LlmProperties properties;
     private final ObjectMapper objectMapper;
@@ -37,8 +41,12 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
     @Override
     public LlmTextResult generate(LlmPrompt prompt) {
         Instant start = Instant.now();
+        String model = (prompt.modelHint() == null || prompt.modelHint().isBlank())
+            ? properties.getModel()
+            : prompt.modelHint().trim();
+        log.info("LLM invoke: promptKey={}, promptVersion={}, model={}", prompt.promptKey(), prompt.promptVersion(), model);
         JsonNode requestPayload = objectMapper.valueToTree(Map.of(
-            "model", properties.getModel(),
+            "model", model,
             "messages", List.of(
                 Map.of("role", "system", "content", prompt.systemPrompt()),
                 Map.of("role", "user", "content", prompt.userPrompt())
@@ -65,7 +73,7 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
         return new LlmTextResult(
             contentNode.asText(),
             properties.getProvider(),
-            properties.getModel(),
+            model,
             usage,
             requestPayload,
             response

@@ -1,13 +1,16 @@
 package com.pandanav.learning.application.service.tutor;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.domain.enums.TutorMessageRole;
+import com.pandanav.learning.domain.llm.PromptTemplateProvider;
+import com.pandanav.learning.domain.llm.model.TutorPromptContext;
 import com.pandanav.learning.domain.model.TutorMessage;
 import com.pandanav.learning.infrastructure.config.TutorLlmProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
@@ -20,14 +23,18 @@ import java.util.Map;
 
 public class RealTutorProvider implements TutorProvider {
 
-    private static final String FALLBACK_MESSAGE = "AI tutor temporarily unavailable";
+    private static final String FALLBACK_MESSAGE = "当前 AI 导师暂时不可用，请先说出你卡住的步骤，我会继续引导你。";
     private static final Logger log = LoggerFactory.getLogger(RealTutorProvider.class);
 
     private final RestClient restClient;
     private final TutorLlmProperties properties;
-    public RealTutorProvider(RestClient restClient, TutorLlmProperties properties) {
+    private final PromptTemplateProvider promptTemplateProvider;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public RealTutorProvider(RestClient restClient, TutorLlmProperties properties, PromptTemplateProvider promptTemplateProvider) {
         this.restClient = restClient;
         this.properties = properties;
+        this.promptTemplateProvider = promptTemplateProvider;
     }
 
     @Override
@@ -56,7 +63,7 @@ public class RealTutorProvider implements TutorProvider {
                         if (in == null) {
                             return null;
                         }
-                        return new com.fasterxml.jackson.databind.ObjectMapper().readTree(in);
+                        return objectMapper.readTree(in);
                     }
                 });
 
@@ -68,7 +75,9 @@ public class RealTutorProvider implements TutorProvider {
                 return new TutorProviderReply(FALLBACK_MESSAGE, properties.getProvider(), properties.getModel());
             }
 
-            return new TutorProviderReply(content.trim(), properties.getProvider(), properties.getModel());
+            // 防止单次回复过长导致教学节奏失控
+            String normalized = truncate(content.trim(), 220);
+            return new TutorProviderReply(normalized, properties.getProvider(), properties.getModel());
         } catch (Exception ex) {
             log.warn(
                 "Tutor LLM call failed. provider={}, model={}, baseUrl={}, reason={}",
@@ -101,26 +110,14 @@ public class RealTutorProvider implements TutorProvider {
     }
 
     private String buildSystemPrompt(TutorProviderRequest request) {
-        return """
-            You are an AI tutor helping a student complete a learning task.
-            Rules:
-            - Explain clearly.
-            - Ask guiding questions.
-            - Encourage thinking.
-            - Avoid giving the final answer immediately.
-            - Keep responses concise and practical.
-
-            Task context:
-            - stage: %s
-            - objective: %s
-            - concept: %s
-            - learning_goal: %s
-            """.formatted(
+        return promptTemplateProvider.buildTutorSystemPrompt(new TutorPromptContext(
             safe(request.taskStage()),
             safe(request.taskObjective()),
             safe(request.nodeName()),
-            safe(request.sessionGoal())
-        );
+            safe(request.sessionGoal()),
+            request.hintMode(),
+            request.directAnswerMode()
+        ));
     }
 
     private String safe(String input) {

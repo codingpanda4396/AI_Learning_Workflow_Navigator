@@ -1,16 +1,20 @@
 package com.pandanav.learning.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pandanav.learning.api.dto.session.GoalDiagnosisRequest;
 import com.pandanav.learning.api.dto.session.GoalDiagnosisResponse;
+import com.pandanav.learning.application.service.llm.LlmJsonParser;
+import com.pandanav.learning.application.service.llm.PromptOutputValidator;
 import com.pandanav.learning.domain.llm.LlmGateway;
+import com.pandanav.learning.domain.llm.PromptTemplateProvider;
+import com.pandanav.learning.domain.llm.model.GoalDiagnosisContext;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
-import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -18,12 +22,22 @@ public class GoalDiagnosisService {
 
     private final LlmGateway llmGateway;
     private final LlmProperties llmProperties;
-    private final ObjectMapper objectMapper;
+    private final PromptTemplateProvider promptTemplateProvider;
+    private final LlmJsonParser llmJsonParser;
+    private final PromptOutputValidator promptOutputValidator;
 
-    public GoalDiagnosisService(LlmGateway llmGateway, LlmProperties llmProperties, ObjectMapper objectMapper) {
+    public GoalDiagnosisService(
+        LlmGateway llmGateway,
+        LlmProperties llmProperties,
+        PromptTemplateProvider promptTemplateProvider,
+        LlmJsonParser llmJsonParser,
+        PromptOutputValidator promptOutputValidator
+    ) {
         this.llmGateway = llmGateway;
         this.llmProperties = llmProperties;
-        this.objectMapper = objectMapper;
+        this.promptTemplateProvider = promptTemplateProvider;
+        this.llmJsonParser = llmJsonParser;
+        this.promptOutputValidator = promptOutputValidator;
     }
 
     public GoalDiagnosisResponse diagnose(GoalDiagnosisRequest request) {
@@ -37,74 +51,99 @@ public class GoalDiagnosisService {
         return diagnoseByRule(request);
     }
 
-    private GoalDiagnosisResponse diagnoseByLlm(GoalDiagnosisRequest request) throws Exception {
-        String systemPrompt = """
-            你是学习目标诊断助手。
-            仅返回 JSON，不要输出 markdown。
-            字段值必须是简体中文。
-            """;
-        String userPrompt = """
-            请评估学习目标质量并输出 JSON 字段：
-            goal_score（0-100）,
-            summary,
-            strengths（字符串数组，2-3 条）,
-            risks（字符串数组，2-3 条）,
-            rewritten_goal（一句话，可执行、可衡量）
-            上下文：
-            course_id=%s
-            chapter_id=%s
-            goal_text=%s
-            """.formatted(request.courseId(), request.chapterId(), request.goalText());
-
-        LlmTextResult result = llmGateway.generate(new LlmPrompt(
-            PromptTemplateKey.EVALUATE_PROMPT_V1,
-            "v1",
-            systemPrompt,
-            userPrompt
+    private GoalDiagnosisResponse diagnoseByLlm(GoalDiagnosisRequest request) {
+        LlmPrompt prompt = promptTemplateProvider.buildGoalDiagnosisPrompt(new GoalDiagnosisContext(
+            request.courseId(),
+            request.chapterId(),
+            request.goalText()
         ));
-        JsonNode parsed = objectMapper.readTree(result.text());
-        int score = parsed.path("goal_score").isNumber() ? parsed.path("goal_score").asInt() : 70;
-        String summary = parsed.path("summary").asText("目标可执行，但仍可进一步收敛。");
-        List<String> strengths = toStringList(parsed.path("strengths"), List.of("学习方向明确。"));
-        List<String> risks = toStringList(parsed.path("risks"), List.of("成功标准尚不够明确。"));
-        String rewrittenGoal = parsed.path("rewritten_goal").asText(request.goalText());
-        return new GoalDiagnosisResponse(score, new GoalDiagnosisResponse.SummaryResponse(summary, strengths, risks, rewrittenGoal));
+
+        LlmTextResult result = llmGateway.generate(prompt);
+        JsonNode parsed = llmJsonParser.parse(result.text());
+        if (!(parsed instanceof ObjectNode objectNode)) {
+            throw new IllegalStateException("Goal diagnosis output must be JSON object.");
+        }
+
+        List<String> errors = promptOutputValidator.validateGoalDiagnosis(objectNode);
+        if (!errors.isEmpty()) {
+            throw new IllegalStateException("Goal diagnosis output invalid: " + String.join("; ", errors));
+        }
+
+        GoalDiagnosisResponse.SmartBreakdown breakdown = readSmartBreakdown(objectNode.path("smart_breakdown"));
+        return new GoalDiagnosisResponse(
+            objectNode.path("goal_score").asInt(),
+            breakdown,
+            new GoalDiagnosisResponse.SummaryResponse(
+                objectNode.path("summary").asText(),
+                toStringList(objectNode.path("strengths"), List.of("学习方向明确。")),
+                toStringList(objectNode.path("risks"), List.of("成功标准尚不够明确。")),
+                objectNode.path("rewritten_goal").asText(request.goalText())
+            )
+        );
     }
 
     private GoalDiagnosisResponse diagnoseByRule(GoalDiagnosisRequest request) {
         String goal = request.goalText().trim();
-        int score = Math.min(95, 45 + Math.min(goal.length(), 80) / 2);
-        if (containsMeasure(goal)) {
-            score += 10;
-        }
-        if (containsTimeline(goal)) {
-            score += 5;
-        }
-        score = Math.min(score, 100);
+
+        int specific = containsSpecificSubject(goal) ? 16 : 11;
+        int measurable = containsMeasure(goal) ? 16 : 10;
+        int achievable = goal.length() <= 120 ? 16 : 11;
+        int relevant = 15;
+        int timeBound = containsTimeline(goal) ? 16 : 10;
+
+        int score = Math.min(100, specific + measurable + achievable + relevant + timeBound);
 
         List<String> strengths = List.of("学习主题明确。", "目标动机清晰。");
         List<String> risks = List.of("学习范围可能偏大。", "结果衡量标准还可更具体。");
-        String rewritten = "在 7 天内掌握 " + request.courseId() + " / " + request.chapterId()
-            + " 的核心机制，完成 3 道训练题，且得分不低于 80 分。";
+
+        String rewritten = "在 7 天内完成 " + request.chapterId()
+            + " 章节的 3 次训练并提交总结，训练平均分不低于 80 分。";
         String summary = score >= 75
-            ? "目标总体可执行，建议补充更明确的验收标准。"
+            ? "目标整体可执行，建议补充更清晰的验收标准。"
             : "目标需要进一步收敛范围，并补充可衡量结果。";
-        return new GoalDiagnosisResponse(score, new GoalDiagnosisResponse.SummaryResponse(summary, strengths, risks, rewritten));
+
+        GoalDiagnosisResponse.SmartBreakdown breakdown = new GoalDiagnosisResponse.SmartBreakdown(
+            specific,
+            measurable,
+            achievable,
+            relevant,
+            timeBound
+        );
+
+        return new GoalDiagnosisResponse(
+            score,
+            breakdown,
+            new GoalDiagnosisResponse.SummaryResponse(summary, strengths, risks, rewritten)
+        );
+    }
+
+    private GoalDiagnosisResponse.SmartBreakdown readSmartBreakdown(JsonNode node) {
+        return new GoalDiagnosisResponse.SmartBreakdown(
+            node.path("specific_score").asInt(),
+            node.path("measurable_score").asInt(),
+            node.path("achievable_score").asInt(),
+            node.path("relevant_score").asInt(),
+            node.path("time_bound_score").asInt()
+        );
     }
 
     private boolean containsMeasure(String text) {
-        return text.matches(".*(\\d+|%|score|分|题|次|个).*");
+        return text.matches(".*(\\d+|%|score|分|次|题).*" );
     }
 
     private boolean containsTimeline(String text) {
-        return text.matches(".*(day|week|month|天|周|月).*");
+        return text.matches(".*(day|week|month|天|周|月).*" );
+    }
+
+    private boolean containsSpecificSubject(String text) {
+        return text.length() > 8 && !text.equals("学习这个章节");
     }
 
     private List<String> toStringList(JsonNode node, List<String> fallback) {
         if (node == null || !node.isArray()) {
             return fallback;
         }
-        List<String> values = new java.util.ArrayList<>();
+        List<String> values = new ArrayList<>();
         for (JsonNode item : node) {
             if (item.isTextual() && !item.asText().isBlank()) {
                 values.add(item.asText());

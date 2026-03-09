@@ -5,10 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.dto.task.RunTaskResponse;
 import com.pandanav.learning.application.usecase.RunTaskUseCase;
 import com.pandanav.learning.auth.UserContextHolder;
+import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.llm.StageContentGenerator;
 import com.pandanav.learning.domain.llm.model.StageContent;
 import com.pandanav.learning.domain.llm.model.StageGenerationContext;
-import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.AttemptLlmMetadata;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningSession;
@@ -86,10 +86,12 @@ public class TaskRunnerService implements RunTaskUseCase {
 
         JsonNode generated;
         AttemptLlmMetadata metadata;
+        String promptKey = null;
         String generationReason;
         try {
             StageContent stageContent = generateByLlm(task, userId);
             generated = stageContent.content();
+            promptKey = stageContent.promptKey();
             metadata = new AttemptLlmMetadata(
                 stageContent.provider(),
                 stageContent.model(),
@@ -105,9 +107,19 @@ public class TaskRunnerService implements RunTaskUseCase {
             if (!llmProperties.isFallbackToRule()) {
                 taskRepository.markAttemptFailed(attemptId, ex.getMessage(), AttemptLlmMetadata.none("LLM"));
                 llmCallLogRepository.save(new LlmCallLog(
-                    attemptId, "TASK_RUN", llmProperties.getProvider(), llmProperties.getModel(),
-                    task.getStage().name() + "_PROMPT_V1", "v1", "{}", "{\"error\":\"" + ex.getMessage() + "\"}",
-                    "{}", "FAILED", null, null, null
+                    attemptId,
+                    "TASK_RUN",
+                    llmProperties.getProvider(),
+                    llmProperties.getModel(),
+                    task.getStage().name(),
+                    "unknown",
+                    "{}",
+                    "{\"error\":\"" + sanitizeReason(ex.getMessage()) + "\"}",
+                    "{}",
+                    "FAILED",
+                    null,
+                    null,
+                    null
                 ));
                 throw ex;
             }
@@ -117,15 +129,15 @@ public class TaskRunnerService implements RunTaskUseCase {
         }
 
         String outputJson = writeJson(generated);
-
         taskRepository.markAttemptSucceeded(attemptId, outputJson, metadata);
+
         if ("LLM".equals(metadata.generationMode())) {
             llmCallLogRepository.save(new LlmCallLog(
                 attemptId,
                 "TASK_RUN",
                 metadata.llmProvider(),
                 metadata.llmModel(),
-                task.getStage().name() + "_PROMPT_V1",
+                promptKey,
                 metadata.promptVersion(),
                 "{}",
                 "{}",
@@ -136,8 +148,8 @@ public class TaskRunnerService implements RunTaskUseCase {
                 metadata.tokenOutput()
             ));
         }
-        task.markSucceeded(outputJson);
 
+        task.markSucceeded(outputJson);
         return toResponse(task, metadata.generationMode(), generationReason, generated);
     }
 
@@ -191,6 +203,7 @@ public class TaskRunnerService implements RunTaskUseCase {
         ConceptNode node = conceptNodeRepository.findById(task.getNodeId())
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
         Mastery mastery = masteryRepository.findByUserIdAndNodeId(session.getUserId(), node.getId()).orElse(null);
+
         StageGenerationContext context = new StageGenerationContext(
             task.getId(),
             task.getSessionId(),
@@ -208,45 +221,32 @@ public class TaskRunnerService implements RunTaskUseCase {
     private JsonNode generateByStage(Task task) {
         return switch (task.getStage()) {
             case STRUCTURE -> objectMapper.valueToTree(Map.of(
-                "sections", List.of(
-                    Map.of("type", "concepts", "title", "核心概念", "bullets", List.of("定义", "关键术语", "适用边界")),
-                    Map.of("type", "structure", "title", "结构拆解", "items", List.of("核心组成 A", "核心组成 B", "输入输出关系")),
-                    Map.of("type", "relations", "title", "关联关系", "items", List.of("前置知识依赖", "后续延伸方向")),
-                    Map.of("type", "summary", "title", "总结", "text", "先建立结构框架，再进入机制理解与训练。")
-                )
+                "title", "核心结构图",
+                "summary", "先明确定义和边界，再梳理关键关系，最后形成可执行学习路径。",
+                "key_points", List.of("定义与边界", "核心流程", "输入输出关系"),
+                "common_misconceptions", List.of("只记结论不看条件", "忽略异常路径"),
+                "suggested_sequence", List.of("先定义", "再机制", "后练习")
             ));
             case UNDERSTANDING -> objectMapper.valueToTree(Map.of(
-                "sections", List.of(
-                    Map.of("type", "concepts", "title", "关键知识点", "bullets", List.of("核心定义", "必要条件", "触发条件")),
-                    Map.of("type", "mechanism", "title", "机制流程", "steps", List.of("步骤一：输入条件", "步骤二：状态变化", "步骤三：输出结果")),
-                    Map.of("type", "misconceptions", "title", "常见误区", "items", List.of("误区一：概念混淆", "误区二：忽略边界条件")),
-                    Map.of("type", "summary", "title", "总结", "text", "理解因果链路比死记步骤更重要。")
-                )
+                "concept_explanation", "该知识点强调在特定条件下的状态变化机制，核心在于识别触发条件和结果。",
+                "analogy", "可以把它看成交通信号系统：条件变化就会切换状态并触发下一步动作。",
+                "worked_example", "示例：先给定输入条件，再逐步判断中间状态，最终得出可验证输出。",
+                "step_by_step_reasoning", List.of("识别前置条件", "判断状态变化", "验证最终结果"),
+                "common_errors", List.of("跳过中间状态", "把必要条件当充分条件"),
+                "check_questions", List.of("哪个条件是触发点？", "状态变化顺序是什么？")
             ));
             case TRAINING -> objectMapper.valueToTree(Map.of(
                 "questions", List.of(
-                    Map.of("id", "q1", "type", "short_answer", "prompt", "请解释该知识点的核心原理。"),
-                    Map.of("id", "q2", "type", "scenario", "prompt", "根据给定场景推导关键状态变化。")
-                ),
-                "variants", List.of(
-                    Map.of("name", "基础版", "focus", "概念准确性"),
-                    Map.of("name", "进阶版", "focus", "边界条件处理")
-                ),
-                "rubric", Map.of(
-                    "full_score", 100,
-                    "dimensions", List.of(
-                        Map.of("name", "概念理解", "weight", 40),
-                        Map.of("name", "推理过程", "weight", 40),
-                        Map.of("name", "表达清晰度", "weight", 20)
-                    )
+                    Map.of("id", "q1", "type", "BASIC", "question", "请解释该知识点的核心定义。", "reference_points", List.of("定义", "适用条件"), "difficulty", "EASY"),
+                    Map.of("id", "q2", "type", "APPLICATION", "question", "给定一个场景，说明该知识点如何应用。", "reference_points", List.of("步骤", "结果"), "difficulty", "MEDIUM"),
+                    Map.of("id", "q3", "type", "REASONING", "question", "当条件变化时，推导状态变化并解释原因。", "reference_points", List.of("推导链路", "边界条件"), "difficulty", "HARD")
                 )
             ));
             case REFLECTION -> objectMapper.valueToTree(Map.of(
-                "diagnosis", "主路径已完成，但边界场景掌握仍需加强。",
-                "reflection_points", List.of("是否能复述核心概念", "是否能解释因果链路", "是否能识别常见误区"),
-                "next_steps", List.of("复盘错题", "完成一组变式训练", "进行 3 分钟口头总结")
+                "reflection_prompt", "请回顾你在哪一步最容易出错，并说明你准备如何避免。",
+                "review_checklist", List.of("能否复述核心概念", "能否解释关键推理", "能否识别常见误区"),
+                "next_step_suggestion", "先重做一题应用题，再做一题推理题，并口头总结 1 分钟。"
             ));
         };
     }
 }
-

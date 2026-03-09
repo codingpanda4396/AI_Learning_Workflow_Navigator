@@ -1,9 +1,11 @@
 package com.pandanav.learning.application.service.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LlmJsonParserTest {
 
@@ -20,5 +22,9 @@ class LlmJsonParserTest {
         String raw = "前置说明 {\"questions\":[{\"id\":\"q1\"}]} 后置说明";
         assertEquals("q1", parser.parse(raw).path("questions").path(0).path("id").asText());
     }
-}
 
+    @Test
+    void shouldThrowWhenJsonCannotBeExtracted() {
+        assertThrows(InternalServerException.class, () -> parser.parse("not-json-content"));
+    }
+}

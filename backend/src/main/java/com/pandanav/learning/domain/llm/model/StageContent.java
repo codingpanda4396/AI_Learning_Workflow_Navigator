@@ -7,10 +7,10 @@ public record StageContent(
     Stage stage,
     JsonNode content,
     String generationMode,
+    String promptKey,
     String promptVersion,
     String provider,
     String model,
     LlmUsage usage
 ) {
 }
-

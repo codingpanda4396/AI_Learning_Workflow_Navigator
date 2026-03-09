@@ -369,3 +369,153 @@ REFLECTION：
 - 优先保证现有功能可运行
 - 所有代码风格尽量贴合当前项目
 - 注释写中文，简洁明确
+
+
+
+
+
+
+每个 TODO 的实现说明
+TODO-1（统一 Prompt 规范基类）
+
+新增 PromptSpec/PromptDefinition/PromptTemplateRenderer
+DefaultPromptTemplateProvider 改为统一 definitions 注册 + 变量渲染
+兼容方式：保留原 PromptTemplateProvider 入口，调用方不需要大改
+TODO-2（Stage Prompt schema 约束）
+
+STRUCTURE/UNDERSTANDING/TRAINING/REFLECTION 全部补了：
+expected_json_schema
+数量/长度约束
+禁止 schema 外字段
+简体中文要求
+紧扣知识点与任务目标要求
+TODO-3（Tutor 教学策略约束）
+
+Tutor system prompt 统一中文风格
+增加“先引导再答案、先识别卡点、可提问先提问、连续卡住给 hint、必要时 partial answer、理解正确后升级问题”
+新增上下文开关：hintMode/directAnswerMode（TutorReplyMode）
+单次回复长度做截断（防长篇）
+幻觉约束已入系统提示
+RealTutorProvider 改为使用统一 PromptProvider 生成 system prompt
+TODO-4（Eval Rubric）
+
+评估 Prompt 新增 rubric 四维度
+EvaluationResult 增加 rubric、promptKey
+SubmitTaskResponse 增加 rubric 字段
+LlmAnswerEvaluator 加入校验 + repair（轻量修复：分数归一化、数组截断）
+DB 不变（仍存 parsed_json / feedback_json，结构兼容）
+TODO-5（Goal Diagnosis -> SMART）
+
+Prompt 改为 SMART 五维打分 + goal_score
+响应 DTO 增加 smart_breakdown
+GoalDiagnosisService 改为 LLM 解析 SMART，不合法时 fallback 规则诊断
+TODO-6（Prompt Version 管理）
+
+PromptTemplateKey 升级为 promptKey + promptVersion
+包含：STRUCTURE_V1...TUTOR_V1，并预留 STRUCTURE_V1_1、EVALUATE_V2
+LlmPrompt/StageContent/EvaluationResult 都带 promptKey + promptVersion
+OpenAiCompatibleLlmGateway 增加结构化日志输出 prompt key/version
+TODO-7（输出失败兜底与校验）
+
+新增 PromptOutputValidator，覆盖：
+缺字段
+类型错误
+数组长度不合法
+空字符串
+额外字段检查
+轻量修复：Eval 的 score/normalized_score、数组截断
+兜底链路：
+parser 异常 -> evaluator/stage service 抛错
+service 层：CompositeAnswerEvaluator 回退 rule；TaskRunnerService 回退模板；GoalDiagnosisService 回退规则
+controller 层：沿用全局异常映射，不直接 500 崩主链（有 fallback 时）
+TODO-8（知识点拆解 Prompt，增强项）
+
+新增 CONCEPT_DECOMPOSE_V1 Prompt
+新增 DTO：ConceptNodeDecomposeResult
+新增 service：ConceptNodeDecomposeService
+标注：增强项，不接入主链路，不影响现有流程
+TODO-9（测试）
+
+已新增并更新测试覆盖：
+Prompt 模板渲染
+Eval 解析
+Goal Diagnosis 解析
+Stage schema 校验
+Tutor prompt 构造
+异常 JSON 兜底（Composite fallback）
+本地执行：mvn test -q 通过
+核心代码（节选）
+public record PromptSpec(
+    String promptKey,
+    String promptVersion,
+    String systemPrompt,
+    String userPromptTemplate,
+    String expectedJsonSchemaText,
+    String outputRules,
+    String modelHint
+) {}
+public enum PromptTemplateKey {
+    STRUCTURE_V1("STRUCTURE", "v1"),
+    STRUCTURE_V1_1("STRUCTURE", "v1.1"),
+    UNDERSTANDING_V1("UNDERSTANDING", "v1"),
+    TRAINING_V1("TRAINING", "v1"),
+    REFLECTION_V1("REFLECTION", "v1"),
+    EVALUATE_V1("EVALUATE", "v1"),
+    EVALUATE_V2("EVALUATE", "v2"),
+    GOAL_DIAGNOSE_V1("GOAL_DIAGNOSE", "v1"),
+    TUTOR_V1("TUTOR", "v1"),
+    CONCEPT_DECOMPOSE_V1("CONCEPT_DECOMPOSE", "v1");
+}
+// 统一组装：业务上下文 + schema + output rules
+private LlmPrompt toPrompt(PromptDefinition definition, Map<String, String> variables) {
+    PromptSpec spec = definition.spec();
+    String rendered = renderer.render(spec.userPromptTemplate(), variables);
+    String userPrompt = rendered
+        + "\n\nexpected_json_schema:\n" + spec.expectedJsonSchemaText()
+        + "\n\noutput_rules:\n" + spec.outputRules();
+    return new LlmPrompt(
+        definition.templateKey(),
+        spec.promptKey(),
+        spec.promptVersion(),
+        spec.systemPrompt(),
+        userPrompt,
+        spec.expectedJsonSchemaText(),
+        spec.outputRules(),
+        spec.modelHint()
+    );
+}
+// Eval: 先 repair，再 validate，不合法走 fallback 链路
+promptOutputValidator.repairEvaluation(objectNode);
+List<String> errors = promptOutputValidator.validateEvaluation(objectNode);
+if (!errors.isEmpty()) {
+    throw new InternalServerException("LLM evaluation output invalid: " + String.join("; ", errors));
+}
+// Tutor: 使用统一模板 + 模式开关
+return promptTemplateProvider.buildTutorSystemPrompt(new TutorPromptContext(
+    safe(request.taskStage()),
+    safe(request.taskObjective()),
+    safe(request.nodeName()),
+    safe(request.sessionGoal()),
+    request.hintMode(),
+    request.directAnswerMode()
+));
+风险点与兼容性说明
+主链路兼容：保持现有 service 接口和数据库表结构，不引入新中间件
+数据库影响：无 schema 变更；llm_call_log 继续使用现有字段
+前端兼容：
+SubmitTaskResponse 新增 rubric，旧前端可忽略，不破坏已存在字段
+Goal 诊断新增 smart_breakdown，旧字段保留
+潜在风险：
+Stage 输出现在更严格，LLM 不合格时更容易进入 fallback（这是预期的稳态行为）
+如果后续前端要展示 rubric/smart_breakdown，需加展示映射
+后续建议（3-5 条）
+
+把 PromptTemplateKey 与 PromptSpec 导出到可观测面板（按 key/version 统计成功率、fallback 率）
+
+增加 Prompt A/B 路由开关（按 sessionId hash 或灰度比例）
+
+在 llm_call_log.parsed_json 上补查询视图，便于按 rubric/SMART 维度做教学分析
+
+给 Tutor 增加“连续卡点计数”持久化（当前仅预留模式字段）
+
+前端补充 rubric 与 smart_breakdown 展示，提高可解释性闭环

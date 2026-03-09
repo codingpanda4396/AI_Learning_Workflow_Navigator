@@ -2,6 +2,7 @@ package com.pandanav.learning.application.service.llm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pandanav.learning.domain.llm.AnswerEvaluator;
 import com.pandanav.learning.domain.llm.model.EvaluationContext;
 import com.pandanav.learning.domain.llm.model.EvaluationResult;
@@ -80,6 +81,15 @@ public class RuleBasedAnswerEvaluator implements AnswerEvaluator {
             : score < 90 ? "INSERT_TRAINING_REINFORCEMENT"
             : "ADVANCE_TO_NEXT_NODE";
 
+        ObjectNode rubric = JsonNodeFactory.instance.objectNode();
+        rubric.put("concept_correctness", Math.min(40, Math.max(0, (int) Math.round(score * 0.4))));
+        rubric.put("reasoning_quality", Math.min(30, Math.max(0, (int) Math.round(score * 0.3))));
+        rubric.put("completeness", Math.min(20, Math.max(0, (int) Math.round(score * 0.2))));
+        int subtotal = rubric.path("concept_correctness").asInt()
+            + rubric.path("reasoning_quality").asInt()
+            + rubric.path("completeness").asInt();
+        rubric.put("clarity", Math.max(0, Math.min(10, score - subtotal)));
+
         JsonNode raw = JsonNodeFactory.instance.objectNode();
         return new EvaluationResult(
             score,
@@ -89,15 +99,22 @@ public class RuleBasedAnswerEvaluator implements AnswerEvaluator {
             strengths.isEmpty() ? List.of("有作答尝试。") : strengths,
             weaknesses,
             nextAction,
+            rubric,
             raw,
             null,
             null,
+            "EVALUATE",
             "rule-v1",
             null
         );
     }
 
     private EvaluationResult emptyResult() {
+        ObjectNode rubric = JsonNodeFactory.instance.objectNode();
+        rubric.put("concept_correctness", 0);
+        rubric.put("reasoning_quality", 0);
+        rubric.put("completeness", 0);
+        rubric.put("clarity", 0);
         return new EvaluationResult(
             0,
             BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP),
@@ -106,9 +123,11 @@ public class RuleBasedAnswerEvaluator implements AnswerEvaluator {
             List.of(),
             List.of("请先给出核心概念定义与推理过程。"),
             "INSERT_REMEDIAL_UNDERSTANDING",
+            rubric,
             JsonNodeFactory.instance.objectNode(),
             null,
             null,
+            "EVALUATE",
             "rule-v1",
             null
         );
@@ -137,4 +156,3 @@ public class RuleBasedAnswerEvaluator implements AnswerEvaluator {
         return words.stream().anyMatch(answer::contains);
     }
 }
-
