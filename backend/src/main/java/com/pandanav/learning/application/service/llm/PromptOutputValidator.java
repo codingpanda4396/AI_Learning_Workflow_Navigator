@@ -165,6 +165,61 @@ public class PromptOutputValidator {
         return errors;
     }
 
+    public List<String> validatePersonalizedPathPlan(JsonNode node) {
+        List<String> errors = new ArrayList<>();
+        if (node == null || !node.isObject()) {
+            errors.add("path plan output must be a JSON object");
+            return errors;
+        }
+
+        Set<String> required = Set.of("ordered_nodes", "inserted_tasks", "plan_reasoning_summary", "risk_flags");
+        validateNoExtraFields(node, required, errors);
+        required.forEach(field -> {
+            if (!node.has(field)) {
+                errors.add("missing field: " + field);
+            }
+        });
+
+        validateText(node, "plan_reasoning_summary", 20, 400, errors);
+        validateStringArray(node, "risk_flags", 0, 8, 2, 80, errors);
+
+        JsonNode orderedNodes = node.path("ordered_nodes");
+        if (!orderedNodes.isArray()) {
+            errors.add("ordered_nodes must be array");
+        } else if (orderedNodes.isEmpty()) {
+            errors.add("ordered_nodes must not be empty");
+        } else {
+            for (JsonNode item : orderedNodes) {
+                if (!item.isObject()) {
+                    errors.add("ordered_nodes entries must be object");
+                    continue;
+                }
+                readInt(item, "node_id", errors);
+                readInt(item, "priority", errors);
+                validateText(item, "reason", 6, 120, errors);
+                validateNoExtraFields(item, Set.of("node_id", "priority", "reason"), errors);
+            }
+        }
+
+        JsonNode insertedTasks = node.path("inserted_tasks");
+        if (!insertedTasks.isArray()) {
+            errors.add("inserted_tasks must be array");
+        } else {
+            for (JsonNode item : insertedTasks) {
+                if (!item.isObject()) {
+                    errors.add("inserted_tasks entries must be object");
+                    continue;
+                }
+                readInt(item, "node_id", errors);
+                validateText(item, "stage", 4, 20, errors);
+                validateText(item, "objective", 10, 200, errors);
+                validateText(item, "trigger", 2, 50, errors);
+                validateNoExtraFields(item, Set.of("node_id", "stage", "objective", "trigger"), errors);
+            }
+        }
+        return errors;
+    }
+
     private int readBoundedInt(JsonNode node, String field, int min, int max, List<String> errors) {
         Integer value = readInt(node, field, errors);
         if (value == null) {

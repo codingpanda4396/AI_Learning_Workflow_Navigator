@@ -3,6 +3,7 @@ package com.pandanav.learning.domain.repository;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.model.AttemptLlmMetadata;
 import com.pandanav.learning.domain.model.Task;
+import com.pandanav.learning.domain.model.TrainingAttemptSummary;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,8 @@ public interface TaskRepository {
     List<Task> findBySessionIdWithStatus(Long sessionId);
 
     Optional<Task> findFirstBySessionIdAndNodeIdAndStage(Long sessionId, Long nodeId, Stage stage);
+
+    List<TrainingAttemptSummary> findRecentTrainingAttempts(Long sessionId, int limit);
 
     Long createRunningAttempt(Long taskId);
 

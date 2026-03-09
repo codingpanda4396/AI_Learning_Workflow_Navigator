@@ -42,4 +42,27 @@ class PromptOutputValidatorTest {
         assertFalse(errors.isEmpty());
         assertTrue(errors.stream().anyMatch(v -> v.contains("unexpected field")));
     }
+
+    @Test
+    void shouldValidatePersonalizedPathPlanSchema() throws Exception {
+        String json = """
+            {
+              "ordered_nodes": [
+                {"node_id": 101, "priority": 1, "reason": "Start from weakest prerequisite first."},
+                {"node_id": 102, "priority": 2, "reason": "Then consolidate concept variants."}
+              ],
+              "inserted_tasks": [
+                {
+                  "node_id": 101,
+                  "stage": "UNDERSTANDING",
+                  "objective": "补齐关键步骤推导，完成一次错误对照解释。",
+                  "trigger": "MISSING_STEPS"
+                }
+              ],
+              "plan_reasoning_summary": "Prioritize weak foundational node and add one remedial understanding task.",
+              "risk_flags": ["LOW_CONFIDENCE_DIAGNOSIS"]
+            }
+            """;
+        assertTrue(validator.validatePersonalizedPathPlan(mapper.readTree(json)).isEmpty());
+    }
 }

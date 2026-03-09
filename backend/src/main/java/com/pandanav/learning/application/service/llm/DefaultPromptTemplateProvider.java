@@ -5,6 +5,7 @@ import com.pandanav.learning.domain.llm.model.ConceptDecomposeContext;
 import com.pandanav.learning.domain.llm.model.EvaluationContext;
 import com.pandanav.learning.domain.llm.model.GoalDiagnosisContext;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.PersonalizedPathContext;
 import com.pandanav.learning.domain.llm.model.PromptDefinition;
 import com.pandanav.learning.domain.llm.model.PromptSpec;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
@@ -13,6 +14,7 @@ import com.pandanav.learning.domain.llm.model.TutorPromptContext;
 import org.springframework.stereotype.Component;
 
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 
 @Component
@@ -67,6 +69,12 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         所有字段值必须使用简体中文，节点关系要实用，不要过度图谱化。
         """;
 
+    private static final String PATH_PLAN_SYSTEM_PROMPT = """
+        You are a personalized learning path planner.
+        Output only one JSON object without markdown code fences.
+        Do not output fields outside schema.
+        """;
+
     private final PromptTemplateRenderer renderer = new PromptTemplateRenderer();
     private final Map<PromptTemplateKey, PromptDefinition> definitions = new EnumMap<>(PromptTemplateKey.class);
 
@@ -74,6 +82,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         registerStagePrompts();
         registerEvaluatePrompt();
         registerGoalDiagnosePrompt();
+        registerPathPlanPrompt();
         registerTutorPrompt();
         registerConceptDecomposePrompt();
     }
@@ -116,6 +125,28 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
             "chapter_id", safe(context.chapterId()),
             "goal_text", safe(context.goalText())
         );
+        return toPrompt(definition, variables);
+    }
+
+    @Override
+    public LlmPrompt buildPersonalizedPathPlanPrompt(PersonalizedPathContext context) {
+        PromptDefinition definition = definitions.get(PromptTemplateKey.PATH_PLAN_V1);
+        Map<String, String> variables = new HashMap<>();
+        variables.put("goal_text", safe(context.goalText()));
+        variables.put(
+            "goal_diagnosis",
+            "specific=%d, measurable=%d, achievable=%d, relevant=%d, time_bound=%d".formatted(
+                context.goalDiagnosis().specificScore(),
+                context.goalDiagnosis().measurableScore(),
+                context.goalDiagnosis().achievableScore(),
+                context.goalDiagnosis().relevantScore(),
+                context.goalDiagnosis().timeBoundScore()
+            )
+        );
+        variables.put("mastery_by_node", safe(context.masteryByNode().toString()));
+        variables.put("recent_error_tags", safe(context.recentErrorTags().toString()));
+        variables.put("recent_scores", safe(context.recentScores().toString()));
+        variables.put("chapter_nodes", safe(context.chapterNodes().toString()));
         return toPrompt(definition, variables);
     }
 
@@ -382,6 +413,53 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                     - 禁止输出 schema 外字段、解释性前后缀、markdown。
                     - goal_score 必须等于 smart_breakdown 五个维度之和。
                     - 所有文本字段值必须为简体中文。
+                    """,
+                null
+            )
+        ));
+    }
+
+    private void registerPathPlanPrompt() {
+        definitions.put(PromptTemplateKey.PATH_PLAN_V1, new PromptDefinition(
+            PromptTemplateKey.PATH_PLAN_V1,
+            new PromptSpec(
+                PromptTemplateKey.PATH_PLAN_V1.promptKey(),
+                PromptTemplateKey.PATH_PLAN_V1.promptVersion(),
+                PATH_PLAN_SYSTEM_PROMPT,
+                """
+                    Build a personalized plan from this context:
+                    goal_text={{goal_text}}
+                    goal_diagnosis={{goal_diagnosis}}
+                    mastery_by_node={{mastery_by_node}}
+                    recent_error_tags={{recent_error_tags}}
+                    recent_scores={{recent_scores}}
+                    chapter_nodes={{chapter_nodes}}
+                    Constraints:
+                    - Only use node_id from chapter_nodes.
+                    - stage in inserted_tasks must be UNDERSTANDING or TRAINING.
+                    - Prefer concise reasons and objectives.
+                    """,
+                """
+                    {
+                      "ordered_nodes": [
+                        {"node_id": 101, "priority": 1, "reason": "string(6-120)"}
+                      ],
+                      "inserted_tasks": [
+                        {
+                          "node_id": 101,
+                          "stage": "UNDERSTANDING|TRAINING",
+                          "objective": "string(10-200)",
+                          "trigger": "string(2-50)"
+                        }
+                      ],
+                      "plan_reasoning_summary": "string(20-400)",
+                      "risk_flags": ["string(4-80)"]
+                    }
+                    """,
+                """
+                    - Output exactly one JSON object.
+                    - Do not output markdown code fences.
+                    - No fields outside schema.
                     """,
                 null
             )

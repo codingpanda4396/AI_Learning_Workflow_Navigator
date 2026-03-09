@@ -9,6 +9,7 @@ public enum PromptTemplateKey {
     EVALUATE_V1("EVALUATE", "v1"),
     EVALUATE_V2("EVALUATE", "v2"),
     GOAL_DIAGNOSE_V1("GOAL_DIAGNOSE", "v1"),
+    PATH_PLAN_V1("PATH_PLAN", "v1"),
     TUTOR_V1("TUTOR", "v1"),
     CONCEPT_DECOMPOSE_V1("CONCEPT_DECOMPOSE", "v1");
 

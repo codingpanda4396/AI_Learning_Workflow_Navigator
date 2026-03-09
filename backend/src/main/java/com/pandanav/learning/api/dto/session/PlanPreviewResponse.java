@@ -5,17 +5,16 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(name = "PlanSessionResponse")
-public record PlanSessionResponse(
+@Schema(name = "PlanPreviewResponse")
+public record PlanPreviewResponse(
     @JsonProperty("session_id")
     @Schema(name = "session_id", example = "123")
     Long sessionId,
-    List<PlannedTaskResponse> tasks,
     @JsonProperty("plan_source")
-    @Schema(name = "plan_source", example = "RULE")
+    @Schema(name = "plan_source", example = "LLM")
     String planSource,
     @JsonProperty("plan_reasoning_summary")
-    @Schema(name = "plan_reasoning_summary", example = "Rule planner baseline applied.")
+    @Schema(name = "plan_reasoning_summary", example = "Prioritize weak nodes and add one remedial task.")
     String planReasoningSummary,
     @JsonProperty("risk_flags")
     List<String> riskFlags
