@@ -1,0 +1,456 @@
+# AI学习流程导航系统 MVP 现状差距与技术实现方案
+
+## 1. 结论摘要
+
+基于 `docs/planning/AI学习流程导航系统_MVP需求文档.pdf`、现有 `docs` 设计文档以及当前前后端代码，项目已经完成了 MVP 的主骨架，但还没有完全达到“训练驱动的个性化学习闭环”。
+
+当前系统已经具备：
+
+- 用户认证、学习会话、任务规划、任务执行主链路
+- 四阶段学习任务体系
+- 结构化练习题生成、提交、判分、持久化
+- 基于练习结果的薄弱点诊断与节点掌握度汇总
+- AI Tutor MVP
+- 个性化路径规划雏形与 Rule/LLM/fallback 机制
+- 前端三步式学习流程页、任务执行页、训练提交页、历史页
+
+当前最主要的差距不是“有没有模块”，而是以下三类：
+
+1. 术语与产品模型还没有完全统一
+2. 各能力虽然存在，但闭环联动还不够完整
+3. 前端用户感知层还没有把“训练反馈反哺路径规划”完整展示出来
+
+---
+
+## 2. 当前现状
+
+### 2.1 后端现状
+
+从 `backend/src/main/java` 和现有文档看，后端已经落地了以下关键模块：
+
+- 会话与任务：
+  - `SessionController`
+  - `TaskController`
+  - `CreateSessionService`
+  - `PlanSessionTasksService`
+  - `TaskRunnerService`
+  - `SubmitTrainingAnswerService`
+- 练习训练：
+  - `PracticeItemController`
+  - `PracticeSubmissionController`
+  - `PracticeServiceImpl`
+  - `LlmPracticeGenerator`
+  - `RulePracticeGenerator`
+- 学习反馈：
+  - `LearningFeedbackController`
+  - `MasteryService`
+  - `WeakPointDiagnosisService`
+- 个性化路径：
+  - `PersonalizedPathPlannerService`
+  - `PlanMode`
+  - `PlanSource`
+- Tutor：
+  - `TutorMessageController`
+  - `TutorMessageService`
+  - `TutorProvider`
+- 数据层：
+  - 已有 `V1` 到 `V14` 的 Flyway migration
+  - 已落地 `practice_item`、`practice_submission`、`node_mastery` 等核心表
+
+### 2.2 前端现状
+
+前端已经不是静态页面，而是具备 MVP 级流程承接能力：
+
+- 会话页：`frontend/src/views/SessionView.vue`
+- 任务运行页：`frontend/src/views/TaskRunView.vue`
+- 训练提交页：`frontend/src/views/TaskSubmitView.vue`
+- 历史页：`frontend/src/views/HistoryView.vue`
+- Tutor 状态管理：`frontend/src/stores/tutor.ts`
+- 练习状态管理：`frontend/src/stores/practice.ts`
+- 会话状态管理：`frontend/src/stores/session.ts`
+- 已接入 `session`、`task`、`practice`、`learningFeedback`、`tutor` API
+
+### 2.3 已经达到需求文档目标的部分
+
+对照 PDF 中“路径规划 -> 内容学习 -> 习题训练 -> 结果评估 -> 动态调整”的目标，当前已完成：
+
+- 路径规划基础能力：已具备
+- 内容学习与任务化执行：已具备
+- 习题训练结构化：已具备
+- 结果评估与薄弱点识别：已具备基础版本
+- 动态调整：已有技术骨架，但联动深度仍不足
+
+---
+
+## 3. 现状与预期需求的差距
+
+### 3.1 产品层差距
+
+#### Gap 1：阶段定义仍存在不一致
+
+需求文档使用的是：
+
+- `STRUCTURE`
+- `UNDERSTANDING`
+- `TRAINING`
+- `EVALUATION`
+
+当前代码和文档并存两套表达：
+
+- 后端主枚举里仍可见 `REFLECTION`
+- 前端 `SessionView.vue` 同时兼容了 `EVALUATION` 和 `REFLECTION`
+
+影响：
+
+- 产品文案、接口返回、任务语义不稳定
+- 后续报告、路径规划、比赛展示材料容易出现表述不一致
+
+#### Gap 2：闭环已经存在，但用户感知还不够强
+
+当前系统更多是“多个模块已打通”，但前端展示还偏分散：
+
+- 用户能做题，但不一定能直观看到“本次训练如何改变后续学习路径”
+- 用户能看到弱项，但弱项与后续任务插入/优先级变化没有强展示
+- 学习反馈更像“结果页”，还不够像“下一步导航页”
+
+#### Gap 3：MVP 的最小核心叙事还需要收口
+
+需求文档强调的是“训练驱动的个性化学习闭环”，而当前项目仍保留较多演进痕迹：
+
+- 旧 `task submit` 闭环
+- 新 `practice item/submission` 闭环
+- Tutor 独立链路
+- 个性化路径规划影子能力
+
+影响：
+
+- 代码本身可用，但产品主故事线还不够单一
+- 后续开发容易继续叠功能，而不是收敛主闭环
+
+### 3.2 后端能力差距
+
+#### Gap 4：任务级训练提交链路与题目级训练链路存在双轨
+
+当前同时存在：
+
+- `SubmitTrainingAnswerService`：偏旧的“整任务提交”
+- `PracticeSubmissionController/Service`：新的“题目级提交”
+
+影响：
+
+- 评分与掌握度更新可能存在双入口
+- 前端后续若统一走 practice，会出现旧接口职责模糊
+- 路径规划、学习报告的数据口径可能不一致
+
+#### Gap 5：个性化路径规划已具备雏形，但反馈利用仍偏轻
+
+虽然已有：
+
+- `PersonalizedPathPlannerService`
+- `node_mastery`
+- `weak-points`
+
+但从现有文档和实现命名看，仍更接近“可接入反馈”，还不是“反馈强驱动”：
+
+- 低掌握度节点是否一定前移，需要更明确规则
+- 错误标签如何映射到补救任务模板，还需要固化
+- 训练结果对任务数量、阶段分布、训练密度的影响还不够透明
+
+#### Gap 6：学习反馈报告还偏“诊断摘要”，不够“规划输入摘要”
+
+当前学习反馈层已具备薄弱点和掌握度，但离需求里的“反哺路径规划”还差一层聚合：
+
+- 缺少明确的 path adjustment summary
+- 缺少“为什么调整”的结构化字段
+- 缺少对 planner 的稳定消费契约
+
+#### Gap 7：事件审计和效果度量还不够成体系
+
+系统已有日志与部分 LLM 审计基础，但面向 MVP 验收还差：
+
+- 题目生成成功率/回退率
+- 判题成功率
+- 反馈驱动规划命中率
+- 训练后成绩改善情况
+
+这会影响后续灰度、答辩和迭代判断。
+
+### 3.3 前端体验差距
+
+#### Gap 8：Session 页已经能看进度和反馈，但还没有“闭环驾驶舱”
+
+当前 `SessionView.vue` 更像：
+
+- 学习计划页
+- 当前任务页
+- 阶段反馈页
+
+还不是一个强闭环的会话中枢，因为缺少：
+
+- 训练统计摘要
+- 弱项趋势
+- 路径调整原因
+- 推荐下一步与原因绑定展示
+
+#### Gap 9：训练结果和 Tutor 结果尚未汇总到同一反馈视图
+
+当前 Tutor、训练、反馈是分开的：
+
+- Tutor 在任务详情中
+- 训练在训练任务中
+- 弱项反馈在会话页
+
+但需求文档中的预期更接近“统一学习助手视角”，即把这些都服务于下一步学习导航。
+
+---
+
+## 4. 建议的 MVP 收敛目标
+
+建议把本项目的下一阶段 MVP 定义收敛为一句话：
+
+> 让系统基于用户目标生成学习路径，在训练题作答后更新掌握度与薄弱点，并将这些反馈直接转化为下一步学习任务与学习报告。
+
+围绕这句话，MVP 必须稳定做到 5 件事：
+
+1. 创建会话并生成初始学习路径
+2. 执行阶段任务并进入训练任务
+3. 生成题目、提交答案、给出判题反馈
+4. 基于训练结果更新掌握度并识别薄弱点
+5. 把薄弱点反哺到路径规划和前端下一步建议中
+
+---
+
+## 5. 技术实现方案
+
+### 5.1 方案原则
+
+- 只做增量收敛，不推翻现有架构
+- 继续沿用 `Rule 保底 + LLM 增强 + fallback`
+- 优先统一主链路，再增强智能度
+- 优先统一数据口径，再优化页面表现
+
+### 5.2 方案一：统一训练主链路
+
+目标：以 `practice_item + practice_submission` 为唯一训练事实来源。
+
+建议：
+
+- 将训练闭环逐步统一到 `PracticeService` 与 `PracticeSubmission` 链路
+- 将 `SubmitTrainingAnswerService` 收敛为：
+  - 兼容层，或
+  - 任务级汇总层，而不再承担题目级事实写入
+- 明确数据分工：
+  - `practice_item`：题目事实
+  - `practice_submission`：作答事实
+  - `node_mastery`：反馈汇总
+  - `learning_feedback/report`：展示与规划输入
+
+预期效果：
+
+- 训练数据口径统一
+- 掌握度重算来源稳定
+- 个性化路径规划不再依赖多个提交模型
+
+### 5.3 方案二：把学习反馈正式升级为 Planner 输入层
+
+目标：让反馈不只是“给用户看”，也要“给 planner 用”。
+
+建议补齐一个稳定的反馈聚合对象，建议字段：
+
+- `session_id`
+- `training_summary`
+- `weak_nodes`
+- `mastery_overview`
+- `recent_error_tags`
+- `path_adjustment_candidates`
+- `next_actions`
+
+推荐做法：
+
+- 在 `LearningFeedbackController` 之上补一个更完整的 report/query service
+- 在 `PersonalizedPathPlannerService` 中明确消费：
+  - 低掌握度节点
+  - 重复错误标签
+  - 最近训练分数
+  - 最近 planner 调整结果
+
+规则建议：
+
+- `mastery_score < 60`：优先前移该节点
+- `CONCEPT_CONFUSION`、`MISSING_STEPS`：优先插入 `UNDERSTANDING`
+- `CALCULATION_ERROR`、`ANSWER_INCOMPLETE`：优先插入 `TRAINING`
+- 连续高分：减少重复训练，允许推进
+
+### 5.4 方案三：统一阶段术语和状态语义
+
+目标：消除 `EVALUATION` / `REFLECTION` 混用。
+
+建议：
+
+- 选定一个最终术语作为产品主表达
+- 推荐对外统一为 `EVALUATION`
+- 若后端存量逻辑仍依赖 `REFLECTION`，则采用：
+  - 数据层兼容
+  - API/前端文案统一
+  - 文档全部收口到同一术语
+
+同时应统一：
+
+- 学习路径
+- 学习任务
+- 习题训练
+- 学习反馈
+- 掌握度
+- 薄弱点
+
+### 5.5 方案四：前端补齐“闭环驾驶舱”
+
+目标：让 Session 页成为最小闭环中枢。
+
+建议在 `SessionView.vue` 或相邻 store 中补充四块展示：
+
+1. 训练摘要
+   - 题目数
+   - 最近正确率
+   - 最近一次训练分数
+2. 薄弱点摘要
+   - Top N weak nodes
+   - 错误标签
+3. 路径调整摘要
+   - 哪些节点被前移
+   - 插入了哪些补救任务
+   - 调整原因
+4. 下一步建议
+   - 推荐任务
+   - 推荐原因
+
+这样前端就能把需求文档里的四层结构压缩成一个用户可理解的页面。
+
+### 5.6 方案五：补齐监控、灰度和验收指标
+
+建议至少记录以下指标：
+
+- practice generation success rate
+- llm parse success rate
+- fallback rate
+- submission count
+- training accuracy
+- weak point hit count
+- personalized planner hit rate
+
+建议开关：
+
+- `llm.practice-generation.enabled`
+- `llm.practice-judgement.enabled`
+- `planner.feedback-driven.enabled`
+- `feedback.llm-summary.enabled`
+
+---
+
+## 6. 推荐实施顺序
+
+### 第一阶段：主链路收敛
+
+目标：统一训练事实来源和反馈口径。
+
+工作项：
+
+- 收敛 `SubmitTrainingAnswerService` 与 `PracticeSubmission` 职责
+- 确认 `node_mastery` 只从 practice 事实重算
+- 统一训练完成后的事件与汇总入口
+
+产出：
+
+- 单一训练事实源
+- 单一路径反馈输入
+
+### 第二阶段：反馈驱动规划做实
+
+目标：让个性化路径规划真正吃到反馈。
+
+工作项：
+
+- 定义 planner 消费的反馈上下文 DTO
+- 固化错误标签 -> 补救任务规则
+- 在 `PersonalizedPathPlannerService` 中输出调整摘要
+
+产出：
+
+- 真实反馈驱动的路径调整
+- 有解释性的规划结果
+
+### 第三阶段：前端闭环展示增强
+
+目标：把闭环结果清晰呈现给用户。
+
+工作项：
+
+- Session 页增加训练摘要、弱项摘要、路径调整摘要
+- 训练页提交后回流到会话反馈
+- 推荐下一步附带原因说明
+
+产出：
+
+- 用户能看懂“为什么下一步是这个任务”
+
+### 第四阶段：术语、文档、指标收口
+
+目标：为展示、协作和后续迭代建立稳定基线。
+
+工作项：
+
+- 统一 `EVALUATION/REFLECTION`
+- 统一文档编码与命名
+- 补齐日志、指标、开关
+
+产出：
+
+- 适合持续迭代和答辩展示的 MVP 版本
+
+---
+
+## 7. 建议的最小改动落地清单
+
+如果只做一轮最有价值的收敛，建议优先完成：
+
+1. 明确训练提交以 `practice_submission` 为准
+2. 新增完整 `learning feedback report` 聚合结构
+3. 让 `PersonalizedPathPlannerService` 直接消费 `weak_points + mastery + recent_scores`
+4. 在 `SessionView.vue` 增加“路径为何调整”的展示
+5. 统一阶段术语到单一对外表达
+
+这五项完成后，项目就会从“多个 AI 学习模块”升级为“可解释的训练驱动学习闭环”。
+
+---
+
+## 8. 风险与注意事项
+
+### 8.1 最大风险
+
+- 继续叠加新功能，而不是收敛已有双轨模型
+- 前后端字段各自演进，导致展示与判题口径不一致
+- planner 虽然接入反馈，但没有解释字段，用户无法感知价值
+
+### 8.2 技术注意事项
+
+- 所有新增 planner 输入都要可回退
+- 所有 LLM 输出都要经过 schema 和业务校验
+- 学习反馈接口应优先返回结构化字段，LLM summary 只能是附加项
+- 前端不要直接拼多个接口字段做隐式推断，应尽量消费后端聚合结果
+
+---
+
+## 9. 最终判断
+
+当前项目距离需求文档中的 MVP 并不远，核心能力大多已经落地，差距主要集中在“收敛、统一、联动、解释”四件事上。
+
+换句话说，下一步最重要的不是继续扩展模块，而是把现有：
+
+- 会话
+- 任务
+- 训练
+- 反馈
+- 个性化路径
+- Tutor
+
+整合成一个稳定、可解释、用户可感知的学习闭环产品。
