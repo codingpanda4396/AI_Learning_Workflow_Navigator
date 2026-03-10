@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -339,23 +339,178 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.workflow-page { min-height: 100dvh; padding: clamp(16px, 2.8vw, 30px); }
-.toolbar { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); flex-wrap: wrap; }
-.workflow-id { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-.workflow-content { display: flex; flex-direction: column; gap: var(--space-lg); max-width: 960px; margin: 0 auto; }
-.step-card { border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: linear-gradient(165deg, rgba(16, 27, 50, 0.94), rgba(8, 14, 26, 0.96)); padding: clamp(16px, 2.8vw, 26px); box-shadow: var(--shadow-md); display: flex; flex-direction: column; gap: var(--space-lg); }
-.step-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-sm); }
-.status-tag { border: 1px solid var(--color-border); border-radius: 999px; padding: 4px 10px; color: var(--color-text-secondary); font-size: var(--font-size-xs); }
-.panel { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: rgba(12, 20, 38, 0.8); padding: var(--space-md); }
-.path-grid { display: grid; gap: var(--space-sm); }
-.path-item { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px; cursor: pointer; }
-.path-item.selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-alpha); }
-.task-list { display: grid; gap: 10px; margin-bottom: 10px; }
-.task-item { border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
-.task-toggle { width: 100%; display: flex; justify-content: space-between; background: rgba(10, 18, 37, 0.9); border: none; color: var(--color-text); padding: 10px; }
-.task-body { padding: 10px; display: grid; gap: 8px; }
-.mastery-list { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 10px; margin: 8px 0; }
-.actions { display: grid; grid-template-columns: 140px 1fr; gap: var(--space-md); }
-.ghost-button { min-height: 44px; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-secondary); background: rgba(12, 21, 42, 0.8); }
-@media (max-width: 900px) { .actions { grid-template-columns: 1fr; } }
+.workflow-page {
+  min-height: 100dvh;
+  padding: clamp(16px, 2.8vw, 30px);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.workflow-id {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.workflow-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.step-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    165deg,
+    var(--color-bg-elevated),
+    var(--color-bg-surface)
+  );
+  padding: clamp(16px, 2.8vw, 26px);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.step-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.step-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.status-tag {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg);
+}
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  padding: var(--space-lg);
+}
+
+.path-grid {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.path-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-smooth);
+  background: var(--color-bg-surface);
+}
+
+.path-item:hover {
+  border-color: var(--color-border-hover);
+  transform: translateY(-2px);
+}
+
+.path-item.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+.task-list {
+  display: grid;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.task-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-surface);
+}
+
+.task-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-bg-elevated);
+  border: none;
+  color: var(--color-text);
+  padding: var(--space-md);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-smooth);
+}
+
+.task-toggle:hover {
+  background: var(--color-bg-hover);
+}
+
+.task-body {
+  padding: var(--space-lg);
+  display: grid;
+  gap: var(--space-md);
+  background: var(--color-bg);
+}
+
+.mastery-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin: var(--space-md) 0;
+  background: var(--color-bg-surface);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.ghost-button {
+  min-height: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
+  font-size: var(--font-size-md);
+  transition: all var(--duration-fast) var(--ease-smooth);
+}
+
+.ghost-button:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-hover);
+  color: var(--color-text);
+}
+
+.ghost-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
