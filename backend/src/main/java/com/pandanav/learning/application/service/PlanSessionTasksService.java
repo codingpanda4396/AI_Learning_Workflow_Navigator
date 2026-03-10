@@ -55,6 +55,20 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
             : sessionRepository.findByIdAndUserPk(sessionId, userId))
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
 
+        List<Task> existingTasks = taskRepository.findBySessionIdWithStatus(sessionId);
+        if (!existingTasks.isEmpty()) {
+            List<PlannedTaskResponse> existingResponseTasks = existingTasks.stream()
+                .map(task -> new PlannedTaskResponse(
+                    task.getId(),
+                    task.getStage().name(),
+                    task.getNodeId(),
+                    task.getObjective(),
+                    (task.getStatus() == null ? TaskStatus.PENDING : task.getStatus()).name()
+                ))
+                .toList();
+            return new PlanSessionResponse(sessionId, existingResponseTasks);
+        }
+
         List<ConceptNode> nodes = conceptNodeRepository.findByChapterIdOrderByOrderNoAsc(session.getChapterId());
         if (nodes.isEmpty()) {
             throw new NotFoundException("No concept nodes found for chapter.");

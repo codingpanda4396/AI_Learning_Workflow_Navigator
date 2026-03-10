@@ -40,10 +40,9 @@ const isCreating = computed(() => sessionStore.creatingSession || sessionStore.p
 const username = computed(() => authStore.currentUser?.username ?? '')
 
 const stepPreview = [
-  { step: 1 as const, title: '目标诊断' },
-  { step: 2 as const, title: '路径规划' },
-  { step: 3 as const, title: '分步学习' },
-  { step: 4 as const, title: '总结反馈' },
+  { step: 1 as const, title: '学习计划' },
+  { step: 2 as const, title: '分步学习' },
+  { step: 3 as const, title: '阶段反馈' },
 ]
 
 const canSubmit = computed(
@@ -60,7 +59,7 @@ const hasDraftInput = computed(
 
 const goalHint = computed(() =>
   goal.value.trim().length > 0
-    ? '提交后进入会话页进行目标诊断和路径规划。'
+    ? '提交后进入会话页确认学习计划并开始分步学习。'
     : '请描述你想学什么、希望达到什么程度。',
 )
 
@@ -235,7 +234,7 @@ onMounted(async () => {
       <PageHeader
         eyebrow="AI Learning Navigator"
         title="开始学习会话"
-        subtitle="首页不再做路径生成；创建会话后在流程页完成诊断与路径规划。"
+        subtitle="创建会话后，在流程页依次完成学习计划、分步学习与阶段反馈。"
       />
       <StepProgress :current-step="1" :steps="stepPreview" />
 

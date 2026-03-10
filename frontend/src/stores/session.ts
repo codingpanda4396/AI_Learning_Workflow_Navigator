@@ -5,6 +5,7 @@ import type {
   CurrentSessionResponse,
   LearningFeedbackResponse,
   PathResponse,
+  PlannedTask,
   RunTaskResponse,
   SessionOverviewResponse,
   SubmitTaskResponse,
@@ -35,6 +36,7 @@ export const useSessionStore = defineStore('session', () => {
   const currentTask = ref<RunTaskResponse | null>(null)
   const currentTaskSessionId = ref<number | null>(null)
   const taskResult = ref<SubmitTaskResponse | null>(null)
+  const plannedTasks = ref<PlannedTask[]>([])
   const currentUserSession = ref<CurrentSessionResponse | null>(null)
   const learningFeedback = ref<LearningFeedbackResponse | null>(null)
   const lastError = ref<NormalizedApiError | null>(null)
@@ -104,7 +106,9 @@ export const useSessionStore = defineStore('session', () => {
     planning.value = true
     clearError()
     try {
-      await planSession(inputSessionId)
+      const response = await planSession(inputSessionId)
+      plannedTasks.value = response.tasks
+      return response
     } catch (input) {
       throw setError(input)
     } finally {
@@ -204,6 +208,7 @@ export const useSessionStore = defineStore('session', () => {
     currentTask.value = null
     currentTaskSessionId.value = null
     taskResult.value = null
+    plannedTasks.value = []
     currentUserSession.value = null
     learningFeedback.value = null
     clearError()
@@ -215,6 +220,7 @@ export const useSessionStore = defineStore('session', () => {
     currentTask,
     currentTaskSessionId,
     taskResult,
+    plannedTasks,
     currentUserSession,
     learningFeedback,
     lastError,

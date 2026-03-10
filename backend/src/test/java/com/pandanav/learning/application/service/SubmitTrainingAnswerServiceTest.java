@@ -96,6 +96,8 @@ class SubmitTrainingAnswerServiceTest {
                 null,
                 "EVALUATE",
                 "rule-v1",
+                null,
+                null,
                 null
             )
         );

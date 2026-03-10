@@ -48,6 +48,8 @@ class CompositeAnswerEvaluatorTest {
             null,
             "EVALUATE",
             "rule-v1",
+            null,
+            null,
             null
         );
         when(llmAnswerEvaluator.evaluate(any())).thenThrow(new RuntimeException("boom"));
@@ -83,6 +85,8 @@ class CompositeAnswerEvaluatorTest {
             null,
             "EVALUATE",
             "rule-v1",
+            null,
+            null,
             null
         );
         when(llmAnswerEvaluator.evaluate(any())).thenThrow(new RuntimeException("Failed to parse LLM JSON output."));

@@ -28,7 +28,7 @@ class LlmAnswerEvaluatorTest {
         LlmJsonParser parser = new LlmJsonParser(new ObjectMapper());
 
         when(provider.buildEvaluationPrompt(any(), any())).thenReturn(
-            new LlmPrompt(PromptTemplateKey.EVALUATE_V1, "EVALUATE", "v1", "sys", "user", "{}", "", null)
+            new LlmPrompt(PromptTemplateKey.EVALUATE_V1, "EVALUATE", "v1", "sys", "user", "{}", "", null, null)
         );
         when(gateway.generate(any())).thenReturn(
             new LlmTextResult(

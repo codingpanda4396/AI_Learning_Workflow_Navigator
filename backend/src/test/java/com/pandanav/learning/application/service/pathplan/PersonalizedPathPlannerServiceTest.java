@@ -96,7 +96,7 @@ class PersonalizedPathPlannerServiceTest {
             new TrainingAttemptSummary(11L, 102L, 42, List.of("MISSING_STEPS"))
         ));
         when(promptTemplateProvider.buildPersonalizedPathPlanPrompt(any())).thenReturn(
-            new LlmPrompt(PromptTemplateKey.PATH_PLAN_V1, "PATH_PLAN", "v1", "sys", "user", "{}", "", null)
+            new LlmPrompt(PromptTemplateKey.PATH_PLAN_V1, "PATH_PLAN", "v1", "sys", "user", "{}", "", null, null)
         );
         when(llmGateway.generate(any())).thenReturn(new LlmTextResult(
             """
