@@ -9,7 +9,7 @@ defineProps<PageHeaderProps>()
 </script>
 
 <template>
-  <header class="page-header">
+  <header class="header">
     <p v-if="eyebrow" class="eyebrow">{{ eyebrow }}</p>
     <h1 class="title">{{ title }}</h1>
     <p v-if="subtitle" class="subtitle">{{ subtitle }}</p>
@@ -18,31 +18,35 @@ defineProps<PageHeaderProps>()
 </template>
 
 <style scoped>
-.page-header {
+.header {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
 }
 
 .eyebrow {
-  color: var(--color-primary-hover);
-  font-weight: 600;
+  font-family: var(--font-body);
   font-size: var(--font-size-xs);
-  letter-spacing: 0.08em;
+  font-weight: 500;
+  color: var(--color-accent-coral);
   text-transform: uppercase;
+  letter-spacing: 1.5px;
 }
 
 .title {
-  font-size: clamp(1.75rem, 5vw, 2.5rem);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
   color: var(--color-text);
+  line-height: 1.2;
   margin: 0;
 }
 
 .subtitle {
-  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
   color: var(--color-text-secondary);
-  max-width: 68ch;
+  line-height: 1.5;
+  margin: 0;
 }
 </style>
