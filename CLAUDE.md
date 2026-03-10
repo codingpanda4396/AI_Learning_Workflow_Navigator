@@ -34,19 +34,19 @@ The system manages learning sessions with adaptive task planning, tracking user 
 # Run locally (requires PostgreSQL)
 cd backend && mvn spring-boot:run
 
-# Run all tests
-mvn clean test
+# Run all tests (from backend directory)
+cd backend && mvn clean test
 
 # Run single test class
-mvn test -Dtest=SessionControllerTest
+cd backend && mvn test -Dtest=SessionControllerTest
 
 # Run single test method
-mvn test -Dtest=SessionControllerTest#testCreateSession
+cd backend && mvn test -Dtest=SessionControllerTest#testCreateSession
 
 # Build JAR (skip tests)
-mvn clean package -DskipTests
+cd backend && mvn clean package -DskipTests
 
-# Docker build (run from repository root)
+# Docker build
 docker build -t ai-learning-backend .
 ```
 
@@ -64,6 +64,15 @@ cd frontend && npm run build
 
 # Preview production build
 cd frontend && npm run preview
+```
+
+### Environment Configuration
+
+**Backend**: Copy `application-local.yml.example` to `application-local.yml` and configure database credentials.
+
+**Frontend**: Create `.env` file (参考 `.env.example`):
+```
+VITE_API_BASE_URL=http://localhost:8080/api
 ```
 
 ## Git Workflow
@@ -134,6 +143,19 @@ frontend/src/
 |--------|----------|-------------|
 | POST | `/api/task/{id}/run` | Run/execute a task |
 | POST | `/api/task/{id}/submit` | Submit task answer for evaluation |
+
+### Session History API
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/session/history` | Get session history with pagination |
+| GET | `/api/session/{id}` | Get session details |
+| POST | `/api/session/{id}/resume` | Resume a paused session |
+
+### Tutor Message API
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/session/{sessionId}/tasks/{taskId}/tutor/messages` | Get tutor message history |
+| POST | `/api/session/{sessionId}/tasks/{taskId}/tutor/messages` | Send tutor message |
 
 ### System
 | Method | Endpoint | Description |
