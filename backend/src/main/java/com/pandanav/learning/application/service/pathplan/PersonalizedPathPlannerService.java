@@ -12,6 +12,7 @@ import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
+import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.PersonalizedPathContext;
 import com.pandanav.learning.domain.llm.model.PersonalizedPathPlan;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
@@ -149,6 +150,12 @@ public class PersonalizedPathPlannerService {
 
         try {
             llmResult = llmGateway.generate(prompt);
+            Integer completionTokens = llmResult.usage() == null ? null : llmResult.usage().tokenOutput();
+            Integer threshold = llmProperties.resolveProfile(LlmInvocationProfile.HEAVY_REASONING_TASK, prompt.promptKey())
+                .completionWarningThreshold();
+            if (completionTokens != null && threshold != null && completionTokens > threshold) {
+                throw new IllegalStateException("path plan completion tokens exceed threshold");
+            }
             JsonNode parsed = llmJsonParser.parse(llmResult.text());
             schemaErrors = promptOutputValidator.validatePersonalizedPathPlan(parsed);
             if (!schemaErrors.isEmpty()) {

@@ -8,7 +8,9 @@ import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
+import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.PracticeGenerationContext;
+import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import org.springframework.stereotype.Component;
 
@@ -22,17 +24,20 @@ public class LlmPracticeGenerator implements PracticeGenerator {
     private final PromptTemplateProvider promptTemplateProvider;
     private final LlmJsonParser llmJsonParser;
     private final PromptOutputValidator promptOutputValidator;
+    private final LlmProperties llmProperties;
 
     public LlmPracticeGenerator(
         LlmGateway llmGateway,
         PromptTemplateProvider promptTemplateProvider,
         LlmJsonParser llmJsonParser,
-        PromptOutputValidator promptOutputValidator
+        PromptOutputValidator promptOutputValidator,
+        LlmProperties llmProperties
     ) {
         this.llmGateway = llmGateway;
         this.promptTemplateProvider = promptTemplateProvider;
         this.llmJsonParser = llmJsonParser;
         this.promptOutputValidator = promptOutputValidator;
+        this.llmProperties = llmProperties;
     }
 
     @Override
@@ -47,6 +52,12 @@ public class LlmPracticeGenerator implements PracticeGenerator {
         ));
 
         LlmTextResult result = llmGateway.generate(prompt);
+        Integer completionTokens = result.usage() == null ? null : result.usage().tokenOutput();
+        Integer threshold = llmProperties.resolveProfile(LlmInvocationProfile.LIGHT_JSON_TASK, prompt.promptKey())
+            .completionWarningThreshold();
+        if (completionTokens != null && threshold != null && completionTokens > threshold) {
+            throw new InternalServerException("practice generation completion tokens exceed threshold");
+        }
         JsonNode parsed = llmJsonParser.parse(result.text());
 
         List<String> errors = promptOutputValidator.validatePracticeGeneration(parsed);

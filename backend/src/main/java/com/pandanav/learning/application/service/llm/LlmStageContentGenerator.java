@@ -41,21 +41,26 @@ public class LlmStageContentGenerator implements StageContentGenerator {
         LlmPrompt prompt = promptTemplateProvider.buildStagePrompt(key, context);
         LlmTextResult result = llmGateway.generate(prompt);
         JsonNode parsed = llmJsonParser.parse(result.text());
+        PromptOutputValidator.SanitizedStageOutput sanitized = promptOutputValidator.sanitizeStage(context.stage(), parsed);
 
-        List<String> errors = promptOutputValidator.validateStage(context.stage(), parsed);
+        List<String> errors = sanitized.errors();
         if (!errors.isEmpty()) {
             throw new InternalServerException("Invalid stage prompt output: " + String.join("; ", errors));
         }
 
         return new StageContent(
             context.stage(),
-            parsed,
+            sanitized.node(),
             "LLM",
             prompt.promptKey(),
             prompt.promptVersion(),
+            prompt.invocationProfile(),
             result.provider(),
             result.model(),
             result.usage(),
+            true,
+            true,
+            sanitized.truncated() || (result.usage() != null && result.usage().truncated()),
             result.requestPayload(),
             result.responsePayload()
         );

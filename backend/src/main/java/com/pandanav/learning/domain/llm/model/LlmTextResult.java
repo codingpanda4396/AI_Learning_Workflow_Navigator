@@ -6,6 +6,7 @@ public record LlmTextResult(
     String text,
     String provider,
     String model,
+    LlmInvocationProfile invocationProfile,
     LlmUsage usage,
     JsonNode requestPayload,
     JsonNode responsePayload

@@ -20,8 +20,10 @@ import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class TutorMessageService {
@@ -61,6 +63,37 @@ public class TutorMessageService {
 
     @Transactional
     public TutorSendMessageResponse sendMessage(Long sessionId, Long taskId, Long userId, String content) {
+        MessageContext context = createMessageContext(sessionId, taskId, userId, content);
+        TutorProviderReply reply = tutorProvider.generateReply(context.request());
+        TutorMessage savedAssistantMessage = saveAssistantMessage(sessionId, taskId, userId, reply);
+
+        return new TutorSendMessageResponse(
+            sessionId,
+            taskId,
+            toResponse(context.userMessage()),
+            toResponse(savedAssistantMessage)
+        );
+    }
+
+    public SseEmitter streamMessage(Long sessionId, Long taskId, Long userId, String content) {
+        MessageContext context = createMessageContext(sessionId, taskId, userId, content);
+        SseEmitter emitter = new SseEmitter(30000L);
+        CompletableFuture.runAsync(() -> {
+            try {
+                emitter.send(SseEmitter.event().name("user_message").data(toResponse(context.userMessage())));
+                TutorProviderReply reply = tutorProvider.streamReply(context.request(), chunk -> sendChunk(emitter, chunk));
+                TutorMessage savedAssistantMessage = saveAssistantMessage(sessionId, taskId, userId, reply);
+                emitter.send(SseEmitter.event().name("completed").data(toResponse(savedAssistantMessage)));
+                emitter.complete();
+            } catch (Exception ex) {
+                emitter.completeWithError(ex);
+            }
+        });
+        return emitter;
+    }
+
+    @Transactional
+    protected MessageContext createMessageContext(Long sessionId, Long taskId, Long userId, String content) {
         String normalizedContent = content == null ? "" : content.trim();
         if (normalizedContent.isEmpty()) {
             throw new BadRequestException("Tutor message content must not be blank.");
@@ -86,7 +119,8 @@ public class TutorMessageService {
             userId,
             MAX_HISTORY_MESSAGES
         );
-        TutorProviderReply reply = tutorProvider.generateReply(
+        return new MessageContext(
+            savedUserMessage,
             new TutorProviderRequest(
                 sessionId,
                 taskId,
@@ -101,7 +135,10 @@ public class TutorMessageService {
                 history
             )
         );
+    }
 
+    @Transactional
+    protected TutorMessage saveAssistantMessage(Long sessionId, Long taskId, Long userId, TutorProviderReply reply) {
         TutorMessage assistantMessage = new TutorMessage();
         assistantMessage.setSessionId(sessionId);
         assistantMessage.setTaskId(taskId);
@@ -110,14 +147,7 @@ public class TutorMessageService {
         assistantMessage.setContent(reply.content());
         assistantMessage.setLlmProvider(reply.provider());
         assistantMessage.setLlmModel(reply.model());
-        TutorMessage savedAssistantMessage = tutorMessageRepository.save(assistantMessage);
-
-        return new TutorSendMessageResponse(
-            sessionId,
-            taskId,
-            toResponse(savedUserMessage),
-            toResponse(savedAssistantMessage)
-        );
+        return tutorMessageRepository.save(assistantMessage);
     }
 
     private Task ensureTaskOwnership(Long sessionId, Long taskId, Long userId) {
@@ -138,5 +168,22 @@ public class TutorMessageService {
             message.getContent(),
             message.getCreatedAt()
         );
+    }
+
+    private void sendChunk(SseEmitter emitter, String chunk) {
+        if (chunk == null || chunk.isBlank()) {
+            return;
+        }
+        try {
+            emitter.send(SseEmitter.event().name("assistant_delta").data(chunk));
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    private record MessageContext(
+        TutorMessage userMessage,
+        TutorProviderRequest request
+    ) {
     }
 }

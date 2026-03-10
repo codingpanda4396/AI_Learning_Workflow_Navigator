@@ -10,6 +10,7 @@ import com.pandanav.learning.api.dto.task.SubmitTaskResponse;
 import com.pandanav.learning.application.service.MasteryUpdateService.MasteryUpdateResult;
 import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.llm.AnswerEvaluator;
+import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.EvaluationContext;
 import com.pandanav.learning.domain.llm.model.EvaluationResult;
 import com.pandanav.learning.application.usecase.SubmitTrainingAnswerUseCase;
@@ -134,9 +135,14 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
                 evaluation.provider(),
                 evaluation.model(),
                 evaluation.promptVersion(),
+                evaluation.provider() == null ? null : LlmInvocationProfile.LIGHT_JSON_TASK.name(),
                 evaluation.usage() == null ? null : evaluation.usage().tokenInput(),
                 evaluation.usage() == null ? null : evaluation.usage().tokenOutput(),
+                evaluation.usage() == null ? null : evaluation.usage().reasoningTokens(),
                 evaluation.usage() == null ? null : evaluation.usage().latencyMs(),
+                evaluation.usage() == null ? null : evaluation.usage().finishReason(),
+                evaluation.usage() != null && evaluation.usage().timeout(),
+                evaluation.usage() != null && evaluation.usage().truncated(),
                 evaluation.provider() == null ? "RULE_FALLBACK" : "LLM"
             )
         );
@@ -144,6 +150,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             llmCallLogRepository.save(new LlmCallLog(
                 null,
                 "TASK_SUBMIT",
+                LlmInvocationProfile.LIGHT_JSON_TASK.name(),
                 evaluation.provider(),
                 evaluation.model(),
                 evaluation.promptKey(),
@@ -154,7 +161,14 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
                 "SUCCEEDED",
                 evaluation.usage() == null ? null : evaluation.usage().latencyMs(),
                 evaluation.usage() == null ? null : evaluation.usage().tokenInput(),
-                evaluation.usage() == null ? null : evaluation.usage().tokenOutput()
+                evaluation.usage() == null ? null : evaluation.usage().tokenOutput(),
+                evaluation.usage() == null ? null : evaluation.usage().reasoningTokens(),
+                evaluation.usage() == null ? null : evaluation.usage().finishReason(),
+                evaluation.usage() != null && evaluation.usage().timeout(),
+                false,
+                true,
+                true,
+                evaluation.usage() != null && evaluation.usage().truncated()
             ));
         }
 

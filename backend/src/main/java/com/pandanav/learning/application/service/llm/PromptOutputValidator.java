@@ -1,6 +1,7 @@
 package com.pandanav.learning.application.service.llm;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pandanav.learning.domain.enums.Stage;
@@ -14,6 +15,60 @@ import java.util.Set;
 
 @Component
 public class PromptOutputValidator {
+
+    public SanitizedStageOutput sanitizeStage(Stage stage, JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return new SanitizedStageOutput(node, false, List.of("stage output must be a JSON object"));
+        }
+        ObjectNode sanitized = ((ObjectNode) node).deepCopy();
+        boolean truncated = false;
+        switch (stage) {
+            case STRUCTURE -> {
+                truncated |= trimText(sanitized, "title", 20);
+                truncated |= trimText(sanitized, "summary", 50);
+                truncated |= limitStringArray(sanitized, "key_points", 4, 12);
+                truncated |= limitStringArray(sanitized, "common_misconceptions", 2, 12);
+                truncated |= limitStringArray(sanitized, "suggested_sequence", 4, 10);
+            }
+            case UNDERSTANDING -> {
+                truncated |= trimText(sanitized, "concept_explanation", 80);
+                truncated |= trimText(sanitized, "analogy", 40);
+                truncated |= trimText(sanitized, "worked_example", 80);
+                truncated |= limitStringArray(sanitized, "step_by_step_reasoning", 4, 16);
+                truncated |= limitStringArray(sanitized, "common_errors", 3, 14);
+                truncated |= limitStringArray(sanitized, "check_questions", 3, 18);
+            }
+            case TRAINING -> {
+                JsonNode questions = sanitized.path("questions");
+                if (questions.isArray()) {
+                    ArrayNode limited = JsonNodeFactory.instance.arrayNode();
+                    for (int i = 0; i < Math.min(3, questions.size()); i++) {
+                        JsonNode item = questions.get(i);
+                        if (!item.isObject()) {
+                            continue;
+                        }
+                        ObjectNode question = ((ObjectNode) item).deepCopy();
+                        truncated |= trimText(question, "id", 20);
+                        truncated |= trimText(question, "type", 20);
+                        truncated |= trimText(question, "question", 36);
+                        truncated |= limitStringArray(question, "reference_points", 2, 10);
+                        truncated |= trimText(question, "difficulty", 10);
+                        limited.add(question);
+                    }
+                    if (questions.size() != limited.size()) {
+                        truncated = true;
+                    }
+                    sanitized.set("questions", limited);
+                }
+            }
+            case REFLECTION -> {
+                truncated |= trimText(sanitized, "reflection_prompt", 50);
+                truncated |= limitStringArray(sanitized, "review_checklist", 4, 12);
+                truncated |= trimText(sanitized, "next_step_suggestion", 50);
+            }
+        }
+        return new SanitizedStageOutput(sanitized, truncated, validateStage(stage, sanitized));
+    }
 
     public List<String> validateStage(Stage stage, JsonNode node) {
         List<String> errors = new ArrayList<>();
@@ -37,25 +92,25 @@ public class PromptOutputValidator {
 
         switch (stage) {
             case STRUCTURE -> {
-                validateText(node, "title", 1, 30, errors);
-                validateText(node, "summary", 1, 80, errors);
-                validateStringArray(node, "key_points", 1, 4, 1, 20, errors);
-                validateStringArray(node, "common_misconceptions", 0, 2, 1, 20, errors);
-                validateStringArray(node, "suggested_sequence", 1, 4, 1, 16, errors);
+                validateText(node, "title", 1, 20, errors);
+                validateText(node, "summary", 1, 50, errors);
+                validateStringArray(node, "key_points", 1, 4, 1, 12, errors);
+                validateStringArray(node, "common_misconceptions", 0, 2, 1, 12, errors);
+                validateStringArray(node, "suggested_sequence", 1, 4, 1, 10, errors);
             }
             case UNDERSTANDING -> {
-                validateText(node, "concept_explanation", 80, 220, errors);
-                validateText(node, "analogy", 40, 120, errors);
-                validateText(node, "worked_example", 80, 220, errors);
-                validateStringArray(node, "step_by_step_reasoning", 3, 5, 12, 45, errors);
-                validateStringArray(node, "common_errors", 2, 4, 10, 40, errors);
-                validateStringArray(node, "check_questions", 2, 4, 12, 45, errors);
+                validateText(node, "concept_explanation", 20, 80, errors);
+                validateText(node, "analogy", 10, 40, errors);
+                validateText(node, "worked_example", 20, 80, errors);
+                validateStringArray(node, "step_by_step_reasoning", 2, 4, 1, 16, errors);
+                validateStringArray(node, "common_errors", 1, 3, 1, 14, errors);
+                validateStringArray(node, "check_questions", 1, 3, 1, 18, errors);
             }
             case TRAINING -> validateTrainingQuestions(node.path("questions"), errors);
             case REFLECTION -> {
-                validateText(node, "reflection_prompt", 30, 120, errors);
-                validateStringArray(node, "review_checklist", 3, 5, 10, 35, errors);
-                validateText(node, "next_step_suggestion", 30, 120, errors);
+                validateText(node, "reflection_prompt", 10, 50, errors);
+                validateStringArray(node, "review_checklist", 2, 4, 1, 12, errors);
+                validateText(node, "next_step_suggestion", 10, 50, errors);
             }
         }
         return errors;
@@ -377,8 +432,8 @@ public class PromptOutputValidator {
             }
             validateText(question, "id", 2, 20, errors);
             validateText(question, "type", 4, 20, errors);
-            validateText(question, "question", 1, 60, errors);
-            validateStringArray(question, "reference_points", 1, 2, 1, 16, errors);
+            validateText(question, "question", 1, 36, errors);
+            validateStringArray(question, "reference_points", 1, 2, 1, 10, errors);
             validateText(question, "difficulty", 4, 10, errors);
 
             String type = question.path("type").asText("");
@@ -416,5 +471,54 @@ public class PromptOutputValidator {
             trimmed.add(original.get(i));
         }
         node.set(field, trimmed);
+    }
+
+    private boolean trimText(ObjectNode node, String field, int maxLen) {
+        JsonNode current = node.path(field);
+        if (!current.isTextual()) {
+            return false;
+        }
+        String value = current.asText().trim();
+        if (value.length() <= maxLen) {
+            if (!value.equals(current.asText())) {
+                node.put(field, value);
+            }
+            return false;
+        }
+        node.put(field, value.substring(0, maxLen));
+        return true;
+    }
+
+    private boolean limitStringArray(ObjectNode node, String field, int maxSize, int maxTextLen) {
+        JsonNode current = node.path(field);
+        if (!current.isArray()) {
+            return false;
+        }
+        boolean truncated = false;
+        ArrayNode limited = JsonNodeFactory.instance.arrayNode();
+        for (int i = 0; i < Math.min(maxSize, current.size()); i++) {
+            JsonNode item = current.get(i);
+            if (!item.isTextual()) {
+                continue;
+            }
+            String value = item.asText().trim();
+            if (value.length() > maxTextLen) {
+                value = value.substring(0, maxTextLen);
+                truncated = true;
+            }
+            limited.add(value);
+        }
+        if (current.size() > maxSize) {
+            truncated = true;
+        }
+        node.set(field, limited);
+        return truncated;
+    }
+
+    public record SanitizedStageOutput(
+        JsonNode node,
+        boolean truncated,
+        List<String> errors
+    ) {
     }
 }

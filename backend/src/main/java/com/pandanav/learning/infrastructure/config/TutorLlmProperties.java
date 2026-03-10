@@ -11,7 +11,8 @@ public class TutorLlmProperties {
     private String apiKey;
     private String model = "deepseek-chat";
     private int timeoutMs = 10000;
-    private int maxOutputTokens = 700;
+    private int maxOutputTokens = 450;
+    private boolean streamEnabled = true;
 
     public boolean isEnabled() {
         return enabled;
@@ -67,6 +68,14 @@ public class TutorLlmProperties {
 
     public void setMaxOutputTokens(int maxOutputTokens) {
         this.maxOutputTokens = Math.max(1, maxOutputTokens);
+    }
+
+    public boolean isStreamEnabled() {
+        return streamEnabled;
+    }
+
+    public void setStreamEnabled(boolean streamEnabled) {
+        this.streamEnabled = streamEnabled;
     }
 
     public boolean isReady() {

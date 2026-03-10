@@ -19,13 +19,16 @@ public class JdbcLlmCallLogRepository implements LlmCallLogRepository {
         jdbcTemplate.update(
             """
                 INSERT INTO llm_call_log (
-                    task_attempt_id, biz_type, provider, model, prompt_template_key, prompt_version,
-                    request_payload, response_payload, parsed_json, status, latency_ms, token_input, token_output
+                    task_attempt_id, biz_type, invocation_profile, provider, model, prompt_template_key, prompt_version,
+                    request_payload, response_payload, parsed_json, status, latency_ms,
+                    input_tokens, output_tokens, reasoning_tokens, finish_reason, timeout_flag,
+                    fallback_used, parse_success, schema_valid, truncated_flag
                 )
-                VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
             log.taskAttemptId(),
             log.bizType(),
+            log.invocationProfile(),
             log.provider(),
             log.model(),
             log.promptTemplateKey(),
@@ -35,8 +38,15 @@ public class JdbcLlmCallLogRepository implements LlmCallLogRepository {
             jsonOrNull(log.parsedJson()),
             log.status(),
             log.latencyMs(),
-            log.tokenInput(),
-            log.tokenOutput()
+            log.inputTokens(),
+            log.outputTokens(),
+            log.reasoningTokens(),
+            log.finishReason(),
+            log.timeoutFlag(),
+            log.fallbackUsed(),
+            log.parseSuccess(),
+            log.schemaValid(),
+            log.truncatedFlag()
         );
     }
 

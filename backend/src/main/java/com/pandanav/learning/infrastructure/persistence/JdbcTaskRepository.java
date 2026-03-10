@@ -271,9 +271,14 @@ public class JdbcTaskRepository implements TaskRepository {
                     llm_provider = ?,
                     llm_model = ?,
                     prompt_version = ?,
+                    invocation_profile = ?,
                     token_input = ?,
                     token_output = ?,
+                    reasoning_tokens = ?,
                     latency_ms = ?,
+                    finish_reason = ?,
+                    timeout_flag = ?,
+                    truncated_flag = ?,
                     generation_mode = ?,
                     finished_at = now()
                 WHERE id = ?
@@ -282,9 +287,14 @@ public class JdbcTaskRepository implements TaskRepository {
             metadata.llmProvider(),
             metadata.llmModel(),
             metadata.promptVersion(),
+            metadata.invocationProfile(),
             metadata.tokenInput(),
             metadata.tokenOutput(),
+            metadata.reasoningTokens(),
             metadata.latencyMs(),
+            metadata.finishReason(),
+            metadata.timeout(),
+            metadata.truncated(),
             metadata.generationMode(),
             attemptId
         );
@@ -300,9 +310,14 @@ public class JdbcTaskRepository implements TaskRepository {
                     llm_provider = ?,
                     llm_model = ?,
                     prompt_version = ?,
+                    invocation_profile = ?,
                     token_input = ?,
                     token_output = ?,
+                    reasoning_tokens = ?,
                     latency_ms = ?,
+                    finish_reason = ?,
+                    timeout_flag = ?,
+                    truncated_flag = ?,
                     generation_mode = ?,
                     finished_at = now()
                 WHERE id = ?
@@ -311,9 +326,14 @@ public class JdbcTaskRepository implements TaskRepository {
             metadata.llmProvider(),
             metadata.llmModel(),
             metadata.promptVersion(),
+            metadata.invocationProfile(),
             metadata.tokenInput(),
             metadata.tokenOutput(),
+            metadata.reasoningTokens(),
             metadata.latencyMs(),
+            metadata.finishReason(),
+            metadata.timeout(),
+            metadata.truncated(),
             metadata.generationMode(),
             attemptId
         );
@@ -332,9 +352,11 @@ public class JdbcTaskRepository implements TaskRepository {
             """
                 INSERT INTO task_attempt (
                     task_id, status, user_answer, score, error_tags, feedback_json,
-                    llm_provider, llm_model, prompt_version, token_input, token_output, latency_ms, generation_mode, created_at
+                    llm_provider, llm_model, prompt_version, invocation_profile,
+                    token_input, token_output, reasoning_tokens, latency_ms, finish_reason, timeout_flag, truncated_flag,
+                    generation_mode, created_at
                 )
-                VALUES (?, 'SUCCEEDED'::run_status, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, now())
+                VALUES (?, 'SUCCEEDED'::run_status, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
                 """,
             taskId,
             userAnswer,
@@ -344,9 +366,14 @@ public class JdbcTaskRepository implements TaskRepository {
             metadata.llmProvider(),
             metadata.llmModel(),
             metadata.promptVersion(),
+            metadata.invocationProfile(),
             metadata.tokenInput(),
             metadata.tokenOutput(),
+            metadata.reasoningTokens(),
             metadata.latencyMs(),
+            metadata.finishReason(),
+            metadata.timeout(),
+            metadata.truncated(),
             metadata.generationMode()
         );
     }

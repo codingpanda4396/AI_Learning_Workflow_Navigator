@@ -6,7 +6,6 @@ import com.pandanav.learning.infrastructure.external.llm.OpenAiCompatibleLlmGate
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 @Configuration
@@ -18,16 +17,6 @@ public class LlmConfig {
         if (!properties.isReady()) {
             return new DisabledLlmGateway();
         }
-
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(properties.getTimeoutMs());
-        requestFactory.setReadTimeout(properties.getTimeoutMs());
-
-        RestClient restClient = restClientBuilder
-            .baseUrl(properties.getBaseUrl())
-            .requestFactory(requestFactory)
-            .build();
-
-        return new OpenAiCompatibleLlmGateway(restClient, properties);
+        return new OpenAiCompatibleLlmGateway(restClientBuilder, properties);
     }
 }

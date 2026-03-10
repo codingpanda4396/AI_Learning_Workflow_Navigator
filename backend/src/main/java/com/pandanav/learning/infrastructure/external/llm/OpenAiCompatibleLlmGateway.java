@@ -3,6 +3,7 @@ package com.pandanav.learning.infrastructure.external.llm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.domain.llm.LlmGateway;
+import com.pandanav.learning.domain.llm.model.LlmProfileConfig;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.LlmUsage;
@@ -14,6 +15,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
@@ -29,12 +31,12 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmGateway.class);
 
-    private final RestClient restClient;
+    private final RestClient.Builder restClientBuilder;
     private final LlmProperties properties;
     private final ObjectMapper objectMapper;
 
-    public OpenAiCompatibleLlmGateway(RestClient restClient, LlmProperties properties) {
-        this.restClient = restClient;
+    public OpenAiCompatibleLlmGateway(RestClient.Builder restClientBuilder, LlmProperties properties) {
+        this.restClientBuilder = restClientBuilder;
         this.properties = properties;
         this.objectMapper = new ObjectMapper();
     }
@@ -42,31 +44,50 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
     @Override
     public LlmTextResult generate(LlmPrompt prompt) {
         Instant start = Instant.now();
+        LlmProfileConfig profile = properties.resolveProfile(prompt.invocationProfile(), prompt.promptKey());
         String model = (prompt.modelHint() == null || prompt.modelHint().isBlank())
-            ? properties.getModel()
+            ? profile.model()
             : prompt.modelHint().trim();
+
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", model);
         payload.put("messages", List.of(
             Map.of("role", "system", "content", prompt.systemPrompt()),
             Map.of("role", "user", "content", prompt.userPrompt())
         ));
-        payload.put("temperature", 0.2);
-        payload.put("response_format", Map.of("type", "json_object"));
-        Integer maxOutputTokens = prompt.maxOutputTokens() != null ? prompt.maxOutputTokens() : resolveMaxOutputTokens(prompt.promptKey());
+        payload.put("temperature", profile.temperature());
+        if (profile.jsonResponse()) {
+            payload.put("response_format", Map.of("type", "json_object"));
+        }
+        Integer maxOutputTokens = prompt.maxOutputTokens() != null ? prompt.maxOutputTokens() : profile.maxTokens();
         if (maxOutputTokens != null && maxOutputTokens > 0) {
             payload.put("max_tokens", maxOutputTokens);
         }
-        JsonNode requestPayload = objectMapper.valueToTree(payload);
-        log.info(
-            "LLM request: promptKey={}, model={}, resolvedMaxOutputTokens={}, payload={}",
-            prompt.promptKey(),
-            model,
-            maxOutputTokens,
-            toCompactJson(requestPayload)
-        );
+        if (profile.extraParams() != null && !profile.extraParams().isEmpty()) {
+            payload.putAll(profile.extraParams());
+        }
 
-        JsonNode response = invokeWithRetry(requestPayload);
+        JsonNode requestPayload = objectMapper.valueToTree(payload);
+        if (properties.isLogRequest()) {
+            log.info(
+                "LLM request: profile={}, promptKey={}, model={}, timeoutMs={}, maxTokens={}, payload={}",
+                prompt.invocationProfile(),
+                prompt.promptKey(),
+                model,
+                profile.timeoutMs(),
+                maxOutputTokens,
+                toCompactJson(requestPayload)
+            );
+        }
+
+        boolean timeout = false;
+        JsonNode response;
+        try {
+            response = invokeWithRetry(requestPayload, profile.timeoutMs());
+        } catch (InternalServerException ex) {
+            timeout = ex.getMessage() != null && ex.getMessage().toLowerCase().contains("timed out");
+            throw ex;
+        }
 
         JsonNode contentNode = response.path("choices").path(0).path("message").path("content");
         if (contentNode.isMissingNode() || contentNode.isNull() || contentNode.asText().isBlank()) {
@@ -75,39 +96,44 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
 
         int latency = (int) Duration.between(start, Instant.now()).toMillis();
         JsonNode usageNode = response.path("usage");
+        JsonNode completionDetails = usageNode.path("completion_tokens_details");
         String finishReason = response.path("choices").path(0).path("finish_reason").asText("");
         Integer promptTokens = usageNode.path("prompt_tokens").isNumber() ? usageNode.path("prompt_tokens").asInt() : null;
         Integer completionTokens = usageNode.path("completion_tokens").isNumber() ? usageNode.path("completion_tokens").asInt() : null;
-        log.info(
-            "LLM response: finish_reason={}, usage.prompt_tokens={}, usage.completion_tokens={}, latency_ms={}",
-            finishReason,
-            promptTokens,
-            completionTokens,
-            latency
-        );
-        LlmUsage usage = new LlmUsage(
-            promptTokens,
-            completionTokens,
-            latency
-        );
+        Integer reasoningTokens = completionDetails.path("reasoning_tokens").isNumber()
+            ? completionDetails.path("reasoning_tokens").asInt()
+            : null;
+        boolean truncated = "length".equalsIgnoreCase(finishReason);
+        if (properties.isLogResponse()) {
+            log.info(
+                "LLM response: profile={}, promptKey={}, finishReason={}, promptTokens={}, completionTokens={}, reasoningTokens={}, latencyMs={}",
+                prompt.invocationProfile(),
+                prompt.promptKey(),
+                finishReason,
+                promptTokens,
+                completionTokens,
+                reasoningTokens,
+                latency
+            );
+        }
 
         return new LlmTextResult(
             contentNode.asText(),
-            properties.getProvider(),
+            profile.provider(),
             model,
-            usage,
+            prompt.invocationProfile(),
+            new LlmUsage(promptTokens, completionTokens, reasoningTokens, latency, finishReason, timeout, truncated),
             requestPayload,
             response
         );
     }
 
-    private JsonNode invokeWithRetry(JsonNode requestPayload) {
+    private JsonNode invokeWithRetry(JsonNode requestPayload, Integer timeoutMs) {
         int attempts = properties.getMaxRetries() + 1;
         Exception lastError = null;
-
         for (int i = 1; i <= attempts; i++) {
             try {
-                ResponseEntity<byte[]> entity = callProvider(requestPayload);
+                ResponseEntity<byte[]> entity = callProvider(requestPayload, timeoutMs);
                 return parseResponse(entity);
             } catch (Exception ex) {
                 lastError = ex;
@@ -125,7 +151,8 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
         throw new InternalServerException("LLM provider call failed: " + (lastError == null ? "unknown" : lastError.getMessage()));
     }
 
-    private ResponseEntity<byte[]> callProvider(JsonNode requestPayload) {
+    private ResponseEntity<byte[]> callProvider(JsonNode requestPayload, Integer timeoutMs) {
+        RestClient restClient = buildClient(timeoutMs);
         try {
             return restClient.post()
                 .uri("/chat/completions")
@@ -143,15 +170,23 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
                     try (InputStream in = res.getBody()) {
                         body = in.readAllBytes();
                     }
-                    return ResponseEntity.status(status)
-                        .headers(res.getHeaders())
-                        .body(body);
+                    return ResponseEntity.status(status).headers(res.getHeaders()).body(body);
                 });
         } catch (InternalServerException e) {
             throw e;
+        } catch (ResourceAccessException ex) {
+            throw new InternalServerException("LLM provider call timed out: " + ex.getMessage());
         } catch (Exception ex) {
             throw new InternalServerException("LLM provider call failed: " + ex.getMessage());
         }
+    }
+
+    private RestClient buildClient(Integer timeoutMs) {
+        int resolvedTimeout = timeoutMs == null || timeoutMs <= 0 ? properties.getTimeoutMs() : timeoutMs;
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(resolvedTimeout);
+        requestFactory.setReadTimeout(resolvedTimeout);
+        return restClientBuilder.baseUrl(properties.getBaseUrl()).requestFactory(requestFactory).build();
     }
 
     private JsonNode parseResponse(ResponseEntity<byte[]> entity) {
@@ -193,25 +228,14 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
     }
 
     private static String readBodyAsString(InputStream in) {
-        if (in == null) return "";
+        if (in == null) {
+            return "";
+        }
         try {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (Exception e) {
             return "(unable to read body: " + e.getMessage() + ")";
         }
-    }
-
-    private Integer resolveMaxOutputTokens(String promptKey) {
-        if (promptKey == null) {
-            return null;
-        }
-        return switch (promptKey) {
-            case "STRUCTURE" -> properties.getStructureMaxOutputTokens();
-            case "TRAINING" -> properties.getTrainingMaxOutputTokens();
-            case "EVALUATE" -> properties.getEvaluationMaxOutputTokens();
-            case "TUTOR" -> properties.getTutorMaxOutputTokens();
-            default -> null;
-        };
     }
 
     private String toCompactJson(JsonNode node) {

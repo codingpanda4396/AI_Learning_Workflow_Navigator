@@ -4,6 +4,7 @@ import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.model.ConceptDecomposeContext;
 import com.pandanav.learning.domain.llm.model.EvaluationContext;
 import com.pandanav.learning.domain.llm.model.GoalDiagnosisContext;
+import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.PersonalizedPathContext;
 import com.pandanav.learning.domain.llm.model.PracticeGenerationContext;
@@ -22,58 +23,52 @@ import java.util.Map;
 public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
 
     private static final String STAGE_SYSTEM_PROMPT = """
-        你是学习任务生成器。
-        仅输出一个 JSON 对象。
-        不要解释、不要 markdown、不要代码块、不要额外字段。
-        全部文本用简体中文，内容紧扣当前知识点与任务目标。
+        你是学习任务结构化生成器。
+        只返回一个合法 JSON 对象。
+        不要解释，不要过程，不要额外文本。
         """;
 
     private static final String EVAL_SYSTEM_PROMPT = """
-        你是训练答案评估器。
-        仅输出一个 JSON 对象。
-        不要解释、不要 markdown、不要代码块、不要额外字段。
-        评分必须严格按 rubric。
+        你是训练结果结构化评估器。
+        只返回一个合法 JSON 对象。
+        不要解释，不要过程，不要额外文本。
         """;
 
     private static final String GOAL_DIAGNOSE_SYSTEM_PROMPT = """
-        你是学习目标诊断助手，使用 SMART 方法诊断目标质量。
-        你只允许输出 JSON，不允许输出 markdown code fence，不允许输出 schema 外字段。
-        所有字段值必须使用简体中文，改写目标必须为一句话、可执行、可衡量。
+        你是学习目标诊断助手。
+        只返回一个合法 JSON 对象。
+        不要解释，不要额外文本。
         """;
 
     private static final String TUTOR_SYSTEM_PROMPT_TEMPLATE = """
-        你是“学习流程导师”，优先引导，不直接给最终答案。
-        先提问定位卡点，再给短提示；必要时再给局部答案。
-        单次回复控制在 80 字以内，禁止长篇解释。
-        不编造上下文外信息。
-        模式开关：
-        - hint_mode: {{hint_mode}}
-        - direct_answer_mode: {{direct_answer_mode}}
+        你是学习流程导师。
+        先定位卡点，再给短提示。
+        单次回复尽量短。
 
-        当前任务上下文：
-        - stage: {{task_stage}}
-        - objective: {{task_objective}}
-        - concept: {{node_name}}
-        - learning_goal: {{session_goal}}
+        hint_mode: {{hint_mode}}
+        direct_answer_mode: {{direct_answer_mode}}
+        stage: {{task_stage}}
+        objective: {{task_objective}}
+        concept: {{node_name}}
+        learning_goal: {{session_goal}}
         """;
 
     private static final String CONCEPT_DECOMPOSE_SYSTEM_PROMPT = """
-        你是学习路径拆解助手，负责把章节/概念/目标拆成最小可学习节点。
-        你只允许输出 JSON，不允许输出 markdown code fence，不允许输出 schema 外字段。
-        所有字段值必须使用简体中文，节点关系要实用，不要过度图谱化。
+        你是概念拆解器。
+        只返回一个合法 JSON 对象。
+        不要解释，不要额外文本。
         """;
 
     private static final String PATH_PLAN_SYSTEM_PROMPT = """
-        You are a personalized learning path planner.
-        Output only one JSON object without markdown code fences.
-        Do not output fields outside schema.
+        You are a learning path planner.
+        Return one compact JSON object only.
+        No explanation.
         """;
 
     private static final String PRACTICE_GENERATION_SYSTEM_PROMPT = """
-        You are a training-question generator.
-        Output only one JSON object and do not use markdown code fences.
-        Do not output fields outside schema.
-        Questions must stay aligned with the given node and task objective.
+        你是训练题结构化生成器。
+        只返回一个合法 JSON 对象。
+        不要解释，不要过程，不要额外文本。
         """;
 
     private final PromptTemplateRenderer renderer = new PromptTemplateRenderer();
@@ -91,11 +86,9 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
 
     @Override
     public LlmPrompt buildStagePrompt(PromptTemplateKey key, StageGenerationContext context) {
-        PromptDefinition definition = definitions.get(key);
-        if (definition == null) {
-            throw new IllegalArgumentException("Unsupported prompt key: " + key);
-        }
+        PromptDefinition definition = getDefinition(key);
         Map<String, String> variables = Map.of(
+            "stage", safe(context.stage() == null ? null : context.stage().name()),
             "objective", safe(context.objective()),
             "node_title", safe(context.nodeTitle())
         );
@@ -104,13 +97,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
 
     @Override
     public LlmPrompt buildEvaluationPrompt(PromptTemplateKey key, EvaluationContext context) {
-        if (key != PromptTemplateKey.EVALUATE_V1 && key != PromptTemplateKey.EVALUATE_V2) {
-            throw new IllegalArgumentException("Unsupported prompt key: " + key);
-        }
-        PromptDefinition definition = definitions.get(key);
-        if (definition == null) {
-            throw new IllegalArgumentException("Unsupported prompt key: " + key);
-        }
+        PromptDefinition definition = getDefinition(key);
         Map<String, String> variables = Map.of(
             "task_objective", safe(context.taskObjective()),
             "generated_question_content", safe(context.generatedQuestionContent()),
@@ -121,18 +108,17 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
 
     @Override
     public LlmPrompt buildGoalDiagnosisPrompt(GoalDiagnosisContext context) {
-        PromptDefinition definition = definitions.get(PromptTemplateKey.GOAL_DIAGNOSE_V1);
-        Map<String, String> variables = Map.of(
+        PromptDefinition definition = getDefinition(PromptTemplateKey.GOAL_DIAGNOSE_V1);
+        return toPrompt(definition, Map.of(
             "course_id", safe(context.courseId()),
             "chapter_id", safe(context.chapterId()),
             "goal_text", safe(context.goalText())
-        );
-        return toPrompt(definition, variables);
+        ));
     }
 
     @Override
     public LlmPrompt buildPersonalizedPathPlanPrompt(PersonalizedPathContext context) {
-        PromptDefinition definition = definitions.get(PromptTemplateKey.PATH_PLAN_V1);
+        PromptDefinition definition = getDefinition(PromptTemplateKey.PATH_PLAN_V1);
         Map<String, String> variables = new HashMap<>();
         variables.put("goal_text", safe(context.goalText()));
         variables.put(
@@ -155,29 +141,27 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
 
     @Override
     public LlmPrompt buildConceptDecomposePrompt(ConceptDecomposeContext context) {
-        PromptDefinition definition = definitions.get(PromptTemplateKey.CONCEPT_DECOMPOSE_V1);
-        Map<String, String> variables = Map.of(
+        PromptDefinition definition = getDefinition(PromptTemplateKey.CONCEPT_DECOMPOSE_V1);
+        return toPrompt(definition, Map.of(
             "chapter_id", safe(context.chapterId()),
             "concept", safe(context.concept()),
             "goal", safe(context.goal())
-        );
-        return toPrompt(definition, variables);
+        ));
     }
 
     @Override
     public LlmPrompt buildPracticeGenerationPrompt(PracticeGenerationContext context) {
-        PromptDefinition definition = definitions.get(PromptTemplateKey.PRACTICE_GENERATION_V1);
-        Map<String, String> variables = Map.of(
+        PromptDefinition definition = getDefinition(PromptTemplateKey.PRACTICE_GENERATION_V1);
+        return toPrompt(definition, Map.of(
             "task_objective", safe(context.taskObjective()),
             "node_title", safe(context.nodeTitle()),
             "stage_content_json", safe(context.stageContentJson())
-        );
-        return toPrompt(definition, variables);
+        ));
     }
 
     @Override
     public String buildTutorSystemPrompt(TutorPromptContext context) {
-        PromptDefinition definition = definitions.get(PromptTemplateKey.TUTOR_V1);
+        PromptDefinition definition = getDefinition(PromptTemplateKey.TUTOR_V1);
         return renderer.render(definition.spec().systemPrompt(), Map.of(
             "task_stage", safe(context.taskStage()),
             "task_objective", safe(context.taskObjective()),
@@ -190,15 +174,14 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
 
     private LlmPrompt toPrompt(PromptDefinition definition, Map<String, String> variables) {
         PromptSpec spec = definition.spec();
-        String renderedUserPrompt = renderer.render(spec.userPromptTemplate(), variables);
-        String userPrompt = renderedUserPrompt
-            + "\n\nexpected_json_schema:\n" + spec.expectedJsonSchemaText()
-            + "\n\noutput_rules:\n" + spec.outputRules();
+        String userPrompt = renderer.render(spec.userPromptTemplate(), variables).trim()
+            + "\nJSON:\n" + spec.expectedJsonSchemaText().trim();
 
         return new LlmPrompt(
             definition.templateKey(),
             spec.promptKey(),
             spec.promptVersion(),
+            resolveProfile(definition.templateKey()),
             spec.systemPrompt(),
             userPrompt,
             spec.expectedJsonSchemaText(),
@@ -208,34 +191,44 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         );
     }
 
+    private PromptDefinition getDefinition(PromptTemplateKey key) {
+        PromptDefinition definition = definitions.get(key);
+        if (definition == null) {
+            throw new IllegalArgumentException("Unsupported prompt key: " + key);
+        }
+        return definition;
+    }
+
+    private LlmInvocationProfile resolveProfile(PromptTemplateKey key) {
+        return switch (key) {
+            case PATH_PLAN_V1 -> LlmInvocationProfile.HEAVY_REASONING_TASK;
+            case TUTOR_V1 -> LlmInvocationProfile.CHAT_TASK;
+            default -> LlmInvocationProfile.LIGHT_JSON_TASK;
+        };
+    }
+
     private void registerStagePrompts() {
         definitions.put(PromptTemplateKey.STRUCTURE_V1, new PromptDefinition(
             PromptTemplateKey.STRUCTURE_V1,
             new PromptSpec(
-                PromptTemplateKey.STRUCTURE_V1.promptKey(),
-                PromptTemplateKey.STRUCTURE_V1.promptVersion(),
+                "STRUCTURE",
+                "v2",
                 STAGE_SYSTEM_PROMPT,
                 """
-                    任务阶段：STRUCTURE
-                    任务目标：{{objective}}
+                    阶段：{{stage}}
                     知识点：{{node_title}}
-                    输出精简学习结构。
+                    目标：{{objective}}
+
+                    生成字段：
+                    - title：1-20字
+                    - summary：1-50字
+                    - key_points：1-4条，每条1-12字
+                    - common_misconceptions：0-2条，每条1-12字
+                    - suggested_sequence：1-4条，每条1-10字
+                    不需要推理过程，不需要解释，不确定就用最保守表达。
                     """,
-                """
-                    {
-                      "title": "string(1-30字)",
-                      "summary": "string(1-80字)",
-                      "key_points": ["string(1-20字), 最多4条"],
-                      "common_misconceptions": ["string(1-20字), 最多2条"],
-                      "suggested_sequence": ["string(1-16字), 最多4条"]
-                    }
-                    """,
-                """
-                    - 只输出 JSON。
-                    - 不要解释，不要 markdown，不要代码块。
-                    - 字段必须与 schema 完全一致，不得新增字段。
-                    - 文本必须短句、可执行、贴合知识点。
-                    """,
+                "{\"title\":\"\",\"summary\":\"\",\"key_points\":[],\"common_misconceptions\":[],\"suggested_sequence\":[]}",
+                "short_json_only",
                 null
             )
         ));
@@ -243,31 +236,25 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         definitions.put(PromptTemplateKey.UNDERSTANDING_V1, new PromptDefinition(
             PromptTemplateKey.UNDERSTANDING_V1,
             new PromptSpec(
-                PromptTemplateKey.UNDERSTANDING_V1.promptKey(),
-                PromptTemplateKey.UNDERSTANDING_V1.promptVersion(),
+                "UNDERSTANDING",
+                "v2",
                 STAGE_SYSTEM_PROMPT,
                 """
-                    任务阶段：UNDERSTANDING
-                    任务目标：{{objective}}
+                    阶段：{{stage}}
                     知识点：{{node_title}}
-                    请输出帮助学生真正理解该知识点的讲解内容。
+                    目标：{{objective}}
+
+                    生成字段：
+                    - concept_explanation：20-80字
+                    - analogy：10-40字
+                    - worked_example：20-80字
+                    - step_by_step_reasoning：2-4条，每条1-16字
+                    - common_errors：1-3条，每条1-14字
+                    - check_questions：1-3条，每条1-18字
+                    不需要推理过程，不需要解释，不确定就用最通用表达。
                     """,
-                """
-                    {
-                      "concept_explanation": "string(80-220字)",
-                      "analogy": "string(40-120字)",
-                      "worked_example": "string(80-220字)",
-                      "step_by_step_reasoning": ["string(12-45字)", "3-5项"],
-                      "common_errors": ["string(10-40字)", "2-4项"],
-                      "check_questions": ["string(12-45字)", "2-4项"]
-                    }
-                    """,
-                """
-                    - 只输出一个 JSON 对象，字段必须严格等于 schema。
-                    - 禁止输出 schema 外字段、解释性前后缀、markdown。
-                    - 所有字段值必须为简体中文。
-                    - 每个问题和示例必须紧扣当前知识点与目标，不得空泛。
-                    """,
+                "{\"concept_explanation\":\"\",\"analogy\":\"\",\"worked_example\":\"\",\"step_by_step_reasoning\":[],\"common_errors\":[],\"check_questions\":[]}",
+                "short_json_only",
                 null
             )
         ));
@@ -275,36 +262,23 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         definitions.put(PromptTemplateKey.TRAINING_V1, new PromptDefinition(
             PromptTemplateKey.TRAINING_V1,
             new PromptSpec(
-                PromptTemplateKey.TRAINING_V1.promptKey(),
-                PromptTemplateKey.TRAINING_V1.promptVersion(),
+                "TRAINING",
+                "v2",
                 STAGE_SYSTEM_PROMPT,
                 """
-                    任务阶段：TRAINING
-                    任务目标：{{objective}}
+                    阶段：{{stage}}
                     知识点：{{node_title}}
-                    仅生成 3 道简短训练题。
+                    目标：{{objective}}
+
+                    生成 3 个短题目：
+                    - BASIC / APPLICATION / REASONING 各 1 题
+                    - question：1-36字
+                    - reference_points：1-2条，每条1-10字
+                    - difficulty：EASY|MEDIUM|HARD
+                    不要解释，不要长题干。
                     """,
-                """
-                    {
-                      "questions": [
-                        {
-                          "id": "string(如q1)",
-                          "type": "BASIC|APPLICATION|REASONING",
-                          "question": "string(1-60字)",
-                          "reference_points": ["string(1-16字), 最多2条"],
-                          "difficulty": "EASY|MEDIUM|HARD"
-                        }
-                      ]
-                    }
-                    约束：questions 数量固定 3。
-                    """,
-                """
-                    - 只输出 JSON。
-                    - 不要解释，不要 markdown，不要代码块。
-                    - 字段必须与 schema 完全一致，不得新增字段。
-                    - 题干简短，不写长解析。
-                    - questions 必须包含 BASIC/APPLICATION/REASONING 各 1 题。
-                    """,
+                "{\"questions\":[{\"id\":\"q1\",\"type\":\"BASIC\",\"question\":\"\",\"reference_points\":[],\"difficulty\":\"EASY\"},{\"id\":\"q2\",\"type\":\"APPLICATION\",\"question\":\"\",\"reference_points\":[],\"difficulty\":\"MEDIUM\"},{\"id\":\"q3\",\"type\":\"REASONING\",\"question\":\"\",\"reference_points\":[],\"difficulty\":\"HARD\"}]}",
+                "short_json_only",
                 null
             )
         ));
@@ -312,123 +286,61 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         definitions.put(PromptTemplateKey.REFLECTION_V1, new PromptDefinition(
             PromptTemplateKey.REFLECTION_V1,
             new PromptSpec(
-                PromptTemplateKey.REFLECTION_V1.promptKey(),
-                PromptTemplateKey.REFLECTION_V1.promptVersion(),
+                "REFLECTION",
+                "v2",
                 STAGE_SYSTEM_PROMPT,
                 """
-                    任务阶段：REFLECTION
-                    任务目标：{{objective}}
+                    阶段：{{stage}}
                     知识点：{{node_title}}
-                    请输出复盘与下一步建议。
+                    目标：{{objective}}
+
+                    生成字段：
+                    - reflection_prompt：10-50字
+                    - review_checklist：2-4条，每条1-12字
+                    - next_step_suggestion：10-50字
+                    不要解释，不要过程。
                     """,
-                """
-                    {
-                      "reflection_prompt": "string(30-120字)",
-                      "review_checklist": ["string(10-35字)", "3-5项"],
-                      "next_step_suggestion": "string(30-120字)"
-                    }
-                    """,
-                """
-                    - 只输出一个 JSON 对象，字段必须严格等于 schema。
-                    - 禁止输出 schema 外字段、解释性前后缀、markdown。
-                    - 所有字段值必须为简体中文。
-                    - 复盘建议必须可执行，且与当前知识点和目标直接相关。
-                    """,
+                "{\"reflection_prompt\":\"\",\"review_checklist\":[],\"next_step_suggestion\":\"\"}",
+                "short_json_only",
                 null
             )
         ));
     }
 
     private void registerEvaluatePrompt() {
-        definitions.put(PromptTemplateKey.EVALUATE_V1, new PromptDefinition(
-            PromptTemplateKey.EVALUATE_V1,
-            new PromptSpec(
-                PromptTemplateKey.EVALUATE_V1.promptKey(),
-                PromptTemplateKey.EVALUATE_V1.promptVersion(),
-                EVAL_SYSTEM_PROMPT,
-                """
-                    任务目标：{{task_objective}}
-                    题目内容：{{generated_question_content}}
-                    学生答案：{{user_answer}}
-                    按 rubric 输出评估 JSON。
-                    """,
-                """
-                    {
-                      "score": "number(0-100)",
-                      "normalized_score": "number(0-1, = score/100)",
-                      "rubric": {
-                        "concept_correctness": "number(0-40)",
-                        "reasoning_quality": "number(0-30)",
-                        "completeness": "number(0-20)",
-                        "clarity": "number(0-10)"
-                      },
-                      "feedback": "string(1-120字)",
-                      "error_tags": ["string, 1-4条"],
-                      "strengths": ["string, 1-3条"],
-                      "weaknesses": ["string, 1-3条"],
-                      "suggested_next_action": "INSERT_REMEDIAL_UNDERSTANDING|INSERT_TRAINING_VARIANTS|INSERT_TRAINING_REINFORCEMENT|ADVANCE_TO_NEXT_NODE"
-                    }
-                    """,
-                """
-                    - 只输出 JSON。
-                    - 不要解释，不要 markdown，不要代码块。
-                    - 字段必须与 schema 完全一致，不得新增字段。
-                    - rubric 四项和必须等于 score。
-                    - normalized_score 必须等于 score/100（保留 3 位小数）。
-                    """,
-                null
-            )
-        ));
-
-        definitions.put(PromptTemplateKey.EVALUATE_V2, new PromptDefinition(
-            PromptTemplateKey.EVALUATE_V2,
-            new PromptSpec(
-                PromptTemplateKey.EVALUATE_V2.promptKey(),
-                PromptTemplateKey.EVALUATE_V2.promptVersion(),
-                EVAL_SYSTEM_PROMPT,
-                definitions.get(PromptTemplateKey.EVALUATE_V1).spec().userPromptTemplate(),
-                definitions.get(PromptTemplateKey.EVALUATE_V1).spec().expectedJsonSchemaText(),
-                definitions.get(PromptTemplateKey.EVALUATE_V1).spec().outputRules(),
-                null
-            )
-        ));
+        PromptSpec spec = new PromptSpec(
+            "EVALUATE",
+            "v2",
+            EVAL_SYSTEM_PROMPT,
+            """
+                objective={{task_objective}}
+                question={{generated_question_content}}
+                answer={{user_answer}}
+                只做短 JSON 填充，不要解释。
+                """,
+            "{\"score\":0,\"normalized_score\":0,\"rubric\":{\"concept_correctness\":0,\"reasoning_quality\":0,\"completeness\":0,\"clarity\":0},\"feedback\":\"\",\"error_tags\":[],\"strengths\":[],\"weaknesses\":[],\"suggested_next_action\":\"INSERT_TRAINING_REINFORCEMENT\"}",
+            "short_json_only",
+            null
+        );
+        definitions.put(PromptTemplateKey.EVALUATE_V1, new PromptDefinition(PromptTemplateKey.EVALUATE_V1, spec));
+        definitions.put(PromptTemplateKey.EVALUATE_V2, new PromptDefinition(PromptTemplateKey.EVALUATE_V2, spec));
     }
 
     private void registerGoalDiagnosePrompt() {
         definitions.put(PromptTemplateKey.GOAL_DIAGNOSE_V1, new PromptDefinition(
             PromptTemplateKey.GOAL_DIAGNOSE_V1,
             new PromptSpec(
-                PromptTemplateKey.GOAL_DIAGNOSE_V1.promptKey(),
-                PromptTemplateKey.GOAL_DIAGNOSE_V1.promptVersion(),
+                "GOAL_DIAGNOSE",
+                "v1",
                 GOAL_DIAGNOSE_SYSTEM_PROMPT,
                 """
-                    请诊断以下学习目标。
-                    course_id={{course_id}}
-                    chapter_id={{chapter_id}}
-                    goal_text={{goal_text}}
+                    course={{course_id}}
+                    chapter={{chapter_id}}
+                    goal={{goal_text}}
+                    给出紧凑诊断 JSON。
                     """,
-                """
-                    {
-                      "goal_score": "number(0-100)",
-                      "smart_breakdown": {
-                        "specific_score": "number(0-20)",
-                        "measurable_score": "number(0-20)",
-                        "achievable_score": "number(0-20)",
-                        "relevant_score": "number(0-20)",
-                        "time_bound_score": "number(0-20)"
-                      },
-                      "summary": "string(40-160字)",
-                      "strengths": ["string", "2-3项"],
-                      "risks": ["string", "2-3项"],
-                      "rewritten_goal": "string(一句话，可执行、可衡量，适合大学生学习场景)"
-                    }
-                    """,
-                """
-                    - 只输出一个 JSON 对象，字段必须严格等于 schema。
-                    - 禁止输出 schema 外字段、解释性前后缀、markdown。
-                    - goal_score 必须等于 smart_breakdown 五个维度之和。
-                    - 所有文本字段值必须为简体中文。
-                    """,
+                "{\"goal_score\":0,\"smart_breakdown\":{\"specific_score\":0,\"measurable_score\":0,\"achievable_score\":0,\"relevant_score\":0,\"time_bound_score\":0},\"summary\":\"\",\"strengths\":[],\"risks\":[],\"rewritten_goal\":\"\"}",
+                "short_json_only",
                 null
             )
         ));
@@ -438,11 +350,10 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         definitions.put(PromptTemplateKey.PATH_PLAN_V1, new PromptDefinition(
             PromptTemplateKey.PATH_PLAN_V1,
             new PromptSpec(
-                PromptTemplateKey.PATH_PLAN_V1.promptKey(),
-                PromptTemplateKey.PATH_PLAN_V1.promptVersion(),
+                "PATH_PLAN",
+                "v2",
                 PATH_PLAN_SYSTEM_PROMPT,
                 """
-                    Build a personalized plan from this context:
                     goal_text={{goal_text}}
                     goal_diagnosis={{goal_diagnosis}}
                     mastery_by_node={{mastery_by_node}}
@@ -450,34 +361,15 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                     recent_scores={{recent_scores}}
                     weak_points_summary={{weak_points_summary}}
                     chapter_nodes={{chapter_nodes}}
+
                     Constraints:
-                    - Only use node_id from chapter_nodes.
-                    - stage in inserted_tasks must be UNDERSTANDING or TRAINING.
-                    - Prioritize low mastery and MISSING_STEPS/CONCEPT_CONFUSION nodes.
-                    - Prefer concise reasons and objectives.
+                    - ordered_nodes reason <= 40 chars
+                    - inserted_tasks <= 3
+                    - objective <= 60 chars
+                    - risk_flags <= 6
                     """,
-                """
-                    {
-                      "ordered_nodes": [
-                        {"node_id": 101, "priority": 1, "reason": "string(6-120)"}
-                      ],
-                      "inserted_tasks": [
-                        {
-                          "node_id": 101,
-                          "stage": "UNDERSTANDING|TRAINING",
-                          "objective": "string(10-200)",
-                          "trigger": "string(2-50)"
-                        }
-                      ],
-                      "plan_reasoning_summary": "string(20-400)",
-                      "risk_flags": ["string(4-80)"]
-                    }
-                    """,
-                """
-                    - Output exactly one JSON object.
-                    - Do not output markdown code fences.
-                    - No fields outside schema.
-                    """,
+                "{\"ordered_nodes\":[{\"node_id\":101,\"priority\":1,\"reason\":\"\"}],\"inserted_tasks\":[{\"node_id\":101,\"stage\":\"UNDERSTANDING\",\"objective\":\"\",\"trigger\":\"\"}],\"plan_reasoning_summary\":\"\",\"risk_flags\":[]}",
+                "compact_json_only",
                 null
             )
         ));
@@ -487,39 +379,23 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         definitions.put(PromptTemplateKey.PRACTICE_GENERATION_V1, new PromptDefinition(
             PromptTemplateKey.PRACTICE_GENERATION_V1,
             new PromptSpec(
-                PromptTemplateKey.PRACTICE_GENERATION_V1.promptKey(),
-                PromptTemplateKey.PRACTICE_GENERATION_V1.promptVersion(),
+                "PRACTICE_GENERATION",
+                "v2",
                 PRACTICE_GENERATION_SYSTEM_PROMPT,
                 """
-                    Generate training questions from current context.
-                    task_objective={{task_objective}}
-                    node_title={{node_title}}
-                    stage_content_json={{stage_content_json}}
+                    知识点：{{node_title}}
+                    目标：{{task_objective}}
+                    参考：{{stage_content_json}}
+
+                    只生成 3 题：
+                    - SINGLE_CHOICE / TRUE_FALSE / SHORT_ANSWER 各 1 题
+                    - stem：8-40字
+                    - standard_answer：1-30字
+                    - explanation：8-40字
+                    不要长解释。
                     """,
-                """
-                    {
-                      "items": [
-                        {
-                          "question_type": "SINGLE_CHOICE|TRUE_FALSE|SHORT_ANSWER",
-                          "stem": "string(20-240)",
-                          "options": ["string(1-100)"],
-                          "standard_answer": "string(1-200)",
-                          "explanation": "string(10-240)",
-                          "difficulty": "EASY|MEDIUM|HARD"
-                        }
-                      ]
-                    }
-                    Constraints:
-                    - items size must be 3.
-                    - must include at least one SINGLE_CHOICE, one TRUE_FALSE, and one SHORT_ANSWER.
-                    - for SHORT_ANSWER, options must be [].
-                    - for TRUE_FALSE, options must be ["True","False"].
-                    """,
-                """
-                    - Output exactly one JSON object.
-                    - No markdown code fence.
-                    - No fields outside schema.
-                    """,
+                "{\"items\":[{\"question_type\":\"SINGLE_CHOICE\",\"stem\":\"\",\"options\":[],\"standard_answer\":\"\",\"explanation\":\"\",\"difficulty\":\"EASY\"},{\"question_type\":\"TRUE_FALSE\",\"stem\":\"\",\"options\":[\"True\",\"False\"],\"standard_answer\":\"False\",\"explanation\":\"\",\"difficulty\":\"MEDIUM\"},{\"question_type\":\"SHORT_ANSWER\",\"stem\":\"\",\"options\":[],\"standard_answer\":\"\",\"explanation\":\"\",\"difficulty\":\"HARD\"}]}",
+                "short_json_only",
                 null
             )
         ));
@@ -528,15 +404,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
     private void registerTutorPrompt() {
         definitions.put(PromptTemplateKey.TUTOR_V1, new PromptDefinition(
             PromptTemplateKey.TUTOR_V1,
-            new PromptSpec(
-                PromptTemplateKey.TUTOR_V1.promptKey(),
-                PromptTemplateKey.TUTOR_V1.promptVersion(),
-                TUTOR_SYSTEM_PROMPT_TEMPLATE,
-                "",
-                "{}",
-                "",
-                null
-            )
+            new PromptSpec("TUTOR", "v1", TUTOR_SYSTEM_PROMPT_TEMPLATE, "", "{}", "", null)
         ));
     }
 
@@ -544,34 +412,17 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         definitions.put(PromptTemplateKey.CONCEPT_DECOMPOSE_V1, new PromptDefinition(
             PromptTemplateKey.CONCEPT_DECOMPOSE_V1,
             new PromptSpec(
-                PromptTemplateKey.CONCEPT_DECOMPOSE_V1.promptKey(),
-                PromptTemplateKey.CONCEPT_DECOMPOSE_V1.promptVersion(),
+                "CONCEPT_DECOMPOSE",
+                "v2",
                 CONCEPT_DECOMPOSE_SYSTEM_PROMPT,
                 """
-                    请基于以下上下文拆解 concept nodes：
-                    chapter_id={{chapter_id}}
+                    chapter={{chapter_id}}
                     concept={{concept}}
                     goal={{goal}}
+                    输出 3-5 个最小节点。
                     """,
-                """
-                    {
-                      "concept_nodes": [
-                        {
-                          "id": "string(例如node1)",
-                          "title": "string(4-20字)",
-                          "description": "string(20-80字)",
-                          "prerequisites": ["string(节点id)"]
-                        }
-                      ]
-                    }
-                    约束：concept_nodes 数量 3-6。
-                    """,
-                """
-                    - 只输出一个 JSON 对象，字段必须严格等于 schema。
-                    - 禁止输出 schema 外字段、解释性前后缀、markdown。
-                    - 所有文本字段值必须为简体中文（id 与 prerequisites 除外）。
-                    - prerequisite 关系要合理且无自依赖。
-                    """,
+                "{\"concept_nodes\":[{\"id\":\"node1\",\"title\":\"\",\"description\":\"\",\"prerequisites\":[]}]}",
+                "short_json_only",
                 null
             )
         ));

@@ -3,6 +3,7 @@ package com.pandanav.learning.domain.model;
 public record LlmCallLog(
     Long taskAttemptId,
     String bizType,
+    String invocationProfile,
     String provider,
     String model,
     String promptTemplateKey,
@@ -12,8 +13,15 @@ public record LlmCallLog(
     String parsedJson,
     String status,
     Integer latencyMs,
-    Integer tokenInput,
-    Integer tokenOutput
+    Integer inputTokens,
+    Integer outputTokens,
+    Integer reasoningTokens,
+    String finishReason,
+    boolean timeoutFlag,
+    boolean fallbackUsed,
+    boolean parseSuccess,
+    boolean schemaValid,
+    boolean truncatedFlag
 ) {
 }
 
