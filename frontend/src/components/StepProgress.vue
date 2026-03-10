@@ -2,14 +2,17 @@
 import type { WorkflowStepNumber } from '@/types/workflow'
 
 type StepStatus = 'pending' | 'running' | 'done' | 'blocked'
+type LearningFlowState = 'completed' | 'current' | 'upcoming'
 
 interface WorkflowStepMeta {
   step: WorkflowStepNumber
   title: string
+  description?: string
   doneCount?: number
   totalCount?: number
   percent?: number
   status?: StepStatus
+  state?: LearningFlowState
 }
 
 interface StepProgressProps {
@@ -17,23 +20,31 @@ interface StepProgressProps {
   steps: WorkflowStepMeta[]
 }
 
-defineProps<StepProgressProps>()
+const props = defineProps<StepProgressProps>()
 
-function markerText(step: WorkflowStepMeta) {
-  return step.status === 'done' ? '✓' : String(step.step)
+function resolveState(step: WorkflowStepMeta): LearningFlowState {
+  if (step.state) {
+    return step.state
+  }
+  if (step.status === 'done') {
+    return 'completed'
+  }
+  if (step.step === props.currentStep || step.status === 'running' || step.status === 'blocked') {
+    return 'current'
+  }
+  return 'upcoming'
 }
 
-function hasProgress(step: WorkflowStepMeta) {
-  return (
-    typeof step.doneCount === 'number' &&
-    typeof step.totalCount === 'number' &&
-    typeof step.percent === 'number' &&
-    typeof step.status === 'string'
-  )
+function markerText(step: WorkflowStepMeta) {
+  return resolveState(step) === 'completed' ? '✓' : String(step.step)
 }
 
 function percent(step: WorkflowStepMeta) {
   return step.percent ?? 0
+}
+
+function showPercent(step: WorkflowStepMeta) {
+  return typeof step.percent === 'number'
 }
 </script>
 
@@ -43,116 +54,130 @@ function percent(step: WorkflowStepMeta) {
       v-for="item in steps"
       :key="item.step"
       class="step-item"
-      :class="{
-        'step-active': item.step === currentStep,
-        'step-done': item.status === 'done',
-        'step-blocked': item.status === 'blocked',
-        'step-pending': !item.status || item.status === 'pending'
-      }"
+      :class="`step-${resolveState(item)}`"
     >
+      <div class="step-rail" />
       <div class="step-indicator">
         {{ markerText(item) }}
       </div>
-      <span class="step-title">{{ item.title }}</span>
-      <div v-if="hasProgress(item)" class="step-line" :class="{ completed: item.status === 'done' }"></div>
-      <span v-if="hasProgress(item)" class="step-progress-text">{{ percent(item) }}%</span>
+      <div class="step-copy">
+        <span class="step-title">{{ item.title }}</span>
+        <span v-if="item.description" class="step-description">{{ item.description }}</span>
+        <span v-else-if="showPercent(item)" class="step-description">{{ percent(item) }}%</span>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .progress-container {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-lg);
-  background: linear-gradient(
-    145deg,
-    var(--color-bg-elevated),
-    var(--color-bg-surface)
-  );
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 1.8vw, 18px);
+  padding: clamp(16px, 2.6vw, 24px);
+  background: linear-gradient(145deg, rgba(21, 29, 43, 0.94), rgba(28, 38, 54, 0.9));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  overflow-x: auto;
+  box-shadow: var(--shadow-md);
 }
 
 .step-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-sm);
-  min-width: 80px;
-}
-
-.step-indicator {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--font-size-sm);
+  position: relative;
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  background: rgba(13, 17, 23, 0.55);
+  min-height: 132px;
   transition: all var(--duration-normal) var(--ease-smooth);
 }
 
-.step-pending {
-  background: var(--color-bg);
-  border: 2px solid var(--color-border);
-  color: var(--color-text-muted);
+.step-item:hover {
+  transform: translateY(-2px);
 }
 
-.step-active {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
-  border: 2px solid var(--color-primary);
-  color: #fff;
-  box-shadow: 0 4px 16px rgba(107, 159, 255, 0.4);
+.step-rail {
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: rgba(61, 80, 104, 0.5);
 }
 
-.step-done {
-  background: var(--color-success);
-  border: 2px solid var(--color-success);
-  color: #fff;
+.step-indicator {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
+  font-weight: 700;
 }
 
-.step-blocked {
-  background: var(--color-warning);
-  border: 2px solid var(--color-warning);
-  color: #fff;
+.step-copy {
+  display: grid;
+  gap: 6px;
 }
 
 .step-title {
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.step-description {
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
   color: var(--color-text-secondary);
-  text-align: center;
-  white-space: nowrap;
 }
 
-.step-line {
-  flex: 1;
-  height: 2px;
-  background: var(--color-border);
-  min-width: 20px;
+.step-completed {
+  border-color: rgba(93, 212, 166, 0.38);
+  background: linear-gradient(160deg, rgba(22, 50, 46, 0.8), rgba(15, 27, 27, 0.9));
 }
 
-.step-line.completed {
-  background: linear-gradient(90deg, var(--color-success), var(--color-primary));
+.step-completed .step-rail,
+.step-completed .step-indicator {
+  background: linear-gradient(135deg, rgba(93, 212, 166, 0.9), rgba(65, 182, 137, 1));
+  color: #08110e;
 }
 
-.step-progress-text {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
+.step-current {
+  border-color: rgba(107, 159, 255, 0.48);
+  background: linear-gradient(160deg, rgba(20, 34, 59, 0.92), rgba(12, 20, 35, 0.92));
+  box-shadow: 0 0 0 1px rgba(107, 159, 255, 0.2), 0 12px 32px rgba(16, 27, 49, 0.45);
+}
+
+.step-current .step-rail,
+.step-current .step-indicator {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: #ffffff;
+}
+
+.step-upcoming {
+  border-color: rgba(42, 58, 82, 0.9);
+}
+
+.step-upcoming .step-indicator {
+  border: 1px solid rgba(61, 80, 104, 0.9);
+  background: rgba(20, 28, 40, 0.9);
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 900px) {
   .progress-container {
-    flex-wrap: wrap;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .progress-container {
+    grid-template-columns: 1fr;
   }
 
   .step-item {
-    flex: 0 0 calc(50% - var(--space-sm));
+    min-height: auto;
   }
 }
 </style>

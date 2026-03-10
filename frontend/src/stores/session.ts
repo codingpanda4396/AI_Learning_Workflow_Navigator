@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type {
+  AsyncStatus,
   CreateSessionRequest,
   CurrentSessionResponse,
   LearningFeedbackResponse,
@@ -21,6 +22,7 @@ import {
 import { getLearningFeedback } from '@/api/learningFeedback'
 import { getTaskDetail, runTask, submitTask } from '@/api/task'
 import { normalizeApiError } from '@/utils/apiError'
+import { normalizeLearningStage } from '@/utils/learningPlanDisplay'
 
 const RETRY_DELAY_MS = 300
 
@@ -65,7 +67,35 @@ export const useSessionStore = defineStore('session', () => {
   const masterySummary = computed(() => currentSession.value?.masterySummary ?? [])
   const nextTask = computed(() => currentSession.value?.nextTask ?? null)
   const currentStage = computed(() => currentSession.value?.currentStage ?? null)
+  const normalizedCurrentStage = computed(() => normalizeLearningStage(currentSession.value?.currentStage))
   const error = computed(() => lastError.value?.message ?? null)
+  const overviewAsyncStatus = computed<AsyncStatus>(() => {
+    if (fetchingSession.value) {
+      return 'RUNNING'
+    }
+    if (currentSession.value) {
+      return 'SUCCEEDED'
+    }
+    return lastError.value ? 'FAILED' : 'IDLE'
+  })
+  const pathAsyncStatus = computed<AsyncStatus>(() => {
+    if (recoveringSession.value) {
+      return 'RUNNING'
+    }
+    if (currentSessionPath.value) {
+      return 'SUCCEEDED'
+    }
+    return lastError.value ? 'FAILED' : 'IDLE'
+  })
+  const feedbackAsyncStatus = computed<AsyncStatus>(() => {
+    if (fetchingLearningFeedback.value) {
+      return 'RUNNING'
+    }
+    if (learningFeedback.value) {
+      return 'SUCCEEDED'
+    }
+    return lastError.value ? 'FAILED' : 'IDLE'
+  })
 
   function clearError() {
     lastError.value = null
@@ -238,6 +268,10 @@ export const useSessionStore = defineStore('session', () => {
     masterySummary,
     nextTask,
     currentStage,
+    normalizedCurrentStage,
+    overviewAsyncStatus,
+    pathAsyncStatus,
+    feedbackAsyncStatus,
     createSession: createSessionAction,
     planSession: planSessionAction,
     fetchSessionOverview: fetchSessionOverviewAction,

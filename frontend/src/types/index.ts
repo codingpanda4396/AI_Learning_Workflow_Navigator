@@ -1,5 +1,22 @@
-export type Stage = 'STRUCTURE' | 'UNDERSTANDING' | 'TRAINING' | 'REFLECTION'
+export type PageLevelFlow = 'create-session' | 'learning-session' | 'feedback-review'
+export type LearningStage = 'STRUCTURE' | 'UNDERSTANDING' | 'TRAINING' | 'EVALUATION'
+export type LegacyLearningStage = 'REFLECTION'
+export type Stage = LearningStage | LegacyLearningStage | 'UNKNOWN'
 export type TaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+export type SessionStatus =
+  | 'CREATED'
+  | 'EVALUATED'
+  | 'PLANNED'
+  | 'LEARNING'
+  | 'QUIZ_READY'
+  | 'ANSWERED'
+  | 'FEEDBACK_READY'
+  | 'REVIEWING'
+  | 'NEXT_ROUND'
+  | 'FAILED'
+export type StepStatus = 'LOCKED' | 'AVAILABLE' | 'ACTIVE' | 'DONE' | 'ERROR'
+export type AsyncStatus = 'IDLE' | 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+export type DisplayStatus = SessionStatus | StepStatus | TaskStatus
 export type ErrorTag =
   | 'CONCEPT_CONFUSION'
   | 'MISSING_STEPS'
