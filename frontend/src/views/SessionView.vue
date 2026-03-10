@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import FloatingTutor from '@/components/tutor/FloatingTutor.vue'
+import TutorLauncher from '@/components/tutor/TutorLauncher.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useWorkflowStore } from '@/stores/workflow'
@@ -10,6 +12,8 @@ import ErrorMessage from '@/components/ErrorMessage.vue'
 import LearningStepBar from '@/components/LearningStepBar.vue'
 import CurrentActionCard from '@/components/CurrentActionCard.vue'
 import SessionSummaryHero from '@/components/SessionSummaryHero.vue'
+import { useTutorPanel } from '@/composables/useTutorPanel'
+import { buildTutorContext } from '@/utils/buildTutorContext'
 import {
   buildSessionStageViewModels,
   findNodeNameByTask,
@@ -245,6 +249,28 @@ const actionHelper = computed(() => {
       : ''
   return [currentStageDetail.value.nextResult, feedbackHint].filter(Boolean).join(' ')
 })
+const tutorTaskId = computed(() => currentDetailTask.value?.taskId ?? sessionStore.nextTask?.taskId ?? null)
+const tutorContext = computed(() =>
+  buildTutorContext({
+    sessionId: sessionId.value,
+    stage: currentDetailTask.value?.stage ?? sessionStore.currentSession?.currentStage,
+    stepLabel: currentStepDefinition.value.title,
+    taskId: tutorTaskId.value,
+    topic: currentTopic.value,
+    course: currentSession.value?.courseId,
+    chapter: currentSession.value?.chapterId,
+    goal: currentSession.value?.goalText,
+    taskTitle: currentStageDetail.value.todo,
+    taskGoal: currentStageDetail.value.objective,
+    taskSummary: actionDescription.value,
+    session: currentSession.value,
+  }),
+)
+const tutorPanel = useTutorPanel({
+  sessionId,
+  taskId: tutorTaskId,
+  context: tutorContext,
+})
 
 function resolveTaskPath(taskId: number) {
   return `/task/${taskId}/run`
@@ -358,6 +384,27 @@ onMounted(async () => {
       <p class="footer-note">当前进度：{{ progressSummary.label }}</p>
     </section>
   </main>
+
+  <TutorLauncher :open="tutorPanel.isOpen.value" subtle label="需要提示？" @toggle="tutorPanel.togglePanel" />
+  <FloatingTutor
+    :open="tutorPanel.isOpen.value"
+    :available="tutorPanel.canUseTutor.value"
+    :context-title="tutorContext.contextTitle"
+    :context-meta="`${currentSession?.courseId || '-'} / ${currentSession?.chapterId || '-'}`"
+    :messages="tutorPanel.messages.value"
+    :loading="tutorPanel.loading.value"
+    :load-error="tutorPanel.loadError.value"
+    :send-error="tutorPanel.sendError.value"
+    :sending="tutorPanel.sending.value"
+    :input="tutorPanel.input.value"
+    :quick-prompts="tutorPanel.quickPrompts"
+    @close="tutorPanel.closePanel"
+    @retry-load="tutorPanel.ensureMessagesLoaded(true)"
+    @retry-send="tutorPanel.retrySend"
+    @submit="tutorPanel.sendMessage"
+    @update-input="tutorPanel.setInput"
+    @use-quick-prompt="tutorPanel.useQuickPrompt"
+  />
 </template>
 
 <style scoped>

@@ -3,6 +3,7 @@ import type {
   TutorMessageListResponse,
   TutorSendMessageResponse,
 } from '@/types'
+import { stripTutorContext } from '@/utils/buildTutorContext'
 
 interface TutorMessageDto {
   id: number
@@ -32,7 +33,7 @@ export function mapTutorMessageDto(dto: TutorMessageDto): TutorMessage {
     sessionId: dto.session_id,
     taskId: dto.task_id,
     role: dto.role,
-    content: dto.content,
+    content: stripTutorContext(dto.content),
     createdAt: dto.created_at,
   }
 }

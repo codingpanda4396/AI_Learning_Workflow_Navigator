@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import FloatingTutor from '@/components/tutor/FloatingTutor.vue'
+import TutorLauncher from '@/components/tutor/TutorLauncher.vue'
 import ErrorMessage from '@/components/ErrorMessage.vue'
 import FeedbackPanel from '@/components/FeedbackPanel.vue'
 import PracticeQuestionCard from '@/components/PracticeQuestionCard.vue'
 import PrimaryButton from '@/components/PrimaryButton.vue'
-import TutorAssistPanel from '@/components/TutorAssistPanel.vue'
+import { useTutorPanel } from '@/composables/useTutorPanel'
 import {
   buildTrainingSteps,
   deriveTrainingStatuses,
@@ -13,13 +15,12 @@ import {
 } from '@/constants/trainingStage'
 import { usePracticeStore } from '@/stores/practice'
 import { useSessionStore } from '@/stores/session'
-import { useTutorStore } from '@/stores/tutor'
+import { buildTutorContext } from '@/utils/buildTutorContext'
 import { getLearningStageDisplay, normalizeLearningStage } from '@/utils/learningPlanDisplay'
 
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
-const tutorStore = useTutorStore()
 const practiceStore = usePracticeStore()
 
 const taskId = computed(() => Number(route.params.id))
@@ -28,7 +29,6 @@ const loadError = computed(() => sessionStore.error)
 const isLoading = computed(() => sessionStore.runningTask)
 const isTrainingTask = computed(() => task.value?.stage === 'TRAINING')
 const sections = computed(() => task.value?.output.sections ?? [])
-const tutorInput = ref('')
 const answerDrafts = ref<Record<number, string>>({})
 const submittingPracticeItemId = ref<number | null>(null)
 const quizPollTimer = ref<number | null>(null)
@@ -39,16 +39,6 @@ const practiceQuiz = computed(() => practiceStore.quiz)
 const practiceItems = computed(() => practiceStore.items)
 const practiceSubmissions = computed(() => practiceStore.submissions)
 const practiceFeedbackReport = computed(() => practiceStore.feedbackReport)
-const tutorMessages = computed(() => tutorStore.messages)
-const tutorLoading = computed(() => tutorStore.loadingMessages)
-const tutorSending = computed(() => tutorStore.sendingMessage)
-const tutorLoadError = computed(() => tutorStore.loadError)
-const tutorSendError = computed(() => tutorStore.sendError)
-const tutorChips = [
-  '这一步最关键的思路是什么？',
-  '可以换一种更好懂的讲法吗？',
-  '帮我先提示一下，不要直接给答案。',
-]
 
 const latestSubmissionByItem = computed(() => {
   const ordered = [...practiceSubmissions.value].sort(
@@ -84,6 +74,7 @@ const stageLabel = computed(() => getLearningStageDisplay(normalizeLearningStage
 const sessionCourse = computed(() => sessionStore.currentSession?.courseId || '当前课程')
 const sessionChapter = computed(() => sessionStore.currentSession?.chapterId || '当前章节')
 const taskGoal = computed(() => sessionStore.currentSession?.goalText || buildGoalSummary())
+const taskSummary = computed(() => buildGoalSummary())
 
 const practiceQueryError = computed(() => {
   if (practiceStore.lastError?.status === 404) {
@@ -192,6 +183,29 @@ function resolveSessionId() {
   }
   return sessionStore.currentTaskSessionId || sessionStore.sessionId || null
 }
+
+const tutorContext = computed(() =>
+  buildTutorContext({
+    sessionId: resolveSessionId(),
+    stage: task.value?.stage,
+    taskId: taskId.value,
+    topic: taskTitle.value,
+    course: sessionStore.currentSession?.courseId,
+    chapter: sessionStore.currentSession?.chapterId,
+    goal: sessionStore.currentSession?.goalText,
+    taskTitle: taskTitle.value,
+    taskGoal: taskGoal.value,
+    taskSummary: taskSummary.value,
+    session: sessionStore.currentSession,
+    task: task.value,
+  }),
+)
+
+const tutorPanel = useTutorPanel({
+  sessionId: computed(() => resolveSessionId()),
+  taskId,
+  context: tutorContext,
+})
 
 function getLatestSubmission(itemId: number) {
   return latestSubmissionByItem.value.get(itemId) ?? null
@@ -322,16 +336,12 @@ async function loadTrainingClosure(generate = false) {
 }
 
 async function loadTutorMessages() {
-  const sessionId = resolveSessionId()
-  if (!sessionId) {
-    return
-  }
-  await tutorStore.load(sessionId, taskId.value)
+  await tutorPanel.ensureMessagesLoaded(true)
 }
 
 async function handleRetry() {
   await loadTask()
-  await Promise.all([fetchSessionContext(), loadTrainingClosure(), loadTutorMessages()])
+  await Promise.all([fetchSessionContext(), loadTrainingClosure()])
 }
 
 async function handlePrimaryAction() {
@@ -389,38 +399,6 @@ async function handleFeedbackAction(action: 'REVIEW' | 'NEXT_ROUND') {
   }
 }
 
-async function handleSendTutorMessage() {
-  const content = tutorInput.value.trim()
-  const sessionId = resolveSessionId()
-  if (!content || !sessionId || tutorStore.sendingMessage) {
-    return
-  }
-
-  try {
-    try {
-      await tutorStore.sendStream(sessionId, taskId.value, content)
-    } catch {
-      await tutorStore.send(sessionId, taskId.value, content)
-    }
-    tutorInput.value = ''
-  } catch (error) {
-    console.error('发送 Tutor 消息失败:', error)
-  }
-}
-
-async function handleRetryTutorSend() {
-  try {
-    await tutorStore.retryLastSend()
-    tutorInput.value = ''
-  } catch (error) {
-    console.error('重试 Tutor 消息失败:', error)
-  }
-}
-
-function useTutorChip(value: string) {
-  tutorInput.value = value
-}
-
 function handleContinue() {
   const sessionId = resolveSessionId()
   if (!sessionId) {
@@ -437,10 +415,9 @@ function handleContinue() {
 
 onMounted(async () => {
   sessionStore.resetTaskState()
-  tutorStore.reset()
   practiceStore.reset()
   await loadTask()
-  await Promise.all([fetchSessionContext(), loadTrainingClosure(), loadTutorMessages()])
+  await Promise.all([fetchSessionContext(), loadTrainingClosure()])
 })
 
 onBeforeUnmount(() => {
@@ -451,10 +428,9 @@ watch(
   () => route.params.id,
   async () => {
     clearQuizPoll()
-    tutorStore.reset()
     practiceStore.reset()
     await loadTask()
-    await Promise.all([fetchSessionContext(), loadTrainingClosure(), loadTutorMessages()])
+    await Promise.all([fetchSessionContext(), loadTrainingClosure()])
   },
 )
 </script>
@@ -477,22 +453,6 @@ watch(
           <p class="meta">{{ sessionCourse }} / {{ sessionChapter }} · {{ stageLabel }}</p>
           <p class="goal">{{ taskGoal }}</p>
         </section>
-
-        <TutorAssistPanel
-          class="tutor-main"
-          :messages="tutorMessages"
-          :loading="tutorLoading"
-          :load-error="tutorLoadError"
-          :send-error="tutorSendError"
-          :sending="tutorSending"
-          :input="tutorInput"
-          :chips="tutorChips"
-          @retry-load="loadTutorMessages"
-          @retry-send="handleRetryTutorSend"
-          @submit="handleSendTutorMessage"
-          @update-input="tutorInput = $event"
-          @use-chip="useTutorChip"
-        />
 
         <section v-if="!isTrainingTask" class="content-card">
           <div class="section-head">
@@ -620,6 +580,27 @@ watch(
       </aside>
     </div>
   </main>
+
+  <TutorLauncher :open="tutorPanel.isOpen.value" @toggle="tutorPanel.togglePanel" />
+  <FloatingTutor
+    :open="tutorPanel.isOpen.value"
+    :available="tutorPanel.canUseTutor.value"
+    :context-title="tutorContext.contextTitle"
+    :context-meta="`${sessionCourse} / ${sessionChapter}`"
+    :messages="tutorPanel.messages.value"
+    :loading="tutorPanel.loading.value"
+    :load-error="tutorPanel.loadError.value"
+    :send-error="tutorPanel.sendError.value"
+    :sending="tutorPanel.sending.value"
+    :input="tutorPanel.input.value"
+    :quick-prompts="tutorPanel.quickPrompts"
+    @close="tutorPanel.closePanel"
+    @retry-load="loadTutorMessages"
+    @retry-send="tutorPanel.retrySend"
+    @submit="tutorPanel.sendMessage"
+    @update-input="tutorPanel.setInput"
+    @use-quick-prompt="tutorPanel.useQuickPrompt"
+  />
 </template>
 
 <style scoped>
@@ -715,10 +696,6 @@ watch(
 .goal-item li {
   color: var(--color-text-secondary);
   line-height: 1.7;
-}
-
-.tutor-main {
-  min-height: 420px;
 }
 
 .section-head {
