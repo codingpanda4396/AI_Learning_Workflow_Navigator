@@ -49,10 +49,10 @@ type StepSource = Pick<TimelineItem, 'stage' | 'status'> & {
 const UNKNOWN_STEP: LearningStepDefinition = {
   key: 'UNKNOWN',
   order: 1,
-  title: '阶段待识别',
-  objective: '等待后端返回明确阶段后继续。',
-  description: '当前记录里没有可识别的学习阶段，页面不会再把它默认当成结构阶段。',
-  shortDescription: '等待明确阶段',
+  title: '准备中',
+  objective: '系统正在整理当前学习阶段。',
+  description: '当前还没有足够信息判断所处阶段，页面会在数据返回后自动更新。',
+  shortDescription: '等待阶段信息',
   actionText: '查看详情',
 }
 
@@ -70,11 +70,11 @@ function normalizeCode(value?: string | null) {
 }
 
 function getDefaultCompletionStandard(step: LearningStepDefinition) {
-  if (step.key === 'STRUCTURE') return '完成本阶段相关任务，并建立当前主题的整体框架。'
-  if (step.key === 'UNDERSTANDING') return '完成原理理解任务，能够解释关键机制与因果关系。'
-  if (step.key === 'TRAINING') return '完成训练任务并提交结果，拿到可用于判断掌握度的反馈。'
-  if (step.key === 'EVALUATION') return '查看反馈、识别薄弱点，并明确下一步改进方向。'
-  return '等待明确阶段后继续。'
+  if (step.key === 'STRUCTURE') return '能说清这一轮要学的内容、顺序和知识关系。'
+  if (step.key === 'UNDERSTANDING') return '能用自己的话解释关键概念和原理。'
+  if (step.key === 'TRAINING') return '完成练习并拿到可用反馈。'
+  if (step.key === 'EVALUATION') return '看懂结果，知道自己下一步该补什么。'
+  return '等待系统同步当前阶段。'
 }
 
 function getStepStatusLabel(status: StepStatus) {
@@ -82,22 +82,22 @@ function getStepStatusLabel(status: StepStatus) {
 }
 
 function getLockedReason(step: LearningStepDefinition) {
-  return `等待上一阶段完成后，再进入「${step.title}」。`
+  return `先完成前一步，才能进入“${step.title}”。`
 }
 
 function getStageActionText(stepStatus: StepStatus) {
-  if (stepStatus === 'AVAILABLE') return '开始本阶段'
-  if (stepStatus === 'ACTIVE') return '继续本阶段'
-  if (stepStatus === 'DONE') return '查看阶段结果'
-  if (stepStatus === 'ERROR') return '重试本阶段'
-  return '等待上一阶段完成'
+  if (stepStatus === 'AVAILABLE') return '开始'
+  if (stepStatus === 'ACTIVE') return '继续'
+  if (stepStatus === 'DONE') return '查看结果'
+  if (stepStatus === 'ERROR') return '重试'
+  return '等待解锁'
 }
 
 function getStageActionHint(step: LearningStepDefinition, stepStatus: StepStatus) {
-  if (stepStatus === 'AVAILABLE') return `现在可以开始「${step.title}」。`
-  if (stepStatus === 'ACTIVE') return `当前重点是继续推进「${step.title}」。`
-  if (stepStatus === 'DONE') return `本阶段已完成，可以查看结果或进入下一阶段。`
-  if (stepStatus === 'ERROR') return `本阶段存在异常，建议先重试当前任务。`
+  if (stepStatus === 'AVAILABLE') return `现在可以开始“${step.title}”。`
+  if (stepStatus === 'ACTIVE') return `现在先把“${step.title}”完成。`
+  if (stepStatus === 'DONE') return `“${step.title}”已经完成，可以继续往下。`
+  if (stepStatus === 'ERROR') return `“${step.title}”出现异常，建议重新进入。`
   return getLockedReason(step)
 }
 
@@ -126,9 +126,9 @@ export function getLearningStageDisplay(stepKey?: string | null) {
 
 function createTopicAwareDescription(step: LearningStepDefinition, source: StepSource, topic: string) {
   if (source.objective?.trim()) {
-    return `${step.title}：${topic}。${source.objective.trim()}`
+    return `${step.title}：围绕“${topic}”，${source.objective.trim()}`
   }
-  return `${step.title}：围绕 ${topic}，${step.description}`
+  return `${step.title}：围绕“${topic}”，${step.description}`
 }
 
 export function getStatusDisplay(status?: string | null): StatusDisplay {
@@ -151,7 +151,7 @@ export function mapTaskToDisplayMeta(source: StepSource, topic: string): Display
   return {
     phaseKey: step.key,
     phaseLabel: step.title,
-    displayTitle: source.nodeName ? `${step.title}：${source.nodeName}` : step.title,
+    displayTitle: source.nodeName ? `${step.title} · ${source.nodeName}` : step.title,
     displayDescription: createTopicAwareDescription(step, source, topic),
     actionText: getPrimaryActionText(source.stage, source.status),
     statusLabel: statusDisplay.label,
@@ -247,7 +247,10 @@ export function buildSessionStageViewModels(
     const stepStatus = resolveStepStatus(step, currentKey, stageItems)
     const state: LearningStepState =
       stepStatus === 'DONE' ? 'completed' : stepStatus === 'ACTIVE' || stepStatus === 'AVAILABLE' ? 'current' : 'upcoming'
-    const currentTask = stageItems.find((item) => item.status === 'RUNNING') ?? stageItems.find((item) => item.status !== 'SUCCEEDED') ?? null
+    const currentTask =
+      stageItems.find((item) => item.status === 'RUNNING') ??
+      stageItems.find((item) => item.status !== 'SUCCEEDED') ??
+      null
     const isBusy = asyncStatus === 'RUNNING' && (stepStatus === 'ACTIVE' || stepStatus === 'AVAILABLE')
     const busyLabel = isBusy ? '处理中' : null
     const actionText = getStageActionText(stepStatus)
@@ -256,10 +259,10 @@ export function buildSessionStageViewModels(
       stepStatus === 'LOCKED'
         ? getLockedReason(step)
         : currentTask
-          ? `当前任务 #${currentTask.taskId} 会推动这一阶段继续前进。`
+          ? `当前任务 #${currentTask.taskId} 正在推动这一阶段继续完成。`
           : stepStatus === 'DONE'
-            ? `本阶段任务已完成，系统会继续推进后续阶段。`
-            : `这是当前推荐推进的阶段。`
+            ? `这一阶段已经完成，可以继续下一步。`
+            : `现在优先完成“${step.title}”。`
 
     return {
       key: step.key,
@@ -298,14 +301,14 @@ export function findNodeNameByTask(taskId: number, plannedNodes: PlannedNode[], 
 export function getPrimaryActionText(stage?: string | null, status?: string | null) {
   const normalizedStatus = normalizeCode(status)
   if (normalizedStatus === 'RUNNING') {
-    return '继续本阶段'
+    return '继续'
   }
   if (normalizedStatus === 'SUCCEEDED') {
-    return '查看阶段结果'
+    return '查看结果'
   }
 
   const step = getLearningStepDefinition(stage)
-  return step.key === 'UNKNOWN' ? '查看详情' : `开始${step.title}`
+  return step.key === 'UNKNOWN' ? '查看详情' : step.actionText
 }
 
 export function getTaskExecutionStatus(status?: string | null): TaskStatus | 'UNKNOWN' {

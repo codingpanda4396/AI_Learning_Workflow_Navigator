@@ -15,13 +15,13 @@ function onInput(event: Event) {
 </script>
 
 <template>
-  <section class="goal-card animate-fade-in-up">
+  <section class="goal-card">
     <label for="goal-input" class="goal-label">学习目标</label>
     <textarea
       id="goal-input"
       class="goal-textarea"
       :value="props.modelValue"
-      placeholder="例如：在一周内掌握 TCP 可靠传输机制，并能完成 3 道相关训练题。"
+      placeholder="例如：这周学会 TCP 可靠传输，并能独立完成几道相关练习。"
       rows="4"
       @input="onInput"
     />
@@ -32,26 +32,12 @@ function onInput(event: Event) {
 
 <style scoped>
 .goal-card {
-  background: linear-gradient(
-    145deg,
-    var(--color-bg-elevated),
-    var(--color-bg-surface)
-  );
+  background: rgba(10, 16, 26, 0.82);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  transition: all var(--duration-normal) var(--ease-smooth);
-}
-
-.goal-card:hover {
-  border-color: var(--color-border-hover);
-  transform: translateY(-2px);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 14px;
 }
 
 .goal-label {
@@ -60,7 +46,6 @@ function onInput(event: Event) {
   font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--color-text);
-  margin-bottom: var(--space-md);
 }
 
 .goal-textarea {
@@ -70,11 +55,10 @@ function onInput(event: Event) {
   font-family: var(--font-body);
   font-size: var(--font-size-md);
   color: var(--color-text);
-  background: var(--color-bg);
-  border: 1.5px solid var(--color-border);
+  background: rgba(6, 10, 18, 0.92);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   resize: vertical;
-  transition: all var(--duration-normal) var(--ease-smooth);
 }
 
 .goal-textarea:focus {
@@ -88,13 +72,13 @@ function onInput(event: Event) {
 }
 
 .goal-hint {
-  margin-top: var(--space-sm);
+  margin: 0;
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
 
 .goal-error {
-  margin-top: var(--space-sm);
+  margin: 0;
   font-size: var(--font-size-sm);
   color: var(--color-error);
 }

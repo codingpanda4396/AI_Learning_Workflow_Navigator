@@ -70,7 +70,7 @@ const itemStatusLabelMap: Record<string, string> = {
   GENERATED: '未作答',
   ACTIVE: '未作答',
   ANSWERED: '已作答',
-  ARCHIVED: '已批改',
+  ARCHIVED: '已归档',
 }
 
 export function deriveTrainingStatuses(input: TrainingStateInput) {
@@ -148,7 +148,7 @@ export function buildTrainingSteps(view: TrainingStageView): TrainingStepItem[] 
     error: 2,
   }
   const currentIndex = currentIndexMap[view]
-  const titles = ['学习计划', '分步学习', '测验生成', '提交作答', '反馈建议']
+  const titles = ['学习计划', '学明白', '做练习', '提交答案', '看结果']
   return titles.map((title, index) => {
     const stepIndex = index + 1
     return {
@@ -163,50 +163,50 @@ export function getTrainingActionContent(view: TrainingStageView): TrainingActio
   switch (view) {
     case 'quiz_generating':
       return {
-        title: '正在生成测验',
-        description: '系统正在准备训练题目，你可以先继续向学习助手提问。',
+        title: '练习题正在生成',
+        description: '系统正在准备本章练习题，你可以先继续向 Tutor 提问。',
         buttonText: '生成中...',
         loading: true,
         disabled: true,
       }
     case 'quiz_ready':
       return {
-        title: '本章测验已就绪',
-        description: '训练题已准备完成，现在可以开始作答。',
-        buttonText: '开始答题',
+        title: '可以开始做练习了',
+        description: '练习已经准备好，现在可以开始作答。',
+        buttonText: '开始做题',
         loading: false,
         disabled: false,
       }
     case 'feedback_generating':
       return {
-        title: '已提交作答',
-        description: '系统正在分析你的表现并生成反馈建议。',
-        buttonText: '查看分析中...',
+        title: '正在整理结果',
+        description: '你的答案已提交，系统正在分析表现并生成建议。',
+        buttonText: '整理中...',
         loading: true,
         disabled: true,
       }
     case 'feedback_ready':
       return {
-        title: '训练反馈已生成',
-        description: '查看你的薄弱点、系统调整和下一步建议。',
-        buttonText: '查看反馈',
+        title: '结果已经准备好',
+        description: '现在可以查看你的薄弱点和下一步建议。',
+        buttonText: '查看结果',
         loading: false,
         disabled: false,
       }
     case 'error':
       return {
         title: '训练流程暂时不可用',
-        description: '请重新加载当前页面，系统会继续保留你已完成的进度。',
-        buttonText: '重试生成',
+        description: '重试后会继续保留你当前的学习进度。',
+        buttonText: '重新加载',
         loading: false,
         disabled: false,
       }
     case 'quiz_not_generated':
     default:
       return {
-        title: '本章测验',
-        description: '用 3 道题检测你对当前知识点的掌握情况。系统会在后台生成，不影响你继续学习。',
-        buttonText: '生成本章测验',
+        title: '开始本章练习',
+        description: '系统会生成少量练习题，帮助你快速确认是否学会了。',
+        buttonText: '生成练习题',
         loading: false,
         disabled: false,
       }
@@ -252,12 +252,12 @@ export function getSystemAdjustments(report: PracticeFeedbackReport | null) {
   }
   const items: string[] = []
   if (report.reviewFocus.length > 0) {
-    items.push(`已整理 ${report.reviewFocus.length} 个优先复习点`)
+    items.push(`系统已标记 ${report.reviewFocus.length} 个优先复习点`)
   }
   if (report.recommendedAction === 'REVIEW') {
-    items.push('系统建议先进入复习，巩固本轮训练中的薄弱点')
+    items.push('建议先回到薄弱点复习，再进入下一轮。')
   } else {
-    items.push('系统建议开启下一轮学习，继续推进当前章节')
+    items.push('可以继续进入下一轮学习。')
   }
   return items
 }

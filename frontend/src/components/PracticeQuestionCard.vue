@@ -70,7 +70,7 @@ const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitt
       rows="4"
       :value="draft"
       :disabled="submitting"
-      placeholder="请输入你的答案"
+      placeholder="写下你的答案或思路。"
       @input="emit('updateDraft', ($event.target as HTMLTextAreaElement).value)"
     ></textarea>
 
@@ -80,7 +80,7 @@ const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitt
 
     <div v-if="submission" class="result-card">
       <p class="result-title">
-        {{ submission.score === null ? '已提交，等待批改' : submission.isCorrect ? '本题回答正确' : '本题还可以再加强' }}
+        {{ submission.score === null ? '已提交，等待批改' : submission.isCorrect ? '这题回答正确' : '这题还可以再加强' }}
       </p>
       <p v-if="submission.feedback" class="result-copy">{{ submission.feedback }}</p>
       <div v-if="submission.errorTags.length" class="tag-row">
@@ -146,6 +146,7 @@ const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitt
 
 .question-stem,
 .result-copy {
+  margin: 0;
   line-height: 1.75;
   color: var(--color-text);
 }
@@ -176,6 +177,7 @@ const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitt
 }
 
 .result-title {
+  margin: 0;
   color: var(--color-success);
   font-weight: 600;
 }

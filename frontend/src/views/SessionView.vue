@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useWorkflowStore } from '@/stores/workflow'
 import type { PageLevelFlow, PlannedNode } from '@/types'
-import PageHeader from '@/components/PageHeader.vue'
-import StepProgress from '@/components/StepProgress.vue'
-import PrimaryButton from '@/components/PrimaryButton.vue'
 import SessionSkeleton from '@/components/SessionSkeleton.vue'
 import ErrorMessage from '@/components/ErrorMessage.vue'
+import LearningStepBar from '@/components/LearningStepBar.vue'
+import CurrentActionCard from '@/components/CurrentActionCard.vue'
+import SessionSummaryHero from '@/components/SessionSummaryHero.vue'
 import {
   buildSessionStageViewModels,
   findNodeNameByTask,
@@ -29,7 +29,6 @@ const sessionStore = useSessionStore()
 const workflowStore = useWorkflowStore()
 
 const sessionId = computed(() => Number(route.params.id))
-const detailExpanded = ref(false)
 
 function dedupeByTaskIdentity<T extends { taskId: number; nodeId?: number; stage?: string }>(items: T[]) {
   const seen = new Set<string>()
@@ -153,43 +152,37 @@ const currentStageDetail = computed(() => {
   const base = currentStageCard.value ?? stageCards.value[0]
   if (!base) {
     return {
-      title: '阶段待识别',
+      title: '准备中',
       topic: currentTopic.value,
-      objective: '等待阶段数据返回。',
-      completionStandard: '等待阶段数据返回后继续。',
+      objective: '等待阶段数据返回后继续。',
       statusLabel: getStatusLabel('PENDING'),
       actionText: '查看详情',
-      actionHint: '当前还没有足够的阶段数据。',
-      reason: '页面正在等待可用的阶段信息。',
+      reason: '系统正在同步当前学习阶段。',
       isActionable: false,
       isBusy: false,
       busyLabel: null as string | null,
-      todo: '等待阶段数据',
-      nextResult: '有了阶段信息后，系统会给出下一步建议。',
-      detailDescription: '当前记录不足以判断真实阶段。',
+      todo: '等待系统准备完成',
+      nextResult: '准备好后会自动给出下一步。',
     }
   }
 
   const taskMeta = currentDetailTask.value ? mapTaskToDisplayMeta(currentDetailTask.value, currentTopic.value) : null
   const currentTodo =
     taskMeta?.displayTitle ||
-    (base.stepStatus === 'LOCKED' ? '等待上一阶段完成' : `${base.actionText}：${base.title}`)
+    (base.stepStatus === 'LOCKED' ? '等待上一阶段完成' : `${base.title}：先做这一阶段的主任务`)
 
   return {
     title: base.title,
     topic: currentTopic.value,
     objective: base.objective,
-    completionStandard: base.completionStandard,
     statusLabel: currentDetailTask.value ? getStatusLabel(currentDetailTask.value.status) : base.statusLabel,
     actionText: base.actionText,
-    actionHint: base.actionHint,
     reason: base.reason,
     isActionable: base.isActionable && !base.isBusy,
     isBusy: base.isBusy,
     busyLabel: base.busyLabel,
     todo: currentTodo,
-    nextResult: base.stepStatus === 'LOCKED' ? '上一阶段完成后，这里会自动解锁。' : '完成后会进入下一阶段或刷新下一步建议。',
-    detailDescription: taskMeta?.displayDescription ?? `${base.title}：围绕 ${currentTopic.value}，${base.description}`,
+    nextResult: base.stepStatus === 'LOCKED' ? '上一阶段完成后，这里会自动解锁。' : '完成后会自动推进到下一步。',
   }
 })
 
@@ -203,72 +196,55 @@ const progressSummary = computed(() => {
     total,
     completed,
     percent,
-    label: total > 0 ? `${completed}/${total} · ${percent}%` : '暂无任务进度',
+    label: total > 0 ? `${completed}/${total} · ${percent}%` : '还没有任务进度',
   }
 })
 
-const topSummaryItems = computed(() => [
+const estimatedDuration = computed(() => {
+  const total = currentSession.value?.progress?.totalTaskCount ?? Math.max(timelineItems.value.length, 1)
+  const minutes = Math.max(20, total * 8)
+  return `约 ${minutes} 分钟`
+})
+
+const heroMetaItems = computed(() => [
   {
-    label: '学习主题',
+    label: '主题',
     value: currentTopic.value,
-    helper: `${currentSession.value?.courseId || '-'} / ${currentSession.value?.chapterId || '-'}`,
   },
   {
-    label: '当前阶段',
+    label: '课程 / 章节',
+    value: `${currentSession.value?.courseId || '-'} / ${currentSession.value?.chapterId || '-'}`,
+  },
+  {
+    label: '当前步骤',
     value: currentStageDetail.value.title,
-    helper: currentStageDetail.value.statusLabel,
   },
   {
-    label: '当前进度',
-    value: progressSummary.value.label,
-    helper: currentSession.value?.goalText || '围绕当前主题持续推进学习任务',
-  },
-  {
-    label: '当前待办',
-    value: currentStageDetail.value.todo,
-    helper: currentStageDetail.value.reason,
+    label: '预计时长',
+    value: estimatedDuration.value,
   },
 ])
 
-const flowSteps = computed(() =>
+const stepItems = computed(() =>
   stageCards.value.map((step) => ({
-    step: step.order,
+    key: step.key,
+    order: step.order,
     title: step.title,
     description: step.objective,
     statusLabel: step.statusLabel,
-    actionHint: step.actionHint,
     state: step.state,
   })),
 )
 
-const detailTaskList = computed(() => {
-  const source =
-    plannedStageTasks.value.length > 0
-      ? plannedStageTasks.value
-      : timelineItems.value.map((item) => ({
-          ...item,
-          objective: '',
-          nodeName: findNodeNameByTask(item.taskId, plannedNodes.value, item.nodeId),
-          nodeStatus: item.status,
-        }))
+const actionDescription = computed(() => `${currentStageDetail.value.objective} 当前先做：${currentStageDetail.value.todo}`)
 
-  return source.map((task) => {
-    const meta = mapTaskToDisplayMeta(task, task.nodeName || currentTopic.value)
-    const taskStage = stageCards.value.find((step) => step.key === normalizeLearningStage(task.stage))
-    return {
-      taskId: task.taskId,
-      stage: task.stage,
-      nodeName: task.nodeName || currentTopic.value,
-      displayTitle: meta.displayTitle,
-      displayDescription: meta.displayDescription,
-      actionText: taskStage?.stepStatus === 'DONE' ? '查看阶段结果' : taskStage?.actionText ?? meta.actionText,
-      statusLabel: meta.statusLabel,
-      disabled: !!taskStage?.isBusy || taskStage?.stepStatus === 'LOCKED',
-    }
-  })
+const actionHelper = computed(() => {
+  const feedbackHint =
+    learningFeedback.value?.weakNodes.length
+      ? `需要重点关注：${learningFeedback.value.weakNodes.slice(0, 2).map((item) => item.nodeName).join('、')}`
+      : ''
+  return [currentStageDetail.value.nextResult, feedbackHint].filter(Boolean).join(' ')
 })
-
-const weakPointPreview = computed(() => learningFeedback.value?.weakNodes.slice(0, 3) ?? [])
 
 function resolveTaskPath(taskId: number) {
   return `/task/${taskId}/run`
@@ -284,19 +260,13 @@ function openTask(taskId: number) {
   })
 }
 
-function toggleDetails() {
-  detailExpanded.value = !detailExpanded.value
-}
-
 function handlePrimaryAction() {
   if (!currentStageDetail.value.isActionable) {
     return
   }
   if (currentDetailTask.value) {
     openTask(currentDetailTask.value.taskId)
-    return
   }
-  detailExpanded.value = true
 }
 
 async function fetchSession() {
@@ -314,7 +284,7 @@ async function fetchSession() {
     try {
       await sessionStore.fetchLearningFeedback(sessionId.value)
     } catch {
-      // feedback is optional for the session overview
+      // optional
     }
   }
 }
@@ -358,132 +328,34 @@ onMounted(async () => {
     <ErrorMessage v-else-if="error && !currentSession" :message="error" @retry="handleRetry" />
 
     <section v-else class="learning-content">
-      <section class="overview-card">
-        <PageHeader
-          :eyebrow="pageFlow === 'feedback-review' ? 'Feedback Review' : 'Learning Session'"
-          title="会话中枢"
-          :subtitle="`你现在处于「${currentStageDetail.title}」，当前建议动作是「${currentStageDetail.actionText}」。`"
-        />
+      <SessionSummaryHero
+        :eyebrow="pageFlow === 'feedback-review' ? 'Review' : 'This Round'"
+        title="本轮学习"
+        subtitle="先看清目标，再跟着下一步继续。"
+        :goal="currentSession?.goalText || '围绕当前主题完成这一轮学习。'"
+        :meta-items="heroMetaItems"
+      />
 
-        <div class="overview-grid">
-          <article v-for="item in topSummaryItems" :key="item.label" class="overview-item">
-            <span class="overview-label">{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-            <p>{{ item.helper }}</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="flow-card">
+      <section class="surface-card">
         <div class="section-head">
-          <h2>当前学习阶段</h2>
-          <span class="section-tip">每个阶段都明确展示状态、目标和动作提示。</span>
+          <h2>学习步骤</h2>
+          <p>一轮学习只分四步，当前该做什么会自动高亮。</p>
         </div>
-        <StepProgress :steps="flowSteps" :current-step="currentStepDefinition.order" />
+        <LearningStepBar :steps="stepItems" />
       </section>
 
-      <section class="current-card">
-        <div class="current-card-main">
-          <div class="current-head">
-            <div>
-              <p class="current-label">当前阶段详情</p>
-              <h2>{{ currentStageDetail.title }}</h2>
-            </div>
-            <span class="status-badge" :class="{ busy: currentStageDetail.isBusy }">
-              {{ currentStageDetail.busyLabel || currentStageDetail.statusLabel }}
-            </span>
-          </div>
+      <CurrentActionCard
+        eyebrow="当前行动"
+        :title="currentStageDetail.title"
+        :description="actionDescription"
+        :helper="actionHelper"
+        :button-text="currentStageDetail.isBusy ? '处理中...' : currentStageDetail.actionText"
+        :status-label="currentStageDetail.busyLabel || currentStageDetail.statusLabel"
+        :disabled="!currentStageDetail.isActionable"
+        @action="handlePrimaryAction"
+      />
 
-          <div class="current-topic">
-            <span class="overview-label">当前主题</span>
-            <h3>{{ currentStageDetail.topic }}</h3>
-          </div>
-
-          <div class="current-goal-block">
-            <article class="goal-card">
-              <span class="overview-label">阶段目标</span>
-              <p>{{ currentStageDetail.objective }}</p>
-            </article>
-            <article class="goal-card">
-              <span class="overview-label">完成标准</span>
-              <p>{{ currentStageDetail.completionStandard }}</p>
-            </article>
-            <article class="goal-card">
-              <span class="overview-label">当前状态</span>
-              <p>{{ currentStageDetail.statusLabel }}，{{ currentStageDetail.reason }}</p>
-            </article>
-            <article class="goal-card">
-              <span class="overview-label">为什么下一步是这个</span>
-              <p>{{ currentStageDetail.detailDescription }}</p>
-            </article>
-          </div>
-
-          <div class="current-actions">
-            <PrimaryButton type="button" :disabled="!currentStageDetail.isActionable" @click="handlePrimaryAction">
-              {{ currentStageDetail.actionText }}
-            </PrimaryButton>
-            <button type="button" class="ghost-button wide" @click="toggleDetails">
-              {{ detailExpanded ? '收起详细任务' : '查看详细任务' }}
-            </button>
-          </div>
-        </div>
-
-        <aside class="current-side">
-          <article class="side-card combat-panel">
-            <span class="overview-label">阶段作战面板</span>
-            <div class="combat-line">
-              <strong>本阶段目标</strong>
-              <p>{{ currentStageDetail.objective }}</p>
-            </div>
-            <div class="combat-line">
-              <strong>你要完成什么</strong>
-              <p>{{ currentStageDetail.todo }}</p>
-            </div>
-            <div class="combat-line">
-              <strong>完成后会发生什么</strong>
-              <p>{{ currentStageDetail.nextResult }}</p>
-            </div>
-            <PrimaryButton type="button" :disabled="!currentStageDetail.isActionable" @click="handlePrimaryAction">
-              {{ currentStageDetail.actionText }}
-            </PrimaryButton>
-          </article>
-
-          <article class="side-card" v-if="learningFeedback">
-            <span class="overview-label">阶段反馈</span>
-            <p>{{ learningFeedback.diagnosisSummary }}</p>
-          </article>
-
-          <article class="side-card" v-if="weakPointPreview.length > 0">
-            <span class="overview-label">建议继续巩固</span>
-            <ul class="side-list">
-              <li v-for="node in weakPointPreview" :key="node.nodeId">{{ node.nodeName }}</li>
-            </ul>
-          </article>
-        </aside>
-      </section>
-
-      <section class="detail-card">
-        <button type="button" class="detail-toggle" @click="toggleDetails">
-          <span>查看详细任务</span>
-          <span>{{ detailExpanded ? '收起' : '展开全部任务' }}</span>
-        </button>
-
-        <div v-if="detailExpanded" class="detail-list">
-          <article v-for="task in detailTaskList" :key="task.taskId" class="detail-item">
-            <div class="detail-copy">
-              <div class="detail-head">
-                <h3>{{ task.displayTitle }}</h3>
-                <span class="status-chip">{{ task.statusLabel }}</span>
-              </div>
-              <p class="detail-node">{{ task.nodeName }}</p>
-              <p class="detail-description">{{ task.displayDescription }}</p>
-            </div>
-            <PrimaryButton type="button" :disabled="task.disabled" @click="openTask(task.taskId)">
-              {{ task.actionText }}
-            </PrimaryButton>
-          </article>
-        </div>
-      </section>
+      <p class="footer-note">当前进度：{{ progressSummary.label }}</p>
     </section>
   </main>
 </template>
@@ -498,8 +370,8 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: var(--space-md);
-  margin-bottom: var(--space-xl);
+  gap: 12px;
+  margin-bottom: 24px;
   flex-wrap: wrap;
 }
 
@@ -509,276 +381,52 @@ onMounted(async () => {
 }
 
 .learning-content {
-  width: min(1120px, 100%);
+  width: min(960px, 100%);
   margin: 0 auto;
   display: grid;
-  gap: clamp(18px, 2.4vw, 28px);
+  gap: 18px;
 }
 
-.overview-card,
-.flow-card,
-.current-card,
-.detail-card {
-  border: 1px solid var(--color-border);
+.surface-card {
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid rgba(61, 80, 104, 0.48);
   border-radius: var(--radius-xl);
-  background: linear-gradient(160deg, rgba(21, 29, 43, 0.96), rgba(15, 21, 33, 0.9));
-  box-shadow: var(--shadow-md);
-}
-
-.overview-card,
-.flow-card,
-.detail-card {
-  padding: clamp(18px, 2.6vw, 28px);
-}
-
-.overview-card {
+  background: rgba(15, 21, 33, 0.94);
   display: grid;
-  gap: var(--space-xl);
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-md);
-}
-
-.overview-item {
-  padding: var(--space-lg);
-  border: 1px solid rgba(61, 80, 104, 0.55);
-  border-radius: var(--radius-lg);
-  background: rgba(13, 17, 23, 0.56);
-  display: grid;
-  gap: 10px;
-}
-
-.overview-item strong {
-  font-size: var(--font-size-md);
-  line-height: 1.5;
-}
-
-.overview-item p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-}
-
-.overview-label {
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  gap: 18px;
 }
 
 .section-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: var(--space-md);
-  margin-bottom: var(--space-lg);
-}
-
-.section-tip {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-.current-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.9fr);
-  overflow: hidden;
-}
-
-.current-card-main {
-  padding: clamp(20px, 3vw, 32px);
-  display: grid;
-  gap: var(--space-xl);
-  border-right: 1px solid rgba(61, 80, 104, 0.4);
-}
-
-.current-side {
-  padding: clamp(18px, 2.6vw, 28px);
-  display: grid;
-  gap: var(--space-md);
-  background: rgba(10, 15, 24, 0.55);
-}
-
-.current-head,
-.detail-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-md);
-}
-
-.current-label {
-  margin-bottom: 6px;
-  color: var(--color-accent-coral);
-  font-size: var(--font-size-sm);
-}
-
-.status-badge,
-.status-chip {
-  padding: 8px 14px;
-  border-radius: var(--radius-full);
-  border: 1px solid rgba(107, 159, 255, 0.28);
-  background: rgba(107, 159, 255, 0.14);
-  color: var(--color-text);
-  font-size: var(--font-size-xs);
-  white-space: nowrap;
-}
-
-.status-badge.busy {
-  border-color: rgba(255, 184, 77, 0.35);
-  background: rgba(255, 184, 77, 0.14);
-}
-
-.current-topic {
-  display: grid;
-  gap: 8px;
-}
-
-.current-topic h3 {
-  font-size: clamp(1.8rem, 3vw, 2.4rem);
-}
-
-.current-goal-block {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-md);
-}
-
-.goal-card,
-.side-card {
-  border: 1px solid rgba(61, 80, 104, 0.48);
-  border-radius: var(--radius-lg);
-  background: rgba(13, 17, 23, 0.58);
-  padding: var(--space-lg);
-  display: grid;
-  gap: 10px;
-}
-
-.goal-card p,
-.side-card p,
-.detail-description,
-.detail-node {
-  margin: 0;
-  line-height: 1.65;
-  color: var(--color-text-secondary);
-}
-
-.current-actions {
-  display: flex;
-  gap: var(--space-md);
+  align-items: baseline;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
-.wide {
-  min-width: 170px;
-}
-
-.combat-panel {
-  gap: var(--space-lg);
-}
-
-.combat-line {
-  display: grid;
-  gap: 6px;
-}
-
-.combat-line strong {
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-}
-
-.side-list {
+.section-head h2,
+.section-head p,
+.footer-note {
   margin: 0;
-  padding-left: 18px;
+}
+
+.section-head p,
+.footer-note {
   color: var(--color-text-secondary);
-}
-
-.detail-toggle {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-md);
-  padding: 0;
-  color: var(--color-text);
-  font-size: var(--font-size-md);
-}
-
-.detail-list {
-  margin-top: var(--space-xl);
-  display: grid;
-  gap: var(--space-md);
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-lg);
-  padding: var(--space-lg);
-  border: 1px solid rgba(61, 80, 104, 0.5);
-  border-radius: var(--radius-lg);
-  background: rgba(13, 17, 23, 0.56);
-}
-
-.detail-copy {
-  display: grid;
-  gap: 8px;
-}
-
-.detail-node {
-  font-size: var(--font-size-sm);
 }
 
 .ghost-button {
-  min-height: 48px;
+  min-height: 46px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
-  background: var(--color-bg-surface);
+  background: rgba(10, 15, 24, 0.92);
   padding: 0 16px;
-  font-size: var(--font-size-md);
-  transition: all var(--duration-fast) var(--ease-smooth);
+  font-size: var(--font-size-sm);
 }
 
 .ghost-button:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-border-hover);
   color: var(--color-text);
-}
-
-@media (max-width: 980px) {
-  .overview-grid,
-  .current-goal-block,
-  .current-card {
-    grid-template-columns: 1fr;
-  }
-
-  .current-card-main {
-    border-right: none;
-    border-bottom: 1px solid rgba(61, 80, 104, 0.4);
-  }
-
-  .detail-item {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-@media (max-width: 720px) {
-  .section-head,
-  .current-head,
-  .detail-head,
-  .detail-toggle {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .current-actions {
-    flex-direction: column;
-  }
+  border-color: var(--color-border-hover);
 }
 </style>

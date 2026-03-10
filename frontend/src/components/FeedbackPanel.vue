@@ -21,9 +21,9 @@ const nextSuggestions = computed(() => {
   }
   const items = [props.report.nextRoundAdvice]
   if (props.report.recommendedAction === 'REVIEW') {
-    items.unshift('推荐先进入复习，优先补齐本轮训练中的薄弱点')
+    items.unshift('建议先回到薄弱点复习，再进入下一轮。')
   } else {
-    items.unshift('可以进入下一轮学习，继续推进当前章节')
+    items.unshift('可以继续下一轮学习，保持当前节奏。')
   }
   return items.filter((item) => item.trim().length > 0)
 })
@@ -34,60 +34,52 @@ const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? nu
   <section class="feedback-card" :class="mode">
     <div class="feedback-head">
       <div>
-        <span class="feedback-label">作答反馈</span>
-        <h3>{{ mode === 'ready' ? '训练反馈' : mode === 'loading' ? '正在分析你的作答表现' : '作答反馈' }}</h3>
+        <span class="feedback-label">结果反馈</span>
+        <h3>{{ mode === 'ready' ? '本轮结果' : mode === 'loading' ? '系统正在整理结果' : '结果反馈' }}</h3>
       </div>
       <span v-if="mode === 'ready'" class="ready-badge">已生成</span>
     </div>
 
     <template v-if="mode === 'empty'">
-      <p class="feedback-copy">
-        你还没有完成本章测验。提交答案后，这里会展示：
-      </p>
-      <ul class="feedback-list">
-        <li>总体表现</li>
-        <li>薄弱点分析</li>
-        <li>下一步建议</li>
-      </ul>
-      <p class="feedback-tip">提交答案后，系统会给出反馈总结、薄弱点与下一步建议</p>
+      <p class="feedback-copy">完成练习后，这里会显示你的整体表现、薄弱点和下一步建议。</p>
     </template>
 
     <template v-else-if="mode === 'loading'">
-      <p class="feedback-copy">请稍候，系统将生成薄弱点分析与后续建议。</p>
+      <p class="feedback-copy">请稍等，系统正在分析你的作答情况。</p>
       <div class="loading-bar"></div>
     </template>
 
     <template v-else>
       <div class="feedback-section">
-        <h4>反馈摘要</h4>
+        <h4>总结</h4>
         <p class="feedback-copy">{{ summary }}</p>
       </div>
 
       <div class="feedback-section">
-        <h4>薄弱点分析</h4>
+        <h4>薄弱点</h4>
         <ul v-if="weakPoints.length" class="feedback-list">
           <li v-for="item in weakPoints" :key="item">{{ item }}</li>
         </ul>
-        <p v-else class="feedback-copy">当前没有明显的集中薄弱点，可以继续保持训练节奏。</p>
+        <p v-else class="feedback-copy">当前没有明显薄弱点，可以继续保持。</p>
       </div>
 
-      <div class="feedback-section">
+      <div class="feedback-section" v-if="systemAdjustments.length">
         <h4>系统调整</h4>
         <ul class="feedback-list">
           <li v-for="item in systemAdjustments" :key="item">{{ item }}</li>
         </ul>
       </div>
 
-      <div class="feedback-section">
-        <h4>下一步建议</h4>
+      <div class="feedback-section" v-if="nextSuggestions.length">
+        <h4>下一步</h4>
         <ul class="feedback-list">
           <li v-for="item in nextSuggestions" :key="item">{{ item }}</li>
         </ul>
       </div>
 
       <div class="feedback-actions">
-        <button type="button" class="ghost-btn" @click="emit('review')">进入复习</button>
-        <button type="button" class="primary-btn" @click="emit('nextRound')">下一轮学习</button>
+        <button type="button" class="ghost-btn" @click="emit('review')">先复习</button>
+        <button type="button" class="primary-btn" @click="emit('nextRound')">继续下一轮</button>
       </div>
     </template>
   </section>
@@ -109,7 +101,6 @@ const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? nu
 
 .feedback-card.ready {
   border-color: rgba(93, 212, 166, 0.32);
-  background: linear-gradient(160deg, rgba(12, 30, 28, 0.9), rgba(14, 21, 31, 0.94));
 }
 
 .feedback-head {
@@ -143,17 +134,17 @@ const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? nu
 
 .feedback-section h4 {
   font-size: var(--font-size-md);
+  margin: 0;
 }
 
 .feedback-copy,
-.feedback-tip,
 .feedback-list {
+  margin: 0;
   color: var(--color-text-secondary);
   line-height: 1.7;
 }
 
 .feedback-list {
-  margin: 0;
   padding-left: 20px;
 }
 
@@ -165,7 +156,7 @@ const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? nu
 
 .ghost-btn,
 .primary-btn {
-  min-height: 46px;
+  min-height: 44px;
   padding: 0 18px;
   border-radius: var(--radius-md);
   font-weight: 600;

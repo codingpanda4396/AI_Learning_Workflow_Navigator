@@ -32,10 +32,10 @@ function formatMessageTime(input: string) {
   <section class="tutor-card">
     <div class="tutor-head">
       <div>
-        <span class="tutor-label">辅助区</span>
-        <h3>学习助手</h3>
+        <span class="tutor-label">Tutor</span>
+        <h3>边学边问</h3>
       </div>
-      <p>围绕当前任务随时提问，获得即时讲解</p>
+      <p>围绕当前任务提问，先把这一步学明白。</p>
     </div>
 
     <div class="chip-row">
@@ -44,13 +44,13 @@ function formatMessageTime(input: string) {
       </button>
     </div>
 
-    <div v-if="loading" class="state-card">正在加载提问记录...</div>
+    <div v-if="loading" class="state-card">正在加载对话记录...</div>
     <div v-else-if="loadError" class="state-card error">
       <span>{{ loadError }}</span>
       <button type="button" class="link-btn" @click="emit('retryLoad')">重新加载</button>
     </div>
     <div v-else-if="messages.length === 0" class="state-card">
-      还没有提问记录，可以从下面这些问题开始
+      还没有对话记录，可以先从上面的快捷问题开始。
     </div>
     <div v-else class="message-list">
       <article
@@ -64,7 +64,7 @@ function formatMessageTime(input: string) {
       </article>
     </div>
 
-    <div v-if="sending" class="sending-state">学习助手正在整理回答...</div>
+    <div v-if="sending" class="sending-state">Tutor 正在整理回答...</div>
 
     <form class="input-row" @submit.prevent="emit('submit')">
       <textarea
@@ -72,10 +72,10 @@ function formatMessageTime(input: string) {
         rows="3"
         :value="input"
         :disabled="sending"
-        placeholder="例如：为什么这里要先求齐次解？"
+        placeholder="例如：这一步为什么要先这样做？"
         @input="emit('updateInput', ($event.target as HTMLTextAreaElement).value)"
       ></textarea>
-      <button type="submit" class="send-btn" :disabled="sending || !input.trim()">发送提问</button>
+      <button type="submit" class="send-btn" :disabled="sending || !input.trim()">发送问题</button>
     </form>
 
     <div v-if="sendError" class="state-card error">
@@ -148,7 +148,7 @@ function formatMessageTime(input: string) {
 }
 
 .message-list {
-  max-height: 360px;
+  max-height: 420px;
   overflow-y: auto;
   display: grid;
   gap: var(--space-sm);
@@ -171,6 +171,7 @@ function formatMessageTime(input: string) {
 }
 
 .message-item p {
+  margin: 0;
   white-space: pre-wrap;
   line-height: 1.65;
 }

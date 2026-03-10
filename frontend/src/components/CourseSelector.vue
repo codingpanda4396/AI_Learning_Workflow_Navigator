@@ -38,14 +38,14 @@ function onChapterInput(event: Event) {
   <section class="selector-group">
     <div class="selector-row">
       <div class="selector-field">
-        <label for="course-input" class="selector-label">课程标识</label>
+        <label for="course-input" class="selector-label">课程</label>
         <input
           id="course-input"
           class="selector-input"
           type="text"
           :value="courseId"
           list="course-suggestions"
-          placeholder="例如：computer_network / linear_algebra"
+          placeholder="例如：computer_network"
           @input="onCourseInput"
         />
         <datalist id="course-suggestions">
@@ -54,14 +54,14 @@ function onChapterInput(event: Event) {
       </div>
 
       <div class="selector-field">
-        <label for="chapter-input" class="selector-label">章节标识</label>
+        <label for="chapter-input" class="selector-label">章节</label>
         <input
           id="chapter-input"
           class="selector-input"
           type="text"
           :value="chapterId"
           list="chapter-suggestions"
-          placeholder="例如：tcp / vector_space"
+          placeholder="例如：tcp"
           @input="onChapterInput"
         />
         <datalist id="chapter-suggestions">
@@ -96,8 +96,6 @@ function onChapterInput(event: Event) {
   font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .selector-input {
@@ -105,10 +103,9 @@ function onChapterInput(event: Event) {
   font-family: var(--font-body);
   font-size: var(--font-size-md);
   color: var(--color-text);
-  background: var(--color-bg);
-  border: 1.5px solid var(--color-border);
+  background: rgba(6, 10, 18, 0.92);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  transition: all var(--duration-normal) var(--ease-smooth);
 }
 
 .selector-input:focus {

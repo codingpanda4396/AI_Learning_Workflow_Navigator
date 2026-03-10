@@ -3,10 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ErrorMessage from '@/components/ErrorMessage.vue'
 import FeedbackPanel from '@/components/FeedbackPanel.vue'
-import LearningProgressStepper from '@/components/LearningProgressStepper.vue'
 import PracticeQuestionCard from '@/components/PracticeQuestionCard.vue'
-import TrainingActionCard from '@/components/TrainingActionCard.vue'
-import TrainingStageHeader from '@/components/TrainingStageHeader.vue'
+import PrimaryButton from '@/components/PrimaryButton.vue'
 import TutorAssistPanel from '@/components/TutorAssistPanel.vue'
 import {
   buildTrainingSteps,
@@ -16,6 +14,7 @@ import {
 import { usePracticeStore } from '@/stores/practice'
 import { useSessionStore } from '@/stores/session'
 import { useTutorStore } from '@/stores/tutor'
+import { getLearningStageDisplay, normalizeLearningStage } from '@/utils/learningPlanDisplay'
 
 const route = useRoute()
 const router = useRouter()
@@ -46,9 +45,9 @@ const tutorSending = computed(() => tutorStore.sendingMessage)
 const tutorLoadError = computed(() => tutorStore.loadError)
 const tutorSendError = computed(() => tutorStore.sendError)
 const tutorChips = [
-  '这道题的关键思路是什么？',
-  '为什么这里要先求齐次解？',
-  '特解一般怎么设？',
+  '这一步最关键的思路是什么？',
+  '可以换一种更好懂的讲法吗？',
+  '帮我先提示一下，不要直接给答案。',
 ]
 
 const latestSubmissionByItem = computed(() => {
@@ -77,39 +76,14 @@ const taskTitle = computed(() => {
     sessionNodeName.value ||
     sections.value.find((section) => section.title?.trim())?.title?.trim() ||
     sessionStore.currentSession?.goalText ||
-    '训练阶段学习'
+    '当前学习任务'
   )
 })
 
-const stageLabel = computed(() => {
-  const map: Record<string, string> = {
-    STRUCTURE: '结构构建',
-    UNDERSTANDING: '分步学习',
-    TRAINING: '训练检测',
-    REFLECTION: '复盘总结',
-  }
-  return task.value?.stage ? map[task.value.stage] || task.value.stage : '训练检测'
-})
-
+const stageLabel = computed(() => getLearningStageDisplay(normalizeLearningStage(task.value?.stage)).title)
 const sessionCourse = computed(() => sessionStore.currentSession?.courseId || '当前课程')
 const sessionChapter = computed(() => sessionStore.currentSession?.chapterId || '当前章节')
-const trainingGoal = computed(() => sessionStore.currentSession?.goalText || buildGoalSummary())
-const secondaryMeta = computed(() => '训练任务已生成')
-
-const summaryItems = computed(() => [
-  {
-    label: '当前训练目标',
-    value: buildGoalSummary(),
-  },
-  {
-    label: '测验进度',
-    value: practiceQuiz.value ? `${practiceQuiz.value.answeredCount}/${practiceQuiz.value.questionCount} 已作答` : '等待生成',
-  },
-  {
-    label: '学习助手',
-    value: tutorMessages.value.length > 0 ? `已记录 ${tutorMessages.value.length} 条对话` : '随时可以提问',
-  },
-])
+const taskGoal = computed(() => sessionStore.currentSession?.goalText || buildGoalSummary())
 
 const practiceQueryError = computed(() => {
   if (practiceStore.lastError?.status === 404) {
@@ -145,22 +119,60 @@ const trainingState = computed(() =>
 
 const trainingSteps = computed(() => buildTrainingSteps(trainingState.value.view))
 const actionContent = computed(() => getTrainingActionContent(trainingState.value.view))
-const feedbackPanelMode = computed<'empty' | 'loading' | 'ready'>(() => {
-  if (trainingState.value.view === 'feedback_ready') {
-    return 'ready'
-  }
-  if (trainingState.value.view === 'feedback_generating') {
-    return 'loading'
-  }
-  return 'empty'
-})
-
 const showGoalSection = computed(
   () => trainingState.value.view === 'quiz_not_generated' || trainingState.value.view === 'quiz_generating',
 )
 const showQuestionSection = computed(() => trainingState.value.view === 'quiz_ready')
 const showFeedbackSection = computed(() => trainingState.value.view === 'feedback_ready')
-const tutorAtBottom = computed(() => trainingState.value.view === 'feedback_ready')
+
+const progressText = computed(() => {
+  if (!isTrainingTask.value) {
+    return '跟随 Tutor 完成当前任务'
+  }
+  if (!practiceQuiz.value) {
+    return '练习未生成'
+  }
+  return `${practiceQuiz.value.answeredCount}/${practiceQuiz.value.questionCount} 题`
+})
+
+const progressHint = computed(() => {
+  if (!isTrainingTask.value) {
+    return '先理解任务目标，再和 Tutor 一步步推进。'
+  }
+  if (trainingState.value.view === 'feedback_ready') {
+    return '练习已完成，可以查看结果。'
+  }
+  if (trainingState.value.view === 'feedback_generating') {
+    return '答案已提交，系统正在整理结果。'
+  }
+  if (trainingState.value.view === 'quiz_ready') {
+    return '练习已准备好，可以开始作答。'
+  }
+  return '先看目标，再决定是否开始本章练习。'
+})
+
+const sidebarTips = computed(() => {
+  const tips = [
+    `当前步骤：${stageLabel.value}`,
+    '遇到卡点时，先向 Tutor 提一个具体问题。',
+  ]
+  if (isTrainingTask.value) {
+    tips.push('做练习时先写自己的思路，再看提示。')
+  } else {
+    tips.push('先完成这一任务，再返回会话继续下一步。')
+  }
+  return tips
+})
+
+const lightweightNotice = computed(() => {
+  if (trainingState.value.view === 'quiz_generating') {
+    return '练习题正在生成，稍后会自动出现。'
+  }
+  if (trainingState.value.view === 'feedback_generating') {
+    return '结果正在整理，稍后会自动刷新。'
+  }
+  return ''
+})
 
 function buildGoalSummary() {
   const summaryParts = sections.value
@@ -170,7 +182,7 @@ function buildGoalSummary() {
   if (summaryParts.length > 0) {
     return summaryParts.join('；')
   }
-  return '围绕当前知识点完成理解梳理、训练作答和反馈复盘。'
+  return '围绕当前知识点完成理解、练习和结果回看。'
 }
 
 function resolveSessionId() {
@@ -223,7 +235,7 @@ async function fetchSessionContext() {
       sessionStore.fetchSessionPath(sessionId),
     ])
   } catch {
-    // Session context is supplemental for this page.
+    // supplemental
   }
 }
 
@@ -265,7 +277,7 @@ function scheduleQuizPoll() {
         scheduleQuizPoll()
       }
     } catch (error) {
-      console.error('轮询测验状态失败:', error)
+      console.error('轮询练习状态失败:', error)
     }
   }, 1200)
 }
@@ -323,6 +335,9 @@ async function handleRetry() {
 }
 
 async function handlePrimaryAction() {
+  if (!isTrainingTask.value) {
+    return
+  }
   if (trainingState.value.view === 'quiz_not_generated') {
     await loadTrainingClosure(true)
     return
@@ -354,7 +369,7 @@ async function handleSubmitPractice(itemId: number) {
       scheduleQuizPoll()
     }
   } catch (error) {
-    console.error('提交测验答案失败:', error)
+    console.error('提交练习答案失败:', error)
   } finally {
     submittingPracticeItemId.value = null
   }
@@ -389,7 +404,7 @@ async function handleSendTutorMessage() {
     }
     tutorInput.value = ''
   } catch (error) {
-    console.error('发送学习助手消息失败:', error)
+    console.error('发送 Tutor 消息失败:', error)
   }
 }
 
@@ -398,7 +413,7 @@ async function handleRetryTutorSend() {
     await tutorStore.retryLastSend()
     tutorInput.value = ''
   } catch (error) {
-    console.error('重试学习助手消息失败:', error)
+    console.error('重试 Tutor 消息失败:', error)
   }
 }
 
@@ -445,190 +460,170 @@ watch(
 </script>
 
 <template>
-  <main class="training-stage-page">
+  <main class="task-page">
     <header class="page-toolbar">
       <button type="button" class="ghost-btn" @click="router.back()">返回上一页</button>
       <button type="button" class="ghost-btn" @click="handleContinue">返回会话</button>
     </header>
 
-    <div v-if="isLoading && !task" class="page-state">正在加载训练页面...</div>
+    <div v-if="isLoading && !task" class="page-state">正在加载任务...</div>
     <ErrorMessage v-else-if="loadError && !task" :message="loadError" @retry="handleRetry" />
 
-    <div v-else-if="task" class="page-content">
-      <TrainingStageHeader
-        :title="taskTitle"
-        :course="sessionCourse"
-        :chapter="sessionChapter"
-        :stage-label="stageLabel"
-        :goal="trainingGoal"
-        :secondary-meta="secondaryMeta"
-        :summary-items="summaryItems"
-      />
+    <div v-else-if="task" class="task-layout">
+      <section class="main-column">
+        <section class="hero-card">
+          <p class="eyebrow">Task Run</p>
+          <h1>{{ taskTitle }}</h1>
+          <p class="meta">{{ sessionCourse }} / {{ sessionChapter }} · {{ stageLabel }}</p>
+          <p class="goal">{{ taskGoal }}</p>
+        </section>
 
-      <LearningProgressStepper v-if="isTrainingTask" :steps="trainingSteps" />
-
-      <section v-if="!isTrainingTask" class="state-panel">
-        <h2>当前任务还不在训练检测阶段</h2>
-        <p>训练测验、反馈建议与学习助手闭环会在训练阶段开放。</p>
-      </section>
-
-      <template v-else>
-        <TrainingActionCard
-          :title="actionContent.title"
-          :description="actionContent.description"
-          :button-text="actionContent.buttonText"
-          :loading="actionContent.loading"
-          :disabled="actionContent.disabled"
-          @action="handlePrimaryAction"
+        <TutorAssistPanel
+          class="tutor-main"
+          :messages="tutorMessages"
+          :loading="tutorLoading"
+          :load-error="tutorLoadError"
+          :send-error="tutorSendError"
+          :sending="tutorSending"
+          :input="tutorInput"
+          :chips="tutorChips"
+          @retry-load="loadTutorMessages"
+          @retry-send="handleRetryTutorSend"
+          @submit="handleSendTutorMessage"
+          @update-input="tutorInput = $event"
+          @use-chip="useTutorChip"
         />
 
-        <section v-if="trainingState.view === 'error'" class="state-panel error">
-          <h2>训练状态加载失败</h2>
-          <p>{{ practiceQueryError || feedbackError || '请重试当前训练流程。' }}</p>
-        </section>
+        <section v-if="!isTrainingTask" class="content-card">
+          <div class="section-head">
+            <h2>任务内容</h2>
+            <p>先看本次任务，再结合 Tutor 一步步推进。</p>
+          </div>
 
-        <section v-if="showGoalSection" class="layout-grid">
-          <section class="content-card">
-            <div class="section-head">
-              <h2>当前训练目标</h2>
-              <p>先理解目标，再决定是否生成本章测验。</p>
-            </div>
-
-            <div class="goal-list">
-              <article v-for="section in sections" :key="section.title" class="goal-item">
-                <h3>{{ section.title }}</h3>
-                <p v-if="section.text">{{ section.text }}</p>
-                <ul v-else-if="section.bullets?.length">
-                  <li v-for="(bullet, index) in section.bullets" :key="`${section.title}-${index}`">{{ bullet }}</li>
-                </ul>
-                <ol v-else-if="section.steps?.length">
-                  <li v-for="(step, index) in section.steps" :key="`${section.title}-${index}`">{{ step }}</li>
-                </ol>
-                <ul v-else-if="section.items?.length">
-                  <li v-for="(item, index) in section.items" :key="`${section.title}-${index}`">{{ item }}</li>
-                </ul>
-                <p v-else>当前任务内容已准备完成，可以继续进入测验。</p>
-              </article>
-            </div>
-          </section>
-
-          <div class="side-stack">
-            <FeedbackPanel :mode="feedbackPanelMode" />
-            <TutorAssistPanel
-              :messages="tutorMessages"
-              :loading="tutorLoading"
-              :load-error="tutorLoadError"
-              :send-error="tutorSendError"
-              :sending="tutorSending"
-              :input="tutorInput"
-              :chips="tutorChips"
-              @retry-load="loadTutorMessages"
-              @retry-send="handleRetryTutorSend"
-              @submit="handleSendTutorMessage"
-              @update-input="tutorInput = $event"
-              @use-chip="useTutorChip"
-            />
+          <div class="goal-list">
+            <article v-for="section in sections" :key="section.title" class="goal-item">
+              <h3>{{ section.title }}</h3>
+              <p v-if="section.text">{{ section.text }}</p>
+              <ul v-else-if="section.bullets?.length">
+                <li v-for="(bullet, index) in section.bullets" :key="`${section.title}-${index}`">{{ bullet }}</li>
+              </ul>
+              <ol v-else-if="section.steps?.length">
+                <li v-for="(step, index) in section.steps" :key="`${section.title}-${index}`">{{ step }}</li>
+              </ol>
+              <ul v-else-if="section.items?.length">
+                <li v-for="(item, index) in section.items" :key="`${section.title}-${index}`">{{ item }}</li>
+              </ul>
+            </article>
           </div>
         </section>
 
-        <section v-if="showQuestionSection" ref="questionListRef" class="layout-grid">
-          <section class="content-card">
-            <div class="section-head">
-              <h2>本章测验</h2>
-              <p>请依次完成作答，提交后系统会生成正式反馈。</p>
-            </div>
+        <section v-if="showGoalSection" class="content-card">
+          <div class="section-head">
+            <h2>这一步要学什么</h2>
+            <p>先看清目标，再决定是否开始本章练习。</p>
+          </div>
 
-            <div v-if="practiceItems.length" class="question-list">
-              <PracticeQuestionCard
-                v-for="(item, index) in practiceItems"
-                :key="item.itemId"
-                :item="item"
-                :index="index"
-                :draft="getItemDraft(item.itemId)"
-                :submission="getLatestSubmission(item.itemId)"
-                :submitting="submittingPracticeItemId === item.itemId"
-                @update-draft="setItemDraft(item.itemId, $event)"
-                @submit="handleSubmitPractice(item.itemId)"
-              />
-            </div>
-            <div v-else class="state-panel">当前还没有生成测验题</div>
-          </section>
-
-          <div class="side-stack compact">
-            <FeedbackPanel :mode="feedbackPanelMode" />
-            <TutorAssistPanel
-              :messages="tutorMessages"
-              :loading="tutorLoading"
-              :load-error="tutorLoadError"
-              :send-error="tutorSendError"
-              :sending="tutorSending"
-              :input="tutorInput"
-              :chips="tutorChips"
-              @retry-load="loadTutorMessages"
-              @retry-send="handleRetryTutorSend"
-              @submit="handleSendTutorMessage"
-              @update-input="tutorInput = $event"
-              @use-chip="useTutorChip"
-            />
+          <div class="goal-list">
+            <article v-for="section in sections" :key="section.title" class="goal-item">
+              <h3>{{ section.title }}</h3>
+              <p v-if="section.text">{{ section.text }}</p>
+              <ul v-else-if="section.bullets?.length">
+                <li v-for="(bullet, index) in section.bullets" :key="`${section.title}-${index}`">{{ bullet }}</li>
+              </ul>
+              <ol v-else-if="section.steps?.length">
+                <li v-for="(step, index) in section.steps" :key="`${section.title}-${index}`">{{ step }}</li>
+              </ol>
+              <ul v-else-if="section.items?.length">
+                <li v-for="(item, index) in section.items" :key="`${section.title}-${index}`">{{ item }}</li>
+              </ul>
+              <p v-else>当前任务内容已准备完成，可以继续进入练习。</p>
+            </article>
           </div>
         </section>
 
-        <section v-if="showFeedbackSection" ref="feedbackSectionRef" class="feedback-layout">
+        <section v-if="showQuestionSection" ref="questionListRef" class="content-card">
+          <div class="section-head">
+            <h2>开始做练习</h2>
+            <p>按顺序作答，提交后系统会自动生成结果。</p>
+          </div>
+
+          <div v-if="practiceItems.length" class="question-list">
+            <PracticeQuestionCard
+              v-for="(item, index) in practiceItems"
+              :key="item.itemId"
+              :item="item"
+              :index="index"
+              :draft="getItemDraft(item.itemId)"
+              :submission="getLatestSubmission(item.itemId)"
+              :submitting="submittingPracticeItemId === item.itemId"
+              @update-draft="setItemDraft(item.itemId, $event)"
+              @submit="handleSubmitPractice(item.itemId)"
+            />
+          </div>
+          <div v-else class="inline-state">暂时还没有练习题。</div>
+        </section>
+
+        <section v-if="showFeedbackSection" ref="feedbackSectionRef" class="content-card">
+          <div class="section-head">
+            <h2>查看结果</h2>
+            <p>系统已经整理好你的表现和下一步建议。</p>
+          </div>
+
           <FeedbackPanel
             mode="ready"
             :report="practiceFeedbackReport"
             @review="handleFeedbackAction('REVIEW')"
             @next-round="handleFeedbackAction('NEXT_ROUND')"
           />
+        </section>
+      </section>
 
-          <TutorAssistPanel
-            v-if="tutorAtBottom"
-            :messages="tutorMessages"
-            :loading="tutorLoading"
-            :load-error="tutorLoadError"
-            :send-error="tutorSendError"
-            :sending="tutorSending"
-            :input="tutorInput"
-            :chips="tutorChips"
-            @retry-load="loadTutorMessages"
-            @retry-send="handleRetryTutorSend"
-            @submit="handleSendTutorMessage"
-            @update-input="tutorInput = $event"
-            @use-chip="useTutorChip"
-          />
+      <aside class="sidebar">
+        <section class="side-card">
+          <span class="side-label">当前步骤</span>
+          <strong>{{ stageLabel }}</strong>
+          <p>{{ actionContent.title }}</p>
+          <PrimaryButton
+            v-if="isTrainingTask"
+            type="button"
+            :loading="actionContent.loading"
+            :disabled="actionContent.disabled"
+            @click="handlePrimaryAction"
+          >
+            {{ actionContent.buttonText }}
+          </PrimaryButton>
         </section>
 
-        <section v-if="trainingState.view === 'feedback_generating'" class="layout-grid">
-          <section class="content-card">
-            <div class="section-head">
-              <h2>作答已提交</h2>
-              <p>系统正在分析你的表现，反馈生成后会自动显示在下方。</p>
+        <section class="side-card">
+          <span class="side-label">完成进度</span>
+          <strong>{{ progressText }}</strong>
+          <p>{{ progressHint }}</p>
+          <div v-if="isTrainingTask" class="step-list">
+            <div v-for="step in trainingSteps" :key="step.key" class="step-row">
+              <span>{{ step.title }}</span>
+              <span>{{ step.state === 'done' ? '已完成' : step.state === 'current' ? '当前' : '待开始' }}</span>
             </div>
-            <FeedbackPanel mode="loading" />
-          </section>
-
-          <TutorAssistPanel
-            :messages="tutorMessages"
-            :loading="tutorLoading"
-            :load-error="tutorLoadError"
-            :send-error="tutorSendError"
-            :sending="tutorSending"
-            :input="tutorInput"
-            :chips="tutorChips"
-            @retry-load="loadTutorMessages"
-            @retry-send="handleRetryTutorSend"
-            @submit="handleSendTutorMessage"
-            @update-input="tutorInput = $event"
-            @use-chip="useTutorChip"
-          />
+          </div>
         </section>
-      </template>
+
+        <section class="side-card">
+          <span class="side-label">学习提示</span>
+          <ul class="tip-list">
+            <li v-for="tip in sidebarTips" :key="tip">{{ tip }}</li>
+          </ul>
+        </section>
+
+        <p v-if="lightweightNotice" class="lightweight-tip">{{ lightweightNotice }}</p>
+        <p v-if="trainingState.view === 'error'" class="error-tip">
+          {{ practiceQueryError || feedbackError || '当前训练流程加载失败，请重试。' }}
+        </p>
+      </aside>
     </div>
   </main>
 </template>
 
 <style scoped>
-.training-stage-page {
+.task-page {
   min-height: 100dvh;
   padding: clamp(16px, 2.8vw, 32px);
 }
@@ -636,13 +631,13 @@ watch(
 .page-toolbar {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-md);
-  margin-bottom: var(--space-xl);
+  gap: 12px;
+  margin-bottom: 24px;
   flex-wrap: wrap;
 }
 
 .ghost-btn {
-  min-height: 46px;
+  min-height: 44px;
   padding: 0 16px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(61, 80, 104, 0.56);
@@ -651,97 +646,141 @@ watch(
 }
 
 .page-state,
-.state-panel {
-  padding: clamp(20px, 3vw, 28px);
-  border-radius: var(--radius-xl);
-  border: 1px solid rgba(61, 80, 104, 0.5);
+.inline-state,
+.lightweight-tip,
+.error-tip {
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
   background: rgba(15, 22, 34, 0.9);
   color: var(--color-text-secondary);
 }
 
-.state-panel {
-  display: grid;
-  gap: var(--space-sm);
+.error-tip {
+  border: 1px solid rgba(255, 122, 138, 0.35);
+  color: var(--color-error);
 }
 
-.state-panel.error {
-  border-color: rgba(255, 122, 138, 0.4);
-}
-
-.page-content {
+.task-layout {
   width: min(1180px, 100%);
   margin: 0 auto;
   display: grid;
-  gap: clamp(18px, 2.4vw, 28px);
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
+  gap: 20px;
 }
 
-.layout-grid {
+.main-column,
+.sidebar {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
-  gap: var(--space-lg);
+  gap: 18px;
+  align-content: start;
 }
 
-.feedback-layout {
-  display: grid;
-  gap: var(--space-lg);
-}
-
-.content-card {
-  display: grid;
-  gap: var(--space-lg);
-  padding: clamp(20px, 3vw, 30px);
+.hero-card,
+.content-card,
+.side-card {
+  padding: clamp(22px, 3vw, 30px);
   border-radius: var(--radius-xl);
   border: 1px solid rgba(61, 80, 104, 0.48);
-  background: linear-gradient(160deg, rgba(18, 26, 39, 0.96), rgba(10, 16, 25, 0.92));
-  box-shadow: var(--shadow-sm);
+  background: rgba(15, 21, 33, 0.94);
 }
 
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-md);
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-
-.section-head p {
-  color: var(--color-text-secondary);
-}
-
-.goal-list,
-.question-list,
-.side-stack {
-  display: grid;
-  gap: var(--space-md);
-}
-
-.goal-item {
+.hero-card {
   display: grid;
   gap: 10px;
-  padding: var(--space-lg);
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(61, 80, 104, 0.42);
-  background: rgba(10, 16, 26, 0.8);
 }
 
+.eyebrow,
+.side-label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-card h1,
+.meta,
+.goal,
+.section-head h2,
+.section-head p,
+.side-card p {
+  margin: 0;
+}
+
+.meta,
+.goal,
+.section-head p,
+.side-card p,
 .goal-item p,
 .goal-item li {
   color: var(--color-text-secondary);
   line-height: 1.7;
 }
 
+.tutor-main {
+  min-height: 420px;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.goal-list,
+.question-list {
+  display: grid;
+  gap: 14px;
+}
+
+.goal-item {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(61, 80, 104, 0.4);
+  background: rgba(10, 16, 26, 0.78);
+}
+
 .goal-item ul,
-.goal-item ol {
+.goal-item ol,
+.tip-list {
   margin: 0;
   padding-left: 20px;
 }
 
-.compact {
-  align-content: start;
+.side-card {
+  display: grid;
+  gap: 12px;
+}
+
+.side-card strong {
+  font-size: var(--font-size-lg);
+  color: var(--color-text);
+}
+
+.step-list {
+  display: grid;
+  gap: 8px;
+}
+
+.step-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.tip-list {
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 980px) {
-  .layout-grid {
+  .task-layout {
     grid-template-columns: 1fr;
   }
 }
