@@ -345,6 +345,7 @@ onMounted(async () => {
 </script>
 
 <template>
+  <div class="session-shell">
   <main class="learning-page">
     <header class="toolbar">
       <button type="button" class="ghost-button" @click="goHome">返回首页</button>
@@ -409,6 +410,7 @@ onMounted(async () => {
     @update-input="tutorPanel.setInput"
     @use-quick-prompt="tutorPanel.useQuickPrompt"
   />
+  </div>
 </template>
 
 <style scoped>

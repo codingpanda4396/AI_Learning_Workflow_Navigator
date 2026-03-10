@@ -441,6 +441,7 @@ watch(
 </script>
 
 <template>
+  <div class="task-run-shell">
   <main class="task-page">
     <header class="page-toolbar">
       <button type="button" class="ghost-btn" @click="router.back()">返回上一页</button>
@@ -606,6 +607,7 @@ watch(
     @update-input="tutorPanel.setInput"
     @use-quick-prompt="tutorPanel.useQuickPrompt"
   />
+  </div>
 </template>
 
 <style scoped>
