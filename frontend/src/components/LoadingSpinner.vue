@@ -22,7 +22,7 @@ defineProps<{
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  gap: var(--space-lg);
 }
 
 .spinner {
@@ -48,7 +48,7 @@ defineProps<{
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   border-top-color: var(--color-primary);
   animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
 }
@@ -77,7 +77,7 @@ defineProps<{
 }
 
 .loading-text {
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
 }
 </style>

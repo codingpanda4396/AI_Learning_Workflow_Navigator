@@ -14,7 +14,7 @@ const emit = defineEmits<{
     <div class="error-icon">!</div>
     <h3 class="error-title">{{ title || '出错了' }}</h3>
     <p class="error-message">{{ message }}</p>
-    <button class="retry-btn" @click="emit('retry')">
+    <button class="error-retry" @click="emit('retry')">
       重试
     </button>
   </div>
@@ -26,7 +26,15 @@ const emit = defineEmits<{
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  gap: var(--space-lg);
+  padding: var(--space-xxl);
+  background: linear-gradient(
+    145deg,
+    var(--color-bg-elevated),
+    var(--color-bg-surface)
+  );
+  border: 1px solid rgba(255, 122, 138, 0.3);
+  border-radius: var(--radius-xl);
   text-align: center;
 }
 
@@ -39,39 +47,38 @@ const emit = defineEmits<{
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--color-error);
-  background: #fef2f2;
+  background: rgba(255, 122, 138, 0.15);
   border-radius: 50%;
-  margin-bottom: 1rem;
 }
 
 .error-title {
-  font-size: 1.125rem;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--color-text);
-  margin-bottom: 0.5rem;
+  margin: 0;
 }
 
 .error-message {
-  font-size: 0.875rem;
+  font-size: var(--font-size-md);
   color: var(--color-text-secondary);
-  margin-bottom: 1.5rem;
+  margin: 0;
   max-width: 300px;
 }
 
-.retry-btn {
-  padding: 0.5rem 1.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-primary);
-  background: transparent;
-  border: 1px solid var(--color-primary);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
+.error-retry {
+  padding: 10px 20px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+  transition: all var(--duration-fast) var(--ease-smooth);
 }
 
-.retry-btn:hover {
-  color: white;
-  background: var(--color-primary);
+.error-retry:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-hover);
+  color: var(--color-text);
 }
 </style>
