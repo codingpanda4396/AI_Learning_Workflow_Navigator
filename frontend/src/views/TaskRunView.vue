@@ -184,6 +184,10 @@ function resolveSessionId() {
   return sessionStore.currentTaskSessionId || sessionStore.sessionId || null
 }
 
+function isValidPositiveId(value: number | null | undefined) {
+  return Number.isFinite(value) && (value ?? 0) > 0
+}
+
 const tutorContext = computed(() =>
   buildTutorContext({
     sessionId: resolveSessionId(),
@@ -401,14 +405,15 @@ async function handleFeedbackAction(action: 'REVIEW' | 'NEXT_ROUND') {
 
 function handleContinue() {
   const sessionId = resolveSessionId()
-  if (!sessionId) {
-    router.push('/')
+  if (!isValidPositiveId(sessionId)) {
+    router.push({ name: 'home' })
     return
   }
   const step = Number(route.query.step)
   const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
   router.push({
-    path: `/session/${sessionId}`,
+    name: 'session',
+    params: { id: String(sessionId) },
     query: { step: resolvedStep },
   })
 }

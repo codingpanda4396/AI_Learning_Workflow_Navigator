@@ -60,6 +60,10 @@ function resolveSessionId() {
   return sessionStore.currentTaskSessionId || sessionStore.sessionId || null
 }
 
+function isValidPositiveId(value: number | null | undefined) {
+  return Number.isFinite(value) && (value ?? 0) > 0
+}
+
 async function loadTask() {
   await sessionStore.runTask(taskId.value)
 }
@@ -79,27 +83,28 @@ async function handleRetry() {
 
 function handleContinue() {
   const targetSessionId = resolveSessionId()
-  if (!targetSessionId) {
-    router.push('/')
+  if (!isValidPositiveId(targetSessionId)) {
+    router.push({ name: 'home' })
     return
   }
   const step = Number(route.query.step)
   const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
   router.push({
-    path: `/session/${targetSessionId}`,
+    name: 'session',
+    params: { id: String(targetSessionId) },
     query: { step: resolvedStep },
   })
 }
 
 function handleGoNextTask() {
   const nextTask = result.value?.nextTask
-  if (!nextTask) return
-  const targetPath = `/task/${nextTask.taskId}/run`
+  if (!nextTask || !isValidPositiveId(nextTask.taskId)) return
   const currentSessionId = resolveSessionId()
   const step = Number(route.query.step)
   const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
   router.push({
-    path: targetPath,
+    name: 'task-run',
+    params: { id: String(nextTask.taskId) },
     ...(currentSessionId
       ? { query: { sessionId: String(currentSessionId), step: resolvedStep } }
       : { query: { step: resolvedStep } }),
@@ -114,7 +119,8 @@ onMounted(async () => {
     const step = Number(route.query.step)
     const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
     await router.replace({
-      path: `/task/${taskId.value}/run`,
+      name: 'task-run',
+      params: { id: String(taskId.value) },
       ...(currentSessionId
         ? { query: { sessionId: String(currentSessionId), step: resolvedStep } }
         : { query: { step: resolvedStep } }),

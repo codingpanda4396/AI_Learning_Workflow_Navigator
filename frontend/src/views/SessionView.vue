@@ -272,13 +272,17 @@ const tutorPanel = useTutorPanel({
   context: tutorContext,
 })
 
-function resolveTaskPath(taskId: number) {
-  return `/task/${taskId}/run`
+function isValidPositiveId(value: number | null | undefined) {
+  return Number.isFinite(value) && (value ?? 0) > 0
 }
 
 function openTask(taskId: number) {
+  if (!isValidPositiveId(taskId) || !isValidPositiveId(sessionId.value)) {
+    return
+  }
   router.push({
-    path: resolveTaskPath(taskId),
+    name: 'task-run',
+    params: { id: String(taskId) },
     query: {
       sessionId: String(sessionId.value),
       step: String(currentStepDefinition.value.order),
@@ -325,14 +329,14 @@ async function goHome() {
 }
 
 async function goHistory() {
-  await router.push('/history')
+  await router.push({ name: 'history' })
 }
 
 async function handleLogout() {
   authStore.clearAuth()
   sessionStore.reset()
   workflowStore.reset()
-  await router.replace('/auth')
+  await router.replace({ name: 'auth' })
 }
 
 onMounted(async () => {
