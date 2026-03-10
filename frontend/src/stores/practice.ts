@@ -219,6 +219,7 @@ export const usePracticeStore = defineStore('practice', () => {
     feedbackReport,
     submissions,
     lastSubmitResult,
+    lastError,
     requestingQuiz,
     pollingQuiz,
     loadingFeedback,
