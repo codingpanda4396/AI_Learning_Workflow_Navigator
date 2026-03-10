@@ -8,11 +8,7 @@ import FeedbackPanel from '@/components/FeedbackPanel.vue'
 import PracticeQuestionCard from '@/components/PracticeQuestionCard.vue'
 import PrimaryButton from '@/components/PrimaryButton.vue'
 import { useTutorPanel } from '@/composables/useTutorPanel'
-import {
-  buildTrainingSteps,
-  deriveTrainingStatuses,
-  getTrainingActionContent,
-} from '@/constants/trainingStage'
+import { buildTrainingSteps, deriveTrainingStatuses, getTrainingActionContent } from '@/constants/trainingStage'
 import { usePracticeStore } from '@/stores/practice'
 import { useSessionStore } from '@/stores/session'
 import { buildTutorContext } from '@/utils/buildTutorContext'
@@ -30,28 +26,13 @@ const isLoading = computed(() => sessionStore.runningTask)
 const isTrainingTask = computed(() => task.value?.stage === 'TRAINING')
 const sections = computed(() => task.value?.output.sections ?? [])
 const answerDrafts = ref<Record<number, string>>({})
-const submittingPracticeItemId = ref<number | null>(null)
 const quizPollTimer = ref<number | null>(null)
 const questionListRef = ref<HTMLElement | null>(null)
 const feedbackSectionRef = ref<HTMLElement | null>(null)
 
 const practiceQuiz = computed(() => practiceStore.quiz)
 const practiceItems = computed(() => practiceStore.items)
-const practiceSubmissions = computed(() => practiceStore.submissions)
 const practiceFeedbackReport = computed(() => practiceStore.feedbackReport)
-
-const latestSubmissionByItem = computed(() => {
-  const ordered = [...practiceSubmissions.value].sort(
-    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
-  )
-  const map = new Map<number, (typeof ordered)[number]>()
-  for (const item of ordered) {
-    if (!map.has(item.practiceItemId)) {
-      map.set(item.practiceItemId, item)
-    }
-  }
-  return map
-})
 
 const sessionNodeName = computed(() => {
   const nodeId = task.value?.nodeId
@@ -80,7 +61,7 @@ const practiceQueryError = computed(() => {
   if (practiceStore.lastError?.status === 404) {
     return null
   }
-  return practiceStore.itemsError || practiceStore.submissionsError
+  return practiceStore.itemsError
 })
 
 const feedbackError = computed(() => {
@@ -90,7 +71,16 @@ const feedbackError = computed(() => {
   return practiceStore.loadingFeedback ? null : practiceStore.submitError
 })
 
-const hasSubmittedAnswers = computed(() => practiceSubmissions.value.length > 0)
+const hasSubmittedAnswers = computed(() => {
+  const quizStatus = practiceQuiz.value?.quizStatus
+  return (
+    !!practiceFeedbackReport.value ||
+    quizStatus === 'ANSWERED' ||
+    quizStatus === 'FEEDBACK_READY' ||
+    quizStatus === 'REVIEWING' ||
+    quizStatus === 'NEXT_ROUND'
+  )
+})
 
 const trainingState = computed(() =>
   deriveTrainingStatuses({
@@ -103,7 +93,7 @@ const trainingState = computed(() =>
     hasSubmittedAnswers: hasSubmittedAnswers.value,
     requestingQuiz: practiceStore.requestingQuiz,
     pollingQuiz: practiceStore.pollingQuiz,
-    submittingAnswer: practiceStore.submittingAnswer,
+    submittingQuiz: practiceStore.submittingQuiz,
     loadingFeedback: practiceStore.loadingFeedback,
   }),
 )
@@ -116,53 +106,79 @@ const showGoalSection = computed(
 const showQuestionSection = computed(() => trainingState.value.view === 'quiz_ready')
 const showFeedbackSection = computed(() => trainingState.value.view === 'feedback_ready')
 
+const allQuestionsAnswered = computed(() => {
+  if (!practiceItems.value.length) {
+    return false
+  }
+  return practiceItems.value.every((item) => (answerDrafts.value[item.questionId] ?? '').trim().length > 0)
+})
+
 const progressText = computed(() => {
   if (!isTrainingTask.value) {
     return '跟随 Tutor 完成当前任务'
   }
   if (!practiceQuiz.value) {
-    return '练习未生成'
+    return '检测题尚未生成'
   }
   return `${practiceQuiz.value.answeredCount}/${practiceQuiz.value.questionCount} 题`
 })
 
 const progressHint = computed(() => {
   if (!isTrainingTask.value) {
-    return '先理解任务目标，再和 Tutor 一步步推进。'
+    return '先理解任务目标，再结合 Tutor 继续推进。'
   }
   if (trainingState.value.view === 'feedback_ready') {
-    return '练习已完成，可以查看结果。'
+    return '检测已完成，可以直接查看反馈。'
   }
   if (trainingState.value.view === 'feedback_generating') {
-    return '答案已提交，系统正在整理结果。'
+    return '答案已提交，系统正在生成反馈。'
   }
   if (trainingState.value.view === 'quiz_ready') {
-    return '练习已准备好，可以开始作答。'
+    return '题目已生成，可以逐题填写并一次性提交。'
   }
-  return '先看目标，再决定是否开始本章练习。'
+  if (trainingState.value.view === 'error') {
+    return '检测流程失败，可直接重试。'
+  }
+  return '先生成检测题，再开始本轮检测。'
 })
 
 const sidebarTips = computed(() => {
-  const tips = [
-    `当前步骤：${stageLabel.value}`,
-    '遇到卡点时，先向 Tutor 提一个具体问题。',
-  ]
+  const tips = [`当前阶段：${stageLabel.value}`, '遇到卡点时，先向 Tutor 提一个具体问题。']
   if (isTrainingTask.value) {
-    tips.push('做练习时先写自己的思路，再看提示。')
+    tips.push('先独立作答，再对照反馈页查看薄弱点。')
   } else {
-    tips.push('先完成这一任务，再返回会话继续下一步。')
+    tips.push('先完成当前任务，再返回会话继续下一步。')
   }
   return tips
 })
 
 const lightweightNotice = computed(() => {
   if (trainingState.value.view === 'quiz_generating') {
-    return '练习题正在生成，稍后会自动出现。'
+    return '检测题生成中，稍后会自动刷新。'
   }
   if (trainingState.value.view === 'feedback_generating') {
-    return '结果正在整理，稍后会自动刷新。'
+    return '反馈整理中，稍后会自动刷新到反馈区块。'
   }
   return ''
+})
+
+const quizStatusLabel = computed(() => {
+  if (!practiceQuiz.value) {
+    return '未生成'
+  }
+  if (practiceQuiz.value.generationStatus === 'FAILED' || practiceQuiz.value.quizStatus === 'FAILED') {
+    return '失败，可重试'
+  }
+  if (practiceQuiz.value.generationStatus === 'PENDING' || practiceQuiz.value.generationStatus === 'RUNNING') {
+    return '生成中'
+  }
+  if (practiceQuiz.value.quizStatus === 'QUIZ_READY') {
+    return '已生成，可开始检测'
+  }
+  if (practiceQuiz.value.quizStatus === 'FEEDBACK_READY') {
+    return '反馈已生成'
+  }
+  return practiceQuiz.value.quizStatus
 })
 
 function buildGoalSummary() {
@@ -173,7 +189,7 @@ function buildGoalSummary() {
   if (summaryParts.length > 0) {
     return summaryParts.join('；')
   }
-  return '围绕当前知识点完成理解、练习和结果回看。'
+  return '围绕当前知识点完成理解、检测和反馈回看。'
 }
 
 function resolveSessionId() {
@@ -211,18 +227,14 @@ const tutorPanel = useTutorPanel({
   context: tutorContext,
 })
 
-function getLatestSubmission(itemId: number) {
-  return latestSubmissionByItem.value.get(itemId) ?? null
+function getItemDraft(questionId: number) {
+  return answerDrafts.value[questionId] ?? ''
 }
 
-function getItemDraft(itemId: number) {
-  return answerDrafts.value[itemId] ?? ''
-}
-
-function setItemDraft(itemId: number, value: string) {
+function setItemDraft(questionId: number, value: string) {
   answerDrafts.value = {
     ...answerDrafts.value,
-    [itemId]: value,
+    [questionId]: value,
   }
 }
 
@@ -234,7 +246,15 @@ function clearQuizPoll() {
 }
 
 function shouldPollQuizStatus() {
-  return practiceStore.quiz?.status === 'GENERATING' || practiceStore.quiz?.status === 'ANSWERED'
+  if (!practiceStore.quiz) {
+    return false
+  }
+  return (
+    practiceStore.quiz.generationStatus === 'PENDING' ||
+    practiceStore.quiz.generationStatus === 'RUNNING' ||
+    practiceStore.quiz.quizStatus === 'GENERATING' ||
+    practiceStore.quiz.quizStatus === 'ANSWERED'
+  )
 }
 
 async function scrollToElement(target: HTMLElement | null) {
@@ -248,12 +268,9 @@ async function fetchSessionContext() {
     return
   }
   try {
-    await Promise.all([
-      sessionStore.fetchSessionOverview(sessionId),
-      sessionStore.fetchSessionPath(sessionId),
-    ])
+    await Promise.all([sessionStore.fetchSessionOverview(sessionId), sessionStore.fetchSessionPath(sessionId)])
   } catch {
-    // supplemental
+    // supplemental request
   }
 }
 
@@ -261,24 +278,52 @@ async function loadTask() {
   await sessionStore.runTask(taskId.value)
 }
 
-async function refreshQuizRelated(sessionId: number) {
-  await practiceStore.loadQuiz(sessionId, taskId.value)
-  if (shouldPollQuizStatus()) {
-    return
-  }
-  await practiceStore.loadSubmissions(sessionId, taskId.value)
-  if (
-    practiceStore.quiz?.status === 'FEEDBACK_READY' ||
-    practiceStore.quiz?.status === 'REVIEWING' ||
-    practiceStore.quiz?.status === 'NEXT_ROUND'
-  ) {
-    try {
-      await practiceStore.loadFeedbackReport(sessionId, taskId.value)
-    } catch {
-      practiceStore.feedbackReport = null
-    }
+function resetQuizAsNotGenerated() {
+  practiceStore.reset()
+  answerDrafts.value = {}
+}
+
+async function syncFeedbackReport(sessionId: number) {
+  const quizStatus = practiceStore.quiz?.quizStatus
+  if (quizStatus === 'FEEDBACK_READY' || quizStatus === 'REVIEWING' || quizStatus === 'NEXT_ROUND') {
+    await practiceStore.loadFeedbackReport(sessionId)
   } else {
     practiceStore.feedbackReport = null
+  }
+}
+
+async function syncQuizState(generate = false) {
+  if (!isTrainingTask.value) {
+    return
+  }
+  const sessionId = resolveSessionId()
+  if (!sessionId) {
+    return
+  }
+  try {
+    if (generate) {
+      await practiceStore.requestQuiz(sessionId)
+    } else {
+      await practiceStore.loadQuizStatus(sessionId)
+    }
+  } catch (error) {
+    if (practiceStore.lastError?.status === 404) {
+      resetQuizAsNotGenerated()
+      return
+    }
+    throw error
+  }
+
+  if (practiceStore.quiz?.generationStatus === 'SUCCEEDED') {
+    await practiceStore.loadQuiz(sessionId)
+  }
+
+  await syncFeedbackReport(sessionId)
+
+  if (shouldPollQuizStatus()) {
+    scheduleQuizPoll()
+  } else {
+    clearQuizPoll()
   }
 }
 
@@ -290,53 +335,11 @@ function scheduleQuizPoll() {
   }
   quizPollTimer.value = window.setTimeout(async () => {
     try {
-      await refreshQuizRelated(sessionId)
-      if (shouldPollQuizStatus()) {
-        scheduleQuizPoll()
-      }
+      await syncQuizState(false)
     } catch (error) {
-      console.error('轮询练习状态失败:', error)
+      console.error('轮询检测状态失败:', error)
     }
   }, 1200)
-}
-
-function resetQuizAsNotGenerated() {
-  practiceStore.quiz = null
-  practiceStore.items = []
-  practiceStore.feedbackReport = null
-  practiceStore.submissions = []
-  practiceStore.clearErrors()
-}
-
-async function loadTrainingClosure(generate = false) {
-  if (!isTrainingTask.value) {
-    return
-  }
-  const sessionId = resolveSessionId()
-  if (!sessionId) {
-    return
-  }
-  try {
-    if (generate) {
-      await practiceStore.requestQuiz(sessionId, taskId.value)
-    } else {
-      await practiceStore.loadQuiz(sessionId, taskId.value)
-    }
-  } catch (error) {
-    if (practiceStore.lastError?.status === 404) {
-      resetQuizAsNotGenerated()
-      return
-    }
-    throw error
-  }
-
-  if (shouldPollQuizStatus()) {
-    practiceStore.feedbackReport = null
-    scheduleQuizPoll()
-    return
-  }
-
-  await refreshQuizRelated(sessionId)
 }
 
 async function loadTutorMessages() {
@@ -345,7 +348,7 @@ async function loadTutorMessages() {
 
 async function handleRetry() {
   await loadTask()
-  await Promise.all([fetchSessionContext(), loadTrainingClosure()])
+  await Promise.all([fetchSessionContext(), syncQuizState(false)])
 }
 
 async function handlePrimaryAction() {
@@ -353,7 +356,7 @@ async function handlePrimaryAction() {
     return
   }
   if (trainingState.value.view === 'quiz_not_generated') {
-    await loadTrainingClosure(true)
+    await syncQuizState(true)
     return
   }
   if (trainingState.value.view === 'quiz_ready') {
@@ -369,23 +372,27 @@ async function handlePrimaryAction() {
   }
 }
 
-async function handleSubmitPractice(itemId: number) {
-  const answer = answerDrafts.value[itemId]?.trim() ?? ''
+async function handleSubmitQuiz() {
   const sessionId = resolveSessionId()
-  if (!sessionId || !answer || practiceStore.submittingAnswer) {
+  if (!sessionId || !allQuestionsAnswered.value || practiceStore.submittingQuiz) {
     return
   }
-  submittingPracticeItemId.value = itemId
   try {
-    await practiceStore.submitAnswer(sessionId, taskId.value, itemId, answer)
-    await refreshQuizRelated(sessionId)
-    if (shouldPollQuizStatus()) {
+    await practiceStore.submitQuiz(
+      sessionId,
+      practiceItems.value.map((item) => ({
+        questionId: item.questionId,
+        userAnswer: (answerDrafts.value[item.questionId] ?? '').trim(),
+      })),
+    )
+    if (practiceStore.feedbackReport) {
+      await sessionStore.fetchLearningFeedback(sessionId)
+      await scrollToElement(feedbackSectionRef.value)
+    } else {
       scheduleQuizPoll()
     }
   } catch (error) {
-    console.error('提交练习答案失败:', error)
-  } finally {
-    submittingPracticeItemId.value = null
+    console.error('提交检测答案失败:', error)
   }
 }
 
@@ -395,9 +402,8 @@ async function handleFeedbackAction(action: 'REVIEW' | 'NEXT_ROUND') {
     return
   }
   try {
-    await practiceStore.applyFeedback(sessionId, taskId.value, action)
+    await practiceStore.applyFeedback(sessionId, action)
     await sessionStore.fetchLearningFeedback(sessionId)
-    await loadTrainingClosure()
   } catch (error) {
     console.error('应用反馈动作失败:', error)
   }
@@ -422,7 +428,7 @@ onMounted(async () => {
   sessionStore.resetTaskState()
   practiceStore.reset()
   await loadTask()
-  await Promise.all([fetchSessionContext(), loadTrainingClosure()])
+  await Promise.all([fetchSessionContext(), syncQuizState(false)])
 })
 
 onBeforeUnmount(() => {
@@ -434,179 +440,198 @@ watch(
   async () => {
     clearQuizPoll()
     practiceStore.reset()
+    answerDrafts.value = {}
     await loadTask()
-    await Promise.all([fetchSessionContext(), loadTrainingClosure()])
+    await Promise.all([fetchSessionContext(), syncQuizState(false)])
   },
 )
 </script>
 
 <template>
   <div class="task-run-shell">
-  <main class="task-page">
-    <header class="page-toolbar">
-      <button type="button" class="ghost-btn" @click="router.back()">返回上一页</button>
-      <button type="button" class="ghost-btn" @click="handleContinue">返回会话</button>
-    </header>
+    <main class="task-page">
+      <header class="page-toolbar">
+        <button type="button" class="ghost-btn" @click="router.back()">返回上一页</button>
+        <button type="button" class="ghost-btn" @click="handleContinue">返回会话</button>
+      </header>
 
-    <div v-if="isLoading && !task" class="page-state">正在加载任务...</div>
-    <ErrorMessage v-else-if="loadError && !task" :message="loadError" @retry="handleRetry" />
+      <div v-if="isLoading && !task" class="page-state">正在加载任务...</div>
+      <ErrorMessage v-else-if="loadError && !task" :message="loadError" @retry="handleRetry" />
 
-    <div v-else-if="task" class="task-layout">
-      <section class="main-column">
-        <section class="hero-card">
-          <p class="eyebrow">Task Run</p>
-          <h1>{{ taskTitle }}</h1>
-          <p class="meta">{{ sessionCourse }} / {{ sessionChapter }} · {{ stageLabel }}</p>
-          <p class="goal">{{ taskGoal }}</p>
-        </section>
+      <div v-else-if="task" class="task-layout">
+        <section class="main-column">
+          <section class="hero-card">
+            <p class="eyebrow">Task Run</p>
+            <h1>{{ taskTitle }}</h1>
+            <p class="meta">{{ sessionCourse }} / {{ sessionChapter }} · {{ stageLabel }}</p>
+            <p class="goal">{{ taskGoal }}</p>
+          </section>
 
-        <section v-if="!isTrainingTask" class="content-card">
-          <div class="section-head">
-            <h2>任务内容</h2>
-            <p>先看本次任务，再结合 Tutor 一步步推进。</p>
-          </div>
-
-          <div class="goal-list">
-            <article v-for="section in sections" :key="section.title" class="goal-item">
-              <h3>{{ section.title }}</h3>
-              <p v-if="section.text">{{ section.text }}</p>
-              <ul v-else-if="section.bullets?.length">
-                <li v-for="(bullet, index) in section.bullets" :key="`${section.title}-${index}`">{{ bullet }}</li>
-              </ul>
-              <ol v-else-if="section.steps?.length">
-                <li v-for="(step, index) in section.steps" :key="`${section.title}-${index}`">{{ step }}</li>
-              </ol>
-              <ul v-else-if="section.items?.length">
-                <li v-for="(item, index) in section.items" :key="`${section.title}-${index}`">{{ item }}</li>
-              </ul>
-            </article>
-          </div>
-        </section>
-
-        <section v-if="showGoalSection" class="content-card">
-          <div class="section-head">
-            <h2>这一步要学什么</h2>
-            <p>先看清目标，再决定是否开始本章练习。</p>
-          </div>
-
-          <div class="goal-list">
-            <article v-for="section in sections" :key="section.title" class="goal-item">
-              <h3>{{ section.title }}</h3>
-              <p v-if="section.text">{{ section.text }}</p>
-              <ul v-else-if="section.bullets?.length">
-                <li v-for="(bullet, index) in section.bullets" :key="`${section.title}-${index}`">{{ bullet }}</li>
-              </ul>
-              <ol v-else-if="section.steps?.length">
-                <li v-for="(step, index) in section.steps" :key="`${section.title}-${index}`">{{ step }}</li>
-              </ol>
-              <ul v-else-if="section.items?.length">
-                <li v-for="(item, index) in section.items" :key="`${section.title}-${index}`">{{ item }}</li>
-              </ul>
-              <p v-else>当前任务内容已准备完成，可以继续进入练习。</p>
-            </article>
-          </div>
-        </section>
-
-        <section v-if="showQuestionSection" ref="questionListRef" class="content-card">
-          <div class="section-head">
-            <h2>开始做练习</h2>
-            <p>按顺序作答，提交后系统会自动生成结果。</p>
-          </div>
-
-          <div v-if="practiceItems.length" class="question-list">
-            <PracticeQuestionCard
-              v-for="(item, index) in practiceItems"
-              :key="item.itemId"
-              :item="item"
-              :index="index"
-              :draft="getItemDraft(item.itemId)"
-              :submission="getLatestSubmission(item.itemId)"
-              :submitting="submittingPracticeItemId === item.itemId"
-              @update-draft="setItemDraft(item.itemId, $event)"
-              @submit="handleSubmitPractice(item.itemId)"
-            />
-          </div>
-          <div v-else class="inline-state">暂时还没有练习题。</div>
-        </section>
-
-        <section v-if="showFeedbackSection" ref="feedbackSectionRef" class="content-card">
-          <div class="section-head">
-            <h2>查看结果</h2>
-            <p>系统已经整理好你的表现和下一步建议。</p>
-          </div>
-
-          <FeedbackPanel
-            mode="ready"
-            :report="practiceFeedbackReport"
-            @review="handleFeedbackAction('REVIEW')"
-            @next-round="handleFeedbackAction('NEXT_ROUND')"
-          />
-        </section>
-      </section>
-
-      <aside class="sidebar">
-        <section class="side-card">
-          <span class="side-label">当前步骤</span>
-          <strong>{{ stageLabel }}</strong>
-          <p>{{ actionContent.title }}</p>
-          <PrimaryButton
-            v-if="isTrainingTask"
-            type="button"
-            :loading="actionContent.loading"
-            :disabled="actionContent.disabled"
-            @click="handlePrimaryAction"
-          >
-            {{ actionContent.buttonText }}
-          </PrimaryButton>
-        </section>
-
-        <section class="side-card">
-          <span class="side-label">完成进度</span>
-          <strong>{{ progressText }}</strong>
-          <p>{{ progressHint }}</p>
-          <div v-if="isTrainingTask" class="step-list">
-            <div v-for="step in trainingSteps" :key="step.key" class="step-row">
-              <span>{{ step.title }}</span>
-              <span>{{ step.state === 'done' ? '已完成' : step.state === 'current' ? '当前' : '待开始' }}</span>
+          <section v-if="!isTrainingTask" class="content-card">
+            <div class="section-head">
+              <h2>任务内容</h2>
+              <p>先阅读本次任务，再结合 Tutor 继续推进。</p>
             </div>
-          </div>
+
+            <div class="goal-list">
+              <article v-for="section in sections" :key="section.title" class="goal-item">
+                <h3>{{ section.title }}</h3>
+                <p v-if="section.text">{{ section.text }}</p>
+                <ul v-else-if="section.bullets?.length">
+                  <li v-for="(bullet, index) in section.bullets" :key="`${section.title}-${index}`">{{ bullet }}</li>
+                </ul>
+                <ol v-else-if="section.steps?.length">
+                  <li v-for="(step, index) in section.steps" :key="`${section.title}-${index}`">{{ step }}</li>
+                </ol>
+                <ul v-else-if="section.items?.length">
+                  <li v-for="(item, index) in section.items" :key="`${section.title}-${index}`">{{ item }}</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <section v-if="showGoalSection" class="content-card">
+            <div class="section-head">
+              <h2>这一轮要学什么</h2>
+              <p>保留原有任务说明区，只在这里增量接入检测题生成状态。</p>
+            </div>
+
+            <div class="quiz-status-banner">
+              <strong>检测题状态</strong>
+              <span>{{ quizStatusLabel }}</span>
+            </div>
+
+            <div class="goal-list">
+              <article v-for="section in sections" :key="section.title" class="goal-item">
+                <h3>{{ section.title }}</h3>
+                <p v-if="section.text">{{ section.text }}</p>
+                <ul v-else-if="section.bullets?.length">
+                  <li v-for="(bullet, index) in section.bullets" :key="`${section.title}-${index}`">{{ bullet }}</li>
+                </ul>
+                <ol v-else-if="section.steps?.length">
+                  <li v-for="(step, index) in section.steps" :key="`${section.title}-${index}`">{{ step }}</li>
+                </ol>
+                <ul v-else-if="section.items?.length">
+                  <li v-for="(item, index) in section.items" :key="`${section.title}-${index}`">{{ item }}</li>
+                </ul>
+                <p v-else>当前任务内容已准备完成，可以继续进入检测。</p>
+              </article>
+            </div>
+          </section>
+
+          <section v-if="showQuestionSection" ref="questionListRef" class="content-card">
+            <div class="section-head">
+              <h2>检测题</h2>
+              <p>支持逐题填写，并一次性提交全部答案。</p>
+            </div>
+
+            <div v-if="practiceItems.length" class="question-list">
+              <PracticeQuestionCard
+                v-for="(item, index) in practiceItems"
+                :key="item.questionId"
+                :item="item"
+                :index="index"
+                :draft="getItemDraft(item.questionId)"
+                :disabled="practiceStore.submittingQuiz"
+                @update-draft="setItemDraft(item.questionId, $event)"
+              />
+            </div>
+            <div v-else class="inline-state">暂时还没有检测题。</div>
+
+            <div class="submit-bar">
+              <p class="submit-hint">
+                {{ allQuestionsAnswered ? '所有题目已填写，可以提交。' : '请先完成所有题目的填写。' }}
+              </p>
+              <PrimaryButton
+                type="button"
+                :loading="practiceStore.submittingQuiz"
+                :disabled="!allQuestionsAnswered"
+                @click="handleSubmitQuiz"
+              >
+                一次性提交
+              </PrimaryButton>
+            </div>
+          </section>
+
+          <section v-if="showFeedbackSection" ref="feedbackSectionRef" class="content-card">
+            <div class="section-head">
+              <h2>反馈页</h2>
+              <p>展示 overallSummary、questionResults、weaknesses 和 suggestedNextAction。</p>
+            </div>
+
+            <FeedbackPanel
+              mode="ready"
+              :report="practiceFeedbackReport"
+              @review="handleFeedbackAction('REVIEW')"
+              @next-round="handleFeedbackAction('NEXT_ROUND')"
+            />
+          </section>
         </section>
 
-        <section class="side-card">
-          <span class="side-label">学习提示</span>
-          <ul class="tip-list">
-            <li v-for="tip in sidebarTips" :key="tip">{{ tip }}</li>
-          </ul>
-        </section>
+        <aside class="sidebar">
+          <section class="side-card">
+            <span class="side-label">当前步骤</span>
+            <strong>{{ stageLabel }}</strong>
+            <p>{{ actionContent.title }}</p>
+            <p class="status-copy">检测题状态：{{ quizStatusLabel }}</p>
+            <PrimaryButton
+              v-if="isTrainingTask"
+              type="button"
+              :loading="actionContent.loading"
+              :disabled="actionContent.disabled"
+              @click="handlePrimaryAction"
+            >
+              {{ actionContent.buttonText }}
+            </PrimaryButton>
+          </section>
 
-        <p v-if="lightweightNotice" class="lightweight-tip">{{ lightweightNotice }}</p>
-        <p v-if="trainingState.view === 'error'" class="error-tip">
-          {{ practiceQueryError || feedbackError || '当前训练流程加载失败，请重试。' }}
-        </p>
-      </aside>
-    </div>
-  </main>
+          <section class="side-card">
+            <span class="side-label">完成进度</span>
+            <strong>{{ progressText }}</strong>
+            <p>{{ progressHint }}</p>
+            <div v-if="isTrainingTask" class="step-list">
+              <div v-for="step in trainingSteps" :key="step.key" class="step-row">
+                <span>{{ step.title }}</span>
+                <span>{{ step.state === 'done' ? '已完成' : step.state === 'current' ? '当前' : '待开始' }}</span>
+              </div>
+            </div>
+          </section>
 
-  <TutorLauncher :open="tutorPanel.isOpen.value" @toggle="tutorPanel.togglePanel" />
-  <FloatingTutor
-    :open="tutorPanel.isOpen.value"
-    :available="tutorPanel.canUseTutor.value"
-    :context-title="tutorContext.contextTitle"
-    :context-meta="`${sessionCourse} / ${sessionChapter}`"
-    :messages="tutorPanel.messages.value"
-    :loading="tutorPanel.loading.value"
-    :load-error="tutorPanel.loadError.value"
-    :send-error="tutorPanel.sendError.value"
-    :sending="tutorPanel.sending.value"
-    :input="tutorPanel.input.value"
-    :quick-prompts="tutorPanel.quickPrompts"
-    @close="tutorPanel.closePanel"
-    @retry-load="loadTutorMessages"
-    @retry-send="tutorPanel.retrySend"
-    @submit="tutorPanel.sendMessage"
-    @update-input="tutorPanel.setInput"
-    @use-quick-prompt="tutorPanel.useQuickPrompt"
-  />
+          <section class="side-card">
+            <span class="side-label">学习提示</span>
+            <ul class="tip-list">
+              <li v-for="tip in sidebarTips" :key="tip">{{ tip }}</li>
+            </ul>
+          </section>
+
+          <p v-if="lightweightNotice" class="lightweight-tip">{{ lightweightNotice }}</p>
+          <p v-if="trainingState.view === 'error'" class="error-tip">
+            {{ practiceQueryError || feedbackError || '当前检测流程加载失败，请重试。' }}
+          </p>
+        </aside>
+      </div>
+    </main>
+
+    <TutorLauncher :open="tutorPanel.isOpen.value" @toggle="tutorPanel.togglePanel" />
+    <FloatingTutor
+      :open="tutorPanel.isOpen.value"
+      :available="tutorPanel.canUseTutor.value"
+      :context-title="tutorContext.contextTitle"
+      :context-meta="`${sessionCourse} / ${sessionChapter}`"
+      :messages="tutorPanel.messages.value"
+      :loading="tutorPanel.loading.value"
+      :load-error="tutorPanel.loadError.value"
+      :send-error="tutorPanel.sendError.value"
+      :sending="tutorPanel.sending.value"
+      :input="tutorPanel.input.value"
+      :quick-prompts="tutorPanel.quickPrompts"
+      @close="tutorPanel.closePanel"
+      @retry-load="loadTutorMessages"
+      @retry-send="tutorPanel.retrySend"
+      @submit="tutorPanel.sendMessage"
+      @update-input="tutorPanel.setInput"
+      @use-quick-prompt="tutorPanel.useQuickPrompt"
+    />
   </div>
 </template>
 
@@ -691,7 +716,8 @@ watch(
 .goal,
 .section-head h2,
 .section-head p,
-.side-card p {
+.side-card p,
+.status-copy {
   margin: 0;
 }
 
@@ -700,7 +726,8 @@ watch(
 .section-head p,
 .side-card p,
 .goal-item p,
-.goal-item li {
+.goal-item li,
+.status-copy {
   color: var(--color-text-secondary);
   line-height: 1.7;
 }
@@ -720,7 +747,9 @@ watch(
   gap: 14px;
 }
 
-.goal-item {
+.goal-item,
+.quiz-status-banner,
+.submit-bar {
   display: grid;
   gap: 10px;
   padding: 18px;
@@ -734,6 +763,15 @@ watch(
 .tip-list {
   margin: 0;
   padding-left: 20px;
+}
+
+.submit-bar {
+  margin-top: 14px;
+}
+
+.submit-hint {
+  margin: 0;
+  color: var(--color-text-secondary);
 }
 
 .side-card {

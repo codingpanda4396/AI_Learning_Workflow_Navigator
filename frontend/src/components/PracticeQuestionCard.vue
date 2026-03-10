@@ -1,23 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import PrimaryButton from '@/components/PrimaryButton.vue'
 import { getQuestionMeta } from '@/constants/trainingStage'
-import type { PracticeItem, PracticeSubmission } from '@/types'
+import type { PracticeItem } from '@/types'
 
 const props = defineProps<{
   item: PracticeItem
   index: number
   draft: string
-  submission: PracticeSubmission | null
-  submitting: boolean
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
   updateDraft: [value: string]
-  submit: []
 }>()
 
-const meta = computed(() => getQuestionMeta(props.item, props.index, props.submission))
+const meta = computed(() => getQuestionMeta(props.item, props.index))
 
 const optionLines = computed(() => {
   if (!Array.isArray(props.item.options)) {
@@ -36,7 +33,7 @@ const optionLines = computed(() => {
         const label = typeof record.label === 'string' ? record.label : ''
         const value = typeof record.value === 'string' ? record.value : ''
         if (label && value) {
-          return `${label}：${value}`
+          return `${label}: ${value}`
         }
         return label || value
       }
@@ -44,8 +41,6 @@ const optionLines = computed(() => {
     })
     .filter((line) => line.trim().length > 0)
 })
-
-const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitting)
 </script>
 
 <template>
@@ -60,33 +55,20 @@ const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitt
     </div>
 
     <p class="question-stem">{{ item.stem }}</p>
+    <p v-if="item.evaluationFocus" class="evaluation-focus">考察点：{{ item.evaluationFocus }}</p>
 
     <ul v-if="optionLines.length" class="question-options">
-      <li v-for="(line, lineIndex) in optionLines" :key="`${item.itemId}-${lineIndex}`">{{ line }}</li>
+      <li v-for="(line, lineIndex) in optionLines" :key="`${item.questionId}-${lineIndex}`">{{ line }}</li>
     </ul>
 
     <textarea
       class="answer-input"
       rows="4"
       :value="draft"
-      :disabled="submitting"
-      placeholder="写下你的答案或思路。"
+      :disabled="disabled"
+      placeholder="填写你的答案或思路"
       @input="emit('updateDraft', ($event.target as HTMLTextAreaElement).value)"
     ></textarea>
-
-    <div class="question-actions">
-      <PrimaryButton :disabled="!canSubmit" :loading="submitting" @click="emit('submit')">提交答案</PrimaryButton>
-    </div>
-
-    <div v-if="submission" class="result-card">
-      <p class="result-title">
-        {{ submission.score === null ? '已提交，等待批改' : submission.isCorrect ? '这题回答正确' : '这题还可以再加强' }}
-      </p>
-      <p v-if="submission.feedback" class="result-copy">{{ submission.feedback }}</p>
-      <div v-if="submission.errorTags.length" class="tag-row">
-        <span v-for="tag in submission.errorTags" :key="`${submission.submissionId}-${tag}`" class="feedback-tag">{{ tag }}</span>
-      </div>
-    </div>
   </article>
 </template>
 
@@ -100,8 +82,7 @@ const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitt
   background: rgba(14, 20, 31, 0.9);
 }
 
-.question-head,
-.question-actions {
+.question-head {
   display: flex;
   justify-content: space-between;
   gap: var(--space-md);
@@ -109,16 +90,14 @@ const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitt
   flex-wrap: wrap;
 }
 
-.question-tags,
-.tag-row {
+.question-tags {
   display: flex;
   gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .label,
-.status-label,
-.feedback-tag {
+.status-label {
   padding: 6px 10px;
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
@@ -145,16 +124,23 @@ const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitt
 }
 
 .question-stem,
-.result-copy {
+.evaluation-focus {
   margin: 0;
   line-height: 1.75;
+}
+
+.question-stem {
   color: var(--color-text);
+}
+
+.evaluation-focus,
+.question-options {
+  color: var(--color-text-secondary);
 }
 
 .question-options {
   margin: 0;
   padding-left: 20px;
-  color: var(--color-text-secondary);
 }
 
 .answer-input {
@@ -165,31 +151,5 @@ const canSubmit = computed(() => props.draft.trim().length > 0 && !props.submitt
   background: rgba(8, 12, 19, 0.82);
   color: var(--color-text);
   resize: vertical;
-}
-
-.result-card {
-  display: grid;
-  gap: 10px;
-  padding: var(--space-lg);
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(93, 212, 166, 0.2);
-  background: rgba(14, 38, 33, 0.45);
-}
-
-.result-title {
-  margin: 0;
-  color: var(--color-success);
-  font-weight: 600;
-}
-
-.feedback-tag {
-  background: rgba(255, 122, 138, 0.14);
-  color: #ffc5cd;
-}
-
-@media (max-width: 640px) {
-  .question-actions :deep(.btn) {
-    width: 100%;
-  }
 }
 </style>

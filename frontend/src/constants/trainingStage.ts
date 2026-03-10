@@ -1,4 +1,4 @@
-import type { PracticeFeedbackReport, PracticeItem, PracticeQuizResponse, PracticeSubmission, RunTaskResponse } from '@/types'
+import type { PracticeFeedbackReport, PracticeItem, PracticeQuizResponse, RunTaskResponse } from '@/types'
 
 export type TrainingTaskStatus = 'idle' | 'ready' | 'error'
 
@@ -30,7 +30,7 @@ export interface TrainingStateInput {
   hasSubmittedAnswers: boolean
   requestingQuiz: boolean
   pollingQuiz: boolean
-  submittingAnswer: boolean
+  submittingQuiz: boolean
   loadingFeedback: boolean
 }
 
@@ -52,9 +52,9 @@ const questionTypeLabelMap: Record<string, string> = {
   BASIC: '基础题',
   APPLICATION: '应用题',
   REASONING: '思考题',
-  SINGLE_CHOICE: '基础题',
-  TRUE_FALSE: '基础题',
-  SHORT_ANSWER: '应用题',
+  SINGLE_CHOICE: '单选题',
+  TRUE_FALSE: '判断题',
+  SHORT_ANSWER: '简答题',
 }
 
 const difficultyLabelMap: Record<string, string> = {
@@ -79,17 +79,18 @@ export function deriveTrainingStatuses(input: TrainingStateInput) {
   let quizStatus: TrainingQuizStatus = 'not_generated'
   if (input.requestingQuiz || input.pollingQuiz) {
     quizStatus = 'generating'
-  } else if (input.submittingAnswer) {
+  } else if (input.submittingQuiz) {
     quizStatus = 'submitting'
   } else if (input.quizError && !input.quiz) {
     quizStatus = 'error'
   } else if (!input.quiz) {
     quizStatus = 'not_generated'
+  } else if (input.quiz.generationStatus === 'PENDING' || input.quiz.generationStatus === 'RUNNING') {
+    quizStatus = 'generating'
+  } else if (input.quiz.generationStatus === 'FAILED' || input.quiz.quizStatus === 'FAILED') {
+    quizStatus = 'error'
   } else {
-    switch (input.quiz.status) {
-      case 'GENERATING':
-        quizStatus = 'generating'
-        break
+    switch (input.quiz.quizStatus) {
       case 'QUIZ_READY':
         quizStatus = 'ready'
         break
@@ -99,8 +100,8 @@ export function deriveTrainingStatuses(input: TrainingStateInput) {
       case 'FEEDBACK_READY':
         quizStatus = 'submitted'
         break
-      case 'FAILED':
-        quizStatus = 'error'
+      case 'GENERATING':
+        quizStatus = 'generating'
         break
       default:
         quizStatus = 'not_generated'
@@ -116,7 +117,7 @@ export function deriveTrainingStatuses(input: TrainingStateInput) {
     feedbackStatus = 'ready'
   } else if (input.feedbackError) {
     feedbackStatus = 'error'
-  } else if (input.quiz?.status === 'ANSWERED') {
+  } else if (input.quiz?.quizStatus === 'ANSWERED') {
     feedbackStatus = 'generating'
   }
 
@@ -131,8 +132,6 @@ export function deriveTrainingStatuses(input: TrainingStateInput) {
     view = 'quiz_ready'
   } else if (quizStatus === 'submitting' || quizStatus === 'submitted' || feedbackStatus === 'generating') {
     view = 'feedback_generating'
-  } else {
-    view = 'quiz_not_generated'
   }
 
   return { taskStatus, quizStatus, feedbackStatus, view }
@@ -148,7 +147,7 @@ export function buildTrainingSteps(view: TrainingStageView): TrainingStepItem[] 
     error: 2,
   }
   const currentIndex = currentIndexMap[view]
-  const titles = ['学习计划', '学明白', '做练习', '提交答案', '看结果']
+  const titles = ['学习计划', '理解任务', '开始检测', '提交答案', '查看反馈']
   return titles.map((title, index) => {
     const stepIndex = index + 1
     return {
@@ -163,50 +162,50 @@ export function getTrainingActionContent(view: TrainingStageView): TrainingActio
   switch (view) {
     case 'quiz_generating':
       return {
-        title: '练习题正在生成',
-        description: '系统正在准备本章练习题，你可以先继续向 Tutor 提问。',
+        title: '检测题生成中',
+        description: '系统正在准备本轮检测题，稍后会自动刷新为可作答状态。',
         buttonText: '生成中...',
         loading: true,
         disabled: true,
       }
     case 'quiz_ready':
       return {
-        title: '可以开始做练习了',
-        description: '练习已经准备好，现在可以开始作答。',
-        buttonText: '开始做题',
+        title: '已生成，可开始检测',
+        description: '题目已经准备完成，可以逐题填写后一次性提交。',
+        buttonText: '开始检测',
         loading: false,
         disabled: false,
       }
     case 'feedback_generating':
       return {
-        title: '正在整理结果',
-        description: '你的答案已提交，系统正在分析表现并生成建议。',
+        title: '反馈整理中',
+        description: '答案已提交，系统正在生成整体反馈和下一步建议。',
         buttonText: '整理中...',
         loading: true,
         disabled: true,
       }
     case 'feedback_ready':
       return {
-        title: '结果已经准备好',
-        description: '现在可以查看你的薄弱点和下一步建议。',
-        buttonText: '查看结果',
+        title: '反馈已生成',
+        description: '现在可以查看整体总结、逐题结果和下一步动作。',
+        buttonText: '查看反馈',
         loading: false,
         disabled: false,
       }
     case 'error':
       return {
-        title: '训练流程暂时不可用',
-        description: '重试后会继续保留你当前的学习进度。',
-        buttonText: '重新加载',
+        title: '检测流程失败，可重试',
+        description: '重新加载后会继续使用当前 session，不会重构页面流程。',
+        buttonText: '重试',
         loading: false,
         disabled: false,
       }
     case 'quiz_not_generated':
     default:
       return {
-        title: '开始本章练习',
-        description: '系统会生成少量练习题，帮助你快速确认是否学会了。',
-        buttonText: '生成练习题',
+        title: '开始生成检测题',
+        description: '系统会基于当前训练任务生成检测题，帮助完成可演示闭环。',
+        buttonText: '生成检测题',
         loading: false,
         disabled: false,
       }
@@ -227,22 +226,16 @@ export function getDifficultyLabel(rawDifficulty: string) {
   return difficultyLabelMap[normalized] ?? '中等'
 }
 
-export function getPracticeItemStatusLabel(item: PracticeItem, submission: PracticeSubmission | null) {
-  if (submission && submission.score !== null) {
-    return '已批改'
-  }
-  if (submission) {
-    return '已作答'
-  }
+export function getPracticeItemStatusLabel(item: PracticeItem) {
   return itemStatusLabelMap[item.status?.trim().toUpperCase()] ?? '未作答'
 }
 
-export function getQuestionMeta(item: PracticeItem, index: number, submission: PracticeSubmission | null) {
+export function getQuestionMeta(item: PracticeItem, index: number) {
   return {
     orderLabel: `第 ${index + 1} 题`,
-    typeLabel: getQuestionTypeLabel(item.questionType, index),
+    typeLabel: getQuestionTypeLabel(item.type, index),
     difficultyLabel: getDifficultyLabel(item.difficulty),
-    statusLabel: getPracticeItemStatusLabel(item, submission),
+    statusLabel: getPracticeItemStatusLabel(item),
   }
 }
 
@@ -254,10 +247,13 @@ export function getSystemAdjustments(report: PracticeFeedbackReport | null) {
   if (report.reviewFocus.length > 0) {
     items.push(`系统已标记 ${report.reviewFocus.length} 个优先复习点`)
   }
+  if (report.suggestedNextAction) {
+    items.push(report.suggestedNextAction)
+  }
   if (report.recommendedAction === 'REVIEW') {
-    items.push('建议先回到薄弱点复习，再进入下一轮。')
+    items.push('建议先进入复习，再开始下一轮学习。')
   } else {
-    items.push('可以继续进入下一轮学习。')
+    items.push('可以直接进入下一轮学习。')
   }
   return items
 }

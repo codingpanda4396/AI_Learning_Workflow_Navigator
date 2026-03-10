@@ -236,51 +236,13 @@ export interface SessionHistoryResponse {
 }
 
 export interface PracticeItem {
-  itemId: number
-  questionType: string
+  questionId: number
+  type: string
   stem: string
   options: unknown
+  evaluationFocus: string
   difficulty: string
-  source: string
   status: string
-}
-
-export interface PracticeItemsResponse {
-  sessionId: number
-  taskId: number
-  itemCount: number
-  items: PracticeItem[]
-}
-
-export interface PracticeSubmission {
-  submissionId: number
-  practiceItemId: number
-  userAnswer: string
-  score: number | null
-  isCorrect: boolean | null
-  feedback: string
-  errorTags: string[]
-  submittedAt: string
-}
-
-export interface PracticeSubmissionsResponse {
-  sessionId: number
-  taskId: number
-  submissionCount: number
-  submissions: PracticeSubmission[]
-}
-
-export interface PracticeJudgement {
-  score: number | null
-  isCorrect: boolean | null
-  feedback: string
-  errorTags: string[]
-}
-
-export interface SubmitPracticeAnswerResponse {
-  submission: PracticeSubmission
-  practiceItem: PracticeItem
-  judgement: PracticeJudgement
 }
 
 export type PracticeQuizStatus =
@@ -296,12 +258,24 @@ export interface PracticeQuizResponse {
   quizId: number
   sessionId: number
   taskId: number
-  status: PracticeQuizStatus
+  generationStatus: TaskStatus
+  quizStatus: PracticeQuizStatus
   questionCount: number
   answeredCount: number
-  generationSource: string
   failureReason: string
+  retryable: boolean
   questions: PracticeItem[]
+}
+
+export interface PracticeQuestionResult {
+  questionId: number
+  type: string
+  stem: string
+  userAnswer: string
+  score: number | null
+  correct: boolean
+  feedback: string
+  errorTags: string[]
 }
 
 export interface PracticeFeedbackReport {
@@ -309,12 +283,16 @@ export interface PracticeFeedbackReport {
   quizId: number
   sessionId: number
   taskId: number
-  diagnosisSummary: string
+  reportStatus: TaskStatus
+  overallSummary: string
+  questionResults: PracticeQuestionResult[]
   strengths: string[]
   weaknesses: string[]
   reviewFocus: string[]
   nextRoundAdvice: string
+  suggestedNextAction: string
   recommendedAction: 'REVIEW' | 'NEXT_ROUND'
+  selectedAction: 'REVIEW' | 'NEXT_ROUND' | ''
   source: string
 }
 

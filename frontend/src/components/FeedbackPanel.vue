@@ -13,20 +13,9 @@ const emit = defineEmits<{
   nextRound: []
 }>()
 
-const summary = computed(() => props.report?.diagnosisSummary ?? '')
-const weakPoints = computed(() => props.report?.weaknesses?.slice(0, 3) ?? [])
-const nextSuggestions = computed(() => {
-  if (!props.report) {
-    return []
-  }
-  const items = [props.report.nextRoundAdvice]
-  if (props.report.recommendedAction === 'REVIEW') {
-    items.unshift('建议先回到薄弱点复习，再进入下一轮。')
-  } else {
-    items.unshift('可以继续下一轮学习，保持当前节奏。')
-  }
-  return items.filter((item) => item.trim().length > 0)
-})
+const summary = computed(() => props.report?.overallSummary ?? '')
+const questionResults = computed(() => props.report?.questionResults ?? [])
+const weakPoints = computed(() => props.report?.weaknesses ?? [])
 const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? null))
 </script>
 
@@ -35,51 +24,65 @@ const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? nu
     <div class="feedback-head">
       <div>
         <span class="feedback-label">结果反馈</span>
-        <h3>{{ mode === 'ready' ? '本轮结果' : mode === 'loading' ? '系统正在整理结果' : '结果反馈' }}</h3>
+        <h3>{{ mode === 'ready' ? '本轮反馈' : mode === 'loading' ? '系统正在整理反馈' : '反馈结果' }}</h3>
       </div>
       <span v-if="mode === 'ready'" class="ready-badge">已生成</span>
     </div>
 
     <template v-if="mode === 'empty'">
-      <p class="feedback-copy">完成练习后，这里会显示你的整体表现、薄弱点和下一步建议。</p>
+      <p class="feedback-copy">提交检测后，这里会展示整体总结、逐题结果、薄弱点和下一步建议。</p>
     </template>
 
     <template v-else-if="mode === 'loading'">
-      <p class="feedback-copy">请稍等，系统正在分析你的作答情况。</p>
+      <p class="feedback-copy">请稍等，系统正在整理你的检测反馈。</p>
       <div class="loading-bar"></div>
     </template>
 
     <template v-else>
       <div class="feedback-section">
-        <h4>总结</h4>
+        <h4>overallSummary</h4>
         <p class="feedback-copy">{{ summary }}</p>
       </div>
 
       <div class="feedback-section">
-        <h4>薄弱点</h4>
+        <h4>questionResults</h4>
+        <div v-if="questionResults.length" class="result-list">
+          <article v-for="result in questionResults" :key="result.questionId" class="result-item">
+            <div class="result-head">
+              <strong>Q{{ result.questionId }}</strong>
+              <span>{{ result.correct ? '正确' : '待加强' }}</span>
+            </div>
+            <p class="result-copy">{{ result.stem }}</p>
+            <p class="result-copy">你的答案：{{ result.userAnswer || '未填写' }}</p>
+            <p class="result-copy">反馈：{{ result.feedback || '暂无逐题反馈' }}</p>
+          </article>
+        </div>
+        <p v-else class="feedback-copy">暂无逐题结果。</p>
+      </div>
+
+      <div class="feedback-section">
+        <h4>weaknesses</h4>
         <ul v-if="weakPoints.length" class="feedback-list">
           <li v-for="item in weakPoints" :key="item">{{ item }}</li>
         </ul>
-        <p v-else class="feedback-copy">当前没有明显薄弱点，可以继续保持。</p>
+        <p v-else class="feedback-copy">当前没有明显薄弱点。</p>
       </div>
 
       <div class="feedback-section" v-if="systemAdjustments.length">
-        <h4>系统调整</h4>
+        <h4>suggestedNextAction</h4>
         <ul class="feedback-list">
           <li v-for="item in systemAdjustments" :key="item">{{ item }}</li>
         </ul>
       </div>
 
-      <div class="feedback-section" v-if="nextSuggestions.length">
-        <h4>下一步</h4>
-        <ul class="feedback-list">
-          <li v-for="item in nextSuggestions" :key="item">{{ item }}</li>
-        </ul>
+      <div class="feedback-section" v-if="report?.nextRoundAdvice">
+        <h4>nextRoundAdvice</h4>
+        <p class="feedback-copy">{{ report.nextRoundAdvice }}</p>
       </div>
 
       <div class="feedback-actions">
-        <button type="button" class="ghost-btn" @click="emit('review')">先复习</button>
-        <button type="button" class="primary-btn" @click="emit('nextRound')">继续下一轮</button>
+        <button type="button" class="ghost-btn" @click="emit('review')">进入复习</button>
+        <button type="button" class="primary-btn" @click="emit('nextRound')">下一轮学习</button>
       </div>
     </template>
   </section>
@@ -132,8 +135,9 @@ const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? nu
   gap: 8px;
 }
 
-.feedback-section h4 {
-  font-size: var(--font-size-md);
+.feedback-section h4,
+.result-head,
+.feedback-head h3 {
   margin: 0;
 }
 
@@ -146,6 +150,31 @@ const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? nu
 
 .feedback-list {
   padding-left: 20px;
+}
+
+.result-list {
+  display: grid;
+  gap: 12px;
+}
+
+.result-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(61, 80, 104, 0.4);
+  background: rgba(10, 16, 26, 0.78);
+}
+
+.result-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.result-copy {
+  margin: 0;
+  color: var(--color-text-secondary);
 }
 
 .feedback-actions {
