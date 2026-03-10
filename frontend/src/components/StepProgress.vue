@@ -32,29 +32,8 @@ function hasProgress(step: WorkflowStepMeta) {
   )
 }
 
-function doneCount(step: WorkflowStepMeta) {
-  return step.doneCount ?? 0
-}
-
-function totalCount(step: WorkflowStepMeta) {
-  return step.totalCount ?? 0
-}
-
 function percent(step: WorkflowStepMeta) {
   return step.percent ?? 0
-}
-
-function statusText(step: WorkflowStepMeta) {
-  switch (step.status) {
-    case 'done':
-      return '已完成'
-    case 'running':
-      return '进行中'
-    case 'blocked':
-      return '受阻'
-    default:
-      return '未开始'
-  }
 }
 </script>
 
