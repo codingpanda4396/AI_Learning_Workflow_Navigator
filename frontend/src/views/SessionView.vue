@@ -19,8 +19,10 @@ const authStore = useAuthStore()
 const sessionStore = useSessionStore()
 const workflowStore = useWorkflowStore()
 
+type SessionStepNumber = 1 | 2 | 3
+
 type StepMeta = {
-  step: WorkflowStepNumber
+  step: SessionStepNumber
   title: string
   task: string
 }
@@ -35,45 +37,128 @@ type StepProgressItem = {
 }
 
 const sessionId = computed(() => Number(route.params.id))
-const browsingStep = ref<WorkflowStepNumber>(1)
+const browsingStep = ref<SessionStepNumber>(1)
 const expandedTaskIds = ref<number[]>([])
 
-function resolveStep(raw: unknown): WorkflowStepNumber {
+function resolveStep(raw: unknown): SessionStepNumber {
   const value = Number(raw)
-  if (Number.isFinite(value) && value >= 1 && value <= 4) {
-    return value as WorkflowStepNumber
+  if (Number.isFinite(value) && value >= 1 && value <= 3) {
+    return value as SessionStepNumber
   }
   return 1
 }
 
 const steps: StepMeta[] = [
-  { step: 1, title: '目标诊断', task: '查看目标质量评估' },
-  { step: 2, title: '路径规划', task: '选择学习路径' },
-  { step: 3, title: '分步学习', task: '按步骤执行任务' },
-  { step: 4, title: '总结反馈', task: '查看进度和下一步建议' },
+  { step: 1, title: '学习计划', task: '确认当前学习目标与计划任务' },
+  { step: 2, title: '分步学习', task: '执行当前任务并推进进度' },
+  { step: 3, title: '阶段反馈', task: '查看阶段进度与下一步建议' },
 ]
 
+function stageLabel(stage: string) {
+  const map: Record<string, string> = {
+    STRUCTURE: '结构构建',
+    UNDERSTANDING: '理解深化',
+    TRAINING: '训练实战',
+    EVALUATION: '阶段评估',
+    REFLECTION: '复盘总结',
+  }
+  return map[stage] || stage
+}
+
+function stageGuide(stage: string) {
+  const map: Record<string, string> = {
+    STRUCTURE: '梳理关键概念、边界与关系，形成知识框架。',
+    UNDERSTANDING: '解释机制和因果链，识别并纠正常见误区。',
+    TRAINING: '完成训练题并提交答案，根据反馈修正。',
+    EVALUATION: '对当前阶段完成情况进行验证并整理改进点。',
+    REFLECTION: '复盘错误模式，提炼下一步改进动作。',
+  }
+  return map[stage] || '按任务提示完成学习。'
+}
+
 const currentSession = computed(() => sessionStore.currentSession)
+const learningFeedback = computed(() => sessionStore.learningFeedback)
 const isLoading = computed(() => sessionStore.fetchingSession || sessionStore.recoveringSession)
 const error = computed(() => sessionStore.error)
-const diagnosis = computed(() => sessionStore.goalDiagnosis)
-const pathOptions = computed(() => sessionStore.pathOptions)
-const selectedPathId = computed(() => sessionStore.selectedPathId)
 const currentStep = computed(() => browsingStep.value)
 const currentStepMeta = computed(() => steps.find((item) => item.step === currentStep.value) ?? steps[0]!)
-const selectedPath = computed(() => pathOptions.value.find((item) => item.pathId === selectedPathId.value) ?? null)
 const username = computed(() => authStore.currentUser?.username ?? '')
 
-const stepProgressData = computed<StepProgressItem[]>(() => {
-  const timeline = currentSession.value?.timeline ?? []
-  const failedCount = timeline.filter((item) => item.status === 'FAILED').length
-  const doneTaskCount = timeline.filter((item) => item.status === 'SUCCEEDED').length
-  const totalTaskCount = timeline.length
-  const step1Done = !!diagnosis.value
-  const step2Done = !!selectedPathId.value && pathOptions.value.length > 0
-  const finalDone = (currentSession.value?.progress?.completionRate ?? 0) >= 1
+function dedupeByTaskIdentity<T extends { taskId: number; nodeId?: number; stage?: string }>(items: T[]) {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const fallbackKey = `${item.nodeId ?? 'unknown'}:${item.stage ?? 'unknown'}`
+    const key = Number.isFinite(item.taskId) && item.taskId > 0 ? `task:${item.taskId}` : `node-stage:${fallbackKey}`
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
+}
 
-  const items: StepProgressItem[] = [
+const timelineItems = computed(() => dedupeByTaskIdentity(currentSession.value?.timeline ?? []))
+
+const plannedNodes = computed(() => {
+  if (sessionStore.plannedNodes.length > 0) {
+    return sessionStore.plannedNodes
+  }
+  const grouped = new Map<number, { nodeId: number; nodeName: string; status: string; stages: Array<{ taskId: number; stage: string; objective: string; status: string }> }>()
+  for (const item of timelineItems.value) {
+    const existing = grouped.get(item.nodeId) ?? {
+      nodeId: item.nodeId,
+      nodeName: `节点 ${item.nodeId}`,
+      status: item.status,
+      stages: [],
+    }
+    existing.stages.push({
+      taskId: item.taskId,
+      stage: item.stage,
+      objective: stageGuide(item.stage),
+      status: item.status,
+    })
+    grouped.set(item.nodeId, existing)
+  }
+  return [...grouped.values()]
+})
+
+const plannedStageTasks = computed(() =>
+  plannedNodes.value.flatMap((plan) =>
+    plan.stages.map((stage) => ({
+      ...stage,
+      nodeId: plan.nodeId,
+      nodeName: plan.nodeName,
+      nodeStatus: plan.status,
+    })),
+  ),
+)
+
+const nextPlannedTask = computed(() => {
+  if (sessionStore.nextTask) {
+    return plannedStageTasks.value.find((item) => item.taskId === sessionStore.nextTask?.taskId) ?? null
+  }
+  return plannedStageTasks.value.find((item) => item.status !== 'SUCCEEDED') ?? plannedStageTasks.value[0] ?? null
+})
+
+const totalTaskCount = computed(() => currentSession.value?.progress?.totalTaskCount ?? timelineItems.value.length)
+const completedTaskCount = computed(() => currentSession.value?.progress?.completedTaskCount ?? 0)
+const completionPercent = computed(() => {
+  const total = totalTaskCount.value
+  if (total <= 0) {
+    return 0
+  }
+  return Math.round((completedTaskCount.value / total) * 100)
+})
+
+const stepProgressData = computed<StepProgressItem[]>(() => {
+  const timeline = timelineItems.value
+  const failedCount = timeline.filter((item) => item.status === 'FAILED').length
+  const step1Done = plannedNodes.value.length > 0
+  const step2HasProgress = completedTaskCount.value > 0 || sessionStore.nextTask !== null
+  const step3Ready = totalTaskCount.value > 0
+  const step3Done = !!learningFeedback.value || (currentSession.value?.progress?.completionRate ?? 0) >= 1
+
+  return [
     {
       step: 1,
       title: steps[0]!.title,
@@ -85,58 +170,30 @@ const stepProgressData = computed<StepProgressItem[]>(() => {
     {
       step: 2,
       title: steps[1]!.title,
-      doneCount: step2Done ? 1 : 0,
-      totalCount: 1,
-      percent: step2Done ? 100 : 0,
-      status: step2Done ? 'done' : (step1Done ? 'running' : 'pending'),
+      doneCount: completedTaskCount.value,
+      totalCount: totalTaskCount.value,
+      percent: completionPercent.value,
+      status:
+        totalTaskCount.value === 0
+          ? (step1Done ? 'running' : 'pending')
+          : completedTaskCount.value >= totalTaskCount.value
+            ? 'done'
+            : failedCount > 0
+              ? 'blocked'
+              : step2HasProgress
+                ? 'running'
+                : 'pending',
     },
     {
       step: 3,
       title: steps[2]!.title,
-      doneCount: doneTaskCount,
-      totalCount: totalTaskCount,
-      percent: totalTaskCount === 0 ? 0 : Math.round((doneTaskCount / totalTaskCount) * 100),
-      status:
-        totalTaskCount === 0
-          ? 'pending'
-          : doneTaskCount === totalTaskCount
-            ? 'done'
-            : failedCount > 0
-              ? 'blocked'
-              : 'running',
-    },
-    {
-      step: 4,
-      title: steps[3]!.title,
-      doneCount: finalDone ? 1 : 0,
+      doneCount: step3Done ? 1 : 0,
       totalCount: 1,
-      percent: finalDone ? 100 : 0,
-      status: finalDone ? 'done' : (totalTaskCount > 0 ? 'running' : 'pending'),
+      percent: step3Done ? 100 : (step3Ready ? 60 : 0),
+      status: step3Done ? 'done' : (step3Ready ? 'running' : 'pending'),
     },
   ]
-
-  return items
 })
-
-function stageLabel(stage: string) {
-  const map: Record<string, string> = {
-    STRUCTURE: '结构构建',
-    UNDERSTANDING: '理解深化',
-    TRAINING: '训练实战',
-    REFLECTION: '复盘总结',
-  }
-  return map[stage] || stage
-}
-
-function stageGuide(stage: string) {
-  const map: Record<string, string> = {
-    STRUCTURE: '梳理关键概念、边界与关系，形成知识框架。',
-    UNDERSTANDING: '解释机制和因果链，识别并纠正常见误区。',
-    TRAINING: '完成训练题并提交答案，根据反馈修正。',
-    REFLECTION: '复盘错误模式，提炼下一步改进动作。',
-  }
-  return map[stage] || '按任务提示完成学习。'
-}
 
 function resolveTaskPath(taskId: number, stage: string) {
   return stage === 'TRAINING' ? `/task/${taskId}/submit` : `/task/${taskId}/run`
@@ -164,24 +221,22 @@ function isTaskExpanded(taskId: number) {
   return expandedTaskIds.value.includes(taskId)
 }
 
-function selectPath(pathId: string) {
-  sessionStore.setSelectedPath(pathId)
-}
-
-async function refreshModuleData() {
-  if (!currentSession.value) return
-  const payload = {
-    courseId: currentSession.value.courseId,
-    chapterId: currentSession.value.chapterId,
-    goalText: currentSession.value.goalText,
-  }
-  await Promise.all([sessionStore.diagnoseGoal(payload), sessionStore.fetchPathOptions(payload)])
-}
-
 async function fetchSession() {
   await sessionStore.fetchSessionOverview(sessionId.value)
   await sessionStore.fetchSessionPath(sessionId.value)
-  await refreshModuleData()
+
+  if ((currentSession.value?.timeline.length ?? 0) === 0) {
+    await sessionStore.planSession(sessionId.value)
+    await sessionStore.fetchSessionOverview(sessionId.value)
+  }
+
+  if (!learningFeedback.value && (currentSession.value?.progress?.totalTaskCount ?? 0) > 0) {
+    try {
+      await sessionStore.fetchLearningFeedback(sessionId.value)
+    } catch {
+      // feedback is non-blocking in MVP session view
+    }
+  }
 }
 
 function handleRunNextTask() {
@@ -193,16 +248,16 @@ async function handleRetry() {
   await fetchSession()
 }
 
-function goToStep(step: WorkflowStepNumber) {
+function goToStep(step: SessionStepNumber) {
   browsingStep.value = step
 }
 
 function handlePrevious() {
-  if (currentStep.value > 1) goToStep((currentStep.value - 1) as WorkflowStepNumber)
+  if (currentStep.value > 1) goToStep((currentStep.value - 1) as SessionStepNumber)
 }
 
 function handleNext() {
-  if (currentStep.value < 4) goToStep((currentStep.value + 1) as WorkflowStepNumber)
+  if (currentStep.value < 3) goToStep((currentStep.value + 1) as SessionStepNumber)
 }
 
 async function goHome() {
@@ -241,7 +296,7 @@ onMounted(async () => {
     <ErrorMessage v-else-if="error && !currentSession" :message="error" @retry="handleRetry" />
 
     <section v-else class="workflow-content">
-      <PageHeader eyebrow="Learning Flow" title="四步学习流程" :subtitle="`当前关注：${currentStepMeta.task}`" />
+      <PageHeader eyebrow="Learning Flow" title="MVP 三步学习流程" :subtitle="`当前关注：${currentStepMeta.task}`" />
       <StepProgress :steps="stepProgressData" :current-step="currentStep" />
 
       <article class="step-card">
@@ -251,43 +306,50 @@ onMounted(async () => {
         </div>
 
         <section v-if="currentStep === 1" class="panel">
-          <h3>目标诊断结果</h3>
-          <p v-if="!diagnosis">暂无诊断结果，请刷新。</p>
-          <template v-else>
-            <p><strong>评分：</strong>{{ diagnosis.goalScore }}/100</p>
-            <p><strong>结论：</strong>{{ diagnosis.feedback.summary }}</p>
-            <p><strong>优势：</strong>{{ diagnosis.feedback.strengths.join('；') }}</p>
-            <p><strong>风险：</strong>{{ diagnosis.feedback.risks.join('；') }}</p>
-            <p><strong>建议目标：</strong>{{ diagnosis.feedback.rewrittenGoal }}</p>
-          </template>
+          <h3>学习计划</h3>
+          <p v-if="currentSession"><strong>课程/章节：</strong>{{ currentSession.courseId }} / {{ currentSession.chapterId }}</p>
+          <p v-if="currentSession"><strong>学习目标：</strong>{{ currentSession.goalText }}</p>
+          <p v-if="nextPlannedTask">
+            <strong>推荐起始任务：</strong>任务 #{{ nextPlannedTask.taskId }}（{{ stageLabel(nextPlannedTask.stage) }}）
+          </p>
+          <p v-if="plannedNodes.length === 0">当前暂无计划任务。</p>
+          <div v-else class="task-list">
+            <article v-for="plan in plannedNodes" :key="`plan-node-${plan.nodeId}`" class="task-item">
+              <div class="task-body">
+                <p><strong>{{ plan.nodeName }}</strong> · 节点 #{{ plan.nodeId }}</p>
+                <p><strong>节点状态：</strong>{{ plan.status }}</p>
+                <div class="task-list">
+                  <article v-for="stage in plan.stages" :key="stage.taskId" class="task-item">
+                    <div class="task-body">
+                      <p><strong>任务 #{{ stage.taskId }}</strong> · {{ stageLabel(stage.stage) }}</p>
+                      <p>{{ stage.objective || stageGuide(stage.stage) }}</p>
+                      <p><strong>状态：</strong>{{ stage.status }}</p>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </article>
+          </div>
         </section>
 
         <section v-if="currentStep === 2" class="panel">
-          <h3>路径选项</h3>
-          <div class="path-grid">
-            <article
-              v-for="path in pathOptions"
-              :key="path.pathId"
-              class="path-item"
-              :class="{ selected: path.pathId === selectedPathId }"
-              @click="selectPath(path.pathId)"
-            >
-              <h4>{{ path.name }}</h4>
-              <p>{{ path.description }}</p>
-              <p>难度：{{ path.difficulty }}，预计 {{ path.estimatedMinutes }} 分钟</p>
-              <ul>
-                <li v-for="(s, idx) in path.steps" :key="`${path.pathId}-${idx}`">{{ s }}</li>
-              </ul>
-            </article>
-          </div>
-          <p v-if="selectedPath"><strong>已选：</strong>{{ selectedPath.name }}</p>
-        </section>
-
-        <section v-if="currentStep === 3" class="panel">
-          <h3>分步学习清单</h3>
-          <p v-if="!currentSession || currentSession.timeline.length === 0">暂无学习步骤。</p>
+          <h3>分步学习</h3>
+          <p><strong>任务进度：</strong>{{ completedTaskCount }}/{{ totalTaskCount }}（{{ completionPercent }}%）</p>
+          <p v-if="nextPlannedTask">
+            <strong>当前建议任务：</strong>任务 #{{ nextPlannedTask.taskId }}（{{ stageLabel(nextPlannedTask.stage) }}）
+          </p>
+          <p v-if="nextPlannedTask"><strong>任务说明：</strong>{{ nextPlannedTask.objective || stageGuide(nextPlannedTask.stage) }}</p>
+          <p v-if="sessionStore.currentTask">
+            <strong>最近执行任务：</strong>
+            #{{ sessionStore.currentTask.taskId }}（{{ stageLabel(sessionStore.currentTask.stage) }}）/{{ sessionStore.currentTask.status }}
+          </p>
+          <p v-if="sessionStore.taskResult">
+            <strong>最近提交结果：</strong>
+            分数 {{ sessionStore.taskResult.score }}，下一动作 {{ sessionStore.taskResult.nextAction }}
+          </p>
+          <p v-if="!currentSession || timelineItems.length === 0">暂无学习步骤。</p>
           <div v-else class="task-list">
-            <article v-for="item in currentSession.timeline" :key="item.taskId" class="task-item">
+            <article v-for="item in timelineItems" :key="item.taskId" class="task-item">
               <button class="task-toggle" @click="toggleTask(item.taskId)">
                 <span>任务 #{{ item.taskId }} - {{ stageLabel(item.stage) }}</span>
                 <span>{{ isTaskExpanded(item.taskId) ? '收起' : '展开' }}</span>
@@ -304,33 +366,36 @@ onMounted(async () => {
           <PrimaryButton v-if="sessionStore.nextTask" type="button" @click="handleRunNextTask">继续当前推荐任务</PrimaryButton>
         </section>
 
-        <section v-if="currentStep === 4" class="panel">
-          <h3>学习总结</h3>
+        <section v-if="currentStep === 3" class="panel">
+          <h3>阶段反馈</h3>
           <p v-if="!currentSession">暂无总结数据。</p>
           <template v-else>
-            <p><strong>课程：</strong>{{ currentSession.courseId }} / {{ currentSession.chapterId }}</p>
-            <p><strong>目标：</strong>{{ currentSession.goalText }}</p>
-            <p>
-              <strong>完成进度：</strong>
-              {{ Math.round((currentSession.progress?.completionRate ?? 0) * 100) }}%
-              ({{ currentSession.progress?.completedTaskCount ?? 0 }}/{{ currentSession.progress?.totalTaskCount ?? 0 }})
-            </p>
+            <p><strong>当前已完成以下任务：</strong>{{ completedTaskCount }}/{{ totalTaskCount }}</p>
+            <p><strong>当前学习进度：</strong>{{ completionPercent }}%</p>
             <p><strong>当前阶段：</strong>{{ stageLabel(currentSession.currentStage) }}</p>
             <div class="mastery-list">
               <p v-for="item in currentSession.masterySummary" :key="item.nodeId">
-                {{ item.nodeName }}：{{ Math.round(item.masteryValue * 100) }}%
+                当前已覆盖这些内容：{{ item.nodeName }}（{{ Math.round(item.masteryValue * 100) }}%）
               </p>
             </div>
+            <template v-if="learningFeedback">
+              <p><strong>阶段总结：</strong>{{ learningFeedback.diagnosisSummary }}</p>
+              <p v-if="learningFeedback.weakNodes.length > 0"><strong>建议下一步继续完成：</strong></p>
+              <ul v-if="learningFeedback.weakNodes.length > 0">
+                <li v-for="node in learningFeedback.weakNodes" :key="node.nodeId">{{ node.nodeName }}（建议继续训练）</li>
+              </ul>
+            </template>
             <p v-if="sessionStore.nextTask">
               <strong>下一建议：</strong>
               进入任务 #{{ sessionStore.nextTask.taskId }}（{{ stageLabel(sessionStore.nextTask.stage) }}）
             </p>
+            <p v-else>如需进一步验证，可进入训练/测验环节。</p>
           </template>
         </section>
 
         <nav class="actions">
           <button class="ghost-button" :disabled="currentStep === 1" @click="handlePrevious">上一步</button>
-          <PrimaryButton v-if="currentStep < 4" type="button" @click="handleNext">下一步</PrimaryButton>
+          <PrimaryButton v-if="currentStep < 3" type="button" @click="handleNext">下一步</PrimaryButton>
           <PrimaryButton v-else type="button" @click="goHome">完成并返回首页</PrimaryButton>
         </nav>
       </article>
@@ -514,3 +579,4 @@ onMounted(async () => {
   }
 }
 </style>
+

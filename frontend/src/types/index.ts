@@ -20,36 +20,23 @@ export interface CreateSessionRequest {
   goalText: string
 }
 
-export interface GoalDiagnosisResponse {
-  goalScore: number
-  feedback: {
-    summary: string
-    strengths: string[]
-    risks: string[]
-    rewrittenGoal: string
-  }
-}
-
-export interface PathOption {
-  pathId: string
-  name: string
-  description: string
-  difficulty: string
-  estimatedMinutes: number
-  steps: string[]
-}
-
-export interface PlannedTask {
+export interface PlannedNodeStage {
   taskId: number
   stage: string
-  nodeId: number
   objective: string
   status: string
 }
 
+export interface PlannedNode {
+  nodeId: number
+  nodeName: string
+  status: string
+  stages: PlannedNodeStage[]
+}
+
 export interface PlanSessionResponse {
   sessionId: number
-  tasks: PlannedTask[]
+  plans: PlannedNode[]
 }
 
 export interface TimelineItem {
@@ -228,4 +215,69 @@ export interface SessionHistoryResponse {
   total: number
   totalPages: number
   items: SessionHistoryItem[]
+}
+
+export interface PracticeItem {
+  itemId: number
+  questionType: string
+  stem: string
+  options: unknown
+  difficulty: string
+  source: string
+  status: string
+}
+
+export interface PracticeItemsResponse {
+  sessionId: number
+  taskId: number
+  itemCount: number
+  items: PracticeItem[]
+}
+
+export interface PracticeSubmission {
+  submissionId: number
+  practiceItemId: number
+  userAnswer: string
+  score: number | null
+  isCorrect: boolean | null
+  feedback: string
+  errorTags: string[]
+  submittedAt: string
+}
+
+export interface PracticeSubmissionsResponse {
+  sessionId: number
+  taskId: number
+  submissionCount: number
+  submissions: PracticeSubmission[]
+}
+
+export interface PracticeJudgement {
+  score: number | null
+  isCorrect: boolean | null
+  feedback: string
+  errorTags: string[]
+}
+
+export interface SubmitPracticeAnswerResponse {
+  submission: PracticeSubmission
+  practiceItem: PracticeItem
+  judgement: PracticeJudgement
+}
+
+export interface WeakPointNode {
+  nodeId: number
+  nodeName: string
+  masteryScore: number
+  trainingAccuracy: number
+  latestEvaluationScore: number | null
+  attemptCount: number
+  recentErrorTags: string[]
+  reasons: string[]
+}
+
+export interface LearningFeedbackResponse {
+  sessionId: number
+  diagnosisSummary: string
+  weakNodes: WeakPointNode[]
 }

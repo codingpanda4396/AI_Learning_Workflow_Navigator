@@ -4,6 +4,7 @@ import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.model.AttemptLlmMetadata;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.enums.TaskStatus;
+import com.pandanav.learning.domain.model.TrainingAttemptSummary;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,6 +13,9 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -190,6 +194,53 @@ public class JdbcTaskRepository implements TaskRepository {
     }
 
     @Override
+    public List<TrainingAttemptSummary> findRecentTrainingAttempts(Long sessionId, int limit) {
+        int boundedLimit = Math.max(1, Math.min(limit, 50));
+        return jdbcTemplate.query(
+            """
+                SELECT t.id AS task_id,
+                       t.node_id,
+                       ta.score,
+                       ARRAY(
+                           SELECT jsonb_array_elements_text(COALESCE(ta.error_tags, '[]'::jsonb))
+                       ) AS error_tags
+                FROM task_attempt ta
+                JOIN task t ON t.id = ta.task_id
+                WHERE t.session_id = ?
+                  AND t.stage = 'TRAINING'::task_stage
+                  AND ta.score IS NOT NULL
+                ORDER BY ta.created_at DESC
+                LIMIT ?
+                """,
+            (rs, rowNum) -> new TrainingAttemptSummary(
+                rs.getLong("task_id"),
+                rs.getLong("node_id"),
+                rs.getInt("score"),
+                readErrorTags(rs)
+            ),
+            sessionId,
+            boundedLimit
+        );
+    }
+
+    @Override
+    public Optional<Integer> findLatestScoreByTaskId(Long taskId) {
+        Integer score = jdbcTemplate.query(
+            """
+                SELECT ta.score
+                FROM task_attempt ta
+                WHERE ta.task_id = ?
+                  AND ta.score IS NOT NULL
+                ORDER BY ta.created_at DESC, ta.id DESC
+                LIMIT 1
+                """,
+            (rs, rowNum) -> rs.getInt("score"),
+            taskId
+        ).stream().findFirst().orElse(null);
+        return Optional.ofNullable(score);
+    }
+
+    @Override
     public Long createRunningAttempt(Long taskId) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
@@ -312,6 +363,21 @@ public class JdbcTaskRepository implements TaskRepository {
         task.setCreatedAt(rs.getObject("created_at", java.time.OffsetDateTime.class));
         task.setUpdatedAt(rs.getObject("updated_at", java.time.OffsetDateTime.class));
         return task;
+    }
+
+    private List<String> readErrorTags(java.sql.ResultSet rs) throws SQLException {
+        java.sql.Array sqlArray = rs.getArray("error_tags");
+        if (sqlArray == null || sqlArray.getArray() == null) {
+            return List.of();
+        }
+        Object raw = sqlArray.getArray();
+        if (!(raw instanceof Object[] values) || values.length == 0) {
+            return List.of();
+        }
+        return Arrays.stream(values)
+            .filter(v -> v != null && !v.toString().isBlank())
+            .map(Object::toString)
+            .toList();
     }
 }
 

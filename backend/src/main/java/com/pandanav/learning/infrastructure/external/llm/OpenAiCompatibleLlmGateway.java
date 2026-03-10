@@ -8,6 +8,8 @@ import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.LlmUsage;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -19,10 +21,13 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class OpenAiCompatibleLlmGateway implements LlmGateway {
+
+    private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmGateway.class);
 
     private final RestClient restClient;
     private final LlmProperties properties;
@@ -37,15 +42,29 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
     @Override
     public LlmTextResult generate(LlmPrompt prompt) {
         Instant start = Instant.now();
-        JsonNode requestPayload = objectMapper.valueToTree(Map.of(
-            "model", properties.getModel(),
-            "messages", List.of(
-                Map.of("role", "system", "content", prompt.systemPrompt()),
-                Map.of("role", "user", "content", prompt.userPrompt())
-            ),
-            "temperature", 0.2,
-            "response_format", Map.of("type", "json_object")
+        String model = (prompt.modelHint() == null || prompt.modelHint().isBlank())
+            ? properties.getModel()
+            : prompt.modelHint().trim();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", model);
+        payload.put("messages", List.of(
+            Map.of("role", "system", "content", prompt.systemPrompt()),
+            Map.of("role", "user", "content", prompt.userPrompt())
         ));
+        payload.put("temperature", 0.2);
+        payload.put("response_format", Map.of("type", "json_object"));
+        Integer maxOutputTokens = prompt.maxOutputTokens() != null ? prompt.maxOutputTokens() : resolveMaxOutputTokens(prompt.promptKey());
+        if (maxOutputTokens != null && maxOutputTokens > 0) {
+            payload.put("max_tokens", maxOutputTokens);
+        }
+        JsonNode requestPayload = objectMapper.valueToTree(payload);
+        log.info(
+            "LLM request: promptKey={}, model={}, resolvedMaxOutputTokens={}, payload={}",
+            prompt.promptKey(),
+            model,
+            maxOutputTokens,
+            toCompactJson(requestPayload)
+        );
 
         JsonNode response = invokeWithRetry(requestPayload);
 
@@ -56,16 +75,26 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
 
         int latency = (int) Duration.between(start, Instant.now()).toMillis();
         JsonNode usageNode = response.path("usage");
+        String finishReason = response.path("choices").path(0).path("finish_reason").asText("");
+        Integer promptTokens = usageNode.path("prompt_tokens").isNumber() ? usageNode.path("prompt_tokens").asInt() : null;
+        Integer completionTokens = usageNode.path("completion_tokens").isNumber() ? usageNode.path("completion_tokens").asInt() : null;
+        log.info(
+            "LLM response: finish_reason={}, usage.prompt_tokens={}, usage.completion_tokens={}, latency_ms={}",
+            finishReason,
+            promptTokens,
+            completionTokens,
+            latency
+        );
         LlmUsage usage = new LlmUsage(
-            usageNode.path("prompt_tokens").isNumber() ? usageNode.path("prompt_tokens").asInt() : null,
-            usageNode.path("completion_tokens").isNumber() ? usageNode.path("completion_tokens").asInt() : null,
+            promptTokens,
+            completionTokens,
             latency
         );
 
         return new LlmTextResult(
             contentNode.asText(),
             properties.getProvider(),
-            properties.getModel(),
+            model,
             usage,
             requestPayload,
             response
@@ -169,6 +198,27 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (Exception e) {
             return "(unable to read body: " + e.getMessage() + ")";
+        }
+    }
+
+    private Integer resolveMaxOutputTokens(String promptKey) {
+        if (promptKey == null) {
+            return null;
+        }
+        return switch (promptKey) {
+            case "STRUCTURE" -> properties.getStructureMaxOutputTokens();
+            case "TRAINING" -> properties.getTrainingMaxOutputTokens();
+            case "EVALUATE" -> properties.getEvaluationMaxOutputTokens();
+            case "TUTOR" -> properties.getTutorMaxOutputTokens();
+            default -> null;
+        };
+    }
+
+    private String toCompactJson(JsonNode node) {
+        try {
+            return objectMapper.writeValueAsString(node);
+        } catch (Exception ex) {
+            return "{\"error\":\"failed to serialize request payload\"}";
         }
     }
 }

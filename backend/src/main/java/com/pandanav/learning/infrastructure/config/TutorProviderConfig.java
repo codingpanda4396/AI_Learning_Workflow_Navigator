@@ -3,6 +3,7 @@ package com.pandanav.learning.infrastructure.config;
 import com.pandanav.learning.application.service.tutor.MockTutorProvider;
 import com.pandanav.learning.application.service.tutor.RealTutorProvider;
 import com.pandanav.learning.application.service.tutor.TutorProvider;
+import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,7 +15,11 @@ import org.springframework.web.client.RestClient;
 public class TutorProviderConfig {
 
     @Bean
-    public TutorProvider tutorProvider(TutorLlmProperties properties, RestClient.Builder restClientBuilder) {
+    public TutorProvider tutorProvider(
+        TutorLlmProperties properties,
+        RestClient.Builder restClientBuilder,
+        PromptTemplateProvider promptTemplateProvider
+    ) {
         if (!properties.isReady()) {
             return new MockTutorProvider();
         }
@@ -28,6 +33,6 @@ public class TutorProviderConfig {
             .requestFactory(requestFactory)
             .build();
 
-        return new RealTutorProvider(restClient, properties);
+        return new RealTutorProvider(restClient, properties, promptTemplateProvider);
     }
 }

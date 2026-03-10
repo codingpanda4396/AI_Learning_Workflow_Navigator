@@ -87,13 +87,17 @@ class SubmitTrainingAnswerServiceTest {
                 new BigDecimal("0.720"),
                 "diag",
                 List.of("MISSING_STEPS"),
-                List.of("s1"),
-                List.of("fix"),
+                List.of("s1", "s2"),
+                List.of("fix1", "fix2"),
                 "INSERT_TRAINING_VARIANTS",
+                new ObjectMapper().createObjectNode(),
                 null,
                 null,
                 null,
+                "EVALUATE",
                 "rule-v1",
+                null,
+                null,
                 null
             )
         );

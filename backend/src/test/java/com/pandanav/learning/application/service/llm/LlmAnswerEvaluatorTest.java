@@ -28,12 +28,21 @@ class LlmAnswerEvaluatorTest {
         LlmJsonParser parser = new LlmJsonParser(new ObjectMapper());
 
         when(provider.buildEvaluationPrompt(any(), any())).thenReturn(
-            new LlmPrompt(PromptTemplateKey.EVALUATE_PROMPT_V1, "v1", "sys", "user")
+            new LlmPrompt(PromptTemplateKey.EVALUATE_V1, "EVALUATE", "v1", "sys", "user", "{}", "", null, null)
         );
         when(gateway.generate(any())).thenReturn(
             new LlmTextResult(
                 """
-                    {"score":84,"normalized_score":0.84,"feedback":"ok","error_tags":["MISSING_STEPS"],"strengths":["s"],"weaknesses":["w"],"suggested_next_action":"INSERT_TRAINING_REINFORCEMENT"}
+                    {
+                      "score":84,
+                      "normalized_score":0.84,
+                      "rubric":{"concept_correctness":34,"reasoning_quality":25,"completeness":17,"clarity":8},
+                      "feedback":"答案核心概念基本正确，但推理链路还可以更完整。",
+                      "error_tags":["MISSING_STEPS","TERMINOLOGY"],
+                      "strengths":["s1","s2"],
+                      "weaknesses":["w1","w2"],
+                      "suggested_next_action":"INSERT_TRAINING_REINFORCEMENT"
+                    }
                     """,
                 "openai-compatible",
                 "gpt-4o-mini",
@@ -43,11 +52,11 @@ class LlmAnswerEvaluatorTest {
             )
         );
 
-        LlmAnswerEvaluator evaluator = new LlmAnswerEvaluator(gateway, provider, parser);
+        LlmAnswerEvaluator evaluator = new LlmAnswerEvaluator(gateway, provider, parser, new PromptOutputValidator());
         EvaluationContext context = new EvaluationContext(1L, 1L, 1L, "obj", "q", "a", null, Stage.TRAINING);
         var result = evaluator.evaluate(context);
         assertEquals(84, result.score());
         assertEquals(new BigDecimal("0.840"), result.normalizedScore());
-        assertEquals(List.of("MISSING_STEPS"), result.errorTags());
+        assertEquals(List.of("MISSING_STEPS", "TERMINOLOGY"), result.errorTags());
     }
 }

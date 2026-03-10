@@ -7,6 +7,7 @@ import com.pandanav.learning.application.service.tutor.TutorProvider;
 import com.pandanav.learning.application.service.tutor.TutorProviderReply;
 import com.pandanav.learning.application.service.tutor.TutorProviderRequest;
 import com.pandanav.learning.domain.enums.TutorMessageRole;
+import com.pandanav.learning.domain.llm.model.TutorReplyMode;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.Task;
@@ -95,6 +96,8 @@ public class TutorMessageService {
                 node == null ? null : node.getName(),
                 session.getGoalText(),
                 normalizedContent,
+                TutorReplyMode.AUTO,
+                TutorReplyMode.AUTO,
                 history
             )
         );

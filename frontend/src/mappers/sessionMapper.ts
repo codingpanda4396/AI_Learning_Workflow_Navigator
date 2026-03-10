@@ -1,23 +1,27 @@
 import type {
   CurrentSessionResponse,
-  GoalDiagnosisResponse,
   PathResponse,
-  PathOption,
   PlanSessionResponse,
   SessionOverviewResponse,
 } from '@/types'
 
-interface PlannedTaskDto {
+interface PlannedNodeStageDto {
   task_id: number
   stage: string
-  node_id: number
   objective: string
   status: string
 }
 
+interface PlannedNodeDto {
+  node_id: number
+  node_name: string
+  status: string
+  stages?: PlannedNodeStageDto[]
+}
+
 interface PlanSessionResponseDto {
   session_id: number
-  tasks?: PlannedTaskDto[]
+  plans?: PlannedNodeDto[]
 }
 
 interface TimelineItemDto {
@@ -86,38 +90,19 @@ interface PathResponseDto {
   nodes?: PathNodeDto[]
 }
 
-interface GoalDiagnosisResponseDto {
-  goal_score: number
-  feedback?: {
-    summary?: string
-    strengths?: string[]
-    risks?: string[]
-    rewritten_goal?: string
-  }
-}
-
-interface PathOptionDto {
-  path_id: string
-  name: string
-  description: string
-  difficulty: string
-  estimated_minutes: number
-  steps?: string[]
-}
-
-interface PathOptionsResponseDto {
-  path_options?: PathOptionDto[]
-}
-
 export function mapPlanSessionDto(dto: PlanSessionResponseDto): PlanSessionResponse {
   return {
     sessionId: dto.session_id,
-    tasks: (dto.tasks ?? []).map((task) => ({
-      taskId: task.task_id,
-      stage: task.stage,
-      nodeId: task.node_id,
-      objective: task.objective,
-      status: task.status,
+    plans: (dto.plans ?? []).map((plan) => ({
+      nodeId: plan.node_id,
+      nodeName: plan.node_name,
+      status: plan.status,
+      stages: (plan.stages ?? []).map((stage) => ({
+        taskId: stage.task_id,
+        stage: stage.stage,
+        objective: stage.objective,
+        status: stage.status,
+      })),
     })),
   }
 }
@@ -186,27 +171,4 @@ export function mapPathDto(dto: PathResponseDto): PathResponse {
       masteryValue: node.mastery_value,
     })),
   }
-}
-
-export function mapGoalDiagnosisDto(dto: GoalDiagnosisResponseDto): GoalDiagnosisResponse {
-  return {
-    goalScore: dto.goal_score,
-    feedback: {
-      summary: dto.feedback?.summary ?? '',
-      strengths: dto.feedback?.strengths ?? [],
-      risks: dto.feedback?.risks ?? [],
-      rewrittenGoal: dto.feedback?.rewritten_goal ?? '',
-    },
-  }
-}
-
-export function mapPathOptionsDto(dto: PathOptionsResponseDto): PathOption[] {
-  return (dto.path_options ?? []).map((item) => ({
-    pathId: item.path_id,
-    name: item.name,
-    description: item.description,
-    difficulty: item.difficulty,
-    estimatedMinutes: item.estimated_minutes,
-    steps: item.steps ?? [],
-  }))
 }

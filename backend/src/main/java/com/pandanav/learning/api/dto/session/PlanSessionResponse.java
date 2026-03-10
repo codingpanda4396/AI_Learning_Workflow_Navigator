@@ -10,6 +10,6 @@ public record PlanSessionResponse(
     @JsonProperty("session_id")
     @Schema(name = "session_id", example = "123")
     Long sessionId,
-    List<PlannedTaskResponse> tasks
+    List<PlannedNodeResponse> plans
 ) {
 }

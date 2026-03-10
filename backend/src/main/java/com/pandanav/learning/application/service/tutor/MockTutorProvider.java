@@ -7,7 +7,7 @@ public class MockTutorProvider implements TutorProvider {
         String question = request.userMessage() == null ? "" : request.userMessage().trim();
         if (question.isEmpty()) {
             return new TutorProviderReply(
-                "你可以先描述你卡住的点，我会先用 2-3 句话解释核心概念，再给一个最小练习。",
+                "你可以先描述你卡住的步骤，我会先提一个引导问题，再给最小提示。",
                 "mock-tutor",
                 "placeholder-v1"
             );
@@ -15,22 +15,11 @@ public class MockTutorProvider implements TutorProvider {
 
         String content;
         if (question.contains("链式法则")) {
-            content = """
-                链式法则可以理解为“外层求导 × 内层求导”。
-                1) 先把复合函数看成 f(g(x))，先对外层 f 求导并保留 g(x)。
-                2) 再乘以内层 g(x) 对 x 的导数。
-                3) 你可以先练习 y=(3x+1)^5，按这个三步写一遍，我再帮你检查。
-                """;
+            content = "先判断外层和内层函数分别是什么？写出 f(g(x)) 后，先对外层求导再乘以内层导数。";
         } else {
-            content = """
-                我先给你一个最小学习路径：
-                1) 先说出你当前理解的一句话版本；
-                2) 我会指出关键漏洞；
-                3) 再给你一道对应难度的小题。
-                你可以先回答：你觉得这题真正考察的核心点是什么？
-                """;
+            content = "先说说你认为这题最关键的一步是什么？我先判断你的卡点，再给你提示。";
         }
 
-        return new TutorProviderReply(content.trim(), "mock-tutor", "placeholder-v1");
+        return new TutorProviderReply(content, "mock-tutor", "placeholder-v1");
     }
 }

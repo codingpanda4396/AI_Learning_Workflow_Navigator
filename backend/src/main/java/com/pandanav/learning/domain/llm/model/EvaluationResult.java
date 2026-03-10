@@ -13,11 +13,14 @@ public record EvaluationResult(
     List<String> strengths,
     List<String> weaknesses,
     String suggestedNextAction,
+    JsonNode rubric,
     JsonNode rawJson,
     String provider,
     String model,
+    String promptKey,
     String promptVersion,
-    LlmUsage usage
+    LlmUsage usage,
+    JsonNode requestPayload,
+    JsonNode responsePayload
 ) {
 }
-

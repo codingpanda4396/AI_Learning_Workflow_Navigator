@@ -346,3 +346,24 @@ RAG 教材支持
 错误诊断与回退学习
 
 多端支持（Web / 小程序 / RN）
+
+
+                ┌───────────────────────────┐
+                │        Frontend UI        │
+                │  Session / Task / Tutor  │
+                └────────────┬──────────────┘
+                             │
+                             ▼
+                   API Gateway (Spring Boot)
+                             │
+ ┌───────────────────────────┼───────────────────────────┐
+ │                           │                           │
+ ▼                           ▼                           ▼
+
+Session Engine         Learning Engine              AI Layer
+(用户学习会话)          (学习任务生成)               (智能能力)
+
+- session create       - concept_node               - LLM Path Planner
+- history              - stage task                 - AI Tutor
+- resume               - stage state                - Goal Diagnosis
+                       - progress                   - Smart Breakdown

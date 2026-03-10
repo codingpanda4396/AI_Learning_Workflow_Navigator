@@ -1,5 +1,6 @@
 package com.pandanav.learning.api.dto.task;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.pandanav.learning.api.dto.session.NextTaskResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,6 +26,7 @@ public record SubmitTaskResponse(
     @JsonProperty("error_tags")
     List<String> errorTags,
     FeedbackResponse feedback,
+    JsonNode rubric,
     List<String> strengths,
     List<String> weaknesses,
     @JsonProperty("mastery_before")

@@ -2,9 +2,9 @@ package com.pandanav.learning.application.service.llm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.pandanav.learning.domain.enums.Stage;
+import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.StageContentGenerator;
-import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
@@ -13,7 +13,7 @@ import com.pandanav.learning.domain.llm.model.StageGenerationContext;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import org.springframework.stereotype.Component;
 
-import java.util.Set;
+import java.util.List;
 
 @Component
 public class LlmStageContentGenerator implements StageContentGenerator {
@@ -21,15 +21,18 @@ public class LlmStageContentGenerator implements StageContentGenerator {
     private final LlmGateway llmGateway;
     private final PromptTemplateProvider promptTemplateProvider;
     private final LlmJsonParser llmJsonParser;
+    private final PromptOutputValidator promptOutputValidator;
 
     public LlmStageContentGenerator(
         LlmGateway llmGateway,
         PromptTemplateProvider promptTemplateProvider,
-        LlmJsonParser llmJsonParser
+        LlmJsonParser llmJsonParser,
+        PromptOutputValidator promptOutputValidator
     ) {
         this.llmGateway = llmGateway;
         this.promptTemplateProvider = promptTemplateProvider;
         this.llmJsonParser = llmJsonParser;
+        this.promptOutputValidator = promptOutputValidator;
     }
 
     @Override
@@ -38,39 +41,32 @@ public class LlmStageContentGenerator implements StageContentGenerator {
         LlmPrompt prompt = promptTemplateProvider.buildStagePrompt(key, context);
         LlmTextResult result = llmGateway.generate(prompt);
         JsonNode parsed = llmJsonParser.parse(result.text());
-        validate(parsed, context.stage());
+
+        List<String> errors = promptOutputValidator.validateStage(context.stage(), parsed);
+        if (!errors.isEmpty()) {
+            throw new InternalServerException("Invalid stage prompt output: " + String.join("; ", errors));
+        }
+
         return new StageContent(
             context.stage(),
             parsed,
             "LLM",
+            prompt.promptKey(),
             prompt.promptVersion(),
             result.provider(),
             result.model(),
-            result.usage()
+            result.usage(),
+            result.requestPayload(),
+            result.responsePayload()
         );
     }
 
     private PromptTemplateKey mapKey(Stage stage) {
         return switch (stage) {
-            case STRUCTURE -> PromptTemplateKey.STRUCTURE_PROMPT_V1;
-            case UNDERSTANDING -> PromptTemplateKey.UNDERSTANDING_PROMPT_V1;
-            case TRAINING -> PromptTemplateKey.TRAINING_PROMPT_V1;
-            case REFLECTION -> PromptTemplateKey.REFLECTION_PROMPT_V1;
+            case STRUCTURE -> PromptTemplateKey.STRUCTURE_V1;
+            case UNDERSTANDING -> PromptTemplateKey.UNDERSTANDING_V1;
+            case TRAINING -> PromptTemplateKey.TRAINING_V1;
+            case REFLECTION -> PromptTemplateKey.REFLECTION_V1;
         };
-    }
-
-    private void validate(JsonNode parsed, Stage stage) {
-        Set<String> required = switch (stage) {
-            case STRUCTURE -> Set.of("title", "summary", "key_points", "common_misconceptions", "suggested_sequence");
-            case UNDERSTANDING -> Set.of("concept_explanation", "analogy", "step_by_step_reasoning", "common_errors", "check_questions");
-            case TRAINING -> Set.of("questions");
-            case REFLECTION -> Set.of("reflection_prompt", "review_checklist", "next_step_suggestion");
-        };
-        for (String field : required) {
-            if (!parsed.has(field)) {
-                throw new InternalServerException("LLM stage output missing field: " + field);
-            }
-        }
     }
 }
-

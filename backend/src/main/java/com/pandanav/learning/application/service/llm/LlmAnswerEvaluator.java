@@ -1,6 +1,7 @@
 package com.pandanav.learning.application.service.llm;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pandanav.learning.domain.llm.AnswerEvaluator;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
@@ -22,51 +23,64 @@ public class LlmAnswerEvaluator implements AnswerEvaluator {
     private final LlmGateway llmGateway;
     private final PromptTemplateProvider promptTemplateProvider;
     private final LlmJsonParser llmJsonParser;
+    private final PromptOutputValidator promptOutputValidator;
 
     public LlmAnswerEvaluator(
         LlmGateway llmGateway,
         PromptTemplateProvider promptTemplateProvider,
-        LlmJsonParser llmJsonParser
+        LlmJsonParser llmJsonParser,
+        PromptOutputValidator promptOutputValidator
     ) {
         this.llmGateway = llmGateway;
         this.promptTemplateProvider = promptTemplateProvider;
         this.llmJsonParser = llmJsonParser;
+        this.promptOutputValidator = promptOutputValidator;
     }
 
     @Override
     public EvaluationResult evaluate(EvaluationContext context) {
-        LlmPrompt prompt = promptTemplateProvider.buildEvaluationPrompt(PromptTemplateKey.EVALUATE_PROMPT_V1, context);
+        LlmPrompt prompt = promptTemplateProvider.buildEvaluationPrompt(PromptTemplateKey.EVALUATE_V1, context);
         LlmTextResult result = llmGateway.generate(prompt);
         JsonNode parsed = llmJsonParser.parse(result.text());
-        Integer score = parsed.path("score").isNumber() ? parsed.path("score").asInt() : null;
-        BigDecimal normalized = readNormalized(parsed, score);
-        if (score == null || normalized == null) {
-            throw new InternalServerException("LLM evaluation output missing score fields.");
+
+        if (!(parsed instanceof ObjectNode objectNode)) {
+            throw new InternalServerException("LLM evaluation output must be JSON object.");
         }
+
+        promptOutputValidator.repairEvaluation(objectNode);
+        List<String> errors = promptOutputValidator.validateEvaluation(objectNode);
+        if (!errors.isEmpty()) {
+            throw new InternalServerException("LLM evaluation output invalid: " + String.join("; ", errors));
+        }
+
+        Integer score = objectNode.path("score").asInt();
+        BigDecimal normalized = readNormalized(objectNode.path("normalized_score"));
+
         return new EvaluationResult(
             score,
             normalized,
-            readText(parsed, "feedback"),
-            readStringList(parsed, "error_tags"),
-            readStringList(parsed, "strengths"),
-            readStringList(parsed, "weaknesses"),
-            readText(parsed, "suggested_next_action"),
-            parsed,
+            readText(objectNode, "feedback"),
+            readStringList(objectNode, "error_tags"),
+            readStringList(objectNode, "strengths"),
+            readStringList(objectNode, "weaknesses"),
+            readText(objectNode, "suggested_next_action"),
+            objectNode.path("rubric"),
+            objectNode,
             result.provider(),
             result.model(),
+            prompt.promptKey(),
             prompt.promptVersion(),
-            result.usage()
+            result.usage(),
+            result.requestPayload(),
+            result.responsePayload()
         );
     }
 
-    private BigDecimal readNormalized(JsonNode parsed, Integer score) {
-        if (parsed.path("normalized_score").isNumber()) {
-            return parsed.path("normalized_score").decimalValue().setScale(3, RoundingMode.HALF_UP);
+    private BigDecimal readNormalized(JsonNode node) {
+        if (!node.isNumber()) {
+            throw new InternalServerException("LLM evaluation output missing normalized_score.");
         }
-        if (score == null) {
-            return null;
-        }
-        return BigDecimal.valueOf(score).divide(BigDecimal.valueOf(100), 3, RoundingMode.HALF_UP);
+        return node.decimalValue().setScale(3, RoundingMode.HALF_UP);
     }
 
     private String readText(JsonNode parsed, String field) {
@@ -85,4 +99,3 @@ public class LlmAnswerEvaluator implements AnswerEvaluator {
             .toList();
     }
 }
-
