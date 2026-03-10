@@ -96,6 +96,15 @@ export const useSessionStore = defineStore('session', () => {
     }
     return lastError.value ? 'FAILED' : 'IDLE'
   })
+  const pageAsyncStatus = computed<AsyncStatus>(() => {
+    if (fetchingSession.value || recoveringSession.value || planning.value) {
+      return 'RUNNING'
+    }
+    if (currentSession.value || currentSessionPath.value) {
+      return 'SUCCEEDED'
+    }
+    return lastError.value ? 'FAILED' : 'IDLE'
+  })
 
   function clearError() {
     lastError.value = null
@@ -272,6 +281,7 @@ export const useSessionStore = defineStore('session', () => {
     overviewAsyncStatus,
     pathAsyncStatus,
     feedbackAsyncStatus,
+    pageAsyncStatus,
     createSession: createSessionAction,
     planSession: planSessionAction,
     fetchSessionOverview: fetchSessionOverviewAction,

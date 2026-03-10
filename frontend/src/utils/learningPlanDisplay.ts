@@ -1,11 +1,5 @@
 import { LEARNING_STAGE_DISPLAY, LEARNING_STAGE_SEQUENCE, STATUS_DISPLAY, type StatusDisplay } from '@/constants/learning'
-import type {
-  DisplayStatus,
-  LearningStage,
-  PlannedNode,
-  TaskStatus,
-  TimelineItem,
-} from '@/types'
+import type { AsyncStatus, DisplayStatus, LearningStage, PlannedNode, StepStatus, TaskStatus, TimelineItem } from '@/types'
 
 export type LearningStepKey = LearningStage | 'UNKNOWN'
 export type LearningStepState = 'completed' | 'current' | 'upcoming'
@@ -27,6 +21,24 @@ export interface DisplayTaskMeta {
   displayDescription: string
   actionText: string
   statusLabel: string
+}
+
+export interface SessionStageViewModel {
+  key: LearningStepKey
+  order: 1 | 2 | 3 | 4
+  title: string
+  objective: string
+  description: string
+  state: LearningStepState
+  stepStatus: StepStatus
+  statusLabel: string
+  actionHint: string
+  actionText: string
+  completionStandard: string
+  isActionable: boolean
+  isBusy: boolean
+  busyLabel: string | null
+  reason: string
 }
 
 type StepSource = Pick<TimelineItem, 'stage' | 'status'> & {
@@ -55,6 +67,38 @@ export const LEARNING_STEPS = LEARNING_STAGE_SEQUENCE.map((stage) => {
 
 function normalizeCode(value?: string | null) {
   return (value ?? '').trim().toUpperCase()
+}
+
+function getDefaultCompletionStandard(step: LearningStepDefinition) {
+  if (step.key === 'STRUCTURE') return '完成本阶段相关任务，并建立当前主题的整体框架。'
+  if (step.key === 'UNDERSTANDING') return '完成原理理解任务，能够解释关键机制与因果关系。'
+  if (step.key === 'TRAINING') return '完成训练任务并提交结果，拿到可用于判断掌握度的反馈。'
+  if (step.key === 'EVALUATION') return '查看反馈、识别薄弱点，并明确下一步改进方向。'
+  return '等待明确阶段后继续。'
+}
+
+function getStepStatusLabel(status: StepStatus) {
+  return STATUS_DISPLAY[status].label
+}
+
+function getLockedReason(step: LearningStepDefinition) {
+  return `等待上一阶段完成后，再进入「${step.title}」。`
+}
+
+function getStageActionText(stepStatus: StepStatus) {
+  if (stepStatus === 'AVAILABLE') return '开始本阶段'
+  if (stepStatus === 'ACTIVE') return '继续本阶段'
+  if (stepStatus === 'DONE') return '查看阶段结果'
+  if (stepStatus === 'ERROR') return '重试本阶段'
+  return '等待上一阶段完成'
+}
+
+function getStageActionHint(step: LearningStepDefinition, stepStatus: StepStatus) {
+  if (stepStatus === 'AVAILABLE') return `现在可以开始「${step.title}」。`
+  if (stepStatus === 'ACTIVE') return `当前重点是继续推进「${step.title}」。`
+  if (stepStatus === 'DONE') return `本阶段已完成，可以查看结果或进入下一阶段。`
+  if (stepStatus === 'ERROR') return `本阶段存在异常，建议先重试当前任务。`
+  return getLockedReason(step)
 }
 
 export function normalizeLearningStage(input?: string | null): LearningStepKey {
@@ -132,12 +176,7 @@ export function getCurrentLearningStep(
   const runningTask = timeline.find((item) => item.status === 'RUNNING')
   const pendingTask = timeline.find((item) => item.status !== 'SUCCEEDED')
 
-  const resolved = findFirstKnownStage([
-    nextTask?.stage,
-    runningTask?.stage,
-    pendingTask?.stage,
-    currentStage,
-  ])
+  const resolved = findFirstKnownStage([nextTask?.stage, runningTask?.stage, pendingTask?.stage, currentStage])
 
   if (resolved !== 'UNKNOWN') {
     return resolved
@@ -146,29 +185,98 @@ export function getCurrentLearningStep(
   return timeline.length > 0 || nextTask?.stage || currentStage ? 'UNKNOWN' : 'STRUCTURE'
 }
 
+function getStageTaskStatus(items: TimelineItem[]) {
+  if (items.some((item) => item.status === 'FAILED')) return 'FAILED'
+  if (items.some((item) => item.status === 'RUNNING')) return 'RUNNING'
+  if (items.length > 0 && items.every((item) => item.status === 'SUCCEEDED')) return 'SUCCEEDED'
+  if (items.some((item) => item.status === 'PENDING')) return 'PENDING'
+  return 'EMPTY'
+}
+
+function resolveStepStatus(
+  step: LearningStepDefinition,
+  currentStep: LearningStepKey,
+  items: TimelineItem[],
+): StepStatus {
+  const taskStatus = getStageTaskStatus(items)
+  if (taskStatus === 'FAILED') return 'ERROR'
+  if (taskStatus === 'SUCCEEDED') return 'DONE'
+
+  if (currentStep === 'UNKNOWN') {
+    return items.length > 0 ? 'AVAILABLE' : 'LOCKED'
+  }
+
+  const currentOrder = getLearningStepDefinition(currentStep).order
+  if (step.order < currentOrder) return 'DONE'
+  if (step.order > currentOrder) return 'LOCKED'
+  if (taskStatus === 'RUNNING') return 'ACTIVE'
+  if (taskStatus === 'PENDING' || taskStatus === 'EMPTY') return 'AVAILABLE'
+  return 'ACTIVE'
+}
+
 export function buildLearningStepStates(
   timeline: TimelineItem[],
   nextTask: { stage: string } | null,
   currentStage?: string | null,
 ) {
   const currentKey = getCurrentLearningStep(timeline, nextTask, currentStage)
-  const currentOrder = currentKey === 'UNKNOWN' ? null : getLearningStepDefinition(currentKey).order
 
   return LEARNING_STEPS.map((step) => {
     const sameStageItems = timeline.filter((item) => normalizeLearningStage(item.stage) === step.key)
-    const allDone = sameStageItems.length > 0 && sameStageItems.every((item) => item.status === 'SUCCEEDED')
-    const isCurrent = currentKey !== 'UNKNOWN' && step.key === currentKey
-    let state: LearningStepState = 'upcoming'
-
-    if (allDone || (currentOrder !== null && step.order < currentOrder)) {
-      state = 'completed'
-    } else if (isCurrent) {
-      state = 'current'
-    }
+    const stepStatus = resolveStepStatus(step, currentKey, sameStageItems)
+    const state: LearningStepState =
+      stepStatus === 'DONE' ? 'completed' : stepStatus === 'ACTIVE' || stepStatus === 'AVAILABLE' ? 'current' : 'upcoming'
 
     return {
       ...step,
       state,
+    }
+  })
+}
+
+export function buildSessionStageViewModels(
+  timeline: TimelineItem[],
+  nextTask: { stage: string } | null,
+  currentStage?: string | null,
+  asyncStatus: AsyncStatus = 'IDLE',
+): SessionStageViewModel[] {
+  const currentKey = getCurrentLearningStep(timeline, nextTask, currentStage)
+
+  return LEARNING_STEPS.map((step) => {
+    const stageItems = timeline.filter((item) => normalizeLearningStage(item.stage) === step.key)
+    const stepStatus = resolveStepStatus(step, currentKey, stageItems)
+    const state: LearningStepState =
+      stepStatus === 'DONE' ? 'completed' : stepStatus === 'ACTIVE' || stepStatus === 'AVAILABLE' ? 'current' : 'upcoming'
+    const currentTask = stageItems.find((item) => item.status === 'RUNNING') ?? stageItems.find((item) => item.status !== 'SUCCEEDED') ?? null
+    const isBusy = asyncStatus === 'RUNNING' && (stepStatus === 'ACTIVE' || stepStatus === 'AVAILABLE')
+    const busyLabel = isBusy ? '处理中' : null
+    const actionText = getStageActionText(stepStatus)
+    const actionHint = getStageActionHint(step, stepStatus)
+    const reason =
+      stepStatus === 'LOCKED'
+        ? getLockedReason(step)
+        : currentTask
+          ? `当前任务 #${currentTask.taskId} 会推动这一阶段继续前进。`
+          : stepStatus === 'DONE'
+            ? `本阶段任务已完成，系统会继续推进后续阶段。`
+            : `这是当前推荐推进的阶段。`
+
+    return {
+      key: step.key,
+      order: step.order,
+      title: step.title,
+      objective: step.objective,
+      description: step.description,
+      state,
+      stepStatus,
+      statusLabel: isBusy ? '处理中' : getStepStatusLabel(stepStatus),
+      actionHint,
+      actionText: isBusy ? '处理中...' : actionText,
+      completionStandard: getDefaultCompletionStandard(step),
+      isActionable: stepStatus === 'AVAILABLE' || stepStatus === 'ACTIVE' || stepStatus === 'ERROR' || stepStatus === 'DONE',
+      isBusy,
+      busyLabel,
+      reason,
     }
   })
 }
@@ -190,14 +298,14 @@ export function findNodeNameByTask(taskId: number, plannedNodes: PlannedNode[], 
 export function getPrimaryActionText(stage?: string | null, status?: string | null) {
   const normalizedStatus = normalizeCode(status)
   if (normalizedStatus === 'RUNNING') {
-    return getSuggestedActionText('RUNNING')
+    return '继续本阶段'
   }
   if (normalizedStatus === 'SUCCEEDED') {
-    return getSuggestedActionText('SUCCEEDED')
+    return '查看阶段结果'
   }
 
   const step = getLearningStepDefinition(stage)
-  return step.actionText
+  return step.key === 'UNKNOWN' ? '查看详情' : `开始${step.title}`
 }
 
 export function getTaskExecutionStatus(status?: string | null): TaskStatus | 'UNKNOWN' {

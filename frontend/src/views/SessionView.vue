@@ -11,13 +11,11 @@ import PrimaryButton from '@/components/PrimaryButton.vue'
 import SessionSkeleton from '@/components/SessionSkeleton.vue'
 import ErrorMessage from '@/components/ErrorMessage.vue'
 import {
-  buildLearningStepStates,
+  buildSessionStageViewModels,
   findNodeNameByTask,
   getCurrentLearningStep,
   getLearningStageDisplay,
-  getPrimaryActionText,
   getStatusLabel,
-  LEARNING_STEPS,
   mapTaskToDisplayMeta,
   normalizeLearningStage,
 } from '@/utils/learningPlanDisplay'
@@ -95,26 +93,25 @@ const plannedStageTasks = computed(() =>
 const currentStepKey = computed(() =>
   getCurrentLearningStep(timelineItems.value, sessionStore.nextTask, sessionStore.normalizedCurrentStage),
 )
-const currentStepDefinition = computed(() => getLearningStageDisplay(currentStepKey.value))
-const recommendedStep = computed(() => LEARNING_STEPS.find((step) => step.key === currentStepKey.value) ?? LEARNING_STEPS[0]!)
 
-const flowSteps = computed(() =>
-  buildLearningStepStates(timelineItems.value, sessionStore.nextTask, sessionStore.normalizedCurrentStage).map((step) => ({
-    step: step.order,
-    title: step.title,
-    description: step.objective,
-    state: step.state,
-  })),
+const stageCards = computed(() =>
+  buildSessionStageViewModels(
+    timelineItems.value,
+    sessionStore.nextTask,
+    sessionStore.normalizedCurrentStage,
+    sessionStore.pageAsyncStatus,
+  ),
 )
 
-const progressSummary = computed(() => {
-  const total = currentSession.value?.progress?.totalTaskCount ?? timelineItems.value.length
-  const completed =
-    currentSession.value?.progress?.completedTaskCount ??
-    timelineItems.value.filter((item) => item.status === 'SUCCEEDED').length
-  const percent = total > 0 ? Math.round((completed / total) * 100) : 0
-  return { total, completed, percent }
+const currentStageCard = computed(() => {
+  const active = stageCards.value.find((item) => item.stepStatus === 'ACTIVE' || item.stepStatus === 'AVAILABLE' || item.stepStatus === 'ERROR')
+  if (active) {
+    return active
+  }
+  return stageCards.value.find((item) => item.key === currentStepKey.value) ?? stageCards.value[0] ?? null
 })
+
+const currentStepDefinition = computed(() => getLearningStageDisplay(currentStageCard.value?.key ?? currentStepKey.value))
 
 const currentDetailTask = computed(() => {
   const preferredTaskId = sessionStore.nextTask?.taskId
@@ -131,14 +128,9 @@ const currentDetailTask = computed(() => {
   }
 
   if (currentStepKey.value !== 'UNKNOWN') {
-    const pendingSameStep = plannedStageTasks.value.find(
+    const sameStepTask = plannedStageTasks.value.find(
       (task) => normalizeLearningStage(task.stage) === currentStepKey.value && task.status !== 'SUCCEEDED',
     )
-    if (pendingSameStep) {
-      return pendingSameStep
-    }
-
-    const sameStepTask = plannedStageTasks.value.find((task) => normalizeLearningStage(task.stage) === currentStepKey.value)
     if (sameStepTask) {
       return sameStepTask
     }
@@ -157,28 +149,96 @@ const currentTopic = computed(() => {
   return plannedNodes.value[0]?.nodeName ?? currentPath.value?.nodes[0]?.nodeName ?? '当前知识点'
 })
 
-const currentCardMeta = computed(() => {
-  if (currentDetailTask.value) {
-    return mapTaskToDisplayMeta(currentDetailTask.value, currentTopic.value)
+const currentStageDetail = computed(() => {
+  const base = currentStageCard.value ?? stageCards.value[0]
+  if (!base) {
+    return {
+      title: '阶段待识别',
+      topic: currentTopic.value,
+      objective: '等待阶段数据返回。',
+      completionStandard: '等待阶段数据返回后继续。',
+      statusLabel: getStatusLabel('PENDING'),
+      actionText: '查看详情',
+      actionHint: '当前还没有足够的阶段数据。',
+      reason: '页面正在等待可用的阶段信息。',
+      isActionable: false,
+      isBusy: false,
+      busyLabel: null as string | null,
+      todo: '等待阶段数据',
+      nextResult: '有了阶段信息后，系统会给出下一步建议。',
+      detailDescription: '当前记录不足以判断真实阶段。',
+    }
   }
 
+  const taskMeta = currentDetailTask.value ? mapTaskToDisplayMeta(currentDetailTask.value, currentTopic.value) : null
+  const currentTodo =
+    taskMeta?.displayTitle ||
+    (base.stepStatus === 'LOCKED' ? '等待上一阶段完成' : `${base.actionText}：${base.title}`)
+
   return {
-    phaseKey: currentStepDefinition.value.key,
-    phaseLabel: currentStepDefinition.value.title,
-    displayTitle: currentStepDefinition.value.title,
-    displayDescription: `${currentStepDefinition.value.title}：围绕 ${currentTopic.value}，${currentStepDefinition.value.description}`,
-    actionText: currentStepDefinition.value.actionText,
-    statusLabel: '未开始',
+    title: base.title,
+    topic: currentTopic.value,
+    objective: base.objective,
+    completionStandard: base.completionStandard,
+    statusLabel: currentDetailTask.value ? getStatusLabel(currentDetailTask.value.status) : base.statusLabel,
+    actionText: base.actionText,
+    actionHint: base.actionHint,
+    reason: base.reason,
+    isActionable: base.isActionable && !base.isBusy,
+    isBusy: base.isBusy,
+    busyLabel: base.busyLabel,
+    todo: currentTodo,
+    nextResult: base.stepStatus === 'LOCKED' ? '上一阶段完成后，这里会自动解锁。' : '完成后会进入下一阶段或刷新下一步建议。',
+    detailDescription: taskMeta?.displayDescription ?? `${base.title}：围绕 ${currentTopic.value}，${base.description}`,
   }
 })
 
-const currentTaskStatusLabel = computed(() =>
-  currentDetailTask.value ? getStatusLabel(currentDetailTask.value.status) : getStatusLabel('PENDING'),
-)
-const primaryActionLabel = computed(() =>
-  currentDetailTask.value
-    ? getPrimaryActionText(currentDetailTask.value.stage, currentDetailTask.value.status)
-    : currentCardMeta.value.actionText,
+const progressSummary = computed(() => {
+  const total = currentSession.value?.progress?.totalTaskCount ?? timelineItems.value.length
+  const completed =
+    currentSession.value?.progress?.completedTaskCount ??
+    timelineItems.value.filter((item) => item.status === 'SUCCEEDED').length
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+  return {
+    total,
+    completed,
+    percent,
+    label: total > 0 ? `${completed}/${total} · ${percent}%` : '暂无任务进度',
+  }
+})
+
+const topSummaryItems = computed(() => [
+  {
+    label: '学习主题',
+    value: currentTopic.value,
+    helper: `${currentSession.value?.courseId || '-'} / ${currentSession.value?.chapterId || '-'}`,
+  },
+  {
+    label: '当前阶段',
+    value: currentStageDetail.value.title,
+    helper: currentStageDetail.value.statusLabel,
+  },
+  {
+    label: '当前进度',
+    value: progressSummary.value.label,
+    helper: currentSession.value?.goalText || '围绕当前主题持续推进学习任务',
+  },
+  {
+    label: '当前待办',
+    value: currentStageDetail.value.todo,
+    helper: currentStageDetail.value.reason,
+  },
+])
+
+const flowSteps = computed(() =>
+  stageCards.value.map((step) => ({
+    step: step.order,
+    title: step.title,
+    description: step.objective,
+    statusLabel: step.statusLabel,
+    actionHint: step.actionHint,
+    state: step.state,
+  })),
 )
 
 const detailTaskList = computed(() => {
@@ -194,15 +254,16 @@ const detailTaskList = computed(() => {
 
   return source.map((task) => {
     const meta = mapTaskToDisplayMeta(task, task.nodeName || currentTopic.value)
+    const taskStage = stageCards.value.find((step) => step.key === normalizeLearningStage(task.stage))
     return {
       taskId: task.taskId,
       stage: task.stage,
-      status: task.status,
       nodeName: task.nodeName || currentTopic.value,
       displayTitle: meta.displayTitle,
       displayDescription: meta.displayDescription,
-      actionText: getPrimaryActionText(task.stage, task.status),
+      actionText: taskStage?.stepStatus === 'DONE' ? '查看阶段结果' : taskStage?.actionText ?? meta.actionText,
       statusLabel: meta.statusLabel,
+      disabled: !!taskStage?.isBusy || taskStage?.stepStatus === 'LOCKED',
     }
   })
 })
@@ -228,6 +289,9 @@ function toggleDetails() {
 }
 
 function handlePrimaryAction() {
+  if (!currentStageDetail.value.isActionable) {
+    return
+  }
   if (currentDetailTask.value) {
     openTask(currentDetailTask.value.taskId, currentDetailTask.value.stage)
     return
@@ -295,34 +359,23 @@ onMounted(async () => {
       <section class="overview-card">
         <PageHeader
           :eyebrow="pageFlow === 'feedback-review' ? 'Feedback Review' : 'Learning Session'"
-          title="学习计划"
-          :subtitle="`你正在学习 ${currentTopic}，当前建议先完成「${recommendedStep.title}」`"
+          title="会话中枢"
+          :subtitle="`你现在处于「${currentStageDetail.title}」，当前建议动作是「${currentStageDetail.actionText}」。`"
         />
 
         <div class="overview-grid">
-          <article class="overview-item">
-            <span class="overview-label">课程 / 章节</span>
-            <strong>{{ currentSession?.courseId || '-' }} / {{ currentSession?.chapterId || '-' }}</strong>
-          </article>
-          <article class="overview-item">
-            <span class="overview-label">学习目标</span>
-            <strong>{{ currentSession?.goalText || '先建立对当前知识点的完整理解' }}</strong>
-          </article>
-          <article class="overview-item">
-            <span class="overview-label">推荐起始阶段</span>
-            <strong>{{ recommendedStep.title }}</strong>
-          </article>
-          <article class="overview-item">
-            <span class="overview-label">当前进度</span>
-            <strong>{{ progressSummary.completed }}/{{ progressSummary.total }} · {{ progressSummary.percent }}%</strong>
+          <article v-for="item in topSummaryItems" :key="item.label" class="overview-item">
+            <span class="overview-label">{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+            <p>{{ item.helper }}</p>
           </article>
         </div>
       </section>
 
       <section class="flow-card">
         <div class="section-head">
-          <h2>学习阶段流程</h2>
-          <span class="section-tip">固定四阶段，和页面流程分开显示，避免语义混淆</span>
+          <h2>当前学习阶段</h2>
+          <span class="section-tip">每个阶段都明确展示状态、目标和动作提示。</span>
         </div>
         <StepProgress :steps="flowSteps" :current-step="currentStepDefinition.order" />
       </section>
@@ -331,31 +384,41 @@ onMounted(async () => {
         <div class="current-card-main">
           <div class="current-head">
             <div>
-              <p class="current-label">当前学习阶段</p>
-              <h2>{{ currentCardMeta.phaseLabel }}</h2>
+              <p class="current-label">当前阶段详情</p>
+              <h2>{{ currentStageDetail.title }}</h2>
             </div>
-            <span class="status-badge">{{ currentTaskStatusLabel }}</span>
+            <span class="status-badge" :class="{ busy: currentStageDetail.isBusy }">
+              {{ currentStageDetail.busyLabel || currentStageDetail.statusLabel }}
+            </span>
           </div>
 
           <div class="current-topic">
-            <span class="overview-label">当前学习主题</span>
-            <h3>{{ currentTopic }}</h3>
+            <span class="overview-label">当前主题</span>
+            <h3>{{ currentStageDetail.topic }}</h3>
           </div>
 
           <div class="current-goal-block">
             <article class="goal-card">
               <span class="overview-label">阶段目标</span>
-              <p>{{ currentStepDefinition.objective }}</p>
+              <p>{{ currentStageDetail.objective }}</p>
             </article>
             <article class="goal-card">
-              <span class="overview-label">学习说明</span>
-              <p>{{ currentCardMeta.displayDescription }}</p>
+              <span class="overview-label">完成标准</span>
+              <p>{{ currentStageDetail.completionStandard }}</p>
+            </article>
+            <article class="goal-card">
+              <span class="overview-label">当前状态</span>
+              <p>{{ currentStageDetail.statusLabel }}，{{ currentStageDetail.reason }}</p>
+            </article>
+            <article class="goal-card">
+              <span class="overview-label">为什么下一步是这个</span>
+              <p>{{ currentStageDetail.detailDescription }}</p>
             </article>
           </div>
 
           <div class="current-actions">
-            <PrimaryButton type="button" @click="handlePrimaryAction">
-              {{ primaryActionLabel }}
+            <PrimaryButton type="button" :disabled="!currentStageDetail.isActionable" @click="handlePrimaryAction">
+              {{ currentStageDetail.actionText }}
             </PrimaryButton>
             <button type="button" class="ghost-button wide" @click="toggleDetails">
               {{ detailExpanded ? '收起详细任务' : '查看详细任务' }}
@@ -364,13 +427,27 @@ onMounted(async () => {
         </div>
 
         <aside class="current-side">
-          <article class="side-card">
-            <span class="overview-label">本阶段关注点</span>
-            <p>{{ currentStepDefinition.description }}</p>
+          <article class="side-card combat-panel">
+            <span class="overview-label">阶段作战面板</span>
+            <div class="combat-line">
+              <strong>本阶段目标</strong>
+              <p>{{ currentStageDetail.objective }}</p>
+            </div>
+            <div class="combat-line">
+              <strong>你要完成什么</strong>
+              <p>{{ currentStageDetail.todo }}</p>
+            </div>
+            <div class="combat-line">
+              <strong>完成后会发生什么</strong>
+              <p>{{ currentStageDetail.nextResult }}</p>
+            </div>
+            <PrimaryButton type="button" :disabled="!currentStageDetail.isActionable" @click="handlePrimaryAction">
+              {{ currentStageDetail.actionText }}
+            </PrimaryButton>
           </article>
 
           <article class="side-card" v-if="learningFeedback">
-            <span class="overview-label">复盘摘要</span>
+            <span class="overview-label">阶段反馈</span>
             <p>{{ learningFeedback.diagnosisSummary }}</p>
           </article>
 
@@ -399,7 +476,7 @@ onMounted(async () => {
               <p class="detail-node">{{ task.nodeName }}</p>
               <p class="detail-description">{{ task.displayDescription }}</p>
             </div>
-            <PrimaryButton type="button" @click="openTask(task.taskId, task.stage)">
+            <PrimaryButton type="button" :disabled="task.disabled" @click="openTask(task.taskId, task.stage)">
               {{ task.actionText }}
             </PrimaryButton>
           </article>
@@ -477,6 +554,12 @@ onMounted(async () => {
   line-height: 1.5;
 }
 
+.overview-item p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
 .overview-label {
   font-size: var(--font-size-xs);
   letter-spacing: 0.08em;
@@ -542,6 +625,11 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.status-badge.busy {
+  border-color: rgba(255, 184, 77, 0.35);
+  background: rgba(255, 184, 77, 0.14);
+}
+
 .current-topic {
   display: grid;
   gap: 8px;
@@ -571,6 +659,7 @@ onMounted(async () => {
 .side-card p,
 .detail-description,
 .detail-node {
+  margin: 0;
   line-height: 1.65;
   color: var(--color-text-secondary);
 }
@@ -583,6 +672,20 @@ onMounted(async () => {
 
 .wide {
   min-width: 170px;
+}
+
+.combat-panel {
+  gap: var(--space-lg);
+}
+
+.combat-line {
+  display: grid;
+  gap: 6px;
+}
+
+.combat-line strong {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
 }
 
 .side-list {

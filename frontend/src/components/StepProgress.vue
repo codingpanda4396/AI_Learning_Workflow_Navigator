@@ -8,6 +8,8 @@ interface WorkflowStepMeta {
   step: WorkflowStepNumber
   title: string
   description?: string
+  statusLabel?: string
+  actionHint?: string
   doneCount?: number
   totalCount?: number
   percent?: number
@@ -61,9 +63,13 @@ function showPercent(step: WorkflowStepMeta) {
         {{ markerText(item) }}
       </div>
       <div class="step-copy">
-        <span class="step-title">{{ item.title }}</span>
+        <div class="step-head">
+          <span class="step-title">{{ item.title }}</span>
+          <span v-if="item.statusLabel" class="step-status">{{ item.statusLabel }}</span>
+        </div>
         <span v-if="item.description" class="step-description">{{ item.description }}</span>
         <span v-else-if="showPercent(item)" class="step-description">{{ percent(item) }}%</span>
+        <span v-if="item.actionHint" class="step-action">{{ item.actionHint }}</span>
       </div>
     </div>
   </div>
@@ -89,7 +95,7 @@ function showPercent(step: WorkflowStepMeta) {
   border-radius: var(--radius-lg);
   border: 1px solid transparent;
   background: rgba(13, 17, 23, 0.55);
-  min-height: 132px;
+  min-height: 172px;
   transition: all var(--duration-normal) var(--ease-smooth);
 }
 
@@ -117,7 +123,14 @@ function showPercent(step: WorkflowStepMeta) {
 
 .step-copy {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+}
+
+.step-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .step-title {
@@ -126,10 +139,24 @@ function showPercent(step: WorkflowStepMeta) {
   color: var(--color-text);
 }
 
-.step-description {
+.step-status {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.step-description,
+.step-action {
   font-size: var(--font-size-sm);
   line-height: 1.5;
   color: var(--color-text-secondary);
+}
+
+.step-action {
+  color: var(--color-text);
 }
 
 .step-completed {
@@ -178,6 +205,11 @@ function showPercent(step: WorkflowStepMeta) {
 
   .step-item {
     min-height: auto;
+  }
+
+  .step-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
