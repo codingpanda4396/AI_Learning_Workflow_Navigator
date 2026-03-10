@@ -35,77 +35,95 @@ function onChapterInput(event: Event) {
 </script>
 
 <template>
-  <section class="selector-card">
-    <div class="field-group">
-      <label for="course-input" class="label">课程标识（可自定义）</label>
-      <input
-        id="course-input"
-        class="input"
-        type="text"
-        :value="courseId"
-        list="course-suggestions"
-        placeholder="例如：computer_network / linear_algebra"
-        @input="onCourseInput"
-      />
-      <datalist id="course-suggestions">
-        <option v-for="course in suggestedCourses" :key="course" :value="course" />
-      </datalist>
-    </div>
+  <section class="selector-group">
+    <div class="selector-row">
+      <div class="selector-field">
+        <label for="course-input" class="selector-label">课程标识</label>
+        <input
+          id="course-input"
+          class="selector-input"
+          type="text"
+          :value="courseId"
+          list="course-suggestions"
+          placeholder="例如：computer_network / linear_algebra"
+          @input="onCourseInput"
+        />
+        <datalist id="course-suggestions">
+          <option v-for="course in suggestedCourses" :key="course" :value="course" />
+        </datalist>
+      </div>
 
-    <div class="field-group">
-      <label for="chapter-input" class="label">章节标识（可自定义）</label>
-      <input
-        id="chapter-input"
-        class="input"
-        type="text"
-        :value="chapterId"
-        list="chapter-suggestions"
-        placeholder="例如：tcp / vector_space"
-        @input="onChapterInput"
-      />
-      <datalist id="chapter-suggestions">
-        <option v-for="chapter in suggestedChapters" :key="chapter" :value="chapter" />
-      </datalist>
+      <div class="selector-field">
+        <label for="chapter-input" class="selector-label">章节标识</label>
+        <input
+          id="chapter-input"
+          class="selector-input"
+          type="text"
+          :value="chapterId"
+          list="chapter-suggestions"
+          placeholder="例如：tcp / vector_space"
+          @input="onChapterInput"
+        />
+        <datalist id="chapter-suggestions">
+          <option v-for="chapter in suggestedChapters" :key="chapter" :value="chapter" />
+        </datalist>
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.selector-card {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.selector-row {
+  display: flex;
   gap: var(--space-md);
 }
 
-.field-group {
+.selector-field {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
 }
 
-.label {
+.selector-label {
+  font-family: var(--font-display);
   font-size: var(--font-size-sm);
   font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.input {
-  width: 100%;
-  min-height: 44px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: #0a1225;
+.selector-input {
+  padding: 14px 18px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
   color: var(--color-text);
-  padding: 0 var(--space-md);
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all var(--duration-normal) var(--ease-smooth);
 }
 
-.input:focus {
+.selector-input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+  box-shadow: 0 0 0 4px var(--color-primary-alpha);
+  outline: none;
+}
+
+.selector-input::placeholder {
+  color: var(--color-text-muted);
 }
 
 @media (max-width: 768px) {
-  .selector-card {
-    grid-template-columns: 1fr;
+  .selector-row {
+    flex-direction: column;
   }
 }
 </style>
