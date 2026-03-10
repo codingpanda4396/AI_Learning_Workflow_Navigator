@@ -1,28 +1,47 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600&display=swap');
 
 :root {
-  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
-  --font-body: 'Manrope', 'Segoe UI', sans-serif;
+  /* Primary - Warm Blue */
+  --color-primary: #6B9FFF;
+  --color-primary-hover: #8AB6FF;
+  --color-primary-active: #5A8AE8;
+  --color-primary-alpha: rgba(107, 159, 255, 0.18);
 
-  --color-bg: #060a14;
-  --color-bg-elevated: #0d1528;
-  --color-bg-surface: #111c34;
-  --color-text: #eaf0ff;
-  --color-text-secondary: #91a4d1;
-  --color-border: #213153;
-  --color-primary: #3e8cff;
-  --color-primary-hover: #63a3ff;
-  --color-primary-active: #2f79e8;
-  --color-primary-alpha: rgba(62, 140, 255, 0.2);
-  --color-success: #2bc58d;
-  --color-warning: #ffb04f;
-  --color-error: #ff6b7a;
+  /* Accent Colors */
+  --color-accent-coral: #FF8A7A;
+  --color-accent-lavender: #B8A9FF;
+  --color-accent-mint: #7EDFC5;
+  --color-accent-peach: #FFB88C;
 
+  /* Background */
+  --color-bg: #0D1117;
+  --color-bg-elevated: #151D2B;
+  --color-bg-surface: #1C2636;
+  --color-bg-hover: #252F42;
+
+  /* Text - Improved contrast */
+  --color-text: #F0F4F8;
+  --color-text-secondary: #A3B4CC;
+  --color-text-muted: #6B7A94;
+
+  /* Border */
+  --color-border: #2A3A52;
+  --color-border-hover: #3D5068;
+
+  /* Status */
+  --color-success: #5DD4A6;
+  --color-warning: #FFB88C;
+  --color-error: #FF7A8A;
+  --color-info: #7EB8FF;
+
+  /* Radius */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 20px;
+  --radius-full: 9999px;
 
+  /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 12px;
@@ -30,14 +49,28 @@
   --space-xl: 24px;
   --space-xxl: 32px;
 
-  --shadow-sm: 0 6px 14px rgba(0, 0, 0, 0.16);
-  --shadow-md: 0 14px 36px rgba(0, 0, 0, 0.28);
+  /* Shadows */
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.45);
+
+  /* Typography */
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-body: 'Manrope', 'Segoe UI', sans-serif;
 
   --font-size-xs: 12px;
   --font-size-sm: 14px;
   --font-size-md: 16px;
   --font-size-lg: 20px;
   --font-size-xl: 28px;
+  --font-size-2xl: 36px;
+
+  /* Animation */
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
 }
 
 *,
