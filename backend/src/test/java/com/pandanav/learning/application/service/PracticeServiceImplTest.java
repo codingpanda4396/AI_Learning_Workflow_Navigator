@@ -14,6 +14,8 @@ import com.pandanav.learning.domain.model.PracticeItem;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.LearningEventRepository;
+import com.pandanav.learning.domain.repository.PracticeFeedbackReportRepository;
+import com.pandanav.learning.domain.repository.PracticeQuizRepository;
 import com.pandanav.learning.domain.repository.PracticeRepository;
 import com.pandanav.learning.domain.repository.PracticeSubmissionRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
@@ -43,6 +45,10 @@ class PracticeServiceImplTest {
     @Mock
     private PracticeSubmissionRepository practiceSubmissionRepository;
     @Mock
+    private PracticeQuizRepository practiceQuizRepository;
+    @Mock
+    private PracticeFeedbackReportRepository practiceFeedbackReportRepository;
+    @Mock
     private TaskRepository taskRepository;
     @Mock
     private SessionRepository sessionRepository;
@@ -55,6 +61,10 @@ class PracticeServiceImplTest {
     @Mock
     private LlmPracticeGenerator llmPracticeGenerator;
     @Mock
+    private PracticeFeedbackReportGenerator practiceFeedbackReportGenerator;
+    @Mock
+    private PracticeQuizAsyncService practiceQuizAsyncService;
+    @Mock
     private MasteryService masteryService;
 
     private LlmProperties llmProperties;
@@ -66,12 +76,16 @@ class PracticeServiceImplTest {
         practiceService = new PracticeServiceImpl(
             practiceRepository,
             practiceSubmissionRepository,
+            practiceQuizRepository,
+            practiceFeedbackReportRepository,
             taskRepository,
             sessionRepository,
             conceptNodeRepository,
             learningEventRepository,
             rulePracticeGenerator,
             llmPracticeGenerator,
+            practiceFeedbackReportGenerator,
+            practiceQuizAsyncService,
             masteryService,
             llmProperties,
             new ObjectMapper()

@@ -23,28 +23,27 @@ import java.util.Map;
 public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
 
     private static final String STAGE_SYSTEM_PROMPT = """
-        你是学习任务结构化生成器。
-        只返回一个合法 JSON 对象。
-        不要解释，不要过程，不要额外文本。
+        You generate structured learning stage content.
+        Return exactly one valid JSON object.
+        Do not include markdown, explanation, or extra text.
         """;
 
     private static final String EVAL_SYSTEM_PROMPT = """
-        你是训练结果结构化评估器。
-        只返回一个合法 JSON 对象。
-        不要解释，不要过程，不要额外文本。
+        You evaluate a learner answer and return structured grading output.
+        Return exactly one valid JSON object.
+        Do not include markdown, explanation, or extra text.
         """;
 
     private static final String GOAL_DIAGNOSE_SYSTEM_PROMPT = """
-        你是学习目标诊断助手。
-        只返回一个合法 JSON 对象。
-        不要解释，不要额外文本。
+        You diagnose whether a learning goal is well-defined.
+        Return exactly one valid JSON object.
+        Do not include markdown, explanation, or extra text.
         """;
 
     private static final String TUTOR_SYSTEM_PROMPT_TEMPLATE = """
-        你是学习流程导师。
-        先定位卡点，再给短提示。
-        单次回复尽量短。
-
+        You are a learning tutor.
+        Identify the learner's blocker first, then give a concise hint.
+        Keep each reply short and practical.
         hint_mode: {{hint_mode}}
         direct_answer_mode: {{direct_answer_mode}}
         stage: {{task_stage}}
@@ -54,9 +53,9 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         """;
 
     private static final String CONCEPT_DECOMPOSE_SYSTEM_PROMPT = """
-        你是概念拆解器。
-        只返回一个合法 JSON 对象。
-        不要解释，不要额外文本。
+        You decompose a concept into smaller learnable nodes.
+        Return exactly one valid JSON object.
+        Do not include markdown, explanation, or extra text.
         """;
 
     private static final String PATH_PLAN_SYSTEM_PROMPT = """
@@ -66,9 +65,9 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
         """;
 
     private static final String PRACTICE_GENERATION_SYSTEM_PROMPT = """
-        你是训练题结构化生成器。
-        只返回一个合法 JSON 对象。
-        不要解释，不要过程，不要额外文本。
+        You generate structured practice questions.
+        Return exactly one valid JSON object.
+        Do not include markdown, explanation, or extra text.
         """;
 
     private final PromptTemplateRenderer renderer = new PromptTemplateRenderer();
@@ -215,17 +214,17 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                 "v2",
                 STAGE_SYSTEM_PROMPT,
                 """
-                    阶段：{{stage}}
-                    知识点：{{node_title}}
-                    目标：{{objective}}
+                    Stage: {{stage}}
+                    Concept: {{node_title}}
+                    Objective: {{objective}}
 
-                    生成字段：
-                    - title：1-20字
-                    - summary：1-50字
-                    - key_points：1-4条，每条1-12字
-                    - common_misconceptions：0-2条，每条1-12字
-                    - suggested_sequence：1-4条，每条1-10字
-                    不需要推理过程，不需要解释，不确定就用最保守表达。
+                    Generate fields:
+                    - title: 1-20 chars
+                    - summary: 1-50 chars
+                    - key_points: 1-4 items, each 1-12 chars
+                    - common_misconceptions: 0-2 items, each 1-12 chars
+                    - suggested_sequence: 1-4 items, each 1-10 chars
+                    Use short, conservative wording.
                     """,
                 "{\"title\":\"\",\"summary\":\"\",\"key_points\":[],\"common_misconceptions\":[],\"suggested_sequence\":[]}",
                 "short_json_only",
@@ -240,18 +239,18 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                 "v2",
                 STAGE_SYSTEM_PROMPT,
                 """
-                    阶段：{{stage}}
-                    知识点：{{node_title}}
-                    目标：{{objective}}
+                    Stage: {{stage}}
+                    Concept: {{node_title}}
+                    Objective: {{objective}}
 
-                    生成字段：
-                    - concept_explanation：20-80字
-                    - analogy：10-40字
-                    - worked_example：20-80字
-                    - step_by_step_reasoning：2-4条，每条1-16字
-                    - common_errors：1-3条，每条1-14字
-                    - check_questions：1-3条，每条1-18字
-                    不需要推理过程，不需要解释，不确定就用最通用表达。
+                    Generate fields:
+                    - concept_explanation: 20-80 chars
+                    - analogy: 10-40 chars
+                    - worked_example: 20-80 chars
+                    - step_by_step_reasoning: 2-4 items, each 1-16 chars
+                    - common_errors: 1-3 items, each 1-14 chars
+                    - check_questions: 1-3 items, each 1-18 chars
+                    Keep it short and direct.
                     """,
                 "{\"concept_explanation\":\"\",\"analogy\":\"\",\"worked_example\":\"\",\"step_by_step_reasoning\":[],\"common_errors\":[],\"check_questions\":[]}",
                 "short_json_only",
@@ -266,16 +265,16 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                 "v2",
                 STAGE_SYSTEM_PROMPT,
                 """
-                    阶段：{{stage}}
-                    知识点：{{node_title}}
-                    目标：{{objective}}
+                    Stage: {{stage}}
+                    Concept: {{node_title}}
+                    Objective: {{objective}}
 
-                    生成 3 个短题目：
-                    - BASIC / APPLICATION / REASONING 各 1 题
-                    - question：1-36字
-                    - reference_points：1-2条，每条1-10字
-                    - difficulty：EASY|MEDIUM|HARD
-                    不要解释，不要长题干。
+                    Generate exactly 3 short questions:
+                    - include one BASIC, one APPLICATION, and one REASONING
+                    - question: 1-36 chars
+                    - reference_points: 1-2 items, each 1-10 chars
+                    - difficulty: EASY, MEDIUM, or HARD
+                    No explanation text outside JSON.
                     """,
                 "{\"questions\":[{\"id\":\"q1\",\"type\":\"BASIC\",\"question\":\"\",\"reference_points\":[],\"difficulty\":\"EASY\"},{\"id\":\"q2\",\"type\":\"APPLICATION\",\"question\":\"\",\"reference_points\":[],\"difficulty\":\"MEDIUM\"},{\"id\":\"q3\",\"type\":\"REASONING\",\"question\":\"\",\"reference_points\":[],\"difficulty\":\"HARD\"}]}",
                 "short_json_only",
@@ -290,15 +289,15 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                 "v2",
                 STAGE_SYSTEM_PROMPT,
                 """
-                    阶段：{{stage}}
-                    知识点：{{node_title}}
-                    目标：{{objective}}
+                    Stage: {{stage}}
+                    Concept: {{node_title}}
+                    Objective: {{objective}}
 
-                    生成字段：
-                    - reflection_prompt：10-50字
-                    - review_checklist：2-4条，每条1-12字
-                    - next_step_suggestion：10-50字
-                    不要解释，不要过程。
+                    Generate fields:
+                    - reflection_prompt: 10-50 chars
+                    - review_checklist: 2-4 items, each 1-12 chars
+                    - next_step_suggestion: 10-50 chars
+                    Keep it actionable and concise.
                     """,
                 "{\"reflection_prompt\":\"\",\"review_checklist\":[],\"next_step_suggestion\":\"\"}",
                 "short_json_only",
@@ -316,7 +315,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                 objective={{task_objective}}
                 question={{generated_question_content}}
                 answer={{user_answer}}
-                只做短 JSON 填充，不要解释。
+                Fill the JSON only. No explanation outside JSON.
                 """,
             "{\"score\":0,\"normalized_score\":0,\"rubric\":{\"concept_correctness\":0,\"reasoning_quality\":0,\"completeness\":0,\"clarity\":0},\"feedback\":\"\",\"error_tags\":[],\"strengths\":[],\"weaknesses\":[],\"suggested_next_action\":\"INSERT_TRAINING_REINFORCEMENT\"}",
             "short_json_only",
@@ -337,7 +336,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                     course={{course_id}}
                     chapter={{chapter_id}}
                     goal={{goal_text}}
-                    给出紧凑诊断 JSON。
+                    Return a compact diagnosis JSON.
                     """,
                 "{\"goal_score\":0,\"smart_breakdown\":{\"specific_score\":0,\"measurable_score\":0,\"achievable_score\":0,\"relevant_score\":0,\"time_bound_score\":0},\"summary\":\"\",\"strengths\":[],\"risks\":[],\"rewritten_goal\":\"\"}",
                 "short_json_only",
@@ -383,16 +382,16 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                 "v2",
                 PRACTICE_GENERATION_SYSTEM_PROMPT,
                 """
-                    知识点：{{node_title}}
-                    目标：{{task_objective}}
-                    参考：{{stage_content_json}}
+                    Concept: {{node_title}}
+                    Objective: {{task_objective}}
+                    Reference: {{stage_content_json}}
 
-                    只生成 3 题：
-                    - SINGLE_CHOICE / TRUE_FALSE / SHORT_ANSWER 各 1 题
-                    - stem：8-40字
-                    - standard_answer：1-30字
-                    - explanation：8-40字
-                    不要长解释。
+                    Generate exactly 3 items:
+                    - include one SINGLE_CHOICE, one TRUE_FALSE, and one SHORT_ANSWER
+                    - stem: 20-240 chars
+                    - standard_answer: 1-200 chars
+                    - explanation: 10-240 chars
+                    Return JSON only.
                     """,
                 "{\"items\":[{\"question_type\":\"SINGLE_CHOICE\",\"stem\":\"\",\"options\":[],\"standard_answer\":\"\",\"explanation\":\"\",\"difficulty\":\"EASY\"},{\"question_type\":\"TRUE_FALSE\",\"stem\":\"\",\"options\":[\"True\",\"False\"],\"standard_answer\":\"False\",\"explanation\":\"\",\"difficulty\":\"MEDIUM\"},{\"question_type\":\"SHORT_ANSWER\",\"stem\":\"\",\"options\":[],\"standard_answer\":\"\",\"explanation\":\"\",\"difficulty\":\"HARD\"}]}",
                 "short_json_only",
@@ -419,7 +418,7 @@ public class DefaultPromptTemplateProvider implements PromptTemplateProvider {
                     chapter={{chapter_id}}
                     concept={{concept}}
                     goal={{goal}}
-                    输出 3-5 个最小节点。
+                    Return 3-5 minimal concept nodes.
                     """,
                 "{\"concept_nodes\":[{\"id\":\"node1\",\"title\":\"\",\"description\":\"\",\"prerequisites\":[]}]}",
                 "short_json_only",

@@ -288,10 +288,11 @@ public class TaskRunnerService implements RunTaskUseCase {
     }
 
     private JsonNode generateByStage(Task task) {
+        String conceptLabel = resolveConceptLabel(task);
         return switch (task.getStage()) {
             case STRUCTURE -> objectMapper.valueToTree(Map.of(
-                "title", safeShort(task.getObjective(), 20),
-                "summary", "建立" + safeShort(task.getObjective(), 20) + "的核心结构认识",
+                "title", safeShort(conceptLabel, 20),
+                "summary", "建立" + safeShort(conceptLabel, 20) + "的核心结构认识",
                 "key_points", List.of("定义边界", "核心关系", "常见变化", "最小流程"),
                 "common_misconceptions", List.of("只记结论", "忽略条件"),
                 "suggested_sequence", List.of("先定义", "再分层", "看关系", "做总结")
@@ -306,7 +307,7 @@ public class TaskRunnerService implements RunTaskUseCase {
             ));
             case TRAINING -> objectMapper.valueToTree(Map.of(
                 "questions", List.of(
-                    Map.of("id", "q1", "type", "BASIC", "question", "说明" + safeShort(task.getObjective(), 12), "reference_points", List.of("定义", "条件"), "difficulty", "EASY"),
+                    Map.of("id", "q1", "type", "BASIC", "question", "说明" + safeShort(conceptLabel, 12), "reference_points", List.of("定义", "条件"), "difficulty", "EASY"),
                     Map.of("id", "q2", "type", "APPLICATION", "question", "给场景说明如何应用", "reference_points", List.of("步骤", "结果"), "difficulty", "MEDIUM"),
                     Map.of("id", "q3", "type", "REASONING", "question", "条件变化后结果怎样变", "reference_points", List.of("推导", "边界"), "difficulty", "HARD")
                 )
@@ -317,6 +318,33 @@ public class TaskRunnerService implements RunTaskUseCase {
                 "next_step_suggestion", "先复述一遍，再做一题短练习。"
             ));
         };
+    }
+
+    private String resolveConceptLabel(Task task) {
+        return conceptNodeRepository.findById(task.getNodeId())
+            .map(ConceptNode::getName)
+            .filter(name -> name != null && !name.isBlank())
+            .orElseGet(() -> extractConceptFromObjective(task.getObjective()));
+    }
+
+    private String extractConceptFromObjective(String objective) {
+        if (objective == null || objective.isBlank()) {
+            return "当前知识点";
+        }
+        String trimmed = objective.trim();
+        if (trimmed.startsWith("梳理") && trimmed.endsWith("的核心结构")) {
+            return trimmed.substring(2, trimmed.length() - "的核心结构".length());
+        }
+        if (trimmed.startsWith("理解") && trimmed.endsWith("的机制与易错点")) {
+            return trimmed.substring(2, trimmed.length() - "的机制与易错点".length());
+        }
+        if (trimmed.startsWith("完成") && trimmed.endsWith("的针对性训练")) {
+            return trimmed.substring(2, trimmed.length() - "的针对性训练".length());
+        }
+        if (trimmed.startsWith("反思") && trimmed.endsWith("的错误与改进方向")) {
+            return trimmed.substring(2, trimmed.length() - "的错误与改进方向".length());
+        }
+        return trimmed;
     }
 
     private String safeShort(String value, int maxLen) {

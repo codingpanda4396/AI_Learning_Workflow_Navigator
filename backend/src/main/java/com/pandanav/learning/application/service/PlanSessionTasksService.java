@@ -94,12 +94,7 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
     }
 
     private String buildObjectiveWithContext(String courseId, String chapterId, String goalText, Stage stage, String conceptName) {
-        String base = taskObjectiveTemplateStrategy.buildObjective(stage, conceptName);
-        String goalPart = (goalText == null || goalText.isBlank()) ? "N/A" : goalText;
-        return base
-            + " [Course: " + courseId + "]"
-            + " [Chapter: " + chapterId + "]"
-            + " [Goal: " + goalPart + "]";
+        return taskObjectiveTemplateStrategy.buildObjective(stage, conceptName);
     }
 
     private void appendInsertedTasks(
@@ -136,7 +131,7 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
 
             String objective = inserted.objective() == null || inserted.objective().isBlank()
                 ? buildObjectiveWithContext(courseId, chapterId, goalText, stage, conceptName)
-                : inserted.objective().trim() + " [PersonalizedTrigger: " + inserted.trigger() + "]";
+                : inserted.objective().trim();
             String key = taskKey(inserted.nodeId(), stage);
             Task existing = uniqueTasks.get(key);
             if (existing != null) {
