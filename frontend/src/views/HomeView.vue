@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -250,7 +250,7 @@ onMounted(async () => {
         <p v-else-if="recentHistory.length === 0" class="history-tip">暂无历史记录。</p>
 
         <div v-else class="history-list">
-          <article v-for="item in recentHistory" :key="item.sessionId" class="history-item">
+          <article v-for="item in recentHistory" :key="item.sessionId" class="history-item animate-fade-in-up">
             <div class="history-item-head">
               <span>Session #{{ item.sessionId }}</span>
               <span>{{ item.status }}</span>
@@ -298,26 +298,174 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.home-page { min-height: 100dvh; padding: clamp(20px, 4vw, 40px); display: grid; grid-template-columns: 1.1fr 1fr; gap: clamp(18px, 3vw, 32px); }
-.home-toolbar { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: var(--space-md); }
-.username { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-.hero-panel, .form-panel { border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: linear-gradient(160deg, rgba(16, 27, 50, 0.92), rgba(10, 16, 30, 0.95)); box-shadow: var(--shadow-md); }
-.hero-panel { padding: clamp(20px, 4vw, 40px); display: flex; flex-direction: column; gap: var(--space-xl); }
-.form-panel { padding: clamp(18px, 3vw, 28px); }
-.start-form { display: flex; flex-direction: column; gap: var(--space-lg); }
-.action-block { border-top: 1px solid var(--color-border); padding-top: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-sm); }
-.history-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); background: rgba(12, 21, 42, 0.8); display: grid; gap: var(--space-sm); }
-.history-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-sm); }
-.history-list { display: grid; gap: 10px; }
-.history-item { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 10px; display: grid; gap: 6px; }
-.history-item-head { display: flex; justify-content: space-between; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-.history-goal { color: var(--color-text); }
-.history-meta { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-.history-actions { display: flex; justify-content: space-between; align-items: center; }
-.history-time { color: var(--color-text-secondary); font-size: var(--font-size-xs); }
-.history-tip { margin: 0; color: var(--color-text-secondary); }
-.history-error { margin: 0; color: var(--color-error); }
-.ghost-btn { border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: transparent; color: var(--color-text); padding: 6px 10px; }
-.submit-error { margin: 0; color: var(--color-error); font-size: var(--font-size-sm); }
-@media (max-width: 980px) { .home-page { grid-template-columns: 1fr; } }
+.home-page {
+  min-height: 100dvh;
+  padding: clamp(20px, 4vw, 40px);
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: clamp(18px, 3vw, 32px);
+}
+
+.home-toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.username {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.hero-panel,
+.form-panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    160deg,
+    var(--color-bg-elevated),
+    var(--color-bg-surface)
+  );
+  box-shadow: var(--shadow-md);
+  transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.hero-panel {
+  padding: clamp(20px, 4vw, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.hero-panel:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.form-panel {
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.start-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.action-block {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.history-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  background: rgba(12, 21, 42, 0.8);
+  display: grid;
+  gap: var(--space-md);
+}
+
+.history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.history-list {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.history-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  background: var(--color-bg);
+  transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.history-item:hover {
+  border-color: var(--color-border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.history-item-head {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.history-goal {
+  color: var(--color-text);
+  margin-bottom: var(--space-xs);
+}
+
+.history-meta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.history-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-time {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.history-tip {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.history-error {
+  margin: 0;
+  color: var(--color-error);
+}
+
+.ghost-btn {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  padding: 8px 14px;
+  font-size: var(--font-size-sm);
+  transition: all var(--duration-fast) var(--ease-smooth);
+}
+
+.ghost-btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-hover);
+  color: var(--color-text);
+}
+
+.ghost-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.submit-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 980px) {
+  .home-page {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
