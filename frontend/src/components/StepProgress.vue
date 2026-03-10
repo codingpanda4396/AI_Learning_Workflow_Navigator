@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import type { WorkflowStepNumber } from '@/types/workflow'
 
 type StepStatus = 'pending' | 'running' | 'done' | 'blocked'
@@ -59,124 +59,121 @@ function statusText(step: WorkflowStepMeta) {
 </script>
 
 <template>
-  <ol class="step-progress" aria-label="学习流程步骤进度">
-    <li
+  <div class="progress-container">
+    <div
       v-for="item in steps"
       :key="item.step"
       class="step-item"
       :class="{
-        active: item.step === currentStep,
-        completed: item.status === 'done',
-        blocked: item.status === 'blocked',
+        'step-active': item.step === currentStep,
+        'step-done': item.status === 'done',
+        'step-blocked': item.status === 'blocked',
+        'step-pending': !item.status || item.status === 'pending'
       }"
     >
-      <div class="head">
-        <span class="marker">{{ markerText(item) }}</span>
-        <span class="text">{{ item.title }}</span>
-        <span v-if="hasProgress(item)" class="ratio">{{ doneCount(item) }}/{{ totalCount(item) }}</span>
+      <div class="step-indicator">
+        {{ markerText(item) }}
       </div>
-      <div v-if="hasProgress(item)" class="track">
-        <span class="fill" :style="{ width: `${percent(item)}%` }"></span>
-      </div>
-      <span v-if="hasProgress(item)" class="percent">{{ percent(item) }}% · {{ statusText(item) }}</span>
-    </li>
-  </ol>
+      <span class="step-title">{{ item.title }}</span>
+      <div v-if="hasProgress(item)" class="step-line" :class="{ completed: item.status === 'done' }"></div>
+      <span v-if="hasProgress(item)" class="step-progress-text">{{ percent(item) }}%</span>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.step-progress {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.progress-container {
+  display: flex;
+  align-items: center;
   gap: var(--space-sm);
+  padding: var(--space-lg);
+  background: linear-gradient(
+    145deg,
+    var(--color-bg-elevated),
+    var(--color-bg-surface)
+  );
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow-x: auto;
 }
 
 .step-item {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-  min-height: 86px;
-  padding: var(--space-sm) var(--space-md);
-  display: grid;
-  gap: 6px;
-  color: var(--color-text-secondary);
-}
-
-.head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: var(--space-sm);
+  min-width: 80px;
 }
 
-.marker {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  border: 1px solid currentColor;
-  display: inline-flex;
+.step-indicator {
+  width: 40px;
+  height: 40px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-}
-
-.text {
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  transition: all var(--duration-normal) var(--ease-smooth);
 }
 
-.ratio {
-  font-size: var(--font-size-xs);
+.step-pending {
+  background: var(--color-bg);
+  border: 2px solid var(--color-border);
+  color: var(--color-text-muted);
 }
 
-.track {
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(145, 164, 209, 0.25);
-  overflow: hidden;
+.step-active {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  border: 2px solid var(--color-primary);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(107, 159, 255, 0.4);
 }
 
-.fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--color-primary);
-  transition: width 180ms ease;
-}
-
-.percent {
-  font-size: var(--font-size-xs);
-}
-
-.step-item.active {
-  color: var(--color-text);
-  border-color: var(--color-primary);
-  box-shadow: inset 0 0 0 1px var(--color-primary);
-}
-
-.step-item.completed {
-  color: #cde2ff;
-  border-color: rgba(62, 140, 255, 0.4);
-}
-
-.step-item.completed .fill {
+.step-done {
   background: var(--color-success);
+  border: 2px solid var(--color-success);
+  color: #fff;
 }
 
-.step-item.blocked {
-  border-color: rgba(255, 176, 79, 0.55);
-}
-
-.step-item.blocked .fill {
+.step-blocked {
   background: var(--color-warning);
+  border: 2px solid var(--color-warning);
+  color: #fff;
+}
+
+.step-title {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: var(--color-border);
+  min-width: 20px;
+}
+
+.step-line.completed {
+  background: linear-gradient(90deg, var(--color-success), var(--color-primary));
+}
+
+.step-progress-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
 }
 
 @media (max-width: 900px) {
-  .step-progress {
-    grid-template-columns: 1fr 1fr;
+  .progress-container {
+    flex-wrap: wrap;
+  }
+
+  .step-item {
+    flex: 0 0 calc(50% - var(--space-sm));
   }
 }
 </style>
