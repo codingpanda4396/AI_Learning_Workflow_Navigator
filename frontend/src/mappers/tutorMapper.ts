@@ -26,7 +26,7 @@ interface TutorSendMessageResponseDto {
   assistant_message: TutorMessageDto
 }
 
-function mapTutorMessage(dto: TutorMessageDto): TutorMessage {
+export function mapTutorMessageDto(dto: TutorMessageDto): TutorMessage {
   return {
     id: dto.id,
     sessionId: dto.session_id,
@@ -41,7 +41,7 @@ export function mapTutorMessageListDto(dto: TutorMessageListResponseDto): TutorM
   return {
     sessionId: dto.session_id,
     taskId: dto.task_id,
-    messages: (dto.messages ?? []).map(mapTutorMessage),
+    messages: (dto.messages ?? []).map(mapTutorMessageDto),
   }
 }
 
@@ -49,7 +49,7 @@ export function mapTutorSendMessageDto(dto: TutorSendMessageResponseDto): TutorS
   return {
     sessionId: dto.session_id,
     taskId: dto.task_id,
-    userMessage: mapTutorMessage(dto.user_message),
-    assistantMessage: mapTutorMessage(dto.assistant_message),
+    userMessage: mapTutorMessageDto(dto.user_message),
+    assistantMessage: mapTutorMessageDto(dto.assistant_message),
   }
 }

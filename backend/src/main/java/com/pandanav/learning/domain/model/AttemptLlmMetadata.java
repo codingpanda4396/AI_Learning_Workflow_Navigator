@@ -16,7 +16,7 @@ public record AttemptLlmMetadata(
 ) {
 
     public static AttemptLlmMetadata none(String generationMode) {
-        return new AttemptLlmMetadata(null, null, null, null, null, null, null, null, false, false, generationMode);
+        return new AttemptLlmMetadata(null, null, null, null, null, null, null, null, null, false, false, generationMode);
     }
 }
 

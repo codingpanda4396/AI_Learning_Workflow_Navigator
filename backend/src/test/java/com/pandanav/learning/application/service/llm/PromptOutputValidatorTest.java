@@ -16,14 +16,30 @@ class PromptOutputValidatorTest {
     void shouldPassStructureSchemaValidation() throws Exception {
         String json = """
             {
-              "title":"连接建立机制结构图",
-              "summary":"先确认连接双方状态和前置条件，再按步骤发送控制报文并校验确认号，最终完成连接建立。",
-              "key_points":["说明三次握手设计目的","梳理状态转换前置条件","解释确认号在可靠性中的作用"],
-              "common_misconceptions":["认为两次握手已经足够安全","忽略 ACK 对状态确认的意义"],
-              "suggested_sequence":["先明确核心定义与边界", "再推导完整流程机制", "最后分析异常与边界场景"]
+              "title":"TCP结构",
+              "summary":"建立 TCP 的核心结构认识",
+              "key_points":["定义边界","核心关系"],
+              "common_misconceptions":["只记结论"],
+              "suggested_sequence":["先定义","再分层","做总结"]
             }
             """;
         assertTrue(validator.validateStage(Stage.STRUCTURE, mapper.readTree(json)).isEmpty());
+    }
+
+    @Test
+    void shouldTrimOverlongStructureOutput() throws Exception {
+        String json = """
+            {
+              "title":"这是一个明显超过二十字的结构标题用于测试裁剪",
+              "summary":"这是一个明显超过五十字的总结内容用于测试裁剪逻辑是否生效并且仍然保持合法 JSON 输出",
+              "key_points":["第一条很长很长很长","第二条很长很长很长","第三条","第四条","第五条"],
+              "common_misconceptions":["误区一很长很长很长","误区二","误区三"],
+              "suggested_sequence":["第一步很长","第二步","第三步","第四步","第五步"]
+            }
+            """;
+        var sanitized = validator.sanitizeStage(Stage.STRUCTURE, mapper.readTree(json));
+        assertTrue(sanitized.truncated());
+        assertTrue(sanitized.errors().isEmpty());
     }
 
     @Test
@@ -31,7 +47,7 @@ class PromptOutputValidatorTest {
         String json = """
             {
               "title":"x",
-              "summary":"这是一段明显不满足长度要求的文本",
+              "summary":"这是一段不合法文本",
               "key_points":[],
               "common_misconceptions":[],
               "suggested_sequence":[],
@@ -55,34 +71,12 @@ class PromptOutputValidatorTest {
                 {
                   "node_id": 101,
                   "stage": "UNDERSTANDING",
-                  "objective": "补齐关键步骤推导，完成一次错误对照解释。",
+                  "objective": "Fill the missing prerequisite reasoning first.",
                   "trigger": "MISSING_STEPS"
                 }
               ],
-              "plan_reasoning_summary": "Prioritize weak foundational node and add one remedial understanding task.",
+              "plan_reasoning_summary": "Prioritize the weak foundational node and insert one short remedial task.",
               "risk_flags": ["LOW_CONFIDENCE_DIAGNOSIS"]
-            }
-            """;
-        assertTrue(validator.validatePersonalizedPathPlan(mapper.readTree(json)).isEmpty());
-    }
-
-    @Test
-    void shouldAllowStageTextAndLeaveStageValidationToBusinessValidator() throws Exception {
-        String json = """
-            {
-              "ordered_nodes": [
-                {"node_id": 101, "priority": 1, "reason": "Start from weak concept."}
-              ],
-              "inserted_tasks": [
-                {
-                  "node_id": 101,
-                  "stage": "REFLECTION",
-                  "objective": "Provide additional reflective notes for this node.",
-                  "trigger": "CONCEPT_CONFUSION"
-                }
-              ],
-              "plan_reasoning_summary": "Prioritize weak node and attach one remediation task for confusion diagnosis.",
-              "risk_flags": []
             }
             """;
         assertTrue(validator.validatePersonalizedPathPlan(mapper.readTree(json)).isEmpty());

@@ -1,16 +1,64 @@
-# ============================================================
-# 本地配置模板
-# 复制此文件为 application-local.yml，然后填写真实配置
-# application-local.yml 已加入 .gitignore，不会被提交
-# ============================================================
-#
-# 复制命令：cp application-local.yml.example application-local.yml
-# Windows：copy application-local.yml.example application-local.yml
-#
-# ============================================================
-
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/ai_learning
     username: postgres
-    password: 填写你的数据库密码
+    password: your-db-password
+
+app:
+  tutor:
+    llm:
+      enabled: false
+      base-url: https://api.deepseek.com/v1
+      api-key: your-tutor-api-key
+      model: deepseek-chat
+      max-output-tokens: 450
+      stream-enabled: true
+  llm:
+    enabled: false
+    provider: openai-compatible
+    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api-key: your-main-llm-api-key
+    model: qwen3.5-plus
+    timeout-ms: 20000
+    max-retries: 1
+    retry-backoff-ms: 800
+    structure-max-output-tokens: 120
+    understanding-max-output-tokens: 160
+    training-max-output-tokens: 220
+    reflection-max-output-tokens: 180
+    evaluation-max-output-tokens: 180
+    practice-generation-max-output-tokens: 260
+    concept-decompose-max-output-tokens: 180
+    path-plan-max-output-tokens: 300
+    tutor-max-output-tokens: 450
+    fallback-to-rule: true
+    profiles:
+      light-json-task:
+        model: qwen3.5-plus
+        timeout-ms: 10000
+        max-tokens: 260
+        temperature: 0.0
+        json-response: true
+        fallback-allowed: true
+        stream-allowed: false
+        completion-warning-threshold: 400
+        disable-thinking: true
+        thinking-budget: 0
+      heavy-reasoning-task:
+        model: qwen3.5-plus
+        timeout-ms: 20000
+        max-tokens: 300
+        temperature: 0.2
+        json-response: true
+        fallback-allowed: true
+        stream-allowed: false
+        completion-warning-threshold: 800
+      chat-task:
+        model: qwen3.5-plus
+        timeout-ms: 15000
+        max-tokens: 450
+        temperature: 0.2
+        json-response: false
+        fallback-allowed: true
+        stream-allowed: true
+        completion-warning-threshold: 600

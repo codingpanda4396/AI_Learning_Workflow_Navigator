@@ -300,8 +300,10 @@ function handlePrimaryAction() {
 }
 
 async function fetchSession() {
-  await sessionStore.fetchSessionOverview(sessionId.value)
-  await sessionStore.fetchSessionPath(sessionId.value)
+  await Promise.all([
+    sessionStore.fetchSessionOverview(sessionId.value),
+    sessionStore.fetchSessionPath(sessionId.value),
+  ])
 
   if ((currentSession.value?.timeline.length ?? 0) === 0) {
     await sessionStore.planSession(sessionId.value)

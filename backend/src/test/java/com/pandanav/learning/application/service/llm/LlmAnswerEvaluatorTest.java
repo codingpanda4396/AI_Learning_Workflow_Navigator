@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.model.EvaluationContext;
+import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.LlmUsage;
@@ -28,7 +29,7 @@ class LlmAnswerEvaluatorTest {
         LlmJsonParser parser = new LlmJsonParser(new ObjectMapper());
 
         when(provider.buildEvaluationPrompt(any(), any())).thenReturn(
-            new LlmPrompt(PromptTemplateKey.EVALUATE_V1, "EVALUATE", "v1", "sys", "user", "{}", "", null, null)
+            new LlmPrompt(PromptTemplateKey.EVALUATE_V1, "EVALUATE", "v1", LlmInvocationProfile.LIGHT_JSON_TASK, "sys", "user", "{}", "", null, null)
         );
         when(gateway.generate(any())).thenReturn(
             new LlmTextResult(
@@ -46,7 +47,8 @@ class LlmAnswerEvaluatorTest {
                     """,
                 "openai-compatible",
                 "gpt-4o-mini",
-                new LlmUsage(10, 20, 100),
+                LlmInvocationProfile.LIGHT_JSON_TASK,
+                new LlmUsage(10, 20, 0, 100, "stop", false, false),
                 new ObjectMapper().createObjectNode(),
                 new ObjectMapper().createObjectNode()
             )

@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { TutorMessage } from '@/types'
-import { getTutorMessages, sendTutorMessage } from '@/api/tutor'
+import { getTutorMessages, sendTutorMessage, streamTutorMessage } from '@/api/tutor'
 import { normalizeApiError } from '@/utils/apiError'
 import type { NormalizedApiError } from '@/types/api'
 
@@ -17,6 +17,7 @@ export const useTutorStore = defineStore('tutor', () => {
   const lastError = ref<NormalizedApiError | null>(null)
 
   const hasMessages = computed(() => messages.value.length > 0)
+  const streamingAssistantId = ref<number | null>(null)
 
   function clearErrors() {
     loadError.value = null
@@ -64,11 +65,42 @@ export const useTutorStore = defineStore('tutor', () => {
     }
   }
 
+  async function sendStream(sessionId: number, taskId: number, content: string) {
+    sendingMessage.value = true
+    sendError.value = null
+    lastSessionId.value = sessionId
+    lastTaskId.value = taskId
+    try {
+      await streamTutorMessage(sessionId, taskId, content, {
+        onUserMessage(message) {
+          messages.value.push(message as TutorMessage)
+        },
+        onAssistantDelta(chunk) {
+          upsertStreamingAssistant(sessionId, taskId, chunk)
+        },
+        onCompleted(message) {
+          finalizeStreamingAssistant(message as TutorMessage)
+        },
+      })
+      lastFailedContent.value = null
+      return true
+    } catch (input) {
+      const normalized = normalizeApiError(input)
+      lastError.value = normalized
+      sendError.value = normalized.message
+      lastFailedContent.value = content
+      clearStreamingAssistant()
+      throw normalized
+    } finally {
+      sendingMessage.value = false
+    }
+  }
+
   async function retryLastSend() {
     if (!lastSessionId.value || !lastTaskId.value || !lastFailedContent.value) {
       return null
     }
-    return send(lastSessionId.value, lastTaskId.value, lastFailedContent.value)
+    return sendStream(lastSessionId.value, lastTaskId.value, lastFailedContent.value)
   }
 
   function reset() {
@@ -79,6 +111,49 @@ export const useTutorStore = defineStore('tutor', () => {
     lastFailedContent.value = null
     lastSessionId.value = null
     lastTaskId.value = null
+    streamingAssistantId.value = null
+  }
+
+  function upsertStreamingAssistant(sessionId: number, taskId: number, chunk: string) {
+    if (!streamingAssistantId.value) {
+      const tempId = -Date.now()
+      streamingAssistantId.value = tempId
+      messages.value.push({
+        id: tempId,
+        sessionId,
+        taskId,
+        role: 'assistant',
+        content: chunk,
+        createdAt: new Date().toISOString(),
+      })
+      return
+    }
+    const target = messages.value.find((message) => message.id === streamingAssistantId.value)
+    if (target) {
+      target.content += chunk
+    }
+  }
+
+  function finalizeStreamingAssistant(message: TutorMessage) {
+    if (!streamingAssistantId.value) {
+      messages.value.push(message)
+      return
+    }
+    const index = messages.value.findIndex((item) => item.id === streamingAssistantId.value)
+    if (index >= 0) {
+      messages.value.splice(index, 1, message)
+    } else {
+      messages.value.push(message)
+    }
+    streamingAssistantId.value = null
+  }
+
+  function clearStreamingAssistant() {
+    if (!streamingAssistantId.value) {
+      return
+    }
+    messages.value = messages.value.filter((message) => message.id !== streamingAssistantId.value)
+    streamingAssistantId.value = null
   }
 
   return {
@@ -91,6 +166,7 @@ export const useTutorStore = defineStore('tutor', () => {
     hasMessages,
     load,
     send,
+    sendStream,
     retryLastSend,
     clearErrors,
     reset,

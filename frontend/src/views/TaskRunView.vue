@@ -228,7 +228,11 @@ async function handleSendTutorMessage() {
   }
 
   try {
-    await tutorStore.send(targetSessionId, taskId.value, content)
+    try {
+      await tutorStore.sendStream(targetSessionId, taskId.value, content)
+    } catch {
+      await tutorStore.send(targetSessionId, taskId.value, content)
+    }
     tutorInput.value = ''
     await scrollTutorToBottom()
   } catch (error) {
@@ -273,8 +277,10 @@ onMounted(async () => {
   tutorStore.reset()
   practiceStore.reset()
   await loadTask()
-  await loadTrainingClosure()
-  await loadTutorMessages()
+  await Promise.all([
+    loadTrainingClosure(),
+    loadTutorMessages(),
+  ])
 })
 
 watch(

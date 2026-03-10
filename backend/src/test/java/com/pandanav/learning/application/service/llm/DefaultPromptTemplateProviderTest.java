@@ -14,17 +14,16 @@ class DefaultPromptTemplateProviderTest {
     private final DefaultPromptTemplateProvider provider = new DefaultPromptTemplateProvider();
 
     @Test
-    void shouldRenderStagePromptWithSchemaAndRules() {
+    void shouldRenderStagePromptWithCompactSchema() {
         var prompt = provider.buildStagePrompt(
             PromptTemplateKey.STRUCTURE_V1,
-            new StageGenerationContext(1L, 1L, "ch1", 1L, "TCP 三次握手", Stage.STRUCTURE, "掌握连接建立机制", null, null)
+            new StageGenerationContext(1L, 1L, "ch1", 1L, "TCP", Stage.STRUCTURE, "understand tcp", null, null)
         );
 
-        assertTrue(prompt.userPrompt().contains("任务阶段：STRUCTURE"));
-        assertTrue(prompt.userPrompt().contains("expected_json_schema"));
-        assertTrue(prompt.userPrompt().contains("output_rules"));
+        assertTrue(prompt.userPrompt().contains("阶段：STRUCTURE"));
+        assertTrue(prompt.userPrompt().contains("\"title\""));
         assertTrue(prompt.promptKey().equals("STRUCTURE"));
-        assertTrue(prompt.promptVersion().equals("v1"));
+        assertTrue(prompt.promptVersion().equals("v2"));
     }
 
     @Test

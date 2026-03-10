@@ -7,6 +7,7 @@ import com.pandanav.learning.domain.enums.PlanMode;
 import com.pandanav.learning.domain.enums.PlanSource;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
+import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
@@ -96,7 +97,7 @@ class PersonalizedPathPlannerServiceTest {
             new TrainingAttemptSummary(11L, 102L, 42, List.of("MISSING_STEPS"))
         ));
         when(promptTemplateProvider.buildPersonalizedPathPlanPrompt(any())).thenReturn(
-            new LlmPrompt(PromptTemplateKey.PATH_PLAN_V1, "PATH_PLAN", "v1", "sys", "user", "{}", "", null, null)
+            new LlmPrompt(PromptTemplateKey.PATH_PLAN_V1, "PATH_PLAN", "v1", LlmInvocationProfile.HEAVY_REASONING_TASK, "sys", "user", "{}", "", null, null)
         );
         when(llmGateway.generate(any())).thenReturn(new LlmTextResult(
             """
@@ -119,6 +120,7 @@ class PersonalizedPathPlannerServiceTest {
             """,
             "provider",
             "model",
+            LlmInvocationProfile.HEAVY_REASONING_TASK,
             null,
             null,
             null
