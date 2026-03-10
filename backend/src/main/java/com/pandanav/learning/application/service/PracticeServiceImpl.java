@@ -8,14 +8,20 @@ import com.pandanav.learning.application.service.practice.PracticeGeneratorReque
 import com.pandanav.learning.application.service.practice.PracticeGeneratorResult;
 import com.pandanav.learning.application.service.practice.RulePracticeGenerator;
 import com.pandanav.learning.domain.enums.ErrorTag;
+import com.pandanav.learning.domain.enums.PracticeFeedbackAction;
 import com.pandanav.learning.domain.enums.PracticeItemSource;
 import com.pandanav.learning.domain.enums.PracticeItemStatus;
+import com.pandanav.learning.domain.enums.PracticeQuizStatus;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningEvent;
+import com.pandanav.learning.domain.model.PracticeFeedbackReport;
 import com.pandanav.learning.domain.model.PracticeItem;
+import com.pandanav.learning.domain.model.PracticeQuiz;
 import com.pandanav.learning.domain.model.PracticeSubmission;
 import com.pandanav.learning.domain.model.Task;
+import com.pandanav.learning.domain.repository.PracticeFeedbackReportRepository;
+import com.pandanav.learning.domain.repository.PracticeQuizRepository;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.LearningEventRepository;
 import com.pandanav.learning.domain.repository.PracticeRepository;
@@ -49,12 +55,16 @@ public class PracticeServiceImpl implements PracticeService {
 
     private final PracticeRepository practiceRepository;
     private final PracticeSubmissionRepository practiceSubmissionRepository;
+    private final PracticeQuizRepository practiceQuizRepository;
+    private final PracticeFeedbackReportRepository practiceFeedbackReportRepository;
     private final TaskRepository taskRepository;
     private final SessionRepository sessionRepository;
     private final ConceptNodeRepository conceptNodeRepository;
     private final LearningEventRepository learningEventRepository;
     private final RulePracticeGenerator rulePracticeGenerator;
     private final LlmPracticeGenerator llmPracticeGenerator;
+    private final PracticeFeedbackReportGenerator practiceFeedbackReportGenerator;
+    private final PracticeQuizAsyncService practiceQuizAsyncService;
     private final MasteryService masteryService;
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
@@ -62,31 +72,108 @@ public class PracticeServiceImpl implements PracticeService {
     public PracticeServiceImpl(
         PracticeRepository practiceRepository,
         PracticeSubmissionRepository practiceSubmissionRepository,
+        PracticeQuizRepository practiceQuizRepository,
+        PracticeFeedbackReportRepository practiceFeedbackReportRepository,
         TaskRepository taskRepository,
         SessionRepository sessionRepository,
         ConceptNodeRepository conceptNodeRepository,
         LearningEventRepository learningEventRepository,
         RulePracticeGenerator rulePracticeGenerator,
         LlmPracticeGenerator llmPracticeGenerator,
+        PracticeFeedbackReportGenerator practiceFeedbackReportGenerator,
+        PracticeQuizAsyncService practiceQuizAsyncService,
         MasteryService masteryService,
         LlmProperties llmProperties,
         ObjectMapper objectMapper
     ) {
         this.practiceRepository = practiceRepository;
         this.practiceSubmissionRepository = practiceSubmissionRepository;
+        this.practiceQuizRepository = practiceQuizRepository;
+        this.practiceFeedbackReportRepository = practiceFeedbackReportRepository;
         this.taskRepository = taskRepository;
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
         this.learningEventRepository = learningEventRepository;
         this.rulePracticeGenerator = rulePracticeGenerator;
         this.llmPracticeGenerator = llmPracticeGenerator;
+        this.practiceFeedbackReportGenerator = practiceFeedbackReportGenerator;
+        this.practiceQuizAsyncService = practiceQuizAsyncService;
         this.masteryService = masteryService;
         this.llmProperties = llmProperties;
         this.objectMapper = objectMapper;
     }
 
     @Override
+    @Transactional
+    public PracticeQuiz requestQuizGeneration(Long sessionId, Long taskId, Long userId) {
+        Task task = requireTrainingTask(sessionId, taskId, userId);
+        PracticeQuiz existing = practiceQuizRepository.findLatestBySessionIdAndTaskIdAndUserPk(sessionId, taskId, userId).orElse(null);
+        if (existing != null) {
+            if (existing.getStatus() == PracticeQuizStatus.GENERATING) {
+                return existing;
+            }
+            if (existing.getStatus() != PracticeQuizStatus.FAILED) {
+                return existing;
+            }
+        }
+
+        PracticeQuiz quiz = new PracticeQuiz();
+        quiz.setSessionId(sessionId);
+        quiz.setTaskId(taskId);
+        quiz.setUserId(userId);
+        quiz.setNodeId(task.getNodeId());
+        quiz.setStatus(PracticeQuizStatus.GENERATING);
+        quiz.setQuestionCount(0);
+        quiz.setAnsweredCount(0);
+        PracticeQuiz saved = practiceQuizRepository.save(quiz);
+        sessionRepository.updateStatus(sessionId, PracticeQuizStatus.GENERATING.name());
+        practiceQuizAsyncService.generateQuizAsync(saved.getId(), sessionId, taskId, userId);
+        return saved;
+    }
+
+    @Override
+    public PracticeQuiz getQuiz(Long sessionId, Long taskId, Long userId) {
+        requireTrainingTask(sessionId, taskId, userId);
+        return practiceQuizRepository.findLatestBySessionIdAndTaskIdAndUserPk(sessionId, taskId, userId)
+            .orElseThrow(() -> new NotFoundException("Practice quiz not found."));
+    }
+
+    @Override
+    public PracticeFeedbackReport getFeedbackReport(Long sessionId, Long taskId, Long userId) {
+        PracticeQuiz quiz = getQuiz(sessionId, taskId, userId);
+        return practiceFeedbackReportRepository.findByQuizId(quiz.getId())
+            .orElseThrow(() -> new NotFoundException("Practice feedback report not found."));
+    }
+
+    @Override
+    @Transactional
+    public PracticeQuiz applyFeedbackAction(Long sessionId, Long taskId, Long userId, String action) {
+        PracticeQuiz quiz = getQuiz(sessionId, taskId, userId);
+        if (quiz.getStatus() != PracticeQuizStatus.FEEDBACK_READY
+            && quiz.getStatus() != PracticeQuizStatus.REVIEWING
+            && quiz.getStatus() != PracticeQuizStatus.NEXT_ROUND) {
+            throw new ConflictException("Practice feedback action is not available yet.");
+        }
+        PracticeFeedbackAction resolved;
+        try {
+            resolved = PracticeFeedbackAction.fromValue(action);
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException(ex.getMessage());
+        }
+        PracticeQuizStatus targetStatus = resolved == PracticeFeedbackAction.REVIEW
+            ? PracticeQuizStatus.REVIEWING
+            : PracticeQuizStatus.NEXT_ROUND;
+        practiceQuizRepository.updateStatus(quiz.getId(), targetStatus, null);
+        sessionRepository.updateStatus(sessionId, targetStatus.name());
+        return practiceQuizRepository.findById(quiz.getId()).orElseThrow(() -> new NotFoundException("Practice quiz not found."));
+    }
+
+    @Override
     public List<PracticeItem> listPracticeItems(Long sessionId, Long taskId, Long userId) {
+        PracticeQuiz quiz = practiceQuizRepository.findLatestBySessionIdAndTaskIdAndUserPk(sessionId, taskId, userId).orElse(null);
+        if (quiz != null) {
+            return practiceRepository.findByQuizId(quiz.getId());
+        }
         requireTrainingTask(sessionId, taskId, userId);
         return practiceRepository.findBySessionIdAndTaskIdAndUserPk(sessionId, taskId, userId);
     }
@@ -109,7 +196,7 @@ public class PracticeServiceImpl implements PracticeService {
         );
 
         PracticeGeneratorResult result = generateWithFallback(request);
-        List<PracticeItem> saved = saveGeneratedItems(task, userId, result);
+        List<PracticeItem> saved = saveGeneratedItems(null, task, userId, result);
         logGeneration(sessionId, userId, task, result, saved.size());
 
         return saved;
@@ -144,11 +231,14 @@ public class PracticeServiceImpl implements PracticeService {
             throw new BadRequestException("user_answer must not be blank.");
         }
 
+        PracticeQuiz quiz = practiceQuizRepository.findLatestBySessionIdAndTaskIdAndUserPk(sessionId, taskId, userId)
+            .orElseThrow(() -> new ConflictException("Practice quiz has not been generated."));
         Optional<PracticeSubmission> previous = practiceSubmissionRepository.findLatestByPracticeItemIdAndUserPk(practiceItemId, userId);
         JudgementResult judgement = judge(item, userAnswer);
 
         PracticeSubmission submission = new PracticeSubmission();
         submission.setPracticeItemId(practiceItemId);
+        submission.setQuizId(quiz.getId());
         submission.setSessionId(sessionId);
         submission.setTaskId(taskId);
         submission.setUserId(userId);
@@ -164,6 +254,7 @@ public class PracticeServiceImpl implements PracticeService {
         practiceRepository.updateStatus(practiceItemId, PracticeItemStatus.ANSWERED);
         masteryService.recalculateNodeMastery(sessionId, taskId, userId);
         logSubmission(sessionId, userId, item, saved, previous.isPresent());
+        updateQuizProgressAndFeedback(quiz, userId);
         return saved;
     }
 
@@ -215,17 +306,44 @@ public class PracticeServiceImpl implements PracticeService {
         return fallback;
     }
 
-    private List<PracticeItem> saveGeneratedItems(Task task, Long userId, PracticeGeneratorResult result) {
+    void generateQuizInternal(Long quizId, Long sessionId, Long taskId, Long userId) {
+        try {
+            Task task = requireTrainingTask(sessionId, taskId, userId);
+            ConceptNode node = conceptNodeRepository.findById(task.getNodeId())
+                .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
+            PracticeGeneratorRequest request = new PracticeGeneratorRequest(
+                sessionId,
+                taskId,
+                userId,
+                node.getId(),
+                node.getName(),
+                task.getObjective(),
+                task.getOutputJson()
+            );
+            PracticeGeneratorResult result = generateWithFallback(request);
+            List<PracticeItem> saved = saveGeneratedItems(quizId, task, userId, result);
+            practiceQuizRepository.markGenerated(quizId, saved.size(), result.source(), result.promptVersion());
+            sessionRepository.updateStatus(sessionId, PracticeQuizStatus.QUIZ_READY.name());
+            logGeneration(sessionId, userId, task, result, saved.size());
+        } catch (Exception ex) {
+            practiceQuizRepository.updateStatus(quizId, PracticeQuizStatus.FAILED, sanitizeReason(ex.getMessage()));
+            sessionRepository.updateStatus(sessionId, PracticeQuizStatus.FAILED.name());
+            log.warn("practice quiz generation failed: quizId={}, sessionId={}, taskId={}, reason={}", quizId, sessionId, taskId, sanitizeReason(ex.getMessage()));
+        }
+    }
+
+    private List<PracticeItem> saveGeneratedItems(Long quizId, Task task, Long userId, PracticeGeneratorResult result) {
         return result.items().stream()
-            .map(item -> toEntity(task, userId, item, result))
+            .map(item -> toEntity(quizId, task, userId, item, result))
             .map(practiceRepository::save)
             .toList();
     }
 
-    private PracticeItem toEntity(Task task, Long userId, PracticeDraftItem item, PracticeGeneratorResult result) {
+    private PracticeItem toEntity(Long quizId, Task task, Long userId, PracticeDraftItem item, PracticeGeneratorResult result) {
         PracticeItem entity = new PracticeItem();
         entity.setSessionId(task.getSessionId());
         entity.setTaskId(task.getId());
+        entity.setQuizId(quizId);
         entity.setUserId(userId);
         entity.setNodeId(task.getNodeId());
         entity.setStage(Stage.TRAINING);
@@ -260,6 +378,30 @@ public class PracticeServiceImpl implements PracticeService {
             .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
 
         return task;
+    }
+
+    private void updateQuizProgressAndFeedback(PracticeQuiz quiz, Long userId) {
+        List<PracticeItem> items = practiceRepository.findByQuizId(quiz.getId());
+        List<PracticeSubmission> submissions = practiceSubmissionRepository.findByQuizId(quiz.getId());
+        long answered = submissions.stream()
+            .map(PracticeSubmission::getPracticeItemId)
+            .distinct()
+            .count();
+        practiceQuizRepository.updateAnsweredCount(quiz.getId(), (int) answered);
+        if (answered < items.size()) {
+            practiceQuizRepository.updateStatus(quiz.getId(), PracticeQuizStatus.ANSWERED, null);
+            sessionRepository.updateStatus(quiz.getSessionId(), PracticeQuizStatus.ANSWERED.name());
+            return;
+        }
+
+        PracticeFeedbackReport existing = practiceFeedbackReportRepository.findByQuizId(quiz.getId()).orElse(null);
+        if (existing == null) {
+            PracticeFeedbackReport report = practiceFeedbackReportGenerator.generate(quiz, items, submissions);
+            practiceFeedbackReportRepository.save(report);
+        }
+        practiceQuizRepository.updateStatus(quiz.getId(), PracticeQuizStatus.FEEDBACK_READY, null);
+        sessionRepository.updateStatus(quiz.getSessionId(), PracticeQuizStatus.FEEDBACK_READY.name());
+        logFeedbackGenerated(quiz.getSessionId(), userId, quiz.getTaskId(), quiz.getId());
     }
 
     private JudgementResult judge(PracticeItem item, String userAnswer) {
@@ -436,6 +578,19 @@ public class PracticeServiceImpl implements PracticeService {
         event.setSessionId(sessionId);
         event.setUserId(userId);
         event.setEventType("PRACTICE_ANSWER_SUBMITTED");
+        event.setEventData(toJson(payload));
+        learningEventRepository.save(event);
+    }
+
+    private void logFeedbackGenerated(Long sessionId, Long userId, Long taskId, Long quizId) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("task_id", taskId);
+        payload.put("quiz_id", quizId);
+
+        LearningEvent event = new LearningEvent();
+        event.setSessionId(sessionId);
+        event.setUserId(userId);
+        event.setEventType("PRACTICE_FEEDBACK_GENERATED");
         event.setEventData(toJson(payload));
         learningEventRepository.save(event);
     }

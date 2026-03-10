@@ -32,32 +32,33 @@ public class JdbcPracticeRepository implements PracticeRepository {
             PreparedStatement ps = connection.prepareStatement(
                 """
                     INSERT INTO practice_item (
-                        session_id, task_id, user_id, node_id, stage, question_type,
+                        session_id, task_id, quiz_id, user_id, node_id, stage, question_type,
                         stem, options_json, standard_answer, explanation, difficulty,
                         source, status, prompt_version, token_input, token_output, latency_ms, trace_id
                     )
-                    VALUES (?, ?, ?, ?, ?::task_stage, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?::task_stage, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                 new String[]{"id"}
             );
             ps.setLong(1, item.getSessionId());
             ps.setLong(2, item.getTaskId());
-            ps.setLong(3, item.getUserId());
-            ps.setLong(4, item.getNodeId());
-            ps.setString(5, item.getStage() == null ? Stage.TRAINING.name() : item.getStage().name());
-            ps.setString(6, item.getQuestionType().name());
-            ps.setString(7, item.getStem());
-            ps.setString(8, item.getOptionsJson());
-            ps.setString(9, item.getStandardAnswer());
-            ps.setString(10, item.getExplanation());
-            ps.setString(11, item.getDifficulty());
-            ps.setString(12, item.getSource().name());
-            ps.setString(13, item.getStatus().name());
-            ps.setString(14, item.getPromptVersion());
-            ps.setObject(15, item.getTokenInput());
-            ps.setObject(16, item.getTokenOutput());
-            ps.setObject(17, item.getLatencyMs());
-            ps.setString(18, item.getTraceId());
+            ps.setObject(3, item.getQuizId());
+            ps.setLong(4, item.getUserId());
+            ps.setLong(5, item.getNodeId());
+            ps.setString(6, item.getStage() == null ? Stage.TRAINING.name() : item.getStage().name());
+            ps.setString(7, item.getQuestionType().name());
+            ps.setString(8, item.getStem());
+            ps.setString(9, item.getOptionsJson());
+            ps.setString(10, item.getStandardAnswer());
+            ps.setString(11, item.getExplanation());
+            ps.setString(12, item.getDifficulty());
+            ps.setString(13, item.getSource().name());
+            ps.setString(14, item.getStatus().name());
+            ps.setString(15, item.getPromptVersion());
+            ps.setObject(16, item.getTokenInput());
+            ps.setObject(17, item.getTokenOutput());
+            ps.setObject(18, item.getLatencyMs());
+            ps.setString(19, item.getTraceId());
             return ps;
         }, keyHolder);
 
@@ -73,7 +74,7 @@ public class JdbcPracticeRepository implements PracticeRepository {
         try {
             PracticeItem item = jdbcTemplate.queryForObject(
                 """
-                    SELECT id, session_id, task_id, user_id, node_id, stage, question_type,
+                    SELECT id, session_id, task_id, quiz_id, user_id, node_id, stage, question_type,
                            stem, options_json, standard_answer, explanation, difficulty,
                            source, status, prompt_version, token_input, token_output, latency_ms, trace_id, created_at
                     FROM practice_item
@@ -93,7 +94,7 @@ public class JdbcPracticeRepository implements PracticeRepository {
         try {
             PracticeItem item = jdbcTemplate.queryForObject(
                 """
-                    SELECT pi.id, pi.session_id, pi.task_id, pi.user_id, pi.node_id, pi.stage, pi.question_type,
+                    SELECT pi.id, pi.session_id, pi.task_id, pi.quiz_id, pi.user_id, pi.node_id, pi.stage, pi.question_type,
                            pi.stem, pi.options_json, pi.standard_answer, pi.explanation, pi.difficulty,
                            pi.source, pi.status, pi.prompt_version, pi.token_input, pi.token_output, pi.latency_ms,
                            pi.trace_id, pi.created_at
@@ -116,7 +117,7 @@ public class JdbcPracticeRepository implements PracticeRepository {
     public List<PracticeItem> findBySessionIdAndTaskId(Long sessionId, Long taskId) {
         return jdbcTemplate.query(
             """
-                SELECT id, session_id, task_id, user_id, node_id, stage, question_type,
+                SELECT id, session_id, task_id, quiz_id, user_id, node_id, stage, question_type,
                        stem, options_json, standard_answer, explanation, difficulty,
                        source, status, prompt_version, token_input, token_output, latency_ms, trace_id, created_at
                 FROM practice_item
@@ -134,7 +135,7 @@ public class JdbcPracticeRepository implements PracticeRepository {
     public List<PracticeItem> findBySessionIdAndTaskIdAndUserPk(Long sessionId, Long taskId, Long userPk) {
         return jdbcTemplate.query(
             """
-                SELECT pi.id, pi.session_id, pi.task_id, pi.user_id, pi.node_id, pi.stage, pi.question_type,
+                SELECT pi.id, pi.session_id, pi.task_id, pi.quiz_id, pi.user_id, pi.node_id, pi.stage, pi.question_type,
                        pi.stem, pi.options_json, pi.standard_answer, pi.explanation, pi.difficulty,
                        pi.source, pi.status, pi.prompt_version, pi.token_input, pi.token_output, pi.latency_ms,
                        pi.trace_id, pi.created_at
@@ -149,6 +150,22 @@ public class JdbcPracticeRepository implements PracticeRepository {
             sessionId,
             taskId,
             userPk
+        );
+    }
+
+    @Override
+    public List<PracticeItem> findByQuizId(Long quizId) {
+        return jdbcTemplate.query(
+            """
+                SELECT id, session_id, task_id, quiz_id, user_id, node_id, stage, question_type,
+                       stem, options_json, standard_answer, explanation, difficulty,
+                       source, status, prompt_version, token_input, token_output, latency_ms, trace_id, created_at
+                FROM practice_item
+                WHERE quiz_id = ?
+                ORDER BY created_at ASC, id ASC
+                """,
+            (rs, rowNum) -> mapItem(rs),
+            quizId
         );
     }
 
@@ -170,6 +187,7 @@ public class JdbcPracticeRepository implements PracticeRepository {
         item.setId(rs.getLong("id"));
         item.setSessionId(rs.getLong("session_id"));
         item.setTaskId(rs.getLong("task_id"));
+        item.setQuizId(rs.getObject("quiz_id", Long.class));
         item.setUserId(rs.getLong("user_id"));
         item.setNodeId(rs.getLong("node_id"));
         item.setStage(Stage.valueOf(rs.getString("stage")));

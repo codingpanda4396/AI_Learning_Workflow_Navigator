@@ -67,6 +67,7 @@ export const LEARNING_STAGE_DISPLAY: Record<LearningStage, LearningStageDisplay>
 }
 
 export const STATUS_DISPLAY: Record<DisplayStatus, StatusDisplay> = {
+  GENERATING: { label: '生成中', actionText: '等待题目' },
   CREATED: { label: '已创建', actionText: '生成学习计划' },
   EVALUATED: { label: '已评估', actionText: '查看评估' },
   PLANNED: { label: '已规划', actionText: '开始学习' },

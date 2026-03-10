@@ -4,6 +4,7 @@ export type LegacyLearningStage = 'REFLECTION'
 export type Stage = LearningStage | LegacyLearningStage | 'UNKNOWN'
 export type TaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'
 export type SessionStatus =
+  | 'GENERATING'
   | 'CREATED'
   | 'EVALUATED'
   | 'PLANNED'
@@ -280,6 +281,41 @@ export interface SubmitPracticeAnswerResponse {
   submission: PracticeSubmission
   practiceItem: PracticeItem
   judgement: PracticeJudgement
+}
+
+export type PracticeQuizStatus =
+  | 'GENERATING'
+  | 'QUIZ_READY'
+  | 'ANSWERED'
+  | 'FEEDBACK_READY'
+  | 'REVIEWING'
+  | 'NEXT_ROUND'
+  | 'FAILED'
+
+export interface PracticeQuizResponse {
+  quizId: number
+  sessionId: number
+  taskId: number
+  status: PracticeQuizStatus
+  questionCount: number
+  answeredCount: number
+  generationSource: string
+  failureReason: string
+  questions: PracticeItem[]
+}
+
+export interface PracticeFeedbackReport {
+  reportId: number
+  quizId: number
+  sessionId: number
+  taskId: number
+  diagnosisSummary: string
+  strengths: string[]
+  weaknesses: string[]
+  reviewFocus: string[]
+  nextRoundAdvice: string
+  recommendedAction: 'REVIEW' | 'NEXT_ROUND'
+  source: string
 }
 
 export interface WeakPointNode {

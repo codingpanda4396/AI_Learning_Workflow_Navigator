@@ -15,6 +15,8 @@ public interface PracticeSubmissionRepository {
 
     List<PracticeSubmission> findBySessionIdAndTaskIdAndUserPk(Long sessionId, Long taskId, Long userPk);
 
+    List<PracticeSubmission> findByQuizId(Long quizId);
+
     List<PracticeSubmission> findBySessionIdAndUserPk(Long sessionId, Long userPk);
 
     Optional<PracticeSubmission> findLatestByPracticeItemIdAndUserPk(Long practiceItemId, Long userPk);

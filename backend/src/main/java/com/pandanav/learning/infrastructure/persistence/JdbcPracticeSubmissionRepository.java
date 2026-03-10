@@ -28,29 +28,30 @@ public class JdbcPracticeSubmissionRepository implements PracticeSubmissionRepos
             PreparedStatement ps = connection.prepareStatement(
                 """
                     INSERT INTO practice_submission (
-                        practice_item_id, session_id, task_id, user_id, user_answer,
+                        practice_item_id, quiz_id, session_id, task_id, user_id, user_answer,
                         score, is_correct, error_tags_json, feedback, judge_mode,
                         prompt_version, token_input, token_output, latency_ms, trace_id
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?)
                     """,
                 new String[]{"id"}
             );
             ps.setLong(1, submission.getPracticeItemId());
-            ps.setLong(2, submission.getSessionId());
-            ps.setLong(3, submission.getTaskId());
-            ps.setLong(4, submission.getUserId());
-            ps.setString(5, submission.getUserAnswer());
-            ps.setObject(6, submission.getScore());
-            ps.setObject(7, submission.getCorrect());
-            ps.setString(8, submission.getErrorTagsJson() == null ? "[]" : submission.getErrorTagsJson());
-            ps.setString(9, submission.getFeedback());
-            ps.setString(10, submission.getJudgeMode() == null ? "RULE" : submission.getJudgeMode());
-            ps.setString(11, submission.getPromptVersion());
-            ps.setObject(12, submission.getTokenInput());
-            ps.setObject(13, submission.getTokenOutput());
-            ps.setObject(14, submission.getLatencyMs());
-            ps.setString(15, submission.getTraceId());
+            ps.setObject(2, submission.getQuizId());
+            ps.setLong(3, submission.getSessionId());
+            ps.setLong(4, submission.getTaskId());
+            ps.setLong(5, submission.getUserId());
+            ps.setString(6, submission.getUserAnswer());
+            ps.setObject(7, submission.getScore());
+            ps.setObject(8, submission.getCorrect());
+            ps.setString(9, submission.getErrorTagsJson() == null ? "[]" : submission.getErrorTagsJson());
+            ps.setString(10, submission.getFeedback());
+            ps.setString(11, submission.getJudgeMode() == null ? "RULE" : submission.getJudgeMode());
+            ps.setString(12, submission.getPromptVersion());
+            ps.setObject(13, submission.getTokenInput());
+            ps.setObject(14, submission.getTokenOutput());
+            ps.setObject(15, submission.getLatencyMs());
+            ps.setString(16, submission.getTraceId());
             return ps;
         }, keyHolder);
 
@@ -65,7 +66,7 @@ public class JdbcPracticeSubmissionRepository implements PracticeSubmissionRepos
     public List<PracticeSubmission> findByPracticeItemId(Long practiceItemId) {
         return jdbcTemplate.query(
             """
-                SELECT id, practice_item_id, session_id, task_id, user_id, user_answer,
+                SELECT id, practice_item_id, quiz_id, session_id, task_id, user_id, user_answer,
                        score, is_correct, error_tags_json, feedback, judge_mode,
                        prompt_version, token_input, token_output, latency_ms, trace_id, submitted_at
                 FROM practice_submission
@@ -81,7 +82,7 @@ public class JdbcPracticeSubmissionRepository implements PracticeSubmissionRepos
     public List<PracticeSubmission> findBySessionIdAndTaskId(Long sessionId, Long taskId) {
         return jdbcTemplate.query(
             """
-                SELECT id, practice_item_id, session_id, task_id, user_id, user_answer,
+                SELECT id, practice_item_id, quiz_id, session_id, task_id, user_id, user_answer,
                        score, is_correct, error_tags_json, feedback, judge_mode,
                        prompt_version, token_input, token_output, latency_ms, trace_id, submitted_at
                 FROM practice_submission
@@ -99,7 +100,7 @@ public class JdbcPracticeSubmissionRepository implements PracticeSubmissionRepos
     public List<PracticeSubmission> findBySessionIdAndTaskIdAndUserPk(Long sessionId, Long taskId, Long userPk) {
         return jdbcTemplate.query(
             """
-                SELECT ps.id, ps.practice_item_id, ps.session_id, ps.task_id, ps.user_id, ps.user_answer,
+                SELECT ps.id, ps.practice_item_id, ps.quiz_id, ps.session_id, ps.task_id, ps.user_id, ps.user_answer,
                        ps.score, ps.is_correct, ps.error_tags_json, ps.feedback, ps.judge_mode,
                        ps.prompt_version, ps.token_input, ps.token_output, ps.latency_ms, ps.trace_id, ps.submitted_at
                 FROM practice_submission ps
@@ -117,10 +118,26 @@ public class JdbcPracticeSubmissionRepository implements PracticeSubmissionRepos
     }
 
     @Override
+    public List<PracticeSubmission> findByQuizId(Long quizId) {
+        return jdbcTemplate.query(
+            """
+                SELECT id, practice_item_id, quiz_id, session_id, task_id, user_id, user_answer,
+                       score, is_correct, error_tags_json, feedback, judge_mode,
+                       prompt_version, token_input, token_output, latency_ms, trace_id, submitted_at
+                FROM practice_submission
+                WHERE quiz_id = ?
+                ORDER BY submitted_at DESC, id DESC
+                """,
+            (rs, rowNum) -> mapSubmission(rs),
+            quizId
+        );
+    }
+
+    @Override
     public List<PracticeSubmission> findBySessionIdAndUserPk(Long sessionId, Long userPk) {
         return jdbcTemplate.query(
             """
-                SELECT ps.id, ps.practice_item_id, ps.session_id, ps.task_id, ps.user_id, ps.user_answer,
+                SELECT ps.id, ps.practice_item_id, ps.quiz_id, ps.session_id, ps.task_id, ps.user_id, ps.user_answer,
                        ps.score, ps.is_correct, ps.error_tags_json, ps.feedback, ps.judge_mode,
                        ps.prompt_version, ps.token_input, ps.token_output, ps.latency_ms, ps.trace_id, ps.submitted_at
                 FROM practice_submission ps
@@ -140,7 +157,7 @@ public class JdbcPracticeSubmissionRepository implements PracticeSubmissionRepos
         try {
             PracticeSubmission submission = jdbcTemplate.queryForObject(
                 """
-                    SELECT ps.id, ps.practice_item_id, ps.session_id, ps.task_id, ps.user_id, ps.user_answer,
+                    SELECT ps.id, ps.practice_item_id, ps.quiz_id, ps.session_id, ps.task_id, ps.user_id, ps.user_answer,
                            ps.score, ps.is_correct, ps.error_tags_json, ps.feedback, ps.judge_mode,
                            ps.prompt_version, ps.token_input, ps.token_output, ps.latency_ms, ps.trace_id, ps.submitted_at
                     FROM practice_submission ps
@@ -164,6 +181,7 @@ public class JdbcPracticeSubmissionRepository implements PracticeSubmissionRepos
         PracticeSubmission submission = new PracticeSubmission();
         submission.setId(rs.getLong("id"));
         submission.setPracticeItemId(rs.getLong("practice_item_id"));
+        submission.setQuizId(rs.getObject("quiz_id", Long.class));
         submission.setSessionId(rs.getLong("session_id"));
         submission.setTaskId(rs.getLong("task_id"));
         submission.setUserId(rs.getLong("user_id"));

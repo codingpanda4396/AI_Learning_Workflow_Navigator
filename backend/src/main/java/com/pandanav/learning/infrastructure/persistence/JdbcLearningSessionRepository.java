@@ -206,6 +206,21 @@ public class JdbcLearningSessionRepository implements SessionRepository {
     }
 
     @Override
+    public void updateStatus(Long sessionId, String status) {
+        jdbcTemplate.update(
+            """
+                UPDATE learning_session
+                SET status = ?,
+                    updated_at = now(),
+                    last_active_at = now()
+                WHERE id = ?
+                """,
+            status,
+            sessionId
+        );
+    }
+
+    @Override
     public void touchLastActive(Long sessionId) {
         jdbcTemplate.update(
             """

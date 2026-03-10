@@ -6,6 +6,7 @@ public class PracticeSubmission {
 
     private Long id;
     private Long practiceItemId;
+    private Long quizId;
     private Long sessionId;
     private Long taskId;
     private Long userId;
@@ -36,6 +37,14 @@ public class PracticeSubmission {
 
     public void setPracticeItemId(Long practiceItemId) {
         this.practiceItemId = practiceItemId;
+    }
+
+    public Long getQuizId() {
+        return quizId;
+    }
+
+    public void setQuizId(Long quizId) {
+        this.quizId = quizId;
     }
 
     public Long getSessionId() {

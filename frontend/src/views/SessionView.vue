@@ -270,13 +270,13 @@ const detailTaskList = computed(() => {
 
 const weakPointPreview = computed(() => learningFeedback.value?.weakNodes.slice(0, 3) ?? [])
 
-function resolveTaskPath(taskId: number, stage: string) {
-  return normalizeLearningStage(stage) === 'TRAINING' ? `/task/${taskId}/submit` : `/task/${taskId}/run`
+function resolveTaskPath(taskId: number) {
+  return `/task/${taskId}/run`
 }
 
-function openTask(taskId: number, stage: string) {
+function openTask(taskId: number) {
   router.push({
-    path: resolveTaskPath(taskId, stage),
+    path: resolveTaskPath(taskId),
     query: {
       sessionId: String(sessionId.value),
       step: String(currentStepDefinition.value.order),
@@ -293,7 +293,7 @@ function handlePrimaryAction() {
     return
   }
   if (currentDetailTask.value) {
-    openTask(currentDetailTask.value.taskId, currentDetailTask.value.stage)
+    openTask(currentDetailTask.value.taskId)
     return
   }
   detailExpanded.value = true
@@ -478,7 +478,7 @@ onMounted(async () => {
               <p class="detail-node">{{ task.nodeName }}</p>
               <p class="detail-description">{{ task.displayDescription }}</p>
             </div>
-            <PrimaryButton type="button" :disabled="task.disabled" @click="openTask(task.taskId, task.stage)">
+            <PrimaryButton type="button" :disabled="task.disabled" @click="openTask(task.taskId)">
               {{ task.actionText }}
             </PrimaryButton>
           </article>

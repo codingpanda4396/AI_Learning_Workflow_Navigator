@@ -334,6 +334,29 @@ public class PromptOutputValidator {
         return errors;
     }
 
+    public List<String> validatePracticeFeedback(JsonNode node) {
+        List<String> errors = new ArrayList<>();
+        if (node == null || !node.isObject()) {
+            errors.add("practice feedback output must be a JSON object");
+            return errors;
+        }
+
+        Set<String> required = Set.of(
+            "diagnosis_summary", "strengths", "weaknesses", "review_focus", "next_round_advice", "recommended_action"
+        );
+        validateNoExtraFields(node, required, errors);
+        validateText(node, "diagnosis_summary", 20, 200, errors);
+        validateStringArray(node, "strengths", 1, 3, 2, 120, errors);
+        validateStringArray(node, "weaknesses", 1, 3, 2, 120, errors);
+        validateStringArray(node, "review_focus", 1, 3, 2, 80, errors);
+        validateText(node, "next_round_advice", 10, 120, errors);
+        String action = node.path("recommended_action").asText("");
+        if (!"REVIEW".equals(action) && !"NEXT_ROUND".equals(action)) {
+            errors.add("recommended_action must be REVIEW or NEXT_ROUND");
+        }
+        return errors;
+    }
+
     private int readBoundedInt(JsonNode node, String field, int min, int max, List<String> errors) {
         Integer value = readInt(node, field, errors);
         if (value == null) {

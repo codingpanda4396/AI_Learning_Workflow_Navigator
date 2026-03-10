@@ -12,6 +12,7 @@ public class PracticeItem {
     private Long id;
     private Long sessionId;
     private Long taskId;
+    private Long quizId;
     private Long userId;
     private Long nodeId;
     private Stage stage;
@@ -52,6 +53,14 @@ public class PracticeItem {
 
     public void setTaskId(Long taskId) {
         this.taskId = taskId;
+    }
+
+    public Long getQuizId() {
+        return quizId;
+    }
+
+    public void setQuizId(Long quizId) {
+        this.quizId = quizId;
     }
 
     public Long getUserId() {

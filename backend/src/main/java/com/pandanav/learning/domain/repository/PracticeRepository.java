@@ -18,5 +18,7 @@ public interface PracticeRepository {
 
     List<PracticeItem> findBySessionIdAndTaskIdAndUserPk(Long sessionId, Long taskId, Long userPk);
 
+    List<PracticeItem> findByQuizId(Long quizId);
+
     void updateStatus(Long id, PracticeItemStatus status);
 }

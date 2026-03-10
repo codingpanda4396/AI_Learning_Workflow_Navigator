@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useTutorStore } from '@/stores/tutor'
@@ -13,8 +13,8 @@ const tutorStore = useTutorStore()
 const practiceStore = usePracticeStore()
 
 const taskId = computed(() => Number(route.params.id))
-const loadError = computed(() => sessionStore.error)
 const task = computed(() => sessionStore.currentTask)
+const loadError = computed(() => sessionStore.error)
 const isLoading = computed(() => sessionStore.runningTask)
 const sections = computed(() => task.value?.output.sections ?? [])
 const generationReason = computed(() => task.value?.generationReason?.trim() ?? '')
@@ -23,13 +23,14 @@ const nonTrainingTip = computed(() => {
   if (!task.value || isTrainingTask.value) {
     return ''
   }
-  return `当前阶段为 ${getStageLabel(task.value.stage)}，训练作答面板仅在训练实战阶段开放。`
+  return `当前阶段是 ${getStageLabel(task.value.stage)}，练习测验只在 TRAINING 阶段开放。`
 })
 
 const tutorInput = ref('')
 const tutorMessagesContainerRef = ref<HTMLElement | null>(null)
 const answerDrafts = ref<Record<number, string>>({})
 const submittingPracticeItemId = ref<number | null>(null)
+const quizPollTimer = ref<number | null>(null)
 
 const tutorMessages = computed(() => tutorStore.messages)
 const tutorLoading = computed(() => tutorStore.loadingMessages)
@@ -37,13 +38,26 @@ const tutorSending = computed(() => tutorStore.sendingMessage)
 const tutorLoadError = computed(() => tutorStore.loadError)
 const tutorSendError = computed(() => tutorStore.sendError)
 const canSendTutorMessage = computed(() => tutorInput.value.trim().length > 0 && !tutorSending.value)
+
+const practiceQuiz = computed(() => practiceStore.quiz)
 const practiceItems = computed(() => practiceStore.items)
 const practiceSubmissions = computed(() => practiceStore.submissions)
-const practiceLoading = computed(() => practiceStore.loadingItems || practiceStore.loadingSubmissions)
-const practiceError = computed(() => practiceStore.itemsError || practiceStore.submissionsError)
-const practiceGenerating = computed(() => practiceStore.generatingItems)
+const practiceFeedbackReport = computed(() => practiceStore.feedbackReport)
+const practiceLoading = computed(
+  () =>
+    practiceStore.loadingItems ||
+    practiceStore.loadingSubmissions ||
+    practiceStore.requestingQuiz ||
+    practiceStore.pollingQuiz ||
+    practiceStore.loadingFeedback,
+)
+const practiceGenerating = computed(() => practiceStore.requestingQuiz || practiceStore.pollingQuiz)
 const practiceSubmitting = computed(() => practiceStore.submittingAnswer)
+const practiceApplyingAction = computed(() => practiceStore.applyingFeedbackAction)
+const practiceError = computed(() => practiceStore.itemsError || practiceStore.submissionsError)
 const practiceSubmitError = computed(() => practiceStore.submitError)
+const quizStatus = computed(() => practiceQuiz.value?.status ?? '')
+
 const learningFeedback = computed(() => sessionStore.learningFeedback)
 const feedbackLoading = computed(() => sessionStore.fetchingLearningFeedback)
 
@@ -73,9 +87,9 @@ function getStageLabel(stage: string) {
 function getGenerationLabel(mode?: string) {
   const map: Record<string, string> = {
     LLM: 'LLM 生成',
-    TEMPLATE_FALLBACK: '模板降级生成',
-    RULE_FALLBACK: '规则降级生成',
-    CACHED: '历史缓存结果',
+    TEMPLATE_FALLBACK: '模板降级',
+    RULE_FALLBACK: '规则降级',
+    CACHED: '缓存结果',
   }
   return mode ? map[mode] || mode : '未知来源'
 }
@@ -119,9 +133,6 @@ function normalizeOptionLine(option: unknown): string {
     if (value) {
       return value
     }
-    return Object.entries(record)
-      .map(([key, val]) => `${key}: ${typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean' ? String(val) : '[object]'}`)
-      .join(' | ')
   }
   return ''
 }
@@ -158,31 +169,78 @@ function getLatestSubmission(itemId: number) {
   return latestSubmissionByItem.value.get(itemId) ?? null
 }
 
+function clearQuizPoll() {
+  if (quizPollTimer.value !== null) {
+    window.clearTimeout(quizPollTimer.value)
+    quizPollTimer.value = null
+  }
+}
+
+async function refreshQuizRelated(sessionId: number) {
+  await practiceStore.loadQuiz(sessionId, taskId.value)
+  if (practiceStore.quiz?.status !== 'GENERATING') {
+    await practiceStore.loadSubmissions(sessionId, taskId.value)
+    if (
+      practiceStore.quiz?.status === 'FEEDBACK_READY' ||
+      practiceStore.quiz?.status === 'REVIEWING' ||
+      practiceStore.quiz?.status === 'NEXT_ROUND'
+    ) {
+      await practiceStore.loadFeedbackReport(sessionId, taskId.value)
+    }
+    await sessionStore.fetchLearningFeedback(sessionId)
+  }
+}
+
+function scheduleQuizPoll() {
+  clearQuizPoll()
+  const sessionId = resolveSessionId()
+  if (!sessionId) {
+    return
+  }
+  quizPollTimer.value = window.setTimeout(async () => {
+    try {
+      await refreshQuizRelated(sessionId)
+      if (practiceStore.quiz?.status === 'GENERATING') {
+        scheduleQuizPoll()
+      }
+    } catch (error) {
+      console.error('轮询测验状态失败:', error)
+    }
+  }, 1200)
+}
+
 async function loadTrainingClosure(generate = false) {
   if (!isTrainingTask.value) {
     return
   }
-  const targetSessionId = resolveSessionId()
-  if (!targetSessionId) {
+  const sessionId = resolveSessionId()
+  if (!sessionId) {
     return
   }
-  if (generate) {
-    await practiceStore.generateItems(targetSessionId, taskId.value)
-  } else {
-    await practiceStore.loadItems(targetSessionId, taskId.value)
+  try {
+    if (generate) {
+      await practiceStore.requestQuiz(sessionId, taskId.value)
+    } else {
+      await practiceStore.loadQuiz(sessionId, taskId.value)
+    }
+  } catch {
+    return
   }
-  await Promise.all([
-    practiceStore.loadSubmissions(targetSessionId, taskId.value),
-    sessionStore.fetchLearningFeedback(targetSessionId),
-  ])
+
+  if (practiceStore.quiz?.status === 'GENERATING') {
+    scheduleQuizPoll()
+    return
+  }
+
+  await refreshQuizRelated(sessionId)
 }
 
 async function loadTutorMessages() {
-  const targetSessionId = resolveSessionId()
-  if (!targetSessionId) {
+  const sessionId = resolveSessionId()
+  if (!sessionId) {
     return
   }
-  await tutorStore.load(targetSessionId, taskId.value)
+  await tutorStore.load(sessionId, taskId.value)
   await scrollTutorToBottom()
 }
 
@@ -202,36 +260,46 @@ async function handleGeneratePractice() {
 
 async function handleSubmitPractice(itemId: number) {
   const answer = answerDrafts.value[itemId]?.trim() ?? ''
-  const targetSessionId = resolveSessionId()
-  if (!targetSessionId || !answer || practiceSubmitting.value) {
+  const sessionId = resolveSessionId()
+  if (!sessionId || !answer || practiceSubmitting.value) {
     return
   }
   submittingPracticeItemId.value = itemId
   try {
-    await practiceStore.submitAnswer(targetSessionId, taskId.value, itemId, answer)
-    await Promise.all([
-      practiceStore.loadSubmissions(targetSessionId, taskId.value),
-      sessionStore.fetchLearningFeedback(targetSessionId),
-    ])
+    await practiceStore.submitAnswer(sessionId, taskId.value, itemId, answer)
+    await refreshQuizRelated(sessionId)
   } catch (error) {
-    console.error('提交训练答案失败:', error)
+    console.error('提交测验答案失败:', error)
   } finally {
     submittingPracticeItemId.value = null
   }
 }
 
+async function handleFeedbackAction(action: 'REVIEW' | 'NEXT_ROUND') {
+  const sessionId = resolveSessionId()
+  if (!sessionId || practiceApplyingAction.value) {
+    return
+  }
+  try {
+    await practiceStore.applyFeedback(sessionId, taskId.value, action)
+    await sessionStore.fetchLearningFeedback(sessionId)
+  } catch (error) {
+    console.error('应用反馈动作失败:', error)
+  }
+}
+
 async function handleSendTutorMessage() {
   const content = tutorInput.value.trim()
-  const targetSessionId = resolveSessionId()
-  if (!content || !targetSessionId || tutorSending.value) {
+  const sessionId = resolveSessionId()
+  if (!content || !sessionId || tutorSending.value) {
     return
   }
 
   try {
     try {
-      await tutorStore.sendStream(targetSessionId, taskId.value, content)
+      await tutorStore.sendStream(sessionId, taskId.value, content)
     } catch {
-      await tutorStore.send(targetSessionId, taskId.value, content)
+      await tutorStore.send(sessionId, taskId.value, content)
     }
     tutorInput.value = ''
     await scrollTutorToBottom()
@@ -259,15 +327,15 @@ function formatMessageTime(input: string) {
 }
 
 function handleContinue() {
-  const targetSessionId = resolveSessionId()
-  if (!targetSessionId) {
+  const sessionId = resolveSessionId()
+  if (!sessionId) {
     router.push('/')
     return
   }
   const step = Number(route.query.step)
   const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
   router.push({
-    path: `/session/${targetSessionId}`,
+    path: `/session/${sessionId}`,
     query: { step: resolvedStep },
   })
 }
@@ -277,10 +345,11 @@ onMounted(async () => {
   tutorStore.reset()
   practiceStore.reset()
   await loadTask()
-  await Promise.all([
-    loadTrainingClosure(),
-    loadTutorMessages(),
-  ])
+  await Promise.all([loadTrainingClosure(), loadTutorMessages()])
+})
+
+onBeforeUnmount(() => {
+  clearQuizPoll()
 })
 
 watch(
@@ -334,8 +403,8 @@ watch(
 
       <section class="training-panel">
         <div class="training-header">
-          <h3 class="training-title">训练驱动闭环</h3>
-          <span v-if="isTrainingTask" class="training-hint">查看题目 -> 作答 -> 判题 -> 反馈建议</span>
+          <h3 class="training-title">训练闭环</h3>
+          <span v-if="isTrainingTask" class="training-hint">Tutor 学习 -> 异步出题 -> 用户答题 -> 反馈报告</span>
           <span v-else class="training-hint">仅 TRAINING 阶段开放</span>
         </div>
 
@@ -344,11 +413,17 @@ watch(
         <template v-else>
           <div class="training-actions">
             <button class="training-btn" :disabled="practiceLoading || practiceGenerating" @click="handleRetryPractice">
-              {{ practiceLoading ? '加载中...' : '刷新题目' }}
+              {{ practiceLoading ? '加载中...' : '刷新测验' }}
             </button>
             <button class="training-btn primary" :disabled="practiceGenerating" @click="handleGeneratePractice">
-              {{ practiceGenerating ? '生成中...' : '生成训练题' }}
+              {{ practiceGenerating ? '生成中...' : '异步生成测验' }}
             </button>
+          </div>
+
+          <div v-if="practiceQuiz" class="training-note">
+            测验状态 {{ practiceQuiz.status }} ｜ 已答 {{ practiceQuiz.answeredCount }}/{{ practiceQuiz.questionCount }}
+            <span v-if="practiceQuiz.generationSource"> ｜ {{ practiceQuiz.generationSource }}</span>
+            <span v-if="practiceQuiz.failureReason"> ｜ {{ practiceQuiz.failureReason }}</span>
           </div>
 
           <div v-if="practiceError" class="training-error-row">
@@ -356,14 +431,15 @@ watch(
             <button class="training-link-btn" @click="handleRetryPractice">重试</button>
           </div>
 
-          <div v-else-if="practiceLoading" class="training-loading">正在加载训练题与提交记录...</div>
-          <div v-else-if="practiceItems.length === 0" class="training-empty">暂无训练题，点击“生成训练题”开始练习。</div>
+          <div v-else-if="quizStatus === 'GENERATING'" class="training-loading">正在异步生成测验题目...</div>
+          <div v-else-if="practiceLoading" class="training-loading">正在加载题目与提交记录...</div>
+          <div v-else-if="practiceItems.length === 0" class="training-empty">暂无测验题，点击“异步生成测验”开始。</div>
 
           <div v-else class="training-item-list">
             <article v-for="item in practiceItems" :key="item.itemId" class="training-item">
               <div class="training-item-head">
                 <span class="training-item-type">{{ item.questionType }}</span>
-                <span class="training-item-meta">难度 {{ item.difficulty }} · {{ item.source }}</span>
+                <span class="training-item-meta">难度 {{ item.difficulty }} ｜ {{ item.source }}</span>
               </div>
               <p class="training-item-stem">{{ item.stem }}</p>
 
@@ -393,9 +469,7 @@ watch(
               <div v-if="getLatestSubmission(item.itemId)" class="training-result">
                 <p class="training-result-title">
                   判题结果：
-                  <strong>
-                    {{ getLatestSubmission(item.itemId)?.isCorrect ? '正确' : '待改进' }}
-                  </strong>
+                  <strong>{{ getLatestSubmission(item.itemId)?.isCorrect ? '正确' : '待改进' }}</strong>
                   <span v-if="getLatestSubmission(item.itemId)?.score !== null">
                     （{{ getLatestSubmission(item.itemId)?.score }} 分）
                   </span>
@@ -403,10 +477,7 @@ watch(
                 <p v-if="getLatestSubmission(item.itemId)?.feedback" class="training-result-text">
                   {{ getLatestSubmission(item.itemId)?.feedback }}
                 </p>
-                <div
-                  v-if="(getLatestSubmission(item.itemId)?.errorTags ?? []).length > 0"
-                  class="training-tags"
-                >
+                <div v-if="(getLatestSubmission(item.itemId)?.errorTags ?? []).length > 0" class="training-tags">
                   <span
                     v-for="tag in getLatestSubmission(item.itemId)?.errorTags ?? []"
                     :key="`${item.itemId}-${tag}`"
@@ -425,18 +496,62 @@ watch(
 
           <section class="feedback-panel">
             <div class="feedback-head">
-              <h4>学习反馈摘要</h4>
+              <h4>测验反馈报告</h4>
               <span v-if="feedbackLoading" class="feedback-loading">更新中...</span>
             </div>
-            <div v-if="learningFeedback">
+
+            <div v-if="practiceFeedbackReport">
+              <p class="feedback-summary">{{ practiceFeedbackReport.diagnosisSummary }}</p>
+
+              <div v-if="practiceFeedbackReport.strengths.length > 0" class="weak-node-list">
+                <article class="weak-node">
+                  <p class="weak-node-title">亮点</p>
+                  <ul class="bullet-list">
+                    <li v-for="(item, idx) in practiceFeedbackReport.strengths" :key="`strength-${idx}`">{{ item }}</li>
+                  </ul>
+                </article>
+              </div>
+
+              <div v-if="practiceFeedbackReport.weaknesses.length > 0" class="weak-node-list">
+                <article class="weak-node">
+                  <p class="weak-node-title">待复习</p>
+                  <ul class="bullet-list">
+                    <li v-for="(item, idx) in practiceFeedbackReport.weaknesses" :key="`weak-${idx}`">{{ item }}</li>
+                  </ul>
+                </article>
+              </div>
+
+              <div v-if="practiceFeedbackReport.reviewFocus.length > 0" class="training-tags">
+                <span v-for="focus in practiceFeedbackReport.reviewFocus" :key="focus" class="training-tag">
+                  {{ focus }}
+                </span>
+              </div>
+
+              <p class="feedback-summary">{{ practiceFeedbackReport.nextRoundAdvice }}</p>
+
+              <div class="training-actions">
+                <button class="training-btn" :disabled="practiceApplyingAction" @click="handleFeedbackAction('REVIEW')">
+                  进入 review
+                </button>
+                <button
+                  class="training-btn primary"
+                  :disabled="practiceApplyingAction"
+                  @click="handleFeedbackAction('NEXT_ROUND')"
+                >
+                  进入 next_round
+                </button>
+              </div>
+            </div>
+
+            <div v-else-if="learningFeedback">
               <p class="feedback-summary">{{ learningFeedback.diagnosisSummary || '暂无诊断总结。' }}</p>
               <div v-if="learningFeedback.weakNodes.length > 0" class="weak-node-list">
                 <article v-for="node in learningFeedback.weakNodes.slice(0, 3)" :key="node.nodeId" class="weak-node">
                   <p class="weak-node-title">{{ node.nodeName }}</p>
                   <p class="weak-node-meta">
-                    掌握度 {{ toPercent(node.masteryScore) }}% · 训练正确率 {{ toPercent(node.trainingAccuracy) }}%
+                    掌握度 {{ toPercent(node.masteryScore) }}% ｜ 训练正确率 {{ toPercent(node.trainingAccuracy) }}%
                   </p>
-                  <p v-if="node.reasons.length > 0" class="weak-node-reason">原因：{{ node.reasons.join('；') }}</p>
+                  <p v-if="node.reasons.length > 0" class="weak-node-reason">原因：{{ node.reasons.join('，') }}</p>
                   <div v-if="node.recentErrorTags.length > 0" class="training-tags">
                     <span v-for="tag in node.recentErrorTags" :key="`${node.nodeId}-${tag}`" class="training-tag">
                       {{ tag }}
@@ -446,8 +561,9 @@ watch(
               </div>
               <p v-else class="training-note">暂无明显薄弱点，继续保持当前训练节奏。</p>
             </div>
-            <div v-else-if="feedbackLoading" class="feedback-loading">正在加载学习反馈...</div>
-            <div v-else class="training-note">暂无学习反馈，请先完成训练题提交。</div>
+
+            <div v-else-if="feedbackLoading" class="feedback-loading">正在加载反馈...</div>
+            <div v-else class="training-note">暂无反馈报告，请先完成全部测验题。</div>
           </section>
         </template>
       </section>
@@ -488,7 +604,7 @@ watch(
             class="tutor-input"
             :disabled="tutorSending"
             rows="2"
-            placeholder="输入你的问题，例如：我不理解这一步为什么这样变形？"
+            placeholder="输入你的问题，例如：我不理解这一题为什么这样判断？"
           ></textarea>
           <button type="submit" class="tutor-send-btn" :disabled="!canSendTutorMessage">
             {{ tutorSending ? '发送中...' : '发送' }}

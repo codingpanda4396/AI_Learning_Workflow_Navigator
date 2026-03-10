@@ -24,6 +24,8 @@ public interface SessionRepository {
 
     void updateCurrentPosition(Long sessionId, Long currentNodeId, Stage currentStage);
 
+    void updateStatus(Long sessionId, String status);
+
     void touchLastActive(Long sessionId);
 }
 

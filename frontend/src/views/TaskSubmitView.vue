@@ -94,7 +94,7 @@ function handleContinue() {
 function handleGoNextTask() {
   const nextTask = result.value?.nextTask
   if (!nextTask) return
-  const targetPath = nextTask.stage === 'TRAINING' ? `/task/${nextTask.taskId}/submit` : `/task/${nextTask.taskId}/run`
+  const targetPath = `/task/${nextTask.taskId}/run`
   const currentSessionId = resolveSessionId()
   const step = Number(route.query.step)
   const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
@@ -109,6 +109,17 @@ function handleGoNextTask() {
 onMounted(async () => {
   sessionStore.resetTaskState()
   await loadTask()
+  if (sessionStore.currentTask?.stage === 'TRAINING') {
+    const currentSessionId = resolveSessionId()
+    const step = Number(route.query.step)
+    const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
+    await router.replace({
+      path: `/task/${taskId.value}/run`,
+      ...(currentSessionId
+        ? { query: { sessionId: String(currentSessionId), step: resolvedStep } }
+        : { query: { step: resolvedStep } }),
+    })
+  }
 })
 </script>
 
