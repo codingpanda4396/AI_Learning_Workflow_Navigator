@@ -84,20 +84,63 @@ const currentStep = computed(() => browsingStep.value)
 const currentStepMeta = computed(() => steps.find((item) => item.step === currentStep.value) ?? steps[0]!)
 const username = computed(() => authStore.currentUser?.username ?? '')
 
-const plannedTasks = computed(() => {
-  if (sessionStore.plannedTasks.length > 0) {
-    return sessionStore.plannedTasks
+function dedupeByTaskIdentity<T extends { taskId: number; nodeId?: number; stage?: string }>(items: T[]) {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const fallbackKey = `${item.nodeId ?? 'unknown'}:${item.stage ?? 'unknown'}`
+    const key = Number.isFinite(item.taskId) && item.taskId > 0 ? `task:${item.taskId}` : `node-stage:${fallbackKey}`
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
+}
+
+const timelineItems = computed(() => dedupeByTaskIdentity(currentSession.value?.timeline ?? []))
+
+const plannedNodes = computed(() => {
+  if (sessionStore.plannedNodes.length > 0) {
+    return sessionStore.plannedNodes
   }
-  return (currentSession.value?.timeline ?? []).map((item) => ({
-    taskId: item.taskId,
-    stage: item.stage,
-    nodeId: item.nodeId,
-    objective: stageGuide(item.stage),
-    status: item.status,
-  }))
+  const grouped = new Map<number, { nodeId: number; nodeName: string; status: string; stages: Array<{ taskId: number; stage: string; objective: string; status: string }> }>()
+  for (const item of timelineItems.value) {
+    const existing = grouped.get(item.nodeId) ?? {
+      nodeId: item.nodeId,
+      nodeName: `节点 ${item.nodeId}`,
+      status: item.status,
+      stages: [],
+    }
+    existing.stages.push({
+      taskId: item.taskId,
+      stage: item.stage,
+      objective: stageGuide(item.stage),
+      status: item.status,
+    })
+    grouped.set(item.nodeId, existing)
+  }
+  return [...grouped.values()]
 })
 
-const totalTaskCount = computed(() => currentSession.value?.progress?.totalTaskCount ?? plannedTasks.value.length)
+const plannedStageTasks = computed(() =>
+  plannedNodes.value.flatMap((plan) =>
+    plan.stages.map((stage) => ({
+      ...stage,
+      nodeId: plan.nodeId,
+      nodeName: plan.nodeName,
+      nodeStatus: plan.status,
+    })),
+  ),
+)
+
+const nextPlannedTask = computed(() => {
+  if (sessionStore.nextTask) {
+    return plannedStageTasks.value.find((item) => item.taskId === sessionStore.nextTask?.taskId) ?? null
+  }
+  return plannedStageTasks.value.find((item) => item.status !== 'SUCCEEDED') ?? plannedStageTasks.value[0] ?? null
+})
+
+const totalTaskCount = computed(() => currentSession.value?.progress?.totalTaskCount ?? timelineItems.value.length)
 const completedTaskCount = computed(() => currentSession.value?.progress?.completedTaskCount ?? 0)
 const completionPercent = computed(() => {
   const total = totalTaskCount.value
@@ -107,17 +150,10 @@ const completionPercent = computed(() => {
   return Math.round((completedTaskCount.value / total) * 100)
 })
 
-const currentPlanTask = computed(() => {
-  if (!sessionStore.nextTask) {
-    return plannedTasks.value[0] ?? null
-  }
-  return plannedTasks.value.find((item) => item.taskId === sessionStore.nextTask?.taskId) ?? plannedTasks.value[0] ?? null
-})
-
 const stepProgressData = computed<StepProgressItem[]>(() => {
-  const timeline = currentSession.value?.timeline ?? []
+  const timeline = timelineItems.value
   const failedCount = timeline.filter((item) => item.status === 'FAILED').length
-  const step1Done = plannedTasks.value.length > 0
+  const step1Done = plannedNodes.value.length > 0
   const step2HasProgress = completedTaskCount.value > 0 || sessionStore.nextTask !== null
   const step3Ready = totalTaskCount.value > 0
   const step3Done = !!learningFeedback.value || (currentSession.value?.progress?.completionRate ?? 0) >= 1
@@ -273,16 +309,24 @@ onMounted(async () => {
           <h3>学习计划</h3>
           <p v-if="currentSession"><strong>课程/章节：</strong>{{ currentSession.courseId }} / {{ currentSession.chapterId }}</p>
           <p v-if="currentSession"><strong>学习目标：</strong>{{ currentSession.goalText }}</p>
-          <p v-if="currentPlanTask">
-            <strong>推荐起始任务：</strong>任务 #{{ currentPlanTask.taskId }}（{{ stageLabel(currentPlanTask.stage) }}）
+          <p v-if="nextPlannedTask">
+            <strong>推荐起始任务：</strong>任务 #{{ nextPlannedTask.taskId }}（{{ stageLabel(nextPlannedTask.stage) }}）
           </p>
-          <p v-if="plannedTasks.length === 0">当前暂无计划任务。</p>
+          <p v-if="plannedNodes.length === 0">当前暂无计划任务。</p>
           <div v-else class="task-list">
-            <article v-for="item in plannedTasks" :key="`plan-${item.taskId}`" class="task-item">
+            <article v-for="plan in plannedNodes" :key="`plan-node-${plan.nodeId}`" class="task-item">
               <div class="task-body">
-                <p><strong>任务 #{{ item.taskId }}</strong> · {{ stageLabel(item.stage) }}</p>
-                <p>{{ item.objective || stageGuide(item.stage) }}</p>
-                <p><strong>状态：</strong>{{ item.status }}</p>
+                <p><strong>{{ plan.nodeName }}</strong> · 节点 #{{ plan.nodeId }}</p>
+                <p><strong>节点状态：</strong>{{ plan.status }}</p>
+                <div class="task-list">
+                  <article v-for="stage in plan.stages" :key="stage.taskId" class="task-item">
+                    <div class="task-body">
+                      <p><strong>任务 #{{ stage.taskId }}</strong> · {{ stageLabel(stage.stage) }}</p>
+                      <p>{{ stage.objective || stageGuide(stage.stage) }}</p>
+                      <p><strong>状态：</strong>{{ stage.status }}</p>
+                    </div>
+                  </article>
+                </div>
               </div>
             </article>
           </div>
@@ -291,10 +335,10 @@ onMounted(async () => {
         <section v-if="currentStep === 2" class="panel">
           <h3>分步学习</h3>
           <p><strong>任务进度：</strong>{{ completedTaskCount }}/{{ totalTaskCount }}（{{ completionPercent }}%）</p>
-          <p v-if="currentPlanTask">
-            <strong>当前建议任务：</strong>任务 #{{ currentPlanTask.taskId }}（{{ stageLabel(currentPlanTask.stage) }}）
+          <p v-if="nextPlannedTask">
+            <strong>当前建议任务：</strong>任务 #{{ nextPlannedTask.taskId }}（{{ stageLabel(nextPlannedTask.stage) }}）
           </p>
-          <p v-if="currentPlanTask"><strong>任务说明：</strong>{{ currentPlanTask.objective || stageGuide(currentPlanTask.stage) }}</p>
+          <p v-if="nextPlannedTask"><strong>任务说明：</strong>{{ nextPlannedTask.objective || stageGuide(nextPlannedTask.stage) }}</p>
           <p v-if="sessionStore.currentTask">
             <strong>最近执行任务：</strong>
             #{{ sessionStore.currentTask.taskId }}（{{ stageLabel(sessionStore.currentTask.stage) }}）/{{ sessionStore.currentTask.status }}
@@ -303,9 +347,9 @@ onMounted(async () => {
             <strong>最近提交结果：</strong>
             分数 {{ sessionStore.taskResult.score }}，下一动作 {{ sessionStore.taskResult.nextAction }}
           </p>
-          <p v-if="!currentSession || currentSession.timeline.length === 0">暂无学习步骤。</p>
+          <p v-if="!currentSession || timelineItems.length === 0">暂无学习步骤。</p>
           <div v-else class="task-list">
-            <article v-for="item in currentSession.timeline" :key="item.taskId" class="task-item">
+            <article v-for="item in timelineItems" :key="item.taskId" class="task-item">
               <button class="task-toggle" @click="toggleTask(item.taskId)">
                 <span>任务 #{{ item.taskId }} - {{ stageLabel(item.stage) }}</span>
                 <span>{{ isTaskExpanded(item.taskId) ? '收起' : '展开' }}</span>

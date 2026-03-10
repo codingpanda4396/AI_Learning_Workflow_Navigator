@@ -5,17 +5,23 @@ import type {
   SessionOverviewResponse,
 } from '@/types'
 
-interface PlannedTaskDto {
+interface PlannedNodeStageDto {
   task_id: number
   stage: string
-  node_id: number
   objective: string
   status: string
 }
 
+interface PlannedNodeDto {
+  node_id: number
+  node_name: string
+  status: string
+  stages?: PlannedNodeStageDto[]
+}
+
 interface PlanSessionResponseDto {
   session_id: number
-  tasks?: PlannedTaskDto[]
+  plans?: PlannedNodeDto[]
 }
 
 interface TimelineItemDto {
@@ -87,12 +93,16 @@ interface PathResponseDto {
 export function mapPlanSessionDto(dto: PlanSessionResponseDto): PlanSessionResponse {
   return {
     sessionId: dto.session_id,
-    tasks: (dto.tasks ?? []).map((task) => ({
-      taskId: task.task_id,
-      stage: task.stage,
-      nodeId: task.node_id,
-      objective: task.objective,
-      status: task.status,
+    plans: (dto.plans ?? []).map((plan) => ({
+      nodeId: plan.node_id,
+      nodeName: plan.node_name,
+      status: plan.status,
+      stages: (plan.stages ?? []).map((stage) => ({
+        taskId: stage.task_id,
+        stage: stage.stage,
+        objective: stage.objective,
+        status: stage.status,
+      })),
     })),
   }
 }

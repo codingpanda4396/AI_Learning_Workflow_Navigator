@@ -20,17 +20,23 @@ export interface CreateSessionRequest {
   goalText: string
 }
 
-export interface PlannedTask {
+export interface PlannedNodeStage {
   taskId: number
   stage: string
-  nodeId: number
   objective: string
   status: string
 }
 
+export interface PlannedNode {
+  nodeId: number
+  nodeName: string
+  status: string
+  stages: PlannedNodeStage[]
+}
+
 export interface PlanSessionResponse {
   sessionId: number
-  tasks: PlannedTask[]
+  plans: PlannedNode[]
 }
 
 export interface TimelineItem {

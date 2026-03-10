@@ -18,6 +18,7 @@ import com.pandanav.learning.domain.repository.TaskRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -58,6 +60,7 @@ class PlanSessionTasksServiceTest {
         Task existing = task(1001L, sessionId, 101L, Stage.TRAINING, TaskStatus.PENDING, "existing");
 
         when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        when(conceptNodeRepository.findByChapterIdOrderByOrderNoAsc("ch-1")).thenReturn(List.of(node(101L, "Node-101", 1)));
         when(taskRepository.findBySessionIdWithStatus(sessionId)).thenReturn(List.of(existing));
 
         PlanSessionTasksService service = new PlanSessionTasksService(
@@ -70,10 +73,11 @@ class PlanSessionTasksServiceTest {
 
         PlanSessionResponse response = service.execute(sessionId, PlanMode.AUTO);
 
-        assertEquals(1, response.tasks().size());
-        assertEquals(1001L, response.tasks().get(0).taskId());
-        assertEquals("PENDING", response.tasks().get(0).status());
-        verify(conceptNodeRepository, never()).findByChapterIdOrderByOrderNoAsc(any());
+        assertEquals(1, response.plans().size());
+        assertEquals(101L, response.plans().get(0).nodeId());
+        assertEquals("PENDING", response.plans().get(0).status());
+        assertEquals(1, response.plans().get(0).stages().size());
+        assertEquals(1001L, response.plans().get(0).stages().get(0).taskId());
         verify(personalizedPathPlannerService, never()).plan(any(), any(), anyBoolean());
         verify(taskRepository, never()).saveAll(anyList());
     }
@@ -118,9 +122,77 @@ class PlanSessionTasksServiceTest {
 
         PlanSessionResponse response = service.execute(sessionId, PlanMode.AUTO);
 
-        assertEquals(1, response.tasks().size());
-        assertEquals(2001L, response.tasks().get(0).taskId());
+        assertEquals(1, response.plans().size());
+        assertEquals(101L, response.plans().get(0).nodeId());
+        assertEquals(1, response.plans().get(0).stages().size());
+        assertEquals(2001L, response.plans().get(0).stages().get(0).taskId());
         verify(taskRepository).saveAll(anyList());
+    }
+
+    @Test
+    void shouldDeduplicateDuplicateNodeStageTasksBeforeSaving() {
+        Long sessionId = 30L;
+        LearningSession session = session(sessionId);
+        ConceptNode node1 = node(101L, "Node-101", 1);
+        ConceptNode node2 = node(102L, "Node-102", 2);
+
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        when(taskRepository.findBySessionIdWithStatus(sessionId)).thenReturn(List.of());
+        when(conceptNodeRepository.findByChapterIdOrderByOrderNoAsc("ch-1")).thenReturn(List.of(node1, node2));
+        when(personalizedPathPlannerService.plan(any(), any(), anyBoolean())).thenReturn(
+            new PersonalizedPlanResult(
+                PlanSource.RULE,
+                List.of(node1, node1, node2),
+                List.of(
+                    new com.pandanav.learning.domain.llm.model.PersonalizedPathPlan.InsertedTask(
+                        101L,
+                        Stage.UNDERSTANDING.name(),
+                        "duplicate inserted understanding objective",
+                        "MISSING_STEPS"
+                    ),
+                    new com.pandanav.learning.domain.llm.model.PersonalizedPathPlan.InsertedTask(
+                        102L,
+                        Stage.TRAINING.name(),
+                        "duplicate inserted training objective",
+                        "CONCEPT_CONFUSION"
+                    )
+                ),
+                "",
+                List.of(),
+                List.of(node1.getId()),
+                null,
+                null,
+                null,
+                null,
+                false,
+                List.of(),
+                false
+            )
+        );
+        when(taskObjectiveTemplateStrategy.buildObjective(any(), any())).thenReturn("objective");
+        when(taskRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PlanSessionTasksService service = new PlanSessionTasksService(
+            sessionRepository,
+            conceptNodeRepository,
+            taskRepository,
+            taskObjectiveTemplateStrategy,
+            personalizedPathPlannerService
+        );
+
+        PlanSessionResponse response = service.execute(sessionId, PlanMode.AUTO);
+
+        ArgumentCaptor<List<Task>> captor = ArgumentCaptor.forClass(List.class);
+        verify(taskRepository).saveAll(captor.capture());
+        List<Task> savedTasks = captor.getValue();
+
+        assertEquals(8, savedTasks.size());
+        assertEquals(2, response.plans().size());
+        assertEquals(4, response.plans().get(0).stages().size());
+        assertEquals(4, response.plans().get(1).stages().size());
+        assertEquals(1L, savedTasks.stream().filter(task -> task.getNodeId().equals(101L) && task.getStage() == Stage.UNDERSTANDING).count());
+        assertEquals(1L, savedTasks.stream().filter(task -> task.getNodeId().equals(102L) && task.getStage() == Stage.TRAINING).count());
+        assertTrue(savedTasks.stream().allMatch(task -> task.getStatus() == TaskStatus.PENDING));
     }
 
     private static LearningSession session(Long id) {
