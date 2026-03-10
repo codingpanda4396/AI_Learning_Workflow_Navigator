@@ -5,15 +5,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.application.service.llm.PromptOutputValidator;
 import com.pandanav.learning.domain.enums.PracticeFeedbackAction;
+import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
+import com.pandanav.learning.domain.llm.model.LlmProfileConfig;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
+import com.pandanav.learning.domain.model.LlmCallLog;
 import com.pandanav.learning.domain.model.PracticeFeedbackReport;
 import com.pandanav.learning.domain.model.PracticeItem;
 import com.pandanav.learning.domain.model.PracticeQuiz;
 import com.pandanav.learning.domain.model.PracticeSubmission;
+import com.pandanav.learning.domain.repository.LlmCallLogRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import org.slf4j.Logger;
@@ -38,6 +42,7 @@ public class PracticeFeedbackReportGenerator {
     private final LlmProperties llmProperties;
     private final LlmJsonParser llmJsonParser;
     private final PromptOutputValidator promptOutputValidator;
+    private final LlmCallLogRepository llmCallLogRepository;
     private final ObjectMapper objectMapper;
 
     public PracticeFeedbackReportGenerator(
@@ -45,12 +50,14 @@ public class PracticeFeedbackReportGenerator {
         LlmProperties llmProperties,
         LlmJsonParser llmJsonParser,
         PromptOutputValidator promptOutputValidator,
+        LlmCallLogRepository llmCallLogRepository,
         ObjectMapper objectMapper
     ) {
         this.llmGateway = llmGateway;
         this.llmProperties = llmProperties;
         this.llmJsonParser = llmJsonParser;
         this.promptOutputValidator = promptOutputValidator;
+        this.llmCallLogRepository = llmCallLogRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -81,13 +88,81 @@ public class PracticeFeedbackReportGenerator {
             null,
             null
         );
-        LlmTextResult result = llmGateway.generate(prompt);
-        JsonNode parsed = llmJsonParser.parse(result.text());
-        List<String> errors = promptOutputValidator.validatePracticeFeedback(parsed);
-        if (!errors.isEmpty()) {
-            throw new InternalServerException("Invalid practice feedback output: " + String.join("; ", errors));
+        LlmProfileConfig profile = llmProperties.resolveProfile(prompt.invocationProfile(), prompt.promptKey());
+        String model = prompt.modelHint() == null || prompt.modelHint().isBlank() ? profile.model() : prompt.modelHint().trim();
+
+        LlmTextResult result = null;
+        try {
+            result = llmGateway.generate(prompt);
+            JsonNode parsed = llmJsonParser.parse(result.text());
+            List<String> errors = promptOutputValidator.validatePracticeFeedback(parsed);
+            if (!errors.isEmpty()) {
+                saveAudit("FAILED", prompt, result, parsed, false, false);
+                throw new InternalServerException("Invalid practice feedback output: " + String.join("; ", errors));
+            }
+            saveAudit("SUCCEEDED", prompt, result, parsed, true, true);
+            PracticeFeedbackReport report = toReport(quiz, parsed, "LLM", PROMPT_VERSION);
+            report.setReportStatus(TaskStatus.SUCCEEDED);
+            report.setReportStartedAt(quiz.getGenerationFinishedAt() == null ? quiz.getCreatedAt() : quiz.getGenerationFinishedAt());
+            report.setReportFinishedAt(java.time.OffsetDateTime.now());
+            report.setTokenInput(result.usage() == null ? null : result.usage().tokenInput());
+            report.setTokenOutput(result.usage() == null ? null : result.usage().tokenOutput());
+            report.setLatencyMs(result.usage() == null ? null : result.usage().latencyMs());
+            return report;
+        } catch (Exception ex) {
+            if (result == null) {
+                llmCallLogRepository.save(new LlmCallLog(
+                    null,
+                    "PRACTICE_FEEDBACK",
+                    prompt.invocationProfile().name(),
+                    profile.provider(),
+                    model,
+                    prompt.promptKey(),
+                    prompt.promptVersion(),
+                    null,
+                    null,
+                    null,
+                    "FAILED",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    llmProperties.isFallbackToRule(),
+                    false,
+                    false,
+                    false
+                ));
+            }
+            throw ex;
         }
-        return toReport(quiz, parsed, "LLM", PROMPT_VERSION);
+    }
+
+    private void saveAudit(String status, LlmPrompt prompt, LlmTextResult result, JsonNode parsed, boolean parseSuccess, boolean schemaValid) {
+        llmCallLogRepository.save(new LlmCallLog(
+            null,
+            "PRACTICE_FEEDBACK",
+            prompt.invocationProfile().name(),
+            result.provider(),
+            result.model(),
+            prompt.promptKey(),
+            prompt.promptVersion(),
+            toJson(result.requestPayload()),
+            toJson(result.responsePayload()),
+            parsed == null ? null : toJson(parsed),
+            status,
+            result.usage() == null ? null : result.usage().latencyMs(),
+            result.usage() == null ? null : result.usage().tokenInput(),
+            result.usage() == null ? null : result.usage().tokenOutput(),
+            result.usage() == null ? null : result.usage().reasoningTokens(),
+            result.usage() == null ? null : result.usage().finishReason(),
+            result.usage() != null && result.usage().timeout(),
+            false,
+            parseSuccess,
+            schemaValid,
+            result.usage() != null && result.usage().truncated()
+        ));
     }
 
     private String buildUserPrompt(PracticeQuiz quiz, List<PracticeItem> items, List<PracticeSubmission> submissions) {
@@ -166,6 +241,9 @@ public class PracticeFeedbackReportGenerator {
         report.setRecommendedAction((average >= 80 ? PracticeFeedbackAction.NEXT_ROUND : PracticeFeedbackAction.REVIEW).name());
         report.setSource("RULE");
         report.setPromptVersion(PROMPT_VERSION);
+        report.setReportStatus(TaskStatus.SUCCEEDED);
+        report.setReportStartedAt(java.time.OffsetDateTime.now());
+        report.setReportFinishedAt(java.time.OffsetDateTime.now());
         return report;
     }
 

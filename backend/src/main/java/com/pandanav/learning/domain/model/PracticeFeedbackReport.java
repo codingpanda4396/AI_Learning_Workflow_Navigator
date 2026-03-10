@@ -1,5 +1,7 @@
 package com.pandanav.learning.domain.model;
 
+import com.pandanav.learning.domain.enums.TaskStatus;
+
 import java.time.OffsetDateTime;
 
 public class PracticeFeedbackReport {
@@ -15,8 +17,18 @@ public class PracticeFeedbackReport {
     private String reviewFocusJson;
     private String nextRoundAdvice;
     private String recommendedAction;
+    private String selectedAction;
     private String source;
     private String promptVersion;
+    private TaskStatus reportStatus;
+    private OffsetDateTime reportStartedAt;
+    private OffsetDateTime reportFinishedAt;
+    private OffsetDateTime actionSelectedAt;
+    private String traceId;
+    private Integer tokenInput;
+    private Integer tokenOutput;
+    private Integer latencyMs;
+    private String lastErrorCode;
     private OffsetDateTime createdAt;
 
     public Long getId() {
@@ -107,6 +119,14 @@ public class PracticeFeedbackReport {
         this.recommendedAction = recommendedAction;
     }
 
+    public String getSelectedAction() {
+        return selectedAction;
+    }
+
+    public void setSelectedAction(String selectedAction) {
+        this.selectedAction = selectedAction;
+    }
+
     public String getSource() {
         return source;
     }
@@ -121,6 +141,78 @@ public class PracticeFeedbackReport {
 
     public void setPromptVersion(String promptVersion) {
         this.promptVersion = promptVersion;
+    }
+
+    public TaskStatus getReportStatus() {
+        return reportStatus;
+    }
+
+    public void setReportStatus(TaskStatus reportStatus) {
+        this.reportStatus = reportStatus;
+    }
+
+    public OffsetDateTime getReportStartedAt() {
+        return reportStartedAt;
+    }
+
+    public void setReportStartedAt(OffsetDateTime reportStartedAt) {
+        this.reportStartedAt = reportStartedAt;
+    }
+
+    public OffsetDateTime getReportFinishedAt() {
+        return reportFinishedAt;
+    }
+
+    public void setReportFinishedAt(OffsetDateTime reportFinishedAt) {
+        this.reportFinishedAt = reportFinishedAt;
+    }
+
+    public OffsetDateTime getActionSelectedAt() {
+        return actionSelectedAt;
+    }
+
+    public void setActionSelectedAt(OffsetDateTime actionSelectedAt) {
+        this.actionSelectedAt = actionSelectedAt;
+    }
+
+    public String getTraceId() {
+        return traceId;
+    }
+
+    public void setTraceId(String traceId) {
+        this.traceId = traceId;
+    }
+
+    public Integer getTokenInput() {
+        return tokenInput;
+    }
+
+    public void setTokenInput(Integer tokenInput) {
+        this.tokenInput = tokenInput;
+    }
+
+    public Integer getTokenOutput() {
+        return tokenOutput;
+    }
+
+    public void setTokenOutput(Integer tokenOutput) {
+        this.tokenOutput = tokenOutput;
+    }
+
+    public Integer getLatencyMs() {
+        return latencyMs;
+    }
+
+    public void setLatencyMs(Integer latencyMs) {
+        this.latencyMs = latencyMs;
+    }
+
+    public String getLastErrorCode() {
+        return lastErrorCode;
+    }
+
+    public void setLastErrorCode(String lastErrorCode) {
+        this.lastErrorCode = lastErrorCode;
     }
 
     public OffsetDateTime getCreatedAt() {

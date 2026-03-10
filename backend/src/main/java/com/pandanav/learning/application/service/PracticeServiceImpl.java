@@ -13,6 +13,7 @@ import com.pandanav.learning.domain.enums.PracticeItemSource;
 import com.pandanav.learning.domain.enums.PracticeItemStatus;
 import com.pandanav.learning.domain.enums.PracticeQuizStatus;
 import com.pandanav.learning.domain.enums.Stage;
+import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningEvent;
 import com.pandanav.learning.domain.model.PracticeFeedbackReport;
@@ -109,7 +110,9 @@ public class PracticeServiceImpl implements PracticeService {
         Task task = requireTrainingTask(sessionId, taskId, userId);
         PracticeQuiz existing = practiceQuizRepository.findLatestBySessionIdAndTaskIdAndUserPk(sessionId, taskId, userId).orElse(null);
         if (existing != null) {
-            if (existing.getStatus() == PracticeQuizStatus.GENERATING) {
+            if (existing.getGenerationStatus() == TaskStatus.PENDING
+                || existing.getGenerationStatus() == TaskStatus.RUNNING
+                || existing.getGenerationStatus() == TaskStatus.SUCCEEDED) {
                 return existing;
             }
             if (existing.getStatus() != PracticeQuizStatus.FAILED) {
@@ -123,6 +126,7 @@ public class PracticeServiceImpl implements PracticeService {
         quiz.setUserId(userId);
         quiz.setNodeId(task.getNodeId());
         quiz.setStatus(PracticeQuizStatus.GENERATING);
+        quiz.setGenerationStatus(TaskStatus.PENDING);
         quiz.setQuestionCount(0);
         quiz.setAnsweredCount(0);
         PracticeQuiz saved = practiceQuizRepository.save(quiz);
@@ -249,6 +253,9 @@ public class PracticeServiceImpl implements PracticeService {
         submission.setErrorTagsJson(toJson(judgement.errorTags().stream().map(Enum::name).toList()));
         submission.setJudgeMode("RULE");
         submission.setPromptVersion("rule-v1");
+        submission.setJudgingStatus(TaskStatus.SUCCEEDED);
+        submission.setJudgingStartedAt(java.time.OffsetDateTime.now());
+        submission.setJudgingFinishedAt(java.time.OffsetDateTime.now());
 
         PracticeSubmission saved = practiceSubmissionRepository.save(submission);
         practiceRepository.updateStatus(practiceItemId, PracticeItemStatus.ANSWERED);
@@ -308,6 +315,7 @@ public class PracticeServiceImpl implements PracticeService {
 
     void generateQuizInternal(Long quizId, Long sessionId, Long taskId, Long userId) {
         try {
+            practiceQuizRepository.updateGenerationState(quizId, TaskStatus.RUNNING, null, null);
             Task task = requireTrainingTask(sessionId, taskId, userId);
             ConceptNode node = conceptNodeRepository.findById(task.getNodeId())
                 .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
@@ -326,6 +334,7 @@ public class PracticeServiceImpl implements PracticeService {
             sessionRepository.updateStatus(sessionId, PracticeQuizStatus.QUIZ_READY.name());
             logGeneration(sessionId, userId, task, result, saved.size());
         } catch (Exception ex) {
+            practiceQuizRepository.updateGenerationState(quizId, TaskStatus.FAILED, sanitizeReason(ex.getMessage()), "QUIZ_GENERATION_FAILED");
             practiceQuizRepository.updateStatus(quizId, PracticeQuizStatus.FAILED, sanitizeReason(ex.getMessage()));
             sessionRepository.updateStatus(sessionId, PracticeQuizStatus.FAILED.name());
             log.warn("practice quiz generation failed: quizId={}, sessionId={}, taskId={}, reason={}", quizId, sessionId, taskId, sanitizeReason(ex.getMessage()));

@@ -1,5 +1,6 @@
 package com.pandanav.learning.domain.model;
 
+import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.enums.PracticeQuizStatus;
 
 import java.time.OffsetDateTime;
@@ -17,6 +18,14 @@ public class PracticeQuiz {
     private String generationSource;
     private String promptVersion;
     private String failureReason;
+    private TaskStatus generationStatus;
+    private OffsetDateTime generationStartedAt;
+    private OffsetDateTime generationFinishedAt;
+    private String traceId;
+    private Integer tokenInput;
+    private Integer tokenOutput;
+    private Integer latencyMs;
+    private String lastErrorCode;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
@@ -106,6 +115,70 @@ public class PracticeQuiz {
 
     public void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
+    }
+
+    public TaskStatus getGenerationStatus() {
+        return generationStatus;
+    }
+
+    public void setGenerationStatus(TaskStatus generationStatus) {
+        this.generationStatus = generationStatus;
+    }
+
+    public OffsetDateTime getGenerationStartedAt() {
+        return generationStartedAt;
+    }
+
+    public void setGenerationStartedAt(OffsetDateTime generationStartedAt) {
+        this.generationStartedAt = generationStartedAt;
+    }
+
+    public OffsetDateTime getGenerationFinishedAt() {
+        return generationFinishedAt;
+    }
+
+    public void setGenerationFinishedAt(OffsetDateTime generationFinishedAt) {
+        this.generationFinishedAt = generationFinishedAt;
+    }
+
+    public String getTraceId() {
+        return traceId;
+    }
+
+    public void setTraceId(String traceId) {
+        this.traceId = traceId;
+    }
+
+    public Integer getTokenInput() {
+        return tokenInput;
+    }
+
+    public void setTokenInput(Integer tokenInput) {
+        this.tokenInput = tokenInput;
+    }
+
+    public Integer getTokenOutput() {
+        return tokenOutput;
+    }
+
+    public void setTokenOutput(Integer tokenOutput) {
+        this.tokenOutput = tokenOutput;
+    }
+
+    public Integer getLatencyMs() {
+        return latencyMs;
+    }
+
+    public void setLatencyMs(Integer latencyMs) {
+        this.latencyMs = latencyMs;
+    }
+
+    public String getLastErrorCode() {
+        return lastErrorCode;
+    }
+
+    public void setLastErrorCode(String lastErrorCode) {
+        this.lastErrorCode = lastErrorCode;
     }
 
     public OffsetDateTime getCreatedAt() {

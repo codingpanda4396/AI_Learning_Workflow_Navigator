@@ -1,6 +1,7 @@
 package com.pandanav.learning.infrastructure.persistence;
 
 import com.pandanav.learning.domain.enums.PracticeQuizStatus;
+import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.PracticeQuiz;
 import com.pandanav.learning.domain.repository.PracticeQuizRepository;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -29,9 +30,10 @@ public class JdbcPracticeQuizRepository implements PracticeQuizRepository {
                 """
                     INSERT INTO practice_quiz (
                         session_id, task_id, user_id, node_id, status, question_count, answered_count,
-                        generation_source, prompt_version, failure_reason
+                        generation_source, prompt_version, failure_reason, generation_status, generation_started_at,
+                        trace_id, token_input, token_output, latency_ms, last_error_code
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::run_status, now(), ?, ?, ?, ?, ?)
                     """,
                 new String[]{"id"}
             );
@@ -45,6 +47,12 @@ public class JdbcPracticeQuizRepository implements PracticeQuizRepository {
             ps.setString(8, quiz.getGenerationSource());
             ps.setString(9, quiz.getPromptVersion());
             ps.setString(10, quiz.getFailureReason());
+            ps.setString(11, (quiz.getGenerationStatus() == null ? TaskStatus.PENDING : quiz.getGenerationStatus()).name());
+            ps.setString(12, quiz.getTraceId());
+            ps.setObject(13, quiz.getTokenInput());
+            ps.setObject(14, quiz.getTokenOutput());
+            ps.setObject(15, quiz.getLatencyMs());
+            ps.setString(16, quiz.getLastErrorCode());
             return ps;
         }, keyHolder);
         Number key = keyHolder.getKey();
@@ -60,7 +68,9 @@ public class JdbcPracticeQuizRepository implements PracticeQuizRepository {
             return Optional.ofNullable(jdbcTemplate.queryForObject(
                 """
                     SELECT id, session_id, task_id, user_id, node_id, status, question_count, answered_count,
-                           generation_source, prompt_version, failure_reason, created_at, updated_at
+                           generation_source, prompt_version, failure_reason, generation_status,
+                           generation_started_at, generation_finished_at, trace_id, token_input, token_output,
+                           latency_ms, last_error_code, created_at, updated_at
                     FROM practice_quiz
                     WHERE id = ?
                     """,
@@ -78,7 +88,9 @@ public class JdbcPracticeQuizRepository implements PracticeQuizRepository {
             return Optional.ofNullable(jdbcTemplate.queryForObject(
                 """
                     SELECT pq.id, pq.session_id, pq.task_id, pq.user_id, pq.node_id, pq.status, pq.question_count, pq.answered_count,
-                           pq.generation_source, pq.prompt_version, pq.failure_reason, pq.created_at, pq.updated_at
+                           pq.generation_source, pq.prompt_version, pq.failure_reason, pq.generation_status,
+                           pq.generation_started_at, pq.generation_finished_at, pq.trace_id, pq.token_input, pq.token_output,
+                           pq.latency_ms, pq.last_error_code, pq.created_at, pq.updated_at
                     FROM practice_quiz pq
                     JOIN learning_session ls ON ls.id = pq.session_id
                     WHERE pq.session_id = ?
@@ -114,15 +126,41 @@ public class JdbcPracticeQuizRepository implements PracticeQuizRepository {
     }
 
     @Override
+    public void updateGenerationState(Long quizId, TaskStatus status, String failureReason, String lastErrorCode) {
+        jdbcTemplate.update(
+            """
+                UPDATE practice_quiz
+                SET generation_status = ?::run_status,
+                    generation_started_at = COALESCE(generation_started_at, now()),
+                    generation_finished_at = CASE
+                        WHEN ? IN ('SUCCEEDED', 'FAILED') THEN now()
+                        ELSE generation_finished_at
+                    END,
+                    failure_reason = ?,
+                    last_error_code = ?,
+                    updated_at = now()
+                WHERE id = ?
+                """,
+            status.name(),
+            status.name(),
+            failureReason,
+            lastErrorCode,
+            quizId
+        );
+    }
+
+    @Override
     public void markGenerated(Long quizId, Integer questionCount, String generationSource, String promptVersion) {
         jdbcTemplate.update(
             """
                 UPDATE practice_quiz
                 SET status = 'QUIZ_READY',
+                    generation_status = 'SUCCEEDED'::run_status,
                     question_count = ?,
                     generation_source = ?,
                     prompt_version = ?,
                     failure_reason = NULL,
+                    generation_finished_at = now(),
                     updated_at = now()
                 WHERE id = ?
                 """,
@@ -160,6 +198,14 @@ public class JdbcPracticeQuizRepository implements PracticeQuizRepository {
         quiz.setGenerationSource(rs.getString("generation_source"));
         quiz.setPromptVersion(rs.getString("prompt_version"));
         quiz.setFailureReason(rs.getString("failure_reason"));
+        quiz.setGenerationStatus(TaskStatus.fromDb(rs.getString("generation_status")));
+        quiz.setGenerationStartedAt(rs.getObject("generation_started_at", java.time.OffsetDateTime.class));
+        quiz.setGenerationFinishedAt(rs.getObject("generation_finished_at", java.time.OffsetDateTime.class));
+        quiz.setTraceId(rs.getString("trace_id"));
+        quiz.setTokenInput(rs.getObject("token_input", Integer.class));
+        quiz.setTokenOutput(rs.getObject("token_output", Integer.class));
+        quiz.setLatencyMs(rs.getObject("latency_ms", Integer.class));
+        quiz.setLastErrorCode(rs.getString("last_error_code"));
         quiz.setCreatedAt(rs.getObject("created_at", java.time.OffsetDateTime.class));
         quiz.setUpdatedAt(rs.getObject("updated_at", java.time.OffsetDateTime.class));
         return quiz;

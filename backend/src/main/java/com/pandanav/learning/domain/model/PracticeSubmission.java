@@ -1,5 +1,7 @@
 package com.pandanav.learning.domain.model;
 
+import com.pandanav.learning.domain.enums.TaskStatus;
+
 import java.time.OffsetDateTime;
 
 public class PracticeSubmission {
@@ -21,6 +23,9 @@ public class PracticeSubmission {
     private Integer tokenOutput;
     private Integer latencyMs;
     private String traceId;
+    private TaskStatus judgingStatus;
+    private OffsetDateTime judgingStartedAt;
+    private OffsetDateTime judgingFinishedAt;
     private OffsetDateTime submittedAt;
 
     public Long getId() {
@@ -157,6 +162,30 @@ public class PracticeSubmission {
 
     public void setTraceId(String traceId) {
         this.traceId = traceId;
+    }
+
+    public TaskStatus getJudgingStatus() {
+        return judgingStatus;
+    }
+
+    public void setJudgingStatus(TaskStatus judgingStatus) {
+        this.judgingStatus = judgingStatus;
+    }
+
+    public OffsetDateTime getJudgingStartedAt() {
+        return judgingStartedAt;
+    }
+
+    public void setJudgingStartedAt(OffsetDateTime judgingStartedAt) {
+        this.judgingStartedAt = judgingStartedAt;
+    }
+
+    public OffsetDateTime getJudgingFinishedAt() {
+        return judgingFinishedAt;
+    }
+
+    public void setJudgingFinishedAt(OffsetDateTime judgingFinishedAt) {
+        this.judgingFinishedAt = judgingFinishedAt;
     }
 
     public OffsetDateTime getSubmittedAt() {

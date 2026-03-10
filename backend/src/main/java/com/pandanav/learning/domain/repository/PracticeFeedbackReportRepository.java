@@ -9,4 +9,6 @@ public interface PracticeFeedbackReportRepository {
     PracticeFeedbackReport save(PracticeFeedbackReport report);
 
     Optional<PracticeFeedbackReport> findByQuizId(Long quizId);
+
+    void markActionSelected(Long reportId, String selectedAction);
 }
