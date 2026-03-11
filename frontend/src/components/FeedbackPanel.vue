@@ -16,7 +16,9 @@ const emit = defineEmits<{
 const summary = computed(() => props.report?.overallSummary ?? '')
 const questionResults = computed(() => props.report?.questionResults ?? [])
 const weakPoints = computed(() => props.report?.weaknesses ?? [])
+const strengths = computed(() => props.report?.strengths ?? [])
 const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? null))
+const primaryAction = computed(() => (props.report?.recommendedAction === 'REVIEW' ? 'review' : 'next'))
 </script>
 
 <template>
@@ -40,12 +42,28 @@ const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? nu
 
     <template v-else>
       <div class="feedback-section">
-        <h4>overallSummary</h4>
+        <h4>这次检测说明了什么</h4>
         <p class="feedback-copy">{{ summary }}</p>
       </div>
 
       <div class="feedback-section">
-        <h4>questionResults</h4>
+        <h4>你已经掌握了什么</h4>
+        <ul v-if="strengths.length" class="feedback-list">
+          <li v-for="item in strengths" :key="item">{{ item }}</li>
+        </ul>
+        <p v-else class="feedback-copy">这一轮已经覆盖了基础理解，可以继续看哪些点还需要补强。</p>
+      </div>
+
+      <div class="feedback-section">
+        <h4>你还不稳的是什么</h4>
+        <ul v-if="weakPoints.length" class="feedback-list">
+          <li v-for="item in weakPoints" :key="item">{{ item }}</li>
+        </ul>
+        <p v-else class="feedback-copy">当前没有明显薄弱点，可以考虑继续下一步。</p>
+      </div>
+
+      <div class="feedback-section">
+        <h4>逐题回看</h4>
         <div v-if="questionResults.length" class="result-list">
           <article v-for="result in questionResults" :key="result.questionId" class="result-item">
             <div class="result-head">
@@ -60,29 +78,23 @@ const systemAdjustments = computed(() => getSystemAdjustments(props.report ?? nu
         <p v-else class="feedback-copy">暂无逐题结果。</p>
       </div>
 
-      <div class="feedback-section">
-        <h4>weaknesses</h4>
-        <ul v-if="weakPoints.length" class="feedback-list">
-          <li v-for="item in weakPoints" :key="item">{{ item }}</li>
-        </ul>
-        <p v-else class="feedback-copy">当前没有明显薄弱点。</p>
-      </div>
-
       <div class="feedback-section" v-if="systemAdjustments.length">
-        <h4>suggestedNextAction</h4>
+        <h4>建议下一步做什么</h4>
         <ul class="feedback-list">
           <li v-for="item in systemAdjustments" :key="item">{{ item }}</li>
         </ul>
       </div>
 
       <div class="feedback-section" v-if="report?.nextRoundAdvice">
-        <h4>nextRoundAdvice</h4>
+        <h4>继续时你可以这样做</h4>
         <p class="feedback-copy">{{ report.nextRoundAdvice }}</p>
       </div>
 
       <div class="feedback-actions">
-        <button type="button" class="ghost-btn" @click="emit('review')">进入复习</button>
-        <button type="button" class="primary-btn" @click="emit('nextRound')">下一轮学习</button>
+        <button v-if="primaryAction === 'next'" type="button" class="ghost-btn" @click="emit('review')">再练一轮</button>
+        <button v-else type="button" class="ghost-btn" @click="emit('nextRound')">继续下一步</button>
+        <button v-if="primaryAction === 'review'" type="button" class="primary-btn" @click="emit('review')">再练一轮</button>
+        <button v-else type="button" class="primary-btn" @click="emit('nextRound')">继续下一步</button>
       </div>
     </template>
   </section>

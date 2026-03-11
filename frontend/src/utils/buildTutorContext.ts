@@ -65,7 +65,7 @@ export function getTutorStepLabel(stage?: string | null, fallback?: string | nul
   const normalized = normalizeLearningStage(stage)
   if (normalized === 'STRUCTURE') return '搭框架'
   if (normalized === 'UNDERSTANDING') return '学明白'
-  if (normalized === 'TRAINING') return '做练习'
+  if (normalized === 'TRAINING') return '做检测'
   if (normalized === 'EVALUATION') return '看结果'
   return getLearningStageDisplay(stage).title
 }

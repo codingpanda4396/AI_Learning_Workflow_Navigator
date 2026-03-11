@@ -11,6 +11,7 @@ import {
 } from '@/api/practice'
 import { normalizeApiError } from '@/utils/apiError'
 import type { NormalizedApiError } from '@/types/api'
+import { getPracticeStatusViewModel, normalizePracticeStatus } from '@/utils/learningNarrative'
 
 function mergeQuiz(current: PracticeQuizResponse | null, incoming: PracticeQuizResponse) {
   return {
@@ -35,6 +36,21 @@ export const usePracticeStore = defineStore('practice', () => {
   const hasItems = computed(() => items.value.length > 0)
   const generationStatus = computed(() => quiz.value?.generationStatus ?? 'PENDING')
   const quizStatus = computed(() => quiz.value?.quizStatus ?? 'GENERATING')
+  const normalizedStatus = computed(() =>
+    normalizePracticeStatus({
+      quiz: quiz.value,
+      quizError: itemsError.value,
+      requestingQuiz: requestingQuiz.value,
+      pollingQuiz: pollingQuiz.value,
+    }),
+  )
+  const statusView = computed(() =>
+    getPracticeStatusViewModel({
+      status: normalizedStatus.value,
+      quiz: quiz.value,
+      error: itemsError.value,
+    }),
+  )
 
   function clearErrors() {
     itemsError.value = null
@@ -183,6 +199,8 @@ export const usePracticeStore = defineStore('practice', () => {
     hasItems,
     generationStatus,
     quizStatus,
+    normalizedStatus,
+    statusView,
     requestQuiz,
     loadQuizStatus,
     loadQuiz,

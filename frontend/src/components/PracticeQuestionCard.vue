@@ -55,7 +55,7 @@ const optionLines = computed(() => {
     </div>
 
     <p class="question-stem">{{ item.stem }}</p>
-    <p v-if="item.evaluationFocus" class="evaluation-focus">考察点：{{ item.evaluationFocus }}</p>
+    <p v-if="item.evaluationFocus" class="evaluation-focus">这题主要检查：{{ item.evaluationFocus }}</p>
 
     <ul v-if="optionLines.length" class="question-options">
       <li v-for="(line, lineIndex) in optionLines" :key="`${item.questionId}-${lineIndex}`">{{ line }}</li>
@@ -66,7 +66,7 @@ const optionLines = computed(() => {
       rows="4"
       :value="draft"
       :disabled="disabled"
-      placeholder="填写你的答案或思路"
+      placeholder="先独立作答，再写下你的判断或解题思路"
       @input="emit('updateDraft', ($event.target as HTMLTextAreaElement).value)"
     ></textarea>
   </article>

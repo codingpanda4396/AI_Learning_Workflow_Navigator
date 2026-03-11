@@ -1,8 +1,11 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import ErrorMessage from '@/components/ErrorMessage.vue'
+import NextStepPanel from '@/components/NextStepPanel.vue'
+import PrimaryButton from '@/components/PrimaryButton.vue'
+import { getFeedbackSummary, getNextActionLabel, getStageShortLabel } from '@/utils/learningNarrative'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,50 +16,20 @@ const userAnswer = ref('')
 
 const task = computed(() => sessionStore.currentTask)
 const result = computed(() => sessionStore.taskResult)
+const summary = computed(() => getFeedbackSummary(null, result.value))
 const isLoading = computed(() => sessionStore.runningTask)
 const isSubmitting = computed(() => sessionStore.submittingTask)
 const loadError = computed(() => sessionStore.error)
-const objectiveTitle = computed(() => task.value?.output.sections[0]?.title || '请回答以下训练问题')
-const normalizedScorePercent = computed(() => (result.value ? Math.round(result.value.normalizedScore * 100) : 0))
+const objectiveTitle = computed(() => task.value?.output.sections[0]?.title || '请先完成这一道检测')
 
-function getStageLabel(stage: string) {
-  const map: Record<string, string> = {
-    STRUCTURE: '结构构建',
-    UNDERSTANDING: '理解深化',
-    TRAINING: '训练实战',
-    REFLECTION: '复盘总结',
-  }
-  return map[stage] || stage
-}
-
-function getErrorTagLabel(tag: string) {
-  const map: Record<string, string> = {
-    CONCEPT_CONFUSION: '概念混淆',
-    MISSING_STEPS: '步骤缺失',
-    BOUNDARY_CASE: '边界问题',
-    TERMINOLOGY: '术语不准确',
-    SHALLOW_REASONING: '推理深度不足',
-    MEMORY_GAP: '记忆缺口',
-  }
-  return map[tag] || tag
-}
-
-function getNextActionLabel(action: string) {
-  const map: Record<string, string> = {
-    INSERT_REMEDIAL_UNDERSTANDING: '补充理解',
-    INSERT_TRAINING_VARIANTS: '训练变式',
-    INSERT_TRAINING_REINFORCEMENT: '强化训练',
-    ADVANCE_TO_NEXT_NODE: '进入下一节点',
-    NOOP: '完成当前节点',
-  }
-  return map[action] || action
-}
+const primaryActionLabel = computed(() => {
+  if (result.value?.nextTask) return '继续下一步'
+  return '返回本轮学习'
+})
 
 function resolveSessionId() {
   const fromQuery = Number(route.query.sessionId)
-  if (Number.isFinite(fromQuery) && fromQuery > 0) {
-    return fromQuery
-  }
+  if (Number.isFinite(fromQuery) && fromQuery > 0) return fromQuery
   return sessionStore.currentTaskSessionId || sessionStore.sessionId || null
 }
 
@@ -81,33 +54,41 @@ async function handleRetry() {
   await loadTask()
 }
 
+function handleBackToSession() {
+  const targetSessionId = resolveSessionId()
+  if (!isValidPositiveId(targetSessionId)) {
+    router.push({ name: 'home' })
+    return
+  }
+  router.push({
+    name: 'session',
+    params: { id: String(targetSessionId) },
+  })
+}
+
 function handleContinue() {
   const targetSessionId = resolveSessionId()
   if (!isValidPositiveId(targetSessionId)) {
     router.push({ name: 'home' })
     return
   }
+
   const step = Number(route.query.step)
   const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
+
+  if (result.value?.nextTask && isValidPositiveId(result.value.nextTask.taskId)) {
+    router.push({
+      name: 'task-run',
+      params: { id: String(result.value.nextTask.taskId) },
+      query: { sessionId: String(targetSessionId), step: resolvedStep },
+    })
+    return
+  }
+
   router.push({
     name: 'session',
     params: { id: String(targetSessionId) },
     query: { step: resolvedStep },
-  })
-}
-
-function handleGoNextTask() {
-  const nextTask = result.value?.nextTask
-  if (!nextTask || !isValidPositiveId(nextTask.taskId)) return
-  const currentSessionId = resolveSessionId()
-  const step = Number(route.query.step)
-  const resolvedStep = Number.isFinite(step) && step >= 1 && step <= 4 ? String(step) : '3'
-  router.push({
-    name: 'task-run',
-    params: { id: String(nextTask.taskId) },
-    ...(currentSessionId
-      ? { query: { sessionId: String(currentSessionId), step: resolvedStep } }
-      : { query: { step: resolvedStep } }),
   })
 }
 
@@ -121,9 +102,7 @@ onMounted(async () => {
     await router.replace({
       name: 'task-run',
       params: { id: String(taskId.value) },
-      ...(currentSessionId
-        ? { query: { sessionId: String(currentSessionId), step: resolvedStep } }
-        : { query: { step: resolvedStep } }),
+      ...(currentSessionId ? { query: { sessionId: String(currentSessionId), step: resolvedStep } } : { query: { step: resolvedStep } }),
     })
   }
 })
@@ -132,8 +111,8 @@ onMounted(async () => {
 <template>
   <div class="task-submit-page">
     <header class="header">
-      <button class="back-btn" @click="router.back()">← 返回</button>
-      <h1 class="task-title">训练任务</h1>
+      <button class="back-btn" @click="router.back()">返回</button>
+      <h1 class="task-title">检测与结果</h1>
     </header>
 
     <div v-if="isLoading && !task" class="loading">加载中...</div>
@@ -141,82 +120,67 @@ onMounted(async () => {
 
     <div v-else-if="task" class="task-content">
       <div class="task-meta">
-        <span class="task-stage">{{ getStageLabel(task.stage) }}</span>
+        <span class="task-stage">{{ getStageShortLabel(task.stage) }}</span>
         <span class="task-id">任务 #{{ task.taskId }}</span>
       </div>
 
       <div v-if="result" class="result-section">
-        <div class="score-display">
-          <span class="score-label">得分</span>
-          <span class="score-value">{{ result.score }}</span>
-          <span class="score-subtitle">标准化分：{{ normalizedScorePercent }}%</span>
-        </div>
+        <section class="hero-card">
+          <p class="eyebrow">检测结果</p>
+          <h2>这次检测帮你看清了当前掌握情况</h2>
+          <p class="hero-copy">{{ result.feedback.diagnosis }}</p>
+        </section>
 
-        <div v-if="result.errorTags.length > 0" class="error-tags">
-          <span v-for="tag in result.errorTags" :key="tag" class="error-tag">{{ getErrorTagLabel(tag) }}</span>
-        </div>
-
-        <div class="feedback">
-          <h3 class="feedback-title">诊断</h3>
-          <p class="diagnosis">{{ result.feedback.diagnosis }}</p>
-
-          <h3 class="feedback-title">改进建议</h3>
-          <ul class="fixes-list">
-            <li v-for="(fix, idx) in result.feedback.fixes" :key="idx">{{ fix }}</li>
+        <section class="result-card">
+          <h3>你已经掌握了什么</h3>
+          <ul v-if="summary.strengths.length" class="result-list">
+            <li v-for="item in summary.strengths" :key="item">{{ item }}</li>
           </ul>
+          <p v-else class="muted-copy">基础理解已经覆盖，可以继续看还不稳的地方。</p>
+        </section>
 
-          <template v-if="result.strengths.length > 0">
-            <h3 class="feedback-title">优势</h3>
-            <ul class="fixes-list">
-              <li v-for="(item, idx) in result.strengths" :key="`s-${idx}`">{{ item }}</li>
-            </ul>
-          </template>
+        <section class="result-card">
+          <h3>你还不稳的是什么</h3>
+          <ul v-if="summary.weaknesses.length" class="result-list">
+            <li v-for="item in summary.weaknesses" :key="item">{{ item }}</li>
+          </ul>
+          <p v-else class="muted-copy">当前没有明显薄弱点，可以继续下一步。</p>
+        </section>
 
-          <template v-if="result.weaknesses.length > 0">
-            <h3 class="feedback-title">薄弱点</h3>
-            <ul class="fixes-list">
-              <li v-for="(item, idx) in result.weaknesses" :key="`w-${idx}`">{{ item }}</li>
-            </ul>
-          </template>
-        </div>
+        <NextStepPanel
+          title="建议下一步做什么"
+          :description="summary.nextStep || getNextActionLabel(result.nextAction)"
+        />
 
-        <div class="mastery-change">
-          <span class="mastery-label">掌握度</span>
-          <span class="mastery-before">{{ Math.round(result.masteryBefore * 100) }}%</span>
-          <span class="mastery-arrow">→</span>
-          <span class="mastery-after">{{ Math.round(result.masteryAfter * 100) }}%</span>
-          <span class="mastery-delta">({{ result.masteryDelta > 0 ? '+' : '' }}{{ Math.round(result.masteryDelta * 100) }}%)</span>
-        </div>
-
-        <div class="next-action">
-          <span class="action-label">下一步：</span>
-          <span class="action-value">{{ getNextActionLabel(result.nextAction) }}</span>
-        </div>
-
-        <div class="actions">
-          <button v-if="result.nextTask" class="continue-btn secondary" @click="handleGoNextTask">开始下一个任务</button>
-          <button class="continue-btn" @click="handleContinue">返回会话</button>
-        </div>
+        <section class="action-row">
+          <button type="button" class="ghost-btn" @click="handleBackToSession">
+            返回本轮学习
+          </button>
+          <PrimaryButton type="button" @click="handleContinue">
+            {{ primaryActionLabel }}
+          </PrimaryButton>
+        </section>
       </div>
 
       <div v-else class="submit-section">
-        <div class="task-objective">
-          <h3 class="objective-title">任务目标</h3>
-          <p class="objective-text">{{ objectiveTitle }}</p>
-        </div>
+        <section class="hero-card">
+          <p class="eyebrow">开始检测</p>
+          <h2>{{ objectiveTitle }}</h2>
+          <p class="hero-copy">这是检测，不是正式考试。提交后系统会告诉你已经掌握了什么，以及建议下一步做什么。</p>
+        </section>
 
         <form class="submit-form" @submit.prevent="handleSubmit">
           <textarea
             v-model="userAnswer"
             class="answer-input"
-            placeholder="请输入你的答案..."
+            placeholder="先独立作答，再写下你的思路或答案"
             rows="8"
             :disabled="isSubmitting"
           ></textarea>
 
-          <button type="submit" class="submit-btn" :disabled="isSubmitting || !userAnswer.trim()">
-            {{ isSubmitting ? '提交中...' : '提交答案' }}
-          </button>
+          <PrimaryButton type="submit" :loading="isSubmitting" :disabled="!userAnswer.trim()">
+            提交检测
+          </PrimaryButton>
         </form>
 
         <p v-if="loadError" class="submit-error">{{ loadError }}</p>
@@ -226,44 +190,131 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.task-submit-page { min-height: 100vh; padding: 1.5rem; }
-.header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
-.back-btn { padding: 0.5rem 1rem; border: 1px solid var(--color-border); border-radius: 6px; background: transparent; color: var(--color-text-secondary); }
-.task-title { font-size: 1.5rem; font-weight: 600; color: var(--color-text); }
-.loading { text-align: center; padding: 3rem; color: var(--color-text-secondary); }
-.task-content { max-width: 720px; margin: 0 auto; }
-.task-meta { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
-.task-stage { padding: 0.25rem 0.75rem; font-size: 0.75rem; font-weight: 600; color: var(--color-primary); background: var(--color-primary-alpha); border-radius: 4px; }
-.task-id { font-size: 0.875rem; color: var(--color-text-secondary); }
-.task-objective { background: var(--color-bg-elevated); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
-.objective-title { font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 0.5rem; }
-.objective-text { font-size: 1rem; color: var(--color-text); }
-.submit-form { display: flex; flex-direction: column; gap: 1rem; }
-.answer-input { width: 100%; padding: 1rem; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-elevated); color: var(--color-text); resize: vertical; }
-.submit-btn { padding: 1rem; font-weight: 600; color: #fff; background: var(--color-primary); border: none; border-radius: 8px; }
-.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.submit-error { margin-top: 12px; color: var(--color-error); font-size: 0.875rem; }
-.result-section { display: flex; flex-direction: column; gap: 1.5rem; }
-.score-display { display: flex; flex-direction: column; align-items: center; padding: 2rem; background: var(--color-bg-elevated); border-radius: 12px; }
-.score-label { font-size: 0.875rem; color: var(--color-text-secondary); }
-.score-value { font-size: 4rem; font-weight: 700; color: var(--color-primary); }
-.score-subtitle { font-size: 0.875rem; color: var(--color-text-secondary); }
-.error-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.error-tag { padding: 0.25rem 0.75rem; font-size: 0.75rem; color: #dc2626; background: #fef2f2; border-radius: 4px; }
-.feedback { background: var(--color-bg-elevated); border-radius: 12px; padding: 1.5rem; }
-.feedback-title { font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 0.5rem; }
-.diagnosis { font-size: 0.9375rem; line-height: 1.6; color: var(--color-text); margin-bottom: 1rem; }
-.fixes-list { padding-left: 1.25rem; margin: 0; }
-.fixes-list li { font-size: 0.9375rem; line-height: 1.6; color: var(--color-text); margin-bottom: 0.5rem; }
-.mastery-change { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 1rem; background: var(--color-bg-elevated); border-radius: 8px; }
-.mastery-label { font-size: 0.875rem; color: var(--color-text-secondary); }
-.mastery-before, .mastery-after { font-size: 1rem; font-weight: 600; color: var(--color-text); }
-.mastery-arrow { color: var(--color-text-secondary); }
-.mastery-delta { font-size: 0.875rem; color: #22c55e; }
-.next-action { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
-.action-label { font-size: 0.875rem; color: var(--color-text-secondary); }
-.action-value { font-size: 0.875rem; font-weight: 600; color: var(--color-primary); }
-.actions { text-align: center; }
-.continue-btn { padding: 1rem 2rem; font-weight: 600; color: #fff; background: var(--color-primary); border: none; border-radius: 8px; }
-.secondary { margin-right: 12px; background: transparent; border: 1px solid var(--color-border); color: var(--color-text); }
+.task-submit-page {
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.back-btn,
+.ghost-btn {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.task-title,
+.hero-card h2,
+.hero-copy,
+.result-card h3,
+.muted-copy {
+  margin: 0;
+}
+
+.task-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--color-text-secondary);
+}
+
+.task-content {
+  max-width: 820px;
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+.task-meta,
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.task-stage {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-alpha);
+  border-radius: 999px;
+}
+
+.task-id {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.result-section,
+.submit-section {
+  display: grid;
+  gap: 18px;
+}
+
+.hero-card,
+.result-card {
+  display: grid;
+  gap: 12px;
+  background: var(--color-bg-elevated);
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: 1px solid var(--color-border);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-copy,
+.muted-copy,
+.result-list,
+.submit-error {
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+.result-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.submit-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.answer-input {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  resize: vertical;
+}
+
+.submit-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: 0.875rem;
+}
 </style>

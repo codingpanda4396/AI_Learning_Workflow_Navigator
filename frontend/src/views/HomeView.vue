@@ -7,7 +7,6 @@ import { useWorkflowStore } from '@/stores/workflow'
 import { getSessionHistory, resumeSession } from '@/api/session'
 import type { SessionHistoryItem } from '@/types'
 import { normalizeApiError } from '@/utils/apiError'
-import { getStatusLabel } from '@/utils/learningPlanDisplay'
 import PageHeader from '@/components/PageHeader.vue'
 import GoalInputCard from '@/components/GoalInputCard.vue'
 import CourseSelector from '@/components/CourseSelector.vue'
@@ -31,7 +30,6 @@ const courseError = ref('')
 const chapterError = ref('')
 const submitError = ref('')
 const checkingResume = ref(true)
-
 const historyLoading = ref(false)
 const historyError = ref('')
 const recentHistory = ref<SessionHistoryItem[]>([])
@@ -40,7 +38,6 @@ const resumingSessionId = ref<number | null>(null)
 const isCreating = computed(() => sessionStore.creatingSession || sessionStore.planning)
 const username = computed(() => authStore.currentUser?.username ?? '')
 const latestSession = computed(() => recentHistory.value[0] ?? null)
-
 const canSubmit = computed(
   () =>
     goal.value.trim().length > 0 &&
@@ -48,46 +45,37 @@ const canSubmit = computed(
     chapterId.value.trim().length > 0 &&
     !isCreating.value,
 )
-
-const hasDraftInput = computed(
-  () => goal.value.trim().length > 0 || courseId.value.trim().length > 0 || chapterId.value.trim().length > 0,
-)
-
-const goalHint = computed(() =>
-  goal.value.trim().length > 0
-    ? '提交后会先生成学习计划，再自动进入本轮学习。'
-    : '用一句话写清楚你想学什么、希望达到什么程度。',
-)
+const startButtonLabel = computed(() => (isCreating.value ? '正在准备学习计划...' : '开始学习'))
 
 function setCourse(nextCourseId: string) {
   courseId.value = nextCourseId
-  if (courseError.value) courseError.value = ''
+  courseError.value = ''
 }
 
 function setChapter(nextChapterId: string) {
   chapterId.value = nextChapterId
-  if (chapterError.value) chapterError.value = ''
+  chapterError.value = ''
 }
 
 function validateInputs() {
   let valid = true
 
   if (!goal.value.trim()) {
-    goalError.value = '请输入学习目标。'
+    goalError.value = '请先写下这轮想学会什么。'
     valid = false
   } else {
     goalError.value = ''
   }
 
   if (!courseId.value.trim()) {
-    courseError.value = '请输入课程标识。'
+    courseError.value = '请选择课程。'
     valid = false
   } else {
     courseError.value = ''
   }
 
   if (!chapterId.value.trim()) {
-    chapterError.value = '请输入章节标识。'
+    chapterError.value = '请选择章节。'
     valid = false
   } else {
     chapterError.value = ''
@@ -100,7 +88,6 @@ async function handleSubmit() {
   if (!validateInputs() || isCreating.value) return
 
   submitError.value = ''
-
   const payload = {
     courseId: courseId.value.trim(),
     chapterId: chapterId.value.trim(),
@@ -120,16 +107,14 @@ async function handleSubmit() {
     workflowStore.setWorkflowId(String(newSessionId))
     await router.push(`/session/${newSessionId}`)
   } catch {
-    submitError.value = sessionStore.error || '创建学习会话失败，请稍后重试。'
+    submitError.value = sessionStore.error || '这轮学习还没创建成功，请稍后再试。'
   }
 }
 
 function formatTime(raw: string) {
   const date = new Date(raw)
-  if (Number.isNaN(date.getTime())) {
-    return raw
-  }
-  return `最近学习 ${date.toLocaleString('zh-CN', {
+  if (Number.isNaN(date.getTime())) return raw
+  return `上次学习 ${date.toLocaleString('zh-CN', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -138,17 +123,8 @@ function formatTime(raw: string) {
 }
 
 function formatProgress(item: SessionHistoryItem) {
-  if (!item.progress) return '暂无进度'
-  const percent = Math.round(item.progress.completionRate * 100)
-  return `进度 ${percent}%`
-}
-
-function formatHistoryStage(item: SessionHistoryItem) {
-  return getStatusLabel(item.status)
-}
-
-function formatHistoryTitle(item: SessionHistoryItem) {
-  return item.goal?.trim() || `${item.course} / ${item.chapter}`
+  if (!item.progress) return '还没有进度'
+  return `学到第 ${item.progress.completedTaskCount + 1} 步，共 ${item.progress.totalTaskCount} 步`
 }
 
 async function loadRecentHistory() {
@@ -200,12 +176,7 @@ onMounted(async () => {
       return
     }
 
-    const response = await sessionStore.fetchCurrentSession()
-    if (response.hasActiveSession && response.session && !hasDraftInput.value && route.name === 'home') {
-      await router.replace(`/session/${response.session.sessionId}`)
-      return
-    }
-
+    await sessionStore.fetchCurrentSession()
     await loadRecentHistory()
   } catch {
     await loadRecentHistory()
@@ -218,7 +189,7 @@ onMounted(async () => {
 <template>
   <main v-if="checkingResume" class="home-page">
     <section class="surface-card loading-card">
-      <PageHeader eyebrow="AI Learning Navigator" title="正在恢复学习" subtitle="检查你是否有未完成的学习会话。" />
+      <PageHeader eyebrow="Learning Navigator" title="正在恢复学习" subtitle="先检查你是否有未完成的学习。" />
     </section>
   </main>
 
@@ -229,28 +200,30 @@ onMounted(async () => {
       <button type="button" class="ghost-btn" @click="handleLogout">退出登录</button>
     </header>
 
-    <section class="surface-card form-card">
+    <section class="surface-card hero-card">
       <PageHeader
-        eyebrow="Create Plan"
-        title="创建学习计划"
-        subtitle="填完这三个信息后，系统会直接带你进入本轮学习。"
+        eyebrow="开始一轮学习"
+        title="告诉系统你想学什么"
+        subtitle="填好目标、课程和章节，然后直接开始。"
       />
 
       <form class="start-form" @submit.prevent="handleSubmit">
-        <GoalInputCard v-model="goal" :hint="goalHint" :error="goalError" />
+        <GoalInputCard
+          v-model="goal"
+          :hint="'用一句话写下你这轮想学会什么，系统会按这个目标带着你往下学。'"
+          :error="goalError"
+        />
         <CourseSelector
           :course-id="courseId"
           :chapter-id="chapterId"
           @update:courseId="setCourse"
           @update:chapterId="setChapter"
         />
-
         <p v-if="courseError" class="submit-error">{{ courseError }}</p>
         <p v-if="chapterError" class="submit-error">{{ chapterError }}</p>
-
-        <div class="action-block">
+        <div class="primary-action">
           <PrimaryButton type="submit" :disabled="!canSubmit" :loading="isCreating">
-            生成学习计划
+            {{ startButtonLabel }}
           </PrimaryButton>
           <p v-if="submitError" class="submit-error">{{ submitError }}</p>
         </div>
@@ -259,24 +232,20 @@ onMounted(async () => {
 
     <section class="surface-card resume-card">
       <div class="resume-head">
-        <PageHeader
-          eyebrow="Continue"
-          title="继续上次学习"
-          subtitle="如果你刚学到一半，可以从这里直接接着学。"
-        />
-        <button type="button" class="ghost-btn" @click="goHistory">查看全部</button>
+        <PageHeader eyebrow="继续上次学习" title="从你上次停下的地方继续" />
+        <button type="button" class="ghost-btn subtle" @click="goHistory">更多记录</button>
       </div>
 
       <p v-if="historyLoading" class="muted-text">正在加载最近学习...</p>
       <p v-else-if="historyError" class="submit-error">{{ historyError }}</p>
-      <p v-else-if="!latestSession" class="muted-text">还没有最近学习记录，先创建一轮新的学习计划吧。</p>
+      <p v-else-if="!latestSession" class="muted-text">还没有上次学习记录，直接开始一轮新的学习吧。</p>
       <ContinueSessionCard
         v-else
-        :title="formatHistoryTitle(latestSession)"
+        :title="latestSession.goal || '继续上次学习目标'"
         :subtitle="`${latestSession.course} / ${latestSession.chapter}`"
         :progress="formatProgress(latestSession)"
         :updated-at="formatTime(latestSession.lastActiveAt)"
-        :stage="formatHistoryStage(latestSession)"
+        stage="继续当前进度"
         :loading="resumingSessionId === latestSession.sessionId"
         :disabled="resumingSessionId === latestSession.sessionId"
         @continue="openHistorySession(latestSession)"
@@ -290,12 +259,16 @@ onMounted(async () => {
   min-height: 100dvh;
   padding: clamp(20px, 4vw, 40px);
   display: grid;
-  gap: 20px;
+  gap: 22px;
+}
+
+.home-toolbar,
+.surface-card {
+  width: min(880px, 100%);
+  margin: 0 auto;
 }
 
 .home-toolbar {
-  width: min(880px, 100%);
-  margin: 0 auto;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -303,30 +276,29 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
-.username {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-}
-
 .surface-card {
-  width: min(880px, 100%);
-  margin: 0 auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background: rgba(15, 21, 33, 0.96);
 }
 
-.form-card {
-  padding: clamp(24px, 4vw, 36px);
-  display: grid;
-  gap: 24px;
-}
-
+.hero-card,
 .resume-card,
 .loading-card {
-  padding: clamp(22px, 3vw, 30px);
+  padding: clamp(24px, 4vw, 36px);
   display: grid;
-  gap: 18px;
+  gap: 22px;
+}
+
+.start-form {
+  display: grid;
+  gap: 20px;
+}
+
+.primary-action {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
 }
 
 .resume-head {
@@ -336,15 +308,10 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.start-form {
-  display: grid;
-  gap: 20px;
-}
-
-.action-block {
-  display: grid;
-  gap: 10px;
-  padding-top: 8px;
+.username,
+.muted-text {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .ghost-btn {
@@ -356,9 +323,8 @@ onMounted(async () => {
   font-size: var(--font-size-sm);
 }
 
-.ghost-btn:hover:not(:disabled) {
-  color: var(--color-text);
-  border-color: var(--color-border-hover);
+.subtle {
+  padding-inline: 12px;
 }
 
 .submit-error {
@@ -367,15 +333,14 @@ onMounted(async () => {
   font-size: var(--font-size-sm);
 }
 
-.muted-text {
-  margin: 0;
-  color: var(--color-text-secondary);
-}
-
 @media (max-width: 720px) {
   .resume-head {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .primary-action :deep(.btn) {
+    width: 100%;
   }
 }
 </style>
