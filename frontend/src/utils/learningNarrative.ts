@@ -1,4 +1,11 @@
-import type { NextAction, PracticeFeedbackReport, PracticeQuizResponse, RunTaskResponse, Stage, SubmitTaskResponse } from '@/types'
+import type {
+  NextAction,
+  PracticeFeedbackReport,
+  PracticeQuizResponse,
+  RunTaskResponse,
+  Stage,
+  SubmitTaskResponse,
+} from '@/types'
 import { normalizeLearningStage } from '@/utils/learningPlanDisplay'
 
 export type UserPracticeStatus = 'idle' | 'generating' | 'ready' | 'failed' | 'unavailable'
@@ -17,51 +24,68 @@ export interface FeedbackSummaryBlock {
   nextStep: string
 }
 
-const stageActionMap: Record<'STRUCTURE' | 'UNDERSTANDING' | 'TRAINING' | 'EVALUATION' | 'UNKNOWN', {
+interface StageNarrative {
   title: string
   summary: string
   primaryAction: string
   reason: string
-}> = {
+  focusLabel: string
+}
+
+const stageActionMap: Record<'STRUCTURE' | 'UNDERSTANDING' | 'TRAINING' | 'EVALUATION' | 'UNKNOWN', StageNarrative> = {
   STRUCTURE: {
     title: '先搭起这一节的知识框架',
-    summary: '先知道这轮会学哪些内容、顺序怎么安排，再进入具体任务。',
-    primaryAction: '开始这一步',
-    reason: '先理清框架，后面学习会更顺。',
+    summary: '先看清这一轮会学哪些内容、按什么顺序推进，再进入具体任务。',
+    primaryAction: '开始这一阶段',
+    reason: '先把框架搭起来，后面的理解和训练会更顺。',
+    focusLabel: '先把这轮学习的主线看明白。',
   },
   UNDERSTANDING: {
-    title: '先把这个概念学明白',
-    summary: '这一步会帮你抓住核心概念、关键原理和容易混淆的地方。',
-    primaryAction: '开始理解',
-    reason: '先学明白，再做检测，错误会更有价值。',
+    title: '先把核心概念学明白',
+    summary: '这一步聚焦概念、原理和容易混淆的地方，为后续训练打底。',
+    primaryAction: '进入学习',
+    reason: '先理解为什么，再进入检测，反馈会更有价值。',
+    focusLabel: '重点是把概念和原理真正讲通。',
   },
   TRAINING: {
-    title: '先完成当前学习，再做检测',
-    summary: '这一步要先读任务、抓关键点，再用检测题确认是否真的掌握。',
-    primaryAction: '进入这一步',
-    reason: '检测不是刷题，而是帮你找出不稳的地方。',
+    title: '完成当前学习并进入检测',
+    summary: '先抓住关键点，再用检测确认自己是否真的掌握。',
+    primaryAction: '继续当前行动',
+    reason: '检测不是刷题，而是帮你找出还不稳的地方。',
+    focusLabel: '带着关键点去做检测，结果会更清楚。',
   },
   EVALUATION: {
-    title: '看看结果，再决定下一步',
-    summary: '这一步会根据你的表现告诉你已经掌握了什么，还需要补什么。',
+    title: '回看结果并决定下一步',
+    summary: '系统会根据你的表现告诉你已经掌握了什么、哪里还需要补强。',
     primaryAction: '查看结果',
-    reason: '结果页会直接给出下一步建议。',
+    reason: '这一页会直接给出下一步建议和原因。',
+    focusLabel: '把反馈看明白，再决定继续、复习还是强化。',
   },
   UNKNOWN: {
     title: '继续当前学习',
-    summary: '系统正在同步当前阶段，你可以先进入当前任务。',
+    summary: '系统正在同步当前阶段，你可以先继续当前任务。',
     primaryAction: '继续学习',
-    reason: '等阶段信息准备好后，这里会自动更新。',
+    reason: '阶段信息准备好后，这里会自动更新。',
+    focusLabel: '先继续当前学习动作。',
   },
 }
 
 const nextActionLabelMap: Record<NextAction | 'UNKNOWN', string> = {
-  INSERT_REMEDIAL_UNDERSTANDING: '先补一轮理解，再继续往下学',
-  INSERT_TRAINING_VARIANTS: '再练一轮针对性检测',
-  INSERT_TRAINING_REINFORCEMENT: '补几道强化练习，稳住关键点',
-  ADVANCE_TO_NEXT_NODE: '可以进入下一章节或下一知识点',
-  NOOP: '回到学习总览，继续当前安排',
-  UNKNOWN: '回到学习总览，按系统建议继续',
+  INSERT_REMEDIAL_UNDERSTANDING: '先回补关键概念，再继续往下学',
+  INSERT_TRAINING_VARIANTS: '再练一轮相近题型，确认已经真正掌握',
+  INSERT_TRAINING_REINFORCEMENT: '补几道强化练习，把薄弱点练稳',
+  ADVANCE_TO_NEXT_NODE: '可以进入下一知识点或下一章节',
+  NOOP: '回到学习导航页，按当前节奏继续',
+  UNKNOWN: '回到学习导航页，按系统建议继续',
+}
+
+const nextActionReasonMap: Record<NextAction | 'UNKNOWN', string> = {
+  INSERT_REMEDIAL_UNDERSTANDING: '系统判断你对核心概念的理解还不够稳，先补理解能减少后续反复出错。',
+  INSERT_TRAINING_VARIANTS: '系统认为你已经有基础，但还需要通过相近情境确认迁移能力。',
+  INSERT_TRAINING_REINFORCEMENT: '系统发现你在关键点上仍有不稳定表现，强化练习能帮助固化。',
+  ADVANCE_TO_NEXT_NODE: '当前节点已经达到继续推进的条件，可以把精力放到下一阶段。',
+  NOOP: '当前结果没有触发额外分支，按既定路径继续即可。',
+  UNKNOWN: '系统会结合当前结果继续安排下一步。',
 }
 
 function sanitizeFailureReason(raw?: string | null) {
@@ -75,21 +99,30 @@ function sanitizeFailureReason(raw?: string | null) {
   return '这一步生成失败了'
 }
 
+function normalizeNextAction(action?: string | null) {
+  const normalized = (action ?? '').trim().toUpperCase() as NextAction
+  return normalized in nextActionLabelMap ? normalized : 'UNKNOWN'
+}
+
 export function getStageNarrative(stage?: string | null) {
   return stageActionMap[normalizeLearningStage(stage) as keyof typeof stageActionMap] ?? stageActionMap.UNKNOWN
 }
 
 export function getStageShortLabel(stage?: Stage | string | null) {
   const normalized = normalizeLearningStage(stage)
-  if (normalized === 'STRUCTURE') return '搭框架'
-  if (normalized === 'UNDERSTANDING') return '学明白'
-  if (normalized === 'TRAINING') return '做检测'
-  if (normalized === 'EVALUATION') return '看结果'
+  if (normalized === 'STRUCTURE') return '建立框架'
+  if (normalized === 'UNDERSTANDING') return '理解原理'
+  if (normalized === 'TRAINING') return '训练应用'
+  if (normalized === 'EVALUATION') return '评估反思'
   return '继续学习'
 }
 
 export function getPrimaryStageAction(stage?: string | null) {
   return getStageNarrative(stage).primaryAction
+}
+
+export function getStageFocusLabel(stage?: string | null) {
+  return getStageNarrative(stage).focusLabel
 }
 
 export function normalizePracticeStatus(input: {
@@ -114,7 +147,13 @@ export function normalizePracticeStatus(input: {
   if (input.quiz.generationStatus === 'PENDING' || input.quiz.generationStatus === 'RUNNING' || input.quiz.quizStatus === 'GENERATING') {
     return 'generating'
   }
-  if (input.quiz.quizStatus === 'QUIZ_READY' || input.quiz.quizStatus === 'ANSWERED' || input.quiz.quizStatus === 'FEEDBACK_READY' || input.quiz.quizStatus === 'REVIEWING' || input.quiz.quizStatus === 'NEXT_ROUND') {
+  if (
+    input.quiz.quizStatus === 'QUIZ_READY' ||
+    input.quiz.quizStatus === 'ANSWERED' ||
+    input.quiz.quizStatus === 'FEEDBACK_READY' ||
+    input.quiz.quizStatus === 'REVIEWING' ||
+    input.quiz.quizStatus === 'NEXT_ROUND'
+  ) {
     return 'ready'
   }
   return 'idle'
@@ -131,7 +170,7 @@ export function getPracticeStatusViewModel(input: {
     return {
       status: 'unavailable',
       badge: '当前无需检测',
-      title: '这一步先专注理解内容',
+      title: '这一步先专注学习内容',
       description: '当前任务不需要单独做检测题，先完成学习内容即可。',
     }
   }
@@ -140,9 +179,9 @@ export function getPracticeStatusViewModel(input: {
     return {
       status: 'generating',
       badge: '正在准备',
-      title: '正在准备检测题',
+      title: '系统正在准备检测题',
       description: '学完这一步后即可开始检测，页面会自动刷新状态。',
-      helper: '这组检测会从概念理解、基本应用、易错点三个角度检查掌握情况。',
+      helper: '这组检测会从概念理解、基本应用和易错点三个角度检查掌握情况。',
     }
   }
 
@@ -150,9 +189,9 @@ export function getPracticeStatusViewModel(input: {
     return {
       status: 'ready',
       badge: '已准备好',
-      title: '检测题已准备好',
+      title: '检测题已经就绪',
       description: '完成当前学习后可直接进入检测，系统会根据结果给出下一步建议。',
-      helper: '这不是正式考试，而是帮助你找出还不稳的地方。',
+      helper: '这不是正式考试，而是帮助你找到还不稳的地方。',
     }
   }
 
@@ -161,7 +200,7 @@ export function getPracticeStatusViewModel(input: {
       status: 'failed',
       badge: '准备失败',
       title: failureText || '这一步生成失败了',
-      description: '你可以重试生成，不影响先继续看当前内容或先问 Tutor。',
+      description: '你可以重试生成，也可以先继续看当前内容或先问 Tutor。',
       helper: '重试后会继续留在当前学习任务中。',
     }
   }
@@ -169,7 +208,7 @@ export function getPracticeStatusViewModel(input: {
   return {
     status: 'idle',
     badge: '尚未开始',
-    title: '检测题还没开始准备',
+    title: '检测题还没有开始准备',
     description: '先完成这一页内容，系统会在合适的时候为你准备检测题。',
     helper: '等检测题准备好后，你可以直接进入检测。',
   }
@@ -182,12 +221,36 @@ export function getFeedbackSummary(report: PracticeFeedbackReport | null, result
     nextStep:
       report?.nextRoundAdvice ||
       report?.suggestedNextAction ||
-      nextActionLabelMap[(result?.nextAction as NextAction | undefined) ?? 'UNKNOWN'] ||
+      nextActionLabelMap[normalizeNextAction(result?.nextAction)] ||
       nextActionLabelMap.UNKNOWN,
   }
 }
 
 export function getNextActionLabel(action?: string | null) {
-  const normalized = (action ?? '').trim().toUpperCase() as NextAction
-  return nextActionLabelMap[normalized] ?? nextActionLabelMap.UNKNOWN
+  return nextActionLabelMap[normalizeNextAction(action)]
+}
+
+export function getNextActionReason(action?: string | null) {
+  return nextActionReasonMap[normalizeNextAction(action)]
+}
+
+export function getPerformanceLabel(result?: SubmitTaskResponse | null) {
+  const score = result?.normalizedScore ?? 0
+  if (score >= 0.85) return '掌握较稳'
+  if (score >= 0.6) return '基本掌握'
+  return '需要继续巩固'
+}
+
+export function formatPercent(value?: number | null) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '--'
+  }
+  return `${Math.round(value * 100)}%`
+}
+
+export function formatMasteryDelta(value?: number | null) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '0'
+  }
+  return `${value > 0 ? '+' : ''}${value.toFixed(2)}`
 }

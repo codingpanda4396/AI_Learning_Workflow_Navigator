@@ -196,7 +196,7 @@ onMounted(async () => {
   <main v-else class="home-page">
     <header class="home-toolbar">
       <span class="username">{{ username }}</span>
-      <button type="button" class="ghost-btn" @click="goHistory">历史记录</button>
+      <button type="button" class="ghost-btn" @click="goHistory">成长记录</button>
       <button type="button" class="ghost-btn" @click="handleLogout">退出登录</button>
     </header>
 
@@ -233,7 +233,7 @@ onMounted(async () => {
     <section class="surface-card resume-card">
       <div class="resume-head">
         <PageHeader eyebrow="继续上次学习" title="从你上次停下的地方继续" />
-        <button type="button" class="ghost-btn subtle" @click="goHistory">更多记录</button>
+        <button type="button" class="ghost-btn subtle" @click="goHistory">查看成长记录</button>
       </div>
 
       <p v-if="historyLoading" class="muted-text">正在加载最近学习...</p>

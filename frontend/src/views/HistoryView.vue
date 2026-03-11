@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getSessionHistory, resumeSession } from '@/api/session'
@@ -18,6 +18,9 @@ const items = ref<SessionHistoryItem[]>([])
 
 const hasPrev = computed(() => page.value > 1)
 const hasNext = computed(() => page.value < totalPages.value)
+const completedSessions = computed(() => items.value.filter((item) => item.progress?.completionRate === 1).length)
+const activeSessions = computed(() => items.value.filter((item) => (item.progress?.completionRate ?? 0) < 1).length)
+const latestItem = computed(() => items.value[0] ?? null)
 
 function formatTime(raw: string) {
   const date = new Date(raw)
@@ -34,9 +37,9 @@ function formatTime(raw: string) {
 }
 
 function progressText(item: SessionHistoryItem) {
-  if (!item.progress) return '-'
+  if (!item.progress) return '还没有开始形成进度'
   const percent = Math.round(item.progress.completionRate * 100)
-  return `${percent}% (${item.progress.completedTaskCount}/${item.progress.totalTaskCount})`
+  return `完成 ${percent}%（${item.progress.completedTaskCount}/${item.progress.totalTaskCount}）`
 }
 
 async function loadHistory() {
@@ -92,31 +95,58 @@ onMounted(async () => {
   <main class="history-page">
     <header class="toolbar">
       <button class="ghost-button" @click="goHome">返回首页</button>
-      <h1>历史记录</h1>
-      <span class="summary">共 {{ total }} 条</span>
+      <div class="title-block">
+        <h1>成长记录</h1>
+        <p>这里汇总你的学习会话、最近进度和继续入口。</p>
+      </div>
+      <span class="summary">共 {{ total }} 条会话</span>
     </header>
 
     <section class="panel">
+      <div class="overview-grid">
+        <article class="overview-card">
+          <span class="overview-label">累计学习</span>
+          <strong>{{ total }}</strong>
+          <p>系统已记录的学习会话数</p>
+        </article>
+        <article class="overview-card">
+          <span class="overview-label">进行中</span>
+          <strong>{{ activeSessions }}</strong>
+          <p>仍可继续推进的学习会话</p>
+        </article>
+        <article class="overview-card">
+          <span class="overview-label">已完成</span>
+          <strong>{{ completedSessions }}</strong>
+          <p>已经走完整轮流程的学习会话</p>
+        </article>
+        <article class="overview-card">
+          <span class="overview-label">最近更新</span>
+          <strong>{{ latestItem ? latestItem.chapter : '暂无' }}</strong>
+          <p>{{ latestItem ? formatTime(latestItem.lastActiveAt) : '开始一轮学习后会显示在这里。' }}</p>
+        </article>
+      </div>
+
       <p v-if="loading" class="tip">加载中...</p>
       <p v-else-if="error" class="error">{{ error }}</p>
-      <p v-else-if="items.length === 0" class="tip">暂无历史记录。</p>
+      <p v-else-if="items.length === 0" class="tip">还没有成长记录，先开始一轮新的学习吧。</p>
 
       <div v-else class="list">
         <article v-for="item in items" :key="item.sessionId" class="card">
           <div class="card-head">
-            <h3>Session #{{ item.sessionId }}</h3>
-            <span class="status">{{ item.status }}</span>
+            <div>
+              <h3>{{ item.goal || `学习会话 #${item.sessionId}` }}</h3>
+              <p>{{ item.course }} / {{ item.chapter }}</p>
+            </div>
+            <span class="status">{{ progressText(item) }}</span>
           </div>
-          <p><strong>课程：</strong>{{ item.course }} / {{ item.chapter }}</p>
-          <p><strong>目标：</strong>{{ item.goal }}</p>
-          <p><strong>进度：</strong>{{ progressText(item) }}</p>
           <p><strong>最近活跃：</strong>{{ formatTime(item.lastActiveAt) }}</p>
+          <p><strong>当前状态：</strong>{{ item.status }}</p>
           <button
             class="resume-btn"
             :disabled="resumingId === item.sessionId"
             @click="handleResume(item)"
           >
-            {{ resumingId === item.sessionId ? '恢复中...' : '继续学习' }}
+            {{ resumingId === item.sessionId ? '进入中...' : '继续学习' }}
           </button>
         </article>
       </div>
@@ -131,18 +161,156 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.history-page { min-height: 100dvh; padding: clamp(16px, 2.8vw, 30px); }
-.toolbar { display: flex; align-items: center; gap: var(--space-md); justify-content: space-between; margin-bottom: var(--space-lg); }
-.summary { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-.panel { border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: linear-gradient(165deg, rgba(16, 27, 50, 0.94), rgba(8, 14, 26, 0.96)); padding: clamp(16px, 2.8vw, 26px); box-shadow: var(--shadow-md); }
-.tip { color: var(--color-text-secondary); }
-.error { color: var(--color-error); }
-.list { display: grid; gap: var(--space-md); }
-.card { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: rgba(12, 20, 38, 0.8); padding: var(--space-md); display: grid; gap: 8px; }
-.card-head { display: flex; align-items: center; justify-content: space-between; }
-.status { border: 1px solid var(--color-border); border-radius: 999px; padding: 2px 8px; color: var(--color-text-secondary); font-size: var(--font-size-xs); }
-.resume-btn { width: 140px; min-height: 40px; border-radius: var(--radius-md); background: var(--color-primary); color: #fff; }
-.resume-btn:disabled { opacity: 0.6; }
-.pager { margin-top: var(--space-lg); display: flex; align-items: center; justify-content: center; gap: var(--space-md); }
-.ghost-button { min-height: 40px; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-secondary); background: rgba(12, 21, 42, 0.8); padding: 0 12px; }
+.history-page {
+  min-height: 100dvh;
+  padding: clamp(16px, 2.8vw, 30px);
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.title-block {
+  display: grid;
+  gap: 6px;
+}
+
+.title-block h1,
+.title-block p {
+  margin: 0;
+}
+
+.title-block p,
+.summary,
+.tip {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(165deg, rgba(16, 27, 50, 0.94), rgba(8, 14, 26, 0.96));
+  padding: clamp(16px, 2.8vw, 26px);
+  box-shadow: var(--shadow-md);
+  display: grid;
+  gap: 18px;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.overview-card,
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(12, 20, 38, 0.8);
+  padding: var(--space-md);
+}
+
+.overview-card {
+  display: grid;
+  gap: 8px;
+}
+
+.overview-card strong {
+  font-size: 1.6rem;
+  color: var(--color-text);
+}
+
+.overview-card p,
+.card p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.overview-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.error {
+  color: var(--color-error);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.card {
+  display: grid;
+  gap: 8px;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.card-head h3,
+.card-head p {
+  margin: 0;
+}
+
+.status {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.resume-btn {
+  width: 140px;
+  min-height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.resume-btn:disabled {
+  opacity: 0.6;
+}
+
+.pager {
+  margin-top: var(--space-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+
+.ghost-button {
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: rgba(12, 21, 42, 0.8);
+  padding: 0 12px;
+}
+
+@media (max-width: 900px) {
+  .overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

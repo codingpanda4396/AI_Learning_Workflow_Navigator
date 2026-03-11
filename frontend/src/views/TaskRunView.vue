@@ -13,7 +13,7 @@ import { useTutorPanel } from '@/composables/useTutorPanel'
 import { usePracticeStore } from '@/stores/practice'
 import { useSessionStore } from '@/stores/session'
 import { buildTutorContext } from '@/utils/buildTutorContext'
-import { getStageShortLabel } from '@/utils/learningNarrative'
+import { getPrimaryStageAction, getStageFocusLabel, getStageShortLabel } from '@/utils/learningNarrative'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,8 +57,9 @@ const stepLabel = computed(() => getStageShortLabel(task.value?.stage))
 const taskGoal = computed(() => sessionStore.currentSession?.goalText || buildGoalSummary())
 const currentStepGoal = computed(() => {
   const first = sections.value.find((section) => section.text?.trim() || section.title?.trim())
-  return first?.text?.trim() || first?.title?.trim() || '先读任务内容，再结合 Tutor 推进。'
+  return first?.text?.trim() || first?.title?.trim() || '先阅读任务内容，再结合 Tutor 推进。'
 })
+const stageFocus = computed(() => getStageFocusLabel(task.value?.stage))
 
 const keyPoints = computed(() => pickSectionList(['关键点', '重点', '核心', '要点'], 4))
 const commonMistakes = computed(() => pickSectionList(['易错', '常见错误', '误区', '注意'], 4))
@@ -81,16 +82,13 @@ const allQuestionsAnswered = computed(() => {
 })
 
 const mainButtonText = computed(() => {
-  if (!isTrainingTask.value) return '完成这一步'
-  if (practiceFeedbackReport.value) return '查看结果'
+  if (!isTrainingTask.value) return getPrimaryStageAction(task.value?.stage)
+  if (practiceFeedbackReport.value) return '查看本轮结果'
   if (practiceStatusView.value.status === 'ready' && !hasSubmittedAnswers.value) return '进入检测'
-  return '完成这一步'
+  return '继续当前学习'
 })
 
-const mainButtonDisabled = computed(() => {
-  if (isTrainingTask.value && practiceFeedbackReport.value) return false
-  return false
-})
+const mainButtonDisabled = computed(() => false)
 
 const tutorContext = computed(() =>
   buildTutorContext({
@@ -114,6 +112,16 @@ const tutorPanel = useTutorPanel({
   taskId,
   context: tutorContext,
 })
+
+const recommendedFocusItems = computed(() => {
+  if (commonMistakes.value.length > 0) return commonMistakes.value
+  if (keyPoints.value.length > 0) return keyPoints.value.slice(0, 2)
+  return [stageFocus.value]
+})
+
+const learningSections = computed(() =>
+  sections.value.filter((section) => section.text?.trim() || section.bullets?.length || section.steps?.length || section.items?.length),
+)
 
 function buildGoalSummary() {
   const summaryParts = sections.value
@@ -182,7 +190,7 @@ async function fetchSessionContext() {
   try {
     await Promise.all([sessionStore.fetchSessionOverview(sessionId), sessionStore.fetchSessionPath(sessionId)])
   } catch {
-    // supplemental request
+    // Supplemental request.
   }
 }
 
@@ -355,7 +363,7 @@ watch(
     <main class="task-page">
       <header class="page-toolbar">
         <button type="button" class="ghost-btn" @click="router.back()">返回上一页</button>
-        <button type="button" class="ghost-btn" @click="handleContinue">返回本轮学习</button>
+        <button type="button" class="ghost-btn" @click="handleContinue">回到本轮导航</button>
       </header>
 
       <div v-if="isLoading && !task" class="page-state">正在加载任务...</div>
@@ -364,21 +372,24 @@ watch(
       <div v-else-if="task" class="task-layout">
         <section class="main-column">
           <section class="hero-card">
-            <p class="eyebrow">当前学习动作</p>
+            <p class="eyebrow">主学习区</p>
             <h1>{{ taskTitle }}</h1>
-            <p class="meta">本轮学习 / {{ stepLabel }} · {{ sessionCourse }} / {{ sessionChapter }}</p>
-            <p class="goal">本步目标：{{ currentStepGoal }}</p>
-            <p class="guide">建议动作：先读任务，再和 Tutor 一起推进；完成后系统会带你进入下一步。</p>
+            <p class="meta">本轮学习 / {{ stepLabel }} / {{ sessionCourse }} / {{ sessionChapter }}</p>
+            <p class="goal">当前目标：{{ currentStepGoal }}</p>
+            <p class="guide">系统建议：{{ stageFocus }}</p>
           </section>
 
           <section class="content-card">
             <div class="section-head">
-              <h2>这一步要学什么</h2>
-              <p>先抓住核心内容，不需要先考虑系统阶段。</p>
+              <div>
+                <p class="section-label">当前任务目标</p>
+                <h2>现在先把这部分学明白</h2>
+              </div>
+              <p>先看主内容，再决定是否进入检测或回看结果。</p>
             </div>
 
             <article class="content-block">
-              <h3>任务内容</h3>
+              <h3>本步学习目标</h3>
               <p>{{ taskGoal }}</p>
             </article>
 
@@ -389,25 +400,39 @@ watch(
               </ul>
             </article>
 
-            <article v-if="commonMistakes.length" class="content-block">
-              <h3>常见错误 / 检查问题</h3>
+            <article v-if="workedExamples.length" class="content-block">
+              <h3>示例提示</h3>
               <ul>
-                <li v-for="item in commonMistakes" :key="item">{{ item }}</li>
+                <li v-for="item in workedExamples" :key="item">{{ item }}</li>
               </ul>
             </article>
 
-            <article v-if="workedExamples.length" class="content-block">
-              <h3>Worked Example</h3>
-              <ul>
-                <li v-for="item in workedExamples" :key="item">{{ item }}</li>
+            <article
+              v-for="(section, index) in learningSections"
+              :key="`${section.title || 'section'}-${index}`"
+              class="content-block"
+            >
+              <h3>{{ section.title || `学习内容 ${index + 1}` }}</h3>
+              <p v-if="section.text">{{ section.text }}</p>
+              <ul v-if="section.bullets?.length">
+                <li v-for="item in section.bullets" :key="item">{{ item }}</li>
+              </ul>
+              <ol v-if="section.steps?.length">
+                <li v-for="item in section.steps" :key="item">{{ item }}</li>
+              </ol>
+              <ul v-if="section.items?.length">
+                <li v-for="item in section.items" :key="item">{{ item }}</li>
               </ul>
             </article>
           </section>
 
           <section v-if="isTrainingTask" class="content-card">
             <div class="section-head">
-              <h2>检测题</h2>
-              <p>这不是正式考试，而是帮助你找出哪里还不稳。</p>
+              <div>
+                <p class="section-label">训练检测</p>
+                <h2>学完后就在这里完成检测</h2>
+              </div>
+              <p>检测用于帮助系统判断你哪里还不稳，不是正式考试。</p>
             </div>
 
             <PracticeStatusCard
@@ -431,7 +456,7 @@ watch(
 
               <div class="submit-bar">
                 <p class="submit-hint">
-                  {{ allQuestionsAnswered ? '可以提交检测了，系统会给你下一步建议。' : '请先完成全部检测题。' }}
+                  {{ allQuestionsAnswered ? '可以提交检测了，系统会根据结果给出下一步建议。' : '请先完成全部检测题。' }}
                 </p>
                 <PrimaryButton
                   type="button"
@@ -452,14 +477,17 @@ watch(
               class="text-btn"
               @click="syncQuizState(true)"
             >
-              重试生成检测题
+              重新生成检测题
             </button>
           </section>
 
           <section v-if="practiceFeedbackReport" ref="feedbackSectionRef" class="content-card">
             <div class="section-head">
-              <h2>结果与下一步</h2>
-              <p>看清已经掌握了什么、哪里还不稳，以及接下来该点哪里。</p>
+              <div>
+                <p class="section-label">结果导航</p>
+                <h2>这次训练说明了什么</h2>
+              </div>
+              <p>看清掌握情况、薄弱点和系统建议，再决定下一步。</p>
             </div>
             <FeedbackPanel
               mode="ready"
@@ -472,14 +500,21 @@ watch(
 
         <aside class="sidebar">
           <section class="side-card">
-            <span class="side-label">当前在哪</span>
+            <span class="side-label">当前阶段</span>
             <strong>{{ stepLabel }}</strong>
-            <p>你正在学习「{{ taskTitle }}」。先完成当前内容，再根据系统提示进入检测或结果页。</p>
+            <p>{{ stageFocus }}</p>
           </section>
 
           <section class="side-card">
-            <span class="side-label">Tutor 提示</span>
-            <p>如果卡住了，优先向 Tutor 提一个具体问题，例如“我不明白这里为什么这样做”。</p>
+            <span class="side-label">推荐关注点</span>
+            <ul class="side-list">
+              <li v-for="item in recommendedFocusItems" :key="item">{{ item }}</li>
+            </ul>
+          </section>
+
+          <section class="side-card">
+            <span class="side-label">Tutor 助手</span>
+            <p>遇到卡点时，优先问一个具体问题，例如“这一步为什么要这样做？”</p>
           </section>
 
           <section v-if="isTrainingTask" class="side-card">
@@ -582,6 +617,7 @@ watch(
 }
 
 .eyebrow,
+.section-label,
 .side-label {
   margin: 0;
   color: var(--color-text-muted);
@@ -598,7 +634,8 @@ watch(
 .section-head p,
 .content-block h3,
 .content-block p,
-.side-card p {
+.side-card p,
+.submit-hint {
   margin: 0;
 }
 
@@ -608,8 +645,10 @@ watch(
 .section-head p,
 .content-block p,
 .content-block li,
+.content-block ol,
 .side-card p,
-.submit-hint {
+.submit-hint,
+.side-list {
   color: var(--color-text-secondary);
   line-height: 1.7;
 }
@@ -629,7 +668,9 @@ watch(
   background: rgba(10, 16, 26, 0.76);
 }
 
-.content-block ul {
+.content-block ul,
+.content-block ol,
+.side-list {
   margin: 0;
   padding-left: 20px;
 }

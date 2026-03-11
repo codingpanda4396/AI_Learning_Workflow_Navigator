@@ -21,7 +21,7 @@ import {
   getCurrentLearningStep,
   normalizeLearningStage,
 } from '@/utils/learningPlanDisplay'
-import { getPrimaryStageAction, getStageNarrative, getStageShortLabel } from '@/utils/learningNarrative'
+import { getPrimaryStageAction, getStageFocusLabel, getStageNarrative, getStageShortLabel } from '@/utils/learningNarrative'
 
 const SKIP_RESUME_ONCE_KEY = 'ai_learning_skip_resume_once'
 
@@ -140,16 +140,16 @@ const progressSummary = computed(() => {
   return {
     total,
     completed,
-    label: total > 0 ? `当前进度 ${Math.min(completed + 1, total)}/${total}` : '当前进度 1/1',
+    label: total > 0 ? `已完成 ${completed}/${total}` : '刚开始这一轮学习',
   }
 })
 
 const stageNarrative = computed(() => getStageNarrative(currentStageCard.value?.key ?? currentStepKey.value))
 const heroMetaItems = computed(() => [
   { label: '学习目标', value: currentSession.value?.goalText || '完成这一轮学习' },
-  { label: '课程 / 章节', value: `${currentSession.value?.courseId || '-'} / ${currentSession.value?.chapterId || '-'}` },
-  { label: '当前步骤', value: getStageShortLabel(currentStageCard.value?.key ?? currentStepKey.value) },
-  { label: '剩余流程', value: progressSummary.value.label },
+  { label: '当前主题', value: currentTopic.value },
+  { label: '当前阶段', value: getStageShortLabel(currentStageCard.value?.key ?? currentStepKey.value) },
+  { label: '整体进度', value: progressSummary.value.label },
 ])
 
 const stepItems = computed(() =>
@@ -158,28 +158,56 @@ const stepItems = computed(() =>
     order: step.order,
     title: step.title,
     description: step.order === currentStageCard.value?.order ? stageNarrative.value.summary : step.completionStandard,
-    statusLabel: step.state === 'completed' ? '已完成' : step.state === 'current' ? '当前进行中' : '尚未开始',
+    statusLabel: step.state === 'completed' ? '已完成' : step.state === 'current' ? '当前阶段' : '待进入',
     state: step.state,
   })),
 )
 
-const actionTitle = computed(() => `当前任务：${stageNarrative.value.title}`)
+const actionTitle = computed(() => `现在先做：${stageNarrative.value.title}`)
 const actionDescription = computed(() => `${currentTopic.value}。${stageNarrative.value.summary}`)
 const actionHelper = computed(() => {
-  const weakHint = learningFeedback.value?.weakNodes?.[0]?.nodeName ? `重点留意：${learningFeedback.value.weakNodes[0].nodeName}` : ''
+  const weakHint = learningFeedback.value?.weakNodes?.[0]?.nodeName ? `当前优先留意：${learningFeedback.value.weakNodes[0].nodeName}` : ''
   return [stageNarrative.value.reason, weakHint].filter(Boolean).join(' ')
 })
 
-const nextStepTitle = computed(() => {
-  const currentOrder = currentStageCard.value?.order ?? 1
-  const next = stageCards.value.find((item) => item.order === currentOrder + 1)
-  return next ? `完成后会进入「${next.title}」` : '完成后会回到结果与下一步建议'
+const weakPointItems = computed(() => learningFeedback.value?.weakNodes?.slice(0, 3) ?? [])
+
+const recentTrainingSummary = computed(() => {
+  if (learningFeedback.value?.diagnosisSummary) return learningFeedback.value.diagnosisSummary
+  if (weakPointItems.value.length > 0) return '最近训练已经产出薄弱点分析，建议优先围绕这些节点继续学习。'
+  if ((currentSession.value?.progress?.completedTaskCount ?? 0) > 0) return '你已经完成了部分任务，可以继续当前阶段并等待新的训练反馈。'
+  return '当前还没有训练结果，先完成这一阶段的学习内容。'
 })
 
-const nextStepDescription = computed(() => {
-  if (currentDetailTask.value?.status === 'FAILED') return '这一步出错后可重新进入，不会丢失当前学习目标。'
-  return '系统会根据当前任务结果自动推进到下一步，你不需要自己判断阶段。'
+const recommendationTitle = computed(() => {
+  if (currentDetailTask.value?.status === 'FAILED') return '先重新进入当前任务'
+  if (sessionStore.nextTask) return `建议继续推进到「${getStageShortLabel(sessionStore.nextTask.stage)}」`
+  return `建议先完成「${getStageShortLabel(currentStageCard.value?.key ?? currentStepKey.value)}」`
 })
+
+const recommendationDescription = computed(() => {
+  if (currentDetailTask.value?.status === 'FAILED') return '这一步出错后可以重新进入，不会丢失当前学习目标。'
+  return '系统会根据当前任务结果自动推进到下一步，你不需要自己判断该切到哪个阶段。'
+})
+
+const recommendationReason = computed(() => {
+  const weakReason = weakPointItems.value[0]?.reasons?.[0]
+  return weakReason || stageNarrative.value.reason
+})
+
+const sequenceItems = computed(() =>
+  plannedNodes.value.map((plan) => ({
+    nodeId: plan.nodeId,
+    nodeName: plan.nodeName,
+    isCurrent: plan.nodeId === currentDetailTask.value?.nodeId,
+    currentStage:
+      plan.stages.find((stage) => stage.taskId === currentDetailTask.value?.taskId)?.stage ??
+      plan.stages.find((stage) => stage.status === 'RUNNING')?.stage ??
+      plan.stages[0]?.stage ??
+      'UNKNOWN',
+    stageCount: plan.stages.length,
+  })),
+)
 
 const tutorTaskId = computed(() => currentDetailTask.value?.taskId ?? sessionStore.nextTask?.taskId ?? null)
 const tutorContext = computed(() =>
@@ -237,7 +265,7 @@ async function fetchSession() {
     try {
       await sessionStore.fetchLearningFeedback(sessionId.value)
     } catch {
-      // optional
+      // Optional today. TODO: replace stitched summary/weak-point panels with a backend aggregated session guidance payload.
     }
   }
 }
@@ -272,7 +300,7 @@ onMounted(async () => {
     <main class="learning-page">
       <header class="toolbar">
         <button type="button" class="ghost-button" @click="goHome">返回首页</button>
-        <button type="button" class="ghost-button" @click="goHistory">历史记录</button>
+        <button type="button" class="ghost-button" @click="goHistory">成长记录</button>
         <span class="toolbar-text">{{ username }}</span>
         <button type="button" class="ghost-button" @click="handleLogout">退出登录</button>
       </header>
@@ -283,32 +311,90 @@ onMounted(async () => {
       <section v-else class="learning-content">
         <SessionSummaryHero
           eyebrow="本轮学习"
-          title="你现在正在这一轮学习里"
-          subtitle="先知道现在在哪，再开始当前这一步。"
+          title="你现在在哪，以及接下来做什么"
+          subtitle="这一页负责帮你看清当前主题、所在阶段和系统建议的下一步。"
           :goal="currentSession?.goalText || '围绕当前主题完成这一轮学习。'"
           :meta-items="heroMetaItems"
         />
 
-        <CurrentActionCard
-          eyebrow="当前行动"
-          :title="actionTitle"
-          :description="actionDescription"
-          :helper="actionHelper"
-          :button-text="getPrimaryStageAction(currentStageCard?.key)"
-          :status-label="currentStageCard?.state === 'completed' ? '已完成' : '现在要做' "
-          :disabled="!currentDetailTask"
-          @action="handlePrimaryAction"
-        />
+        <div class="content-grid">
+          <section class="main-column">
+            <CurrentActionCard
+              eyebrow="当前行动"
+              :title="actionTitle"
+              :description="actionDescription"
+              :helper="actionHelper"
+              :button-text="getPrimaryStageAction(currentStageCard?.key)"
+              :status-label="currentStageCard?.state === 'completed' ? '已完成' : '现在要做'"
+              :disabled="!currentDetailTask"
+              @action="handlePrimaryAction"
+            />
 
-        <section class="surface-card">
-          <div class="section-head">
-            <h2>这一轮会怎么推进</h2>
-            <p>先理解概念，再做检测，最后看结果并决定下一步。</p>
-          </div>
-          <LearningStepBar :steps="stepItems" />
-        </section>
+            <section class="surface-card">
+              <div class="section-head">
+                <div>
+                  <p class="section-label">当前阶段</p>
+                  <h2>{{ getStageShortLabel(currentStageCard?.key ?? currentStepKey) }}</h2>
+                </div>
+                <p>{{ getStageFocusLabel(currentStageCard?.key ?? currentStepKey) }}</p>
+              </div>
+              <LearningStepBar :steps="stepItems" />
+            </section>
 
-        <NextStepPanel :title="nextStepTitle" :description="nextStepDescription" />
+            <section class="surface-card">
+              <div class="section-head">
+                <div>
+                  <p class="section-label">任务序列</p>
+                  <h2>这轮学习会沿着哪些知识点推进</h2>
+                </div>
+                <p>当前任务所在节点会被高亮，方便你知道自己正学到哪里。</p>
+              </div>
+              <div class="sequence-list">
+                <article
+                  v-for="item in sequenceItems"
+                  :key="item.nodeId"
+                  class="sequence-item"
+                  :class="{ current: item.isCurrent }"
+                >
+                  <div>
+                    <strong>{{ item.nodeName }}</strong>
+                    <p>{{ item.isCurrent ? '当前正在推进' : '后续会进入' }}</p>
+                  </div>
+                  <div class="sequence-meta">
+                    <span>{{ getStageShortLabel(item.currentStage) }}</span>
+                    <span>{{ item.stageCount }} 个阶段任务</span>
+                  </div>
+                </article>
+              </div>
+            </section>
+          </section>
+
+          <aside class="side-column">
+            <section class="summary-card">
+              <span class="summary-label">最近训练结果</span>
+              <h3>系统刚刚看到了什么</h3>
+              <p>{{ recentTrainingSummary }}</p>
+            </section>
+
+            <section class="summary-card">
+              <span class="summary-label">当前薄弱点</span>
+              <h3>优先补哪里</h3>
+              <ul v-if="weakPointItems.length" class="bullet-list">
+                <li v-for="item in weakPointItems" :key="item.nodeId">
+                  <strong>{{ item.nodeName }}</strong>
+                  <span>{{ item.reasons[0] || '这部分仍需要继续巩固。' }}</span>
+                </li>
+              </ul>
+              <p v-else>当前还没有明确薄弱点，先完成这一阶段学习，系统会补充新的训练判断。</p>
+            </section>
+
+            <section class="summary-card">
+              <span class="summary-label">系统建议</span>
+              <NextStepPanel :title="recommendationTitle" :description="recommendationDescription" />
+              <p class="reason-copy">为什么这样建议：{{ recommendationReason }}</p>
+            </section>
+          </aside>
+        </div>
       </section>
     </main>
 
@@ -351,19 +437,35 @@ onMounted(async () => {
 }
 
 .toolbar-text,
-.section-head p {
+.section-head p,
+.sequence-item p,
+.reason-copy {
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
 }
 
 .learning-content {
-  width: min(960px, 100%);
+  width: min(1180px, 100%);
   margin: 0 auto;
   display: grid;
   gap: 18px;
 }
 
-.surface-card {
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.86fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.main-column,
+.side-column {
+  display: grid;
+  gap: 18px;
+}
+
+.surface-card,
+.summary-card {
   padding: clamp(22px, 3vw, 30px);
   border: 1px solid rgba(61, 80, 104, 0.48);
   border-radius: var(--radius-xl);
@@ -381,8 +483,67 @@ onMounted(async () => {
 }
 
 .section-head h2,
-.section-head p {
+.section-head p,
+.summary-card h3,
+.summary-card p,
+.reason-copy {
   margin: 0;
+}
+
+.section-label,
+.summary-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sequence-list,
+.bullet-list {
+  display: grid;
+  gap: 12px;
+}
+
+.sequence-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(61, 80, 104, 0.38);
+  background: rgba(10, 16, 26, 0.76);
+}
+
+.sequence-item strong,
+.summary-card h3 {
+  color: var(--color-text);
+}
+
+.sequence-item.current {
+  border-color: rgba(107, 159, 255, 0.52);
+  box-shadow: inset 0 0 0 1px rgba(107, 159, 255, 0.18);
+}
+
+.sequence-meta {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.bullet-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.bullet-list li {
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+.bullet-list span {
+  display: block;
 }
 
 .ghost-button {
@@ -393,5 +554,11 @@ onMounted(async () => {
   background: rgba(10, 15, 24, 0.92);
   padding: 0 16px;
   font-size: var(--font-size-sm);
+}
+
+@media (max-width: 980px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -5,7 +5,15 @@ import { useSessionStore } from '@/stores/session'
 import ErrorMessage from '@/components/ErrorMessage.vue'
 import NextStepPanel from '@/components/NextStepPanel.vue'
 import PrimaryButton from '@/components/PrimaryButton.vue'
-import { getFeedbackSummary, getNextActionLabel, getStageShortLabel } from '@/utils/learningNarrative'
+import {
+  formatMasteryDelta,
+  formatPercent,
+  getFeedbackSummary,
+  getNextActionLabel,
+  getNextActionReason,
+  getPerformanceLabel,
+  getStageShortLabel,
+} from '@/utils/learningNarrative'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,9 +30,29 @@ const isSubmitting = computed(() => sessionStore.submittingTask)
 const loadError = computed(() => sessionStore.error)
 const objectiveTitle = computed(() => task.value?.output.sections[0]?.title || '请先完成这一道检测')
 
-const primaryActionLabel = computed(() => {
-  if (result.value?.nextTask) return '继续下一步'
-  return '返回本轮学习'
+const primaryActionLabel = computed(() => (result.value?.nextTask ? '继续下一步' : '回到本轮学习'))
+const evaluationStateLabel = computed(() => {
+  if (isSubmitting.value) return '结果生成中'
+  if (result.value) return '推荐动作已生成'
+  return '等待提交'
+})
+
+const reasoningItems = computed(() => {
+  if (!result.value) return []
+  return [
+    `本轮表现：${getPerformanceLabel(result.value)}（${formatPercent(result.value.normalizedScore)}）`,
+    `系统推荐：${getNextActionLabel(result.value.nextAction)}`,
+    `推荐原因：${getNextActionReason(result.value.nextAction)}`,
+  ]
+})
+
+const growthItems = computed(() => {
+  if (!result.value) return []
+  return [
+    `掌握度变化：${formatMasteryDelta(result.value.masteryDelta)}`,
+    `当前掌握度：${formatPercent(result.value.masteryAfter)}`,
+    '本轮结果会继续计入你的学习记录，供后续路径推荐使用。',
+  ]
 })
 
 function resolveSessionId() {
@@ -45,6 +73,14 @@ async function handleSubmit() {
   if (!userAnswer.value.trim() || isSubmitting.value) return
   try {
     await sessionStore.submitTask(taskId.value, userAnswer.value.trim())
+    const currentSessionId = resolveSessionId()
+    if (currentSessionId) {
+      try {
+        await sessionStore.fetchLearningFeedback(currentSessionId)
+      } catch {
+        // Optional for this page.
+      }
+    }
   } catch (error) {
     console.error('提交失败:', error)
   }
@@ -112,7 +148,10 @@ onMounted(async () => {
   <div class="task-submit-page">
     <header class="header">
       <button class="back-btn" @click="router.back()">返回</button>
-      <h1 class="task-title">检测与结果</h1>
+      <div>
+        <h1 class="task-title">结果与下一步</h1>
+        <p class="header-copy">提交后，系统会说明你学得怎么样，以及接下来建议怎么走。</p>
+      </div>
     </header>
 
     <div v-if="isLoading && !task" class="loading">加载中...</div>
@@ -122,29 +161,42 @@ onMounted(async () => {
       <div class="task-meta">
         <span class="task-stage">{{ getStageShortLabel(task.stage) }}</span>
         <span class="task-id">任务 #{{ task.taskId }}</span>
+        <span class="task-state">{{ evaluationStateLabel }}</span>
       </div>
 
       <div v-if="result" class="result-section">
         <section class="hero-card">
-          <p class="eyebrow">检测结果</p>
-          <h2>这次检测帮你看清了当前掌握情况</h2>
+          <p class="eyebrow">结果总览</p>
+          <h2>{{ getPerformanceLabel(result) }}</h2>
           <p class="hero-copy">{{ result.feedback.diagnosis }}</p>
         </section>
 
-        <section class="result-card">
-          <h3>你已经掌握了什么</h3>
-          <ul v-if="summary.strengths.length" class="result-list">
-            <li v-for="item in summary.strengths" :key="item">{{ item }}</li>
-          </ul>
-          <p v-else class="muted-copy">基础理解已经覆盖，可以继续看还不稳的地方。</p>
+        <section class="result-grid">
+          <section class="result-card">
+            <h3>你已经掌握了什么</h3>
+            <ul v-if="summary.strengths.length" class="result-list">
+              <li v-for="item in summary.strengths" :key="item">{{ item }}</li>
+            </ul>
+            <p v-else class="muted-copy">这一轮已经覆盖了基础理解，可以继续看哪些点还需要补强。</p>
+          </section>
+
+          <section class="result-card">
+            <h3>你还不稳的是什么</h3>
+            <ul v-if="summary.weaknesses.length" class="result-list">
+              <li v-for="item in summary.weaknesses" :key="item">{{ item }}</li>
+            </ul>
+            <p v-else class="muted-copy">当前没有明显薄弱点，可以继续推进下一步。</p>
+          </section>
         </section>
 
         <section class="result-card">
-          <h3>你还不稳的是什么</h3>
-          <ul v-if="summary.weaknesses.length" class="result-list">
-            <li v-for="item in summary.weaknesses" :key="item">{{ item }}</li>
+          <h3>系统怎么判断的</h3>
+          <ul class="result-list">
+            <li v-for="item in reasoningItems" :key="item">{{ item }}</li>
           </ul>
-          <p v-else class="muted-copy">当前没有明显薄弱点，可以继续下一步。</p>
+          <ul v-if="result.feedback.fixes.length" class="result-list secondary-list">
+            <li v-for="item in result.feedback.fixes" :key="item">{{ item }}</li>
+          </ul>
         </section>
 
         <NextStepPanel
@@ -152,9 +204,16 @@ onMounted(async () => {
           :description="summary.nextStep || getNextActionLabel(result.nextAction)"
         />
 
+        <section class="result-card">
+          <h3>成长沉淀</h3>
+          <ul class="result-list">
+            <li v-for="item in growthItems" :key="item">{{ item }}</li>
+          </ul>
+        </section>
+
         <section class="action-row">
           <button type="button" class="ghost-btn" @click="handleBackToSession">
-            返回本轮学习
+            回到本轮学习
           </button>
           <PrimaryButton type="button" @click="handleContinue">
             {{ primaryActionLabel }}
@@ -166,7 +225,22 @@ onMounted(async () => {
         <section class="hero-card">
           <p class="eyebrow">开始检测</p>
           <h2>{{ objectiveTitle }}</h2>
-          <p class="hero-copy">这是检测，不是正式考试。提交后系统会告诉你已经掌握了什么，以及建议下一步做什么。</p>
+          <p class="hero-copy">这不是正式考试。提交后系统会给出掌握情况、薄弱点和下一步建议。</p>
+        </section>
+
+        <section class="timeline-card">
+          <div class="timeline-item current">
+            <strong>1. 提交当前回答</strong>
+            <p>先独立完成这一步，系统才有依据判断你的掌握情况。</p>
+          </div>
+          <div class="timeline-item" :class="{ current: isSubmitting }">
+            <strong>2. 生成结果</strong>
+            <p>系统会整理表现、问题和推荐动作。</p>
+          </div>
+          <div class="timeline-item">
+            <strong>3. 决定下一步</strong>
+            <p>结果页会告诉你该继续、复习还是强化。</p>
+          </div>
         </section>
 
         <form class="submit-form" @submit.prevent="handleSubmit">
@@ -197,7 +271,7 @@ onMounted(async () => {
 
 .header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -212,6 +286,7 @@ onMounted(async () => {
 }
 
 .task-title,
+.header-copy,
 .hero-card h2,
 .hero-copy,
 .result-card h3,
@@ -225,39 +300,56 @@ onMounted(async () => {
   color: var(--color-text);
 }
 
+.header-copy,
+.loading,
+.task-id,
+.task-state,
+.hero-copy,
+.muted-copy,
+.result-list,
+.submit-error,
+.timeline-item p {
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
 .loading {
   text-align: center;
   padding: 3rem;
-  color: var(--color-text-secondary);
 }
 
 .task-content {
-  max-width: 820px;
+  max-width: 920px;
   margin: 0 auto;
   display: grid;
   gap: 18px;
 }
 
 .task-meta,
-.action-row {
+.action-row,
+.result-grid {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 1rem;
   flex-wrap: wrap;
 }
 
-.task-stage {
+.task-stage,
+.task-state {
   padding: 0.25rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-primary);
-  background: var(--color-primary-alpha);
   border-radius: 999px;
 }
 
-.task-id {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
+.task-stage {
+  color: var(--color-primary);
+  background: var(--color-primary-alpha);
+}
+
+.task-state {
+  color: var(--color-text);
+  background: rgba(107, 159, 255, 0.16);
 }
 
 .result-section,
@@ -267,13 +359,18 @@ onMounted(async () => {
 }
 
 .hero-card,
-.result-card {
+.result-card,
+.timeline-card {
   display: grid;
   gap: 12px;
   background: var(--color-bg-elevated);
   border-radius: 16px;
   padding: 1.5rem;
   border: 1px solid var(--color-border);
+}
+
+.result-grid > .result-card {
+  flex: 1 1 280px;
 }
 
 .eyebrow {
@@ -284,17 +381,29 @@ onMounted(async () => {
   text-transform: uppercase;
 }
 
-.hero-copy,
-.muted-copy,
-.result-list,
-.submit-error {
-  color: var(--color-text-secondary);
-  line-height: 1.7;
-}
-
 .result-list {
   margin: 0;
   padding-left: 1.25rem;
+}
+
+.secondary-list {
+  border-top: 1px solid rgba(61, 80, 104, 0.3);
+  padding-top: 12px;
+}
+
+.timeline-card {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.timeline-item {
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(10, 16, 26, 0.72);
+  border: 1px solid rgba(61, 80, 104, 0.34);
+}
+
+.timeline-item.current {
+  border-color: rgba(107, 159, 255, 0.48);
 }
 
 .submit-form {
@@ -316,5 +425,11 @@ onMounted(async () => {
   margin: 0;
   color: var(--color-error);
   font-size: 0.875rem;
+}
+
+@media (max-width: 760px) {
+  .timeline-card {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
