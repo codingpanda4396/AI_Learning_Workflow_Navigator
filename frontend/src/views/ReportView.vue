@@ -4,9 +4,9 @@ import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import LoadingState from '@/components/common/LoadingState.vue';
-import ReportSummaryCard from '@/components/cards/ReportSummaryCard.vue';
-import NextActionPanel from '@/components/panels/NextActionPanel.vue';
-import WeakPointList from '@/components/panels/WeakPointList.vue';
+import NextStepCard from '@/components/common/NextStepCard.vue';
+import PageSection from '@/components/common/PageSection.vue';
+import ReportBlock from '@/components/common/ReportBlock.vue';
 import { useFeedbackStore } from '@/stores/feedback';
 
 const route = useRoute();
@@ -15,16 +15,47 @@ const feedbackStore = useFeedbackStore();
 const sessionId = computed(() => Number(route.params.sessionId));
 const report = computed(() => feedbackStore.report);
 
-async function submitAction(action: string) {
-  await feedbackStore.submitNextAction(sessionId.value, action);
+const conclusion = computed(() => {
+  if (!report.value) {
+    return '本轮学习反馈正在生成。';
+  }
+  return report.value.overallSummary || report.value.diagnosisSummary || '你已经完成了这一轮学习，可以根据建议进入下一步。';
+});
+
+const strengths = computed(() => (report.value?.strengths?.length ? report.value.strengths.slice(0, 4) : ['你已经完成了当前检测，系统会继续根据结果补全优势总结。']));
+const weaknesses = computed(() => (report.value?.weaknesses?.length ? report.value.weaknesses.slice(0, 4) : report.value?.reviewFocus?.slice(0, 4) || ['目前还没有明确弱项，可以直接进入下一步。']));
+const nextStepAction = computed(() => report.value?.nextStep?.recommendedAction || report.value?.suggestedNextAction || report.value?.recommendedAction || 'NEXT');
+const nextStepTitle = computed(() => {
+  switch (nextStepAction.value) {
+    case 'REVIEW':
+      return '先回到总览，继续巩固不稳定的内容';
+    case 'QUIZ':
+    case 'TRAINING':
+      return '进入下一轮检测';
+    default:
+      return '进入下一步';
+  }
+});
+const nextStepReason = computed(() => report.value?.nextStep?.reason || report.value?.nextRoundAdvice || '系统会根据这轮表现继续安排最合适的后续学习。');
+
+async function submitPrimaryAction() {
+  const action = nextStepAction.value || 'NEXT';
+  try {
+    await feedbackStore.submitNextAction(sessionId.value, action);
+  } catch {
+    // Keep navigation available even if submit fails.
+  }
+
+  if (action.includes('QUIZ') || action.includes('TRAIN')) {
+    await router.push(`/sessions/${sessionId.value}/quiz`);
+    return;
+  }
+
+  await router.push(`/sessions/${sessionId.value}`);
 }
 
 async function goSession() {
   await router.push(`/sessions/${sessionId.value}`);
-}
-
-async function goQuiz() {
-  await router.push(`/sessions/${sessionId.value}/quiz`);
 }
 
 async function goGrowth() {
@@ -40,59 +71,28 @@ onMounted(async () => {
   <AppShell>
     <LoadingState v-if="feedbackStore.loading && !report" />
     <ErrorState v-else-if="feedbackStore.error && !report" :message="feedbackStore.error" />
-    <div v-else-if="report" class="space-y-8">
-      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ReportSummaryCard title="本轮总体结论" :content="report.overallSummary || report.diagnosisSummary" />
-        <ReportSummaryCard title="学会了什么" :content="report.strengths.join('；')" />
-        <ReportSummaryCard title="哪些地方薄弱" :content="report.weaknesses.join('；')" />
-        <ReportSummaryCard title="系统为什么这样建议" :content="report.nextStep?.reason || report.nextRoundAdvice" />
-      </section>
+    <div v-else-if="report" class="space-y-6">
+      <PageSection eyebrow="学习报告" title="这一轮学习反馈" :description="conclusion" />
 
-      <section class="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-        <div class="space-y-6">
-          <div class="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200">
-            <h3 class="text-base font-semibold text-slate-900">各题结果摘要</h3>
-            <div class="mt-4 space-y-4">
-              <div v-for="item in report.questionResults" :key="item.questionId" class="rounded-2xl bg-slate-50 p-4">
-                <div class="flex items-center justify-between gap-4">
-                  <p class="font-medium text-slate-900">{{ item.stem }}</p>
-                  <span class="text-sm text-slate-500">{{ item.score ?? '--' }} 分</span>
-                </div>
-                <p class="mt-2 text-sm text-slate-600">{{ item.feedback || '暂无单题反馈' }}</p>
-              </div>
-            </div>
-          </div>
+      <ReportBlock title="总体结论" tone="highlight" :description="conclusion" />
+      <ReportBlock title="学会了什么" :items="strengths" />
+      <ReportBlock title="还不稳定的地方" :items="weaknesses" />
+      <ReportBlock title="系统建议下一步做什么" :description="nextStepReason">
+        <p class="text-sm font-semibold text-slate-900">{{ nextStepTitle }}</p>
+        <p class="mt-3 text-sm leading-7 text-slate-600">{{ nextStepReason }}</p>
+      </ReportBlock>
 
-          <WeakPointList :items="report.weakPoints" />
-        </div>
-
-        <div class="space-y-6">
-          <ReportSummaryCard title="掌握度 / 成长摘要" :content="`growth_recorded: ${report.growthRecorded ? 'yes' : 'no'}`" />
-          <NextActionPanel
-            :loading="feedbackStore.loading"
-            :recommended-action="report.recommendedAction || report.nextStep?.recommendedAction"
-            :suggested-action="report.suggestedNextAction"
-            @submit="submitAction"
-          />
-
-          <div class="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200">
-            <div class="flex flex-col gap-3">
-              <button class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white" @click="submitAction('REVIEW')">
-                进入复习
-              </button>
-              <button class="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-700" @click="goQuiz">
-                开启下一轮
-              </button>
-              <button class="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-700" @click="goSession">
-                返回 session 总览
-              </button>
-              <button class="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-medium text-slate-700" @click="goGrowth">
-                查看成长看板
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <NextStepCard
+        :title="nextStepTitle"
+        :reason="nextStepReason"
+        action-label="进入下一步"
+        secondary-label="返回学习总览"
+        tertiary-label="查看成长记录"
+        :loading="feedbackStore.loading"
+        @primary="submitPrimaryAction"
+        @secondary="goSession"
+        @tertiary="goGrowth"
+      />
     </div>
   </AppShell>
 </template>

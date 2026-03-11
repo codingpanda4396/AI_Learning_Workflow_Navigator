@@ -15,16 +15,6 @@ export function formatPercent(value?: number | null) {
   return `${Math.round(normalized)}%`;
 }
 
-export function formatOutputContent(output: unknown) {
-  if (typeof output === 'string') {
-    return output;
-  }
-  if (output && typeof output === 'object') {
-    return JSON.stringify(output, null, 2);
-  }
-  return '暂无内容';
-}
-
 export function toNumber(value: unknown) {
   if (typeof value === 'number') {
     return value;

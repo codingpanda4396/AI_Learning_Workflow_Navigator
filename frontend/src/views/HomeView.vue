@@ -3,6 +3,7 @@ import { computed, onMounted, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
+import PageSection from '@/components/common/PageSection.vue';
 import { DEFAULT_SESSION_FORM } from '@/constants/app';
 import { useSessionStore } from '@/stores/session';
 
@@ -24,11 +25,10 @@ async function createAndPlan() {
 }
 
 async function continueLearning() {
-  const target = recentSessionId.value;
-  if (!target) {
+  if (!recentSessionId.value) {
     return;
   }
-  await router.push(`/sessions/${target}`);
+  await router.push(`/sessions/${recentSessionId.value}`);
 }
 
 onMounted(async () => {
@@ -42,54 +42,76 @@ onMounted(async () => {
 
 <template>
   <AppShell>
-    <div class="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-      <section class="rounded-[2rem] bg-white p-8 shadow-sm ring-1 ring-slate-200">
-        <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Step 1</p>
-        <h2 class="mt-3 text-3xl font-semibold text-slate-900">新建学习会话</h2>
-        <p class="mt-3 text-sm leading-7 text-slate-600">
-          首页只做一件事：把新的学习闭环启动起来。创建成功后会自动调用 plan，并进入 session 总览。
-        </p>
+    <div class="space-y-6">
+      <PageSection
+        eyebrow="开始学习"
+        title="从这里开始你的这轮学习"
+        description="先告诉我你想学什么、正在学到哪一章、这轮最希望解决的问题。系统会为你生成一条可以顺着完成的学习路径。"
+      />
 
-        <form class="mt-8 space-y-5" @submit.prevent="createAndPlan">
-          <label class="block">
-            <span class="text-sm text-slate-600">course_id</span>
-            <input v-model="form.courseId" class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400" />
-          </label>
-          <label class="block">
-            <span class="text-sm text-slate-600">chapter_id</span>
-            <input v-model="form.chapterId" class="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400" />
-          </label>
-          <label class="block">
-            <span class="text-sm text-slate-600">goal_text</span>
-            <textarea v-model="form.goalText" class="mt-2 min-h-30 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400" />
-          </label>
-          <button class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white disabled:opacity-60" :disabled="sessionStore.loading">
-            创建并规划任务
-          </button>
-        </form>
-      </section>
-
-      <section class="space-y-6">
-        <div class="rounded-[2rem] bg-slate-900 p-8 text-white">
-          <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Step 2</p>
-          <h3 class="mt-3 text-2xl font-semibold">继续最近学习</h3>
-          <p class="mt-3 text-sm leading-7 text-slate-300">
-            如果本地或后端存在最近的 session，可直接回到总览继续当前链路。
+      <PageSection compact>
+        <div class="mx-auto max-w-3xl rounded-[2rem] bg-slate-950 p-7 text-white shadow-[0_28px_90px_rgba(15,23,42,0.28)] md:p-9">
+          <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">新的学习</p>
+          <h2 class="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">开始新的学习</h2>
+          <p class="mt-4 text-sm leading-7 text-slate-300 md:text-base">
+            填好这三个信息后，就能直接进入当前学习总览，并看到系统建议先完成哪一步。
           </p>
-          <button
-            class="mt-6 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-slate-900 disabled:opacity-50"
-            :disabled="!recentSessionId"
-            @click="continueLearning"
-          >
-            {{ recentSessionId ? `继续 Session #${recentSessionId}` : '暂无最近学习' }}
-          </button>
-        </div>
 
-        <EmptyState
-          title="当前首页职责很单一"
-          description="新建学习，或者继续最近学习。其它导航全部放进 SessionView。"
-        />
-      </section>
+          <form class="mt-8 space-y-5" @submit.prevent="createAndPlan">
+            <label class="block">
+              <span class="text-sm font-medium text-slate-200">学习课程</span>
+              <input
+                v-model="form.courseId"
+                class="mt-2 w-full rounded-2xl border border-white/12 bg-white/8 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-300"
+                placeholder="例如：计算机网络"
+              />
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium text-slate-200">当前章节</span>
+              <input
+                v-model="form.chapterId"
+                class="mt-2 w-full rounded-2xl border border-white/12 bg-white/8 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-300"
+                placeholder="例如：TCP"
+              />
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium text-slate-200">你的目标</span>
+              <textarea
+                v-model="form.goalText"
+                class="mt-2 min-h-32 w-full rounded-2xl border border-white/12 bg-white/8 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-amber-300"
+                placeholder="例如：我想真正理解 TCP 为什么能可靠传输"
+              />
+            </label>
+            <button
+              class="w-full rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="sessionStore.loading"
+            >
+              开始新的学习
+            </button>
+          </form>
+        </div>
+      </PageSection>
+
+      <PageSection compact>
+        <div class="mx-auto max-w-3xl">
+          <div v-if="recentSessionId" class="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p class="text-sm font-semibold text-slate-900">继续最近学习</p>
+                <p class="mt-2 text-sm leading-7 text-slate-600">如果你还没完成上一轮学习，可以直接回到当前总览，继续这一步。</p>
+              </div>
+              <button class="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50" @click="continueLearning">
+                继续最近学习
+              </button>
+            </div>
+          </div>
+          <EmptyState
+            v-else
+            title="还没有可继续的学习记录"
+            description="先开始一轮新的学习，系统会在你下次回来时帮你接上进度。"
+          />
+        </div>
+      </PageSection>
     </div>
   </AppShell>
 </template>

@@ -12,7 +12,7 @@ export async function createSessionApi(payload: SessionCreatePayload) {
 }
 
 export async function planSessionApi(sessionId: number) {
-  const { data } = await apiClient.post(`/api/session/${sessionId}/plan?mode=adaptive`);
+  const { data } = await apiClient.post(`/api/session/${sessionId}/plan?mode=auto`);
   return data as Record<string, unknown>;
 }
 

@@ -1,9 +1,9 @@
-export const APP_TITLE = 'AI 个性化学习导航系统';
+export const APP_TITLE = 'AI 学习闭环导航';
 
 export const DEFAULT_SESSION_FORM = {
   courseId: 'computer_network',
   chapterId: 'tcp',
-  goalText: '理解 TCP 可靠传输机制，并完成一次训练闭环',
+  goalText: '理解 TCP 可靠传输机制，并完成一轮检测与反馈。',
 };
 
 export const STORAGE_KEYS = {
@@ -13,9 +13,9 @@ export const STORAGE_KEYS = {
 };
 
 export const STAGE_LABELS: Record<string, string> = {
-  STRUCTURE: '结构搭建',
-  UNDERSTANDING: '原理理解',
-  TRAINING: '训练检测',
-  REFLECTION: '反思巩固',
-  EVALUATE: '结果评估',
+  STRUCTURE: '搭建结构',
+  UNDERSTANDING: '理解原理',
+  TRAINING: '进入检测',
+  REFLECTION: '复盘巩固',
+  EVALUATE: '查看反馈',
 };

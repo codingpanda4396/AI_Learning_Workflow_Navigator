@@ -5,6 +5,7 @@ import AppShell from '@/components/common/AppShell.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import LoadingState from '@/components/common/LoadingState.vue';
+import PageSection from '@/components/common/PageSection.vue';
 import QuizQuestionCard from '@/components/common/QuizQuestionCard.vue';
 import { useQuizStore } from '@/stores/quiz';
 
@@ -15,20 +16,18 @@ const sessionId = computed(() => Number(route.params.sessionId));
 const answers = reactive<Record<number, string>>({});
 let timer: number | undefined;
 
-const statusLabel = computed(() => {
+const statusText = computed(() => {
   switch (quizStore.status) {
     case 'generating':
-      return '生成中';
-    case 'ready':
-      return '可作答';
+      return '正在生成题目';
     case 'submitting':
-      return '提交中';
+      return '正在评估答案';
     case 'completed':
-      return '已完成';
+      return '检测已完成';
     case 'error':
-      return '生成失败';
+      return '检测暂时不可用';
     default:
-      return '未生成';
+      return '';
   }
 });
 
@@ -84,23 +83,16 @@ onBeforeUnmount(() => {
 
 <template>
   <AppShell>
-    <div class="space-y-6">
-      <section class="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Quiz</p>
-            <h2 class="mt-2 text-3xl font-semibold text-slate-900">训练检测</h2>
-            <p class="mt-3 text-sm text-slate-600">状态：{{ statusLabel }}</p>
-          </div>
-          <button
-            class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
-            :disabled="quizStore.loading || quizStore.status === 'generating'"
-            @click="generate"
-          >
-            {{ quizStore.quiz ? '重新生成题目' : '生成训练题' }}
-          </button>
+    <div class="space-y-6 pb-26">
+      <PageSection
+        eyebrow="在线检测"
+        title="完成检测后，系统会生成学习反馈"
+        description="先独立作答，再根据反馈确认你已经掌握了什么、还需要继续巩固什么。"
+      >
+        <div v-if="statusText" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          {{ statusText }}
         </div>
-      </section>
+      </PageSection>
 
       <LoadingState v-if="quizStore.loading && !quizStore.quiz" />
       <ErrorState v-else-if="quizStore.error && !quizStore.quiz" :message="quizStore.error" />
@@ -112,23 +104,37 @@ onBeforeUnmount(() => {
           :index="index"
           :question="question"
         />
+      </section>
+      <EmptyState
+        v-else
+        title="检测题目还没准备好"
+        description="点击下方按钮开始生成题目。生成完成后，页面会自动切换到答题状态。"
+      >
+        <button class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" :disabled="quizStore.loading" @click="generate">
+          开始生成题目
+        </button>
+      </EmptyState>
 
-        <div class="flex justify-end">
+      <div class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur">
+        <div class="mx-auto flex max-w-6xl justify-end px-5 py-4 md:px-6">
           <button
-            class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-medium text-white disabled:opacity-60"
+            v-if="quizStore.quiz?.questions.length"
+            class="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="quizStore.submitting"
             @click="submit"
           >
             提交答案
           </button>
+          <button
+            v-else
+            class="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+            :disabled="quizStore.loading || quizStore.status === 'generating'"
+            @click="generate"
+          >
+            {{ quizStore.status === 'generating' ? '正在生成题目' : '开始生成题目' }}
+          </button>
         </div>
-      </section>
-
-      <EmptyState
-        v-else
-        title="当前还没有题目"
-        description="点击上方按钮触发 quiz 生成。若后端正在生成，页面会自动轮询状态。"
-      />
+      </div>
     </div>
   </AppShell>
 </template>
