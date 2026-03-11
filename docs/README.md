@@ -22,6 +22,7 @@
 
 ## Current highlights
 
+- Cross-functional status summary: `project-current-status.md`
 - Architecture entry: `architecture/system-architecture.md`
 - Backend summary: `backend/backend-implementation-overview-3.8.md`
 - Local setup: `devops/local-dev.md`
