@@ -14,11 +14,14 @@ defineEmits<{
 </script>
 
 <template>
-  <section class="sticky bottom-4 z-20 rounded-[2rem] border border-slate-200/80 bg-white/95 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur">
+  <section class="rounded-[2.2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f5f7fb_100%)] p-6 shadow-[0_28px_80px_rgba(15,23,42,0.1)]">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div class="max-w-2xl">
-        <p class="text-sm font-semibold text-slate-950">确认后会直接进入本轮学习执行链路。</p>
-        <p class="mt-1 text-sm leading-6 text-slate-600">系统会基于这份规划创建 session，并按四阶段任务流继续推进。</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">最终确认</p>
+        <h3 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">确认这次 AI 学习决策</h3>
+        <p class="mt-3 text-sm leading-7 text-slate-600">
+          确认后会立即创建本轮学习 session，并按这份安排进入执行链路。你会从推荐起点开始，顺着四阶段流程继续推进。
+        </p>
       </div>
 
       <div class="flex flex-col gap-3 sm:flex-row">
@@ -28,7 +31,7 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('diagnosis')"
         >
-          查看能力诊断摘要
+          回看诊断依据
         </button>
         <button
           type="button"
@@ -36,7 +39,7 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('back')"
         >
-          返回修改目标
+          返回调整目标
         </button>
         <button
           type="button"
@@ -44,15 +47,15 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('regenerate')"
         >
-          {{ regenerating ? '重新生成中...' : '重新生成方案' }}
+          {{ regenerating ? '重排方案中...' : '重新生成方案' }}
         </button>
         <button
           type="button"
-          class="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          class="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.24)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="disabled || regenerating || confirming"
           @click="$emit('confirm')"
         >
-          {{ confirming ? '正在创建学习会话...' : '确认方案，开始学习' }}
+          {{ confirming ? '正在创建学习 session...' : '确认方案，开始学习' }}
         </button>
       </div>
     </div>

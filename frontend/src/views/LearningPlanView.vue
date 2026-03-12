@@ -98,6 +98,13 @@ async function openDiagnosis() {
   await router.push('/diagnosis');
 }
 
+function focusConfirmSection() {
+  document.getElementById('plan-confirm-anchor')?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  });
+}
+
 watch(
   () => [route.query.sessionId, route.query.goal, route.query.course, route.query.chapter],
   async () => {
@@ -128,8 +135,8 @@ onBeforeUnmount(() => {
 
         <PageSection
           eyebrow="AI 正在生成"
-          title="系统正在把你的诊断结果转成这轮行动方案"
-          description="不是简单套模板，而是在结合目标、当前基础和已有画像决定这轮从哪里开始、先做什么、为什么这样排。"
+          title="正在把你的诊断结果转成这一轮的行动决策"
+          description="不是套模板，而是在结合目标、薄弱点和当前基础，决定这轮从哪里开始、为什么这样排，以及确认后如何进入执行。"
         >
           <div class="grid gap-4 md:grid-cols-3">
             <div v-for="item in 3" :key="item" class="animate-pulse rounded-[1.7rem] border border-slate-200 bg-white p-5">
@@ -143,7 +150,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
-        <ErrorState :message="error || '学习规划暂时生成失败，你可以重试一次。'" />
+        <ErrorState :message="error || '学习规划暂时生成失败，你可以重新试一次。'" />
         <div class="flex justify-start">
           <button
             type="button"
@@ -168,20 +175,26 @@ onBeforeUnmount(() => {
         >
           {{
             viewState === 'confirming'
-              ? '系统正在创建本轮学习会话，并把这份规划接入后续执行链路。'
-              : '系统正在根据你的新偏好重新组织学习起点、解释依据和任务顺序。'
+              ? '系统正在创建本轮学习 session，并把这份决策接入后续执行链路。'
+              : '系统正在根据你的偏好重新组织学习起点、解释依据和任务顺序。'
           }}
         </div>
 
         <PlanReasonPanel :reasons="preview.reasons" :diagnosis-summary="preview.diagnosisSummary" />
         <PlanPathPreviewPanel :nodes="preview.pathNodes" />
-        <PlanTaskPreviewPanel :tasks="preview.taskPreviews" :next-step-note="preview.nextStepNote" />
+        <PlanTaskPreviewPanel
+          :tasks="preview.taskPreviews"
+          :next-step-note="preview.nextStepNote"
+          :busy="learningPlanStore.confirming || learningPlanStore.regenerating"
+          @focus-confirm="focusConfirmSection"
+        />
         <PlanAdjustPanel
           v-model="adjustments"
           :disabled="learningPlanStore.confirming"
           :regenerating="learningPlanStore.regenerating"
           @regenerate="regeneratePlan"
         />
+        <div id="plan-confirm-anchor" class="pt-2" />
         <PlanActionBar
           :confirming="learningPlanStore.confirming"
           :regenerating="learningPlanStore.regenerating"
