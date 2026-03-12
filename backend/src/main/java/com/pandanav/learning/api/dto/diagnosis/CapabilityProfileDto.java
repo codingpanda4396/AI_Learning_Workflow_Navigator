@@ -18,6 +18,8 @@ public record CapabilityProfileDto(
     @JsonProperty("goalOrientation")
     String goalOrientation,
     @JsonProperty("summary")
-    String summary
+    String summary,
+    @JsonProperty("planExplanation")
+    String planExplanation
 ) {
 }

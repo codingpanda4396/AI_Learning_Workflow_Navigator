@@ -5,23 +5,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.dto.diagnosis.CapabilityProfileDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisNextActionDto;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisQuestionCopyDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisQuestionDto;
 import com.pandanav.learning.api.dto.diagnosis.GenerateDiagnosisResponse;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisAnswerRequest;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisRequest;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisResponse;
-import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.enums.DiagnosisDimension;
 import com.pandanav.learning.domain.enums.DiagnosisStatus;
-import com.pandanav.learning.domain.llm.LlmGateway;
-import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
-import com.pandanav.learning.domain.llm.model.LlmPrompt;
-import com.pandanav.learning.domain.llm.model.LlmTextResult;
-import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.domain.model.CapabilityProfile;
 import com.pandanav.learning.domain.model.CapabilityProfileDraft;
+import com.pandanav.learning.domain.model.CapabilityProfileSummaryCopy;
 import com.pandanav.learning.domain.model.DiagnosisAnswer;
 import com.pandanav.learning.domain.model.DiagnosisQuestion;
+import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
 import com.pandanav.learning.domain.model.DiagnosisSession;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.repository.CapabilityProfileRepository;
@@ -41,7 +38,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,9 +50,10 @@ public class DiagnosisService {
     private final DiagnosisAnswerRepository diagnosisAnswerRepository;
     private final CapabilityProfileRepository capabilityProfileRepository;
     private final DiagnosisTemplateFactory diagnosisTemplateFactory;
+    private final DiagnosisQuestionCopyLlmService diagnosisQuestionCopyLlmService;
     private final CapabilityProfileBuilder capabilityProfileBuilder;
-    private final LlmGateway llmGateway;
-    private final LlmJsonParser llmJsonParser;
+    private final CapabilityProfileSummaryGenerator capabilityProfileSummaryGenerator;
+    private final CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService;
     private final ObjectMapper objectMapper;
 
     public DiagnosisService(
@@ -65,9 +62,10 @@ public class DiagnosisService {
         DiagnosisAnswerRepository diagnosisAnswerRepository,
         CapabilityProfileRepository capabilityProfileRepository,
         DiagnosisTemplateFactory diagnosisTemplateFactory,
+        DiagnosisQuestionCopyLlmService diagnosisQuestionCopyLlmService,
         CapabilityProfileBuilder capabilityProfileBuilder,
-        LlmGateway llmGateway,
-        LlmJsonParser llmJsonParser,
+        CapabilityProfileSummaryGenerator capabilityProfileSummaryGenerator,
+        CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService,
         ObjectMapper objectMapper
     ) {
         this.sessionRepository = sessionRepository;
@@ -75,9 +73,10 @@ public class DiagnosisService {
         this.diagnosisAnswerRepository = diagnosisAnswerRepository;
         this.capabilityProfileRepository = capabilityProfileRepository;
         this.diagnosisTemplateFactory = diagnosisTemplateFactory;
+        this.diagnosisQuestionCopyLlmService = diagnosisQuestionCopyLlmService;
         this.capabilityProfileBuilder = capabilityProfileBuilder;
-        this.llmGateway = llmGateway;
-        this.llmJsonParser = llmJsonParser;
+        this.capabilityProfileSummaryGenerator = capabilityProfileSummaryGenerator;
+        this.capabilityProfileSummaryLlmService = capabilityProfileSummaryLlmService;
         this.objectMapper = objectMapper;
     }
 
@@ -85,14 +84,14 @@ public class DiagnosisService {
         LearningSession session = sessionRepository.findByIdAndUserPk(sessionId, userId)
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
 
-        List<DiagnosisQuestion> fallbackQuestions = diagnosisTemplateFactory.buildQuestions(session.getGoalText());
-        List<DiagnosisQuestion> questions = refineQuestions(session, fallbackQuestions);
+        List<DiagnosisQuestion> fallbackQuestions = diagnosisTemplateFactory.buildQuestions(session);
+        List<DiagnosisQuestion> questions = diagnosisQuestionCopyLlmService.enhanceQuestions(session, fallbackQuestions);
 
         DiagnosisSession diagnosisSession = new DiagnosisSession();
         diagnosisSession.setLearningSessionId(session.getId());
         diagnosisSession.setUserPk(userId);
         diagnosisSession.setStatus(DiagnosisStatus.GENERATED);
-        diagnosisSession.setGeneratedQuestionsJson(toJson(fallbackQuestionsToMap(questions)));
+        diagnosisSession.setGeneratedQuestionsJson(toJson(questionsToMap(questions)));
         diagnosisSession.setStartedAt(OffsetDateTime.now());
 
         DiagnosisSession saved = diagnosisSessionRepository.save(diagnosisSession);
@@ -122,7 +121,9 @@ public class DiagnosisService {
             ));
 
         CapabilityProfileDraft draft = capabilityProfileBuilder.build(answersByDimension);
-        String summary = generateSummary(learningSession, draft, answersByDimension).orElse(draft.summaryText());
+        CapabilityProfileSummaryCopy fallbackSummary = capabilityProfileSummaryGenerator.buildFallback(draft);
+        CapabilityProfileSummaryCopy summaryCopy = capabilityProfileSummaryLlmService.generate(learningSession, draft, answersByDimension)
+            .orElse(fallbackSummary);
 
         CapabilityProfile profile = new CapabilityProfile();
         profile.setLearningSessionId(learningSession.getId());
@@ -134,112 +135,14 @@ public class DiagnosisService {
         profile.setLearningPreference(draft.learningPreference());
         profile.setTimeBudget(draft.timeBudget());
         profile.setGoalOrientation(draft.goalOrientation());
-        profile.setSummaryText(summary);
+        profile.setSummaryText(summaryCopy.summary());
+        profile.setPlanExplanation(summaryCopy.planExplanation());
         profile.setVersion(nextVersion(learningSession.getId()));
 
         CapabilityProfile savedProfile = capabilityProfileRepository.save(profile);
         diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.PROFILED, OffsetDateTime.now());
 
         return new SubmitDiagnosisResponse(toProfileDto(savedProfile), NEXT_ACTION);
-    }
-
-    private List<DiagnosisQuestion> refineQuestions(LearningSession session, List<DiagnosisQuestion> fallbackQuestions) {
-        try {
-            LlmPrompt prompt = new LlmPrompt(
-                PromptTemplateKey.DIAGNOSIS_QUESTION_V1,
-                PromptTemplateKey.DIAGNOSIS_QUESTION_V1.promptKey(),
-                PromptTemplateKey.DIAGNOSIS_QUESTION_V1.promptVersion(),
-                LlmInvocationProfile.LIGHT_JSON_TASK,
-                "You rewrite diagnosis question copy for college students. Return one JSON object only.",
-                """
-                    learning_goal=%s
-                    chapter_id=%s
-                    questions=%s
-                    Rewrite only title, description, and options.
-                    Keep question_id, dimension, type, required, and option count unchanged.
-                    JSON schema: {"questions":[{"question_id":"","title":"","description":"","options":[""]}]}
-                    """.formatted(safe(session.getGoalText()), safe(session.getChapterId()), toJson(fallbackQuestionsToMap(fallbackQuestions))),
-                "{\"questions\":[{\"question_id\":\"\",\"title\":\"\",\"description\":\"\",\"options\":[\"\"]}]}",
-                "short_json_only",
-                null,
-                500
-            );
-            LlmTextResult llmResult = llmGateway.generate(prompt);
-            JsonNode root = llmJsonParser.parse(llmResult.text());
-            JsonNode items = root.path("questions");
-            if (!items.isArray() || items.size() != fallbackQuestions.size()) {
-                return fallbackQuestions;
-            }
-
-            Map<String, DiagnosisQuestion> byId = fallbackQuestions.stream()
-                .collect(Collectors.toMap(DiagnosisQuestion::questionId, question -> question));
-            List<DiagnosisQuestion> refined = new ArrayList<>();
-            for (JsonNode item : items) {
-                DiagnosisQuestion original = byId.get(item.path("question_id").asText(""));
-                if (original == null) {
-                    return fallbackQuestions;
-                }
-                List<String> options = new ArrayList<>();
-                for (JsonNode option : item.path("options")) {
-                    if (option.isTextual() && !option.asText().isBlank()) {
-                        options.add(option.asText().trim());
-                    }
-                }
-                if (options.size() != original.options().size()) {
-                    return fallbackQuestions;
-                }
-                refined.add(new DiagnosisQuestion(
-                    original.questionId(),
-                    original.dimension(),
-                    original.type(),
-                    textOrDefault(item.path("title").asText(""), original.title()),
-                    textOrDefault(item.path("description").asText(""), original.description()),
-                    options,
-                    original.required()
-                ));
-            }
-            return refined;
-        } catch (Exception ex) {
-            return fallbackQuestions;
-        }
-    }
-
-    private Optional<String> generateSummary(
-        LearningSession session,
-        CapabilityProfileDraft draft,
-        Map<DiagnosisDimension, List<String>> answersByDimension
-    ) {
-        try {
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("goalText", safe(session.getGoalText()));
-            payload.put("draft", draft);
-            payload.put("answers", answersByDimension);
-            LlmPrompt prompt = new LlmPrompt(
-                PromptTemplateKey.CAPABILITY_SUMMARY_V1,
-                PromptTemplateKey.CAPABILITY_SUMMARY_V1.promptKey(),
-                PromptTemplateKey.CAPABILITY_SUMMARY_V1.promptVersion(),
-                LlmInvocationProfile.LIGHT_JSON_TASK,
-                "You summarize learner profiles in simple Chinese. Return one JSON object only.",
-                """
-                    data=%s
-                    Write one concise Chinese summary under 120 chars.
-                    JSON schema: {"summary":""}
-                    """.formatted(toJson(payload)),
-                "{\"summary\":\"\"}",
-                "short_json_only",
-                null,
-                220
-            );
-            LlmTextResult llmResult = llmGateway.generate(prompt);
-            JsonNode root = llmJsonParser.parse(llmResult.text());
-            String summary = root.path("summary").asText("");
-            if (summary == null || summary.isBlank()) {
-                return Optional.empty();
-            }
-            return Optional.of(summary.trim());
-        } catch (Exception ex) {
-            return Optional.empty();
-        }
     }
 
     private void validateAnswers(Map<String, DiagnosisQuestion> questionMap, List<SubmitDiagnosisAnswerRequest> answerRequests) {
@@ -333,14 +236,16 @@ public class DiagnosisService {
                 for (JsonNode option : item.path("options")) {
                     options.add(option.asText(""));
                 }
+                DiagnosisQuestionCopy copy = readCopy(item.path("copy"), item);
                 questions.add(new DiagnosisQuestion(
                     item.path("questionId").asText(""),
                     DiagnosisDimension.valueOf(item.path("dimension").asText("FOUNDATION")),
                     item.path("type").asText("single_choice"),
-                    item.path("title").asText(""),
-                    item.path("description").asText(""),
+                    textOrDefault(item.path("title").asText(""), copy.title()),
+                    textOrDefault(item.path("description").asText(""), copy.description()),
                     options,
-                    item.path("required").asBoolean(true)
+                    item.path("required").asBoolean(true),
+                    copy
                 ));
             }
             return questions;
@@ -349,7 +254,26 @@ public class DiagnosisService {
         }
     }
 
-    private List<Map<String, Object>> fallbackQuestionsToMap(List<DiagnosisQuestion> questions) {
+    private DiagnosisQuestionCopy readCopy(JsonNode copyNode, JsonNode questionNode) {
+        if (copyNode != null && copyNode.isObject()) {
+            return new DiagnosisQuestionCopy(
+                copyNode.path("sectionLabel").asText(""),
+                copyNode.path("title").asText(questionNode.path("title").asText("")),
+                copyNode.path("description").asText(questionNode.path("description").asText("")),
+                copyNode.path("placeholder").asText(""),
+                copyNode.path("submitHint").asText("")
+            );
+        }
+        return new DiagnosisQuestionCopy(
+            questionNode.path("dimension").asText(""),
+            questionNode.path("title").asText(""),
+            questionNode.path("description").asText(""),
+            "",
+            ""
+        );
+    }
+
+    private List<Map<String, Object>> questionsToMap(List<DiagnosisQuestion> questions) {
         return questions.stream().map(question -> {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("questionId", question.questionId());
@@ -359,6 +283,7 @@ public class DiagnosisService {
             item.put("description", question.description());
             item.put("options", question.options());
             item.put("required", question.required());
+            item.put("copy", question.copy());
             return item;
         }).toList();
     }
@@ -371,7 +296,8 @@ public class DiagnosisService {
             profile.getLearningPreference(),
             profile.getTimeBudget(),
             profile.getGoalOrientation(),
-            profile.getSummaryText()
+            profile.getSummaryText(),
+            profile.getPlanExplanation()
         );
     }
 
@@ -384,7 +310,14 @@ public class DiagnosisService {
                 question.title(),
                 question.description(),
                 question.options(),
-                question.required()
+                question.required(),
+                new DiagnosisQuestionCopyDto(
+                    question.copy().sectionLabel(),
+                    question.copy().title(),
+                    question.copy().description(),
+                    question.copy().placeholder(),
+                    question.copy().submitHint()
+                )
             ))
             .toList();
     }
@@ -419,9 +352,5 @@ public class DiagnosisService {
 
     private String textOrDefault(String candidate, String fallback) {
         return candidate == null || candidate.isBlank() ? fallback : candidate.trim();
-    }
-
-    private String safe(String value) {
-        return value == null || value.isBlank() ? "(unknown)" : value.trim();
     }
 }

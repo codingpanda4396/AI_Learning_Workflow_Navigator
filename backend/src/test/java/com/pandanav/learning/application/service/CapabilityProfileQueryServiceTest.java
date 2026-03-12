@@ -41,6 +41,7 @@ class CapabilityProfileQueryServiceTest {
         profile.setTimeBudget("每周 4-6 小时");
         profile.setGoalOrientation("INTERVIEW");
         profile.setSummaryText("用户当前基础偏弱，但目标明确。");
+        profile.setPlanExplanation("系统会先补基础，再逐步增加训练。");
         profile.setVersion(2);
 
         when(sessionRepository.findByIdAndUserPk(88L, 10L)).thenReturn(Optional.of(session));
@@ -55,5 +56,6 @@ class CapabilityProfileQueryServiceTest {
         assertEquals("INTERVIEW", response.capabilityProfile().goalOrientation());
         assertEquals("每周 4-6 小时", context.timeBudget());
         assertEquals("PRACTICE_FIRST", context.learningPreference());
+        assertEquals("系统会先补基础，再逐步增加训练。", response.capabilityProfile().planExplanation());
     }
 }

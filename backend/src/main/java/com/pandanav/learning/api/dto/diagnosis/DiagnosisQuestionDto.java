@@ -18,6 +18,8 @@ public record DiagnosisQuestionDto(
     @JsonProperty("options")
     List<String> options,
     @JsonProperty("required")
-    boolean required
+    boolean required,
+    @JsonProperty("copy")
+    DiagnosisQuestionCopyDto copy
 ) {
 }

@@ -55,7 +55,8 @@ public class CapabilityProfileQueryService {
             profile.getLearningPreference(),
             profile.getTimeBudget(),
             profile.getGoalOrientation(),
-            profile.getSummaryText()
+            profile.getSummaryText(),
+            profile.getPlanExplanation()
         );
     }
 }

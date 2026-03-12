@@ -39,8 +39,8 @@ public class JdbcCapabilityProfileRepository implements CapabilityProfileReposit
                     INSERT INTO capability_profile
                       (learning_session_id, user_id, source_diagnosis_id, current_level,
                        strengths_json, weaknesses_json, preferences_json, constraints_json,
-                       summary_text, version)
-                    VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?)
+                       summary_text, plan_explanation, version)
+                    VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?)
                     """,
                 new String[]{"id"}
             );
@@ -56,7 +56,8 @@ public class JdbcCapabilityProfileRepository implements CapabilityProfileReposit
             )));
             ps.setString(8, writeJson(Map.of("timeBudget", profile.getTimeBudget())));
             ps.setString(9, profile.getSummaryText());
-            ps.setInt(10, profile.getVersion() == null ? 1 : profile.getVersion());
+            ps.setString(10, profile.getPlanExplanation());
+            ps.setInt(11, profile.getVersion() == null ? 1 : profile.getVersion());
             return ps;
         }, keyHolder);
         Number key = keyHolder.getKey();
@@ -73,7 +74,7 @@ public class JdbcCapabilityProfileRepository implements CapabilityProfileReposit
                 """
                     SELECT id, learning_session_id, user_id, source_diagnosis_id, current_level,
                            strengths_json, weaknesses_json, preferences_json, constraints_json,
-                           summary_text, version, created_at, updated_at
+                           summary_text, plan_explanation, version, created_at, updated_at
                     FROM capability_profile
                     WHERE learning_session_id = ?
                     ORDER BY version DESC, created_at DESC, id DESC
@@ -94,6 +95,7 @@ public class JdbcCapabilityProfileRepository implements CapabilityProfileReposit
                     item.setGoalOrientation(preferences.getOrDefault("goalOrientation", ""));
                     item.setTimeBudget(constraints.getOrDefault("timeBudget", ""));
                     item.setSummaryText(rs.getString("summary_text"));
+                    item.setPlanExplanation(rs.getString("plan_explanation"));
                     item.setVersion(rs.getObject("version", Integer.class));
                     item.setCreatedAt(rs.getObject("created_at", OffsetDateTime.class));
                     item.setUpdatedAt(rs.getObject("updated_at", OffsetDateTime.class));

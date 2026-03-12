@@ -11,6 +11,7 @@ public record DiagnosisQuestion(
     String title,
     String description,
     List<String> options,
-    boolean required
+    boolean required,
+    DiagnosisQuestionCopy copy
 ) {
 }

@@ -18,6 +18,7 @@ public class CapabilityProfile {
     private String timeBudget;
     private String goalOrientation;
     private String summaryText;
+    private String planExplanation;
     private Integer version;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
@@ -108,6 +109,14 @@ public class CapabilityProfile {
 
     public void setSummaryText(String summaryText) {
         this.summaryText = summaryText;
+    }
+
+    public String getPlanExplanation() {
+        return planExplanation;
+    }
+
+    public void setPlanExplanation(String planExplanation) {
+        this.planExplanation = planExplanation;
     }
 
     public Integer getVersion() {
