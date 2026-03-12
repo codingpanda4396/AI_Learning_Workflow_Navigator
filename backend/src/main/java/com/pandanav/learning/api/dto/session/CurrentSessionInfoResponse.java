@@ -25,6 +25,9 @@ public record CurrentSessionInfoResponse(
     Long currentNodeId,
     @JsonProperty("current_stage")
     @Schema(name = "current_stage", example = "STRUCTURE")
-    String currentStage
+    String currentStage,
+    @JsonProperty("session_status")
+    @Schema(name = "session_status", example = "LEARNING")
+    String sessionStatus
 ) {
 }

@@ -12,6 +12,7 @@ import com.pandanav.learning.domain.enums.PracticeFeedbackAction;
 import com.pandanav.learning.domain.enums.PracticeItemSource;
 import com.pandanav.learning.domain.enums.PracticeItemStatus;
 import com.pandanav.learning.domain.enums.PracticeQuizStatus;
+import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.ConceptNode;
@@ -130,7 +131,7 @@ public class PracticeServiceImpl implements PracticeService {
         quiz.setQuestionCount(0);
         quiz.setAnsweredCount(0);
         PracticeQuiz saved = practiceQuizRepository.save(quiz);
-        sessionRepository.updateStatus(sessionId, PracticeQuizStatus.GENERATING.name());
+        sessionRepository.updateStatus(sessionId, SessionStatus.PRACTICING);
         practiceQuizAsyncService.generateQuizAsync(saved.getId(), sessionId, taskId, userId);
         return saved;
     }
@@ -153,7 +154,7 @@ public class PracticeServiceImpl implements PracticeService {
     @Transactional
     public PracticeQuiz applyFeedbackAction(Long sessionId, Long taskId, Long userId, String action) {
         PracticeQuiz quiz = getQuiz(sessionId, taskId, userId);
-        if (quiz.getStatus() != PracticeQuizStatus.FEEDBACK_READY
+        if (quiz.getStatus() != PracticeQuizStatus.REPORT_READY
             && quiz.getStatus() != PracticeQuizStatus.REVIEWING
             && quiz.getStatus() != PracticeQuizStatus.NEXT_ROUND) {
             throw new ConflictException("Practice feedback action is not available yet.");
@@ -168,7 +169,7 @@ public class PracticeServiceImpl implements PracticeService {
             ? PracticeQuizStatus.REVIEWING
             : PracticeQuizStatus.NEXT_ROUND;
         practiceQuizRepository.updateStatus(quiz.getId(), targetStatus, null);
-        sessionRepository.updateStatus(sessionId, targetStatus.name());
+        sessionRepository.updateStatus(sessionId, resolved == PracticeFeedbackAction.REVIEW ? SessionStatus.LEARNING : SessionStatus.PRACTICING);
         return practiceQuizRepository.findById(quiz.getId()).orElseThrow(() -> new NotFoundException("Practice quiz not found."));
     }
 
@@ -331,12 +332,12 @@ public class PracticeServiceImpl implements PracticeService {
             PracticeGeneratorResult result = generateWithFallback(request);
             List<PracticeItem> saved = saveGeneratedItems(quizId, task, userId, result);
             practiceQuizRepository.markGenerated(quizId, saved.size(), result.source(), result.promptVersion());
-            sessionRepository.updateStatus(sessionId, PracticeQuizStatus.QUIZ_READY.name());
+            sessionRepository.updateStatus(sessionId, SessionStatus.PRACTICING);
             logGeneration(sessionId, userId, task, result, saved.size());
         } catch (Exception ex) {
             practiceQuizRepository.updateGenerationState(quizId, TaskStatus.FAILED, sanitizeReason(ex.getMessage()), "QUIZ_GENERATION_FAILED");
             practiceQuizRepository.updateStatus(quizId, PracticeQuizStatus.FAILED, sanitizeReason(ex.getMessage()));
-            sessionRepository.updateStatus(sessionId, PracticeQuizStatus.FAILED.name());
+            sessionRepository.updateStatus(sessionId, SessionStatus.FAILED);
             log.warn("practice quiz generation failed: quizId={}, sessionId={}, taskId={}, reason={}", quizId, sessionId, taskId, sanitizeReason(ex.getMessage()));
         }
     }
@@ -363,7 +364,7 @@ public class PracticeServiceImpl implements PracticeService {
         entity.setExplanation(item.explanation());
         entity.setDifficulty(item.difficulty());
         entity.setSource(PracticeItemSource.fromDb(result.source()));
-        entity.setStatus(PracticeItemStatus.ACTIVE);
+        entity.setStatus(PracticeItemStatus.READY);
         entity.setPromptVersion(result.promptVersion());
         entity.setTokenInput(result.tokenInput());
         entity.setTokenOutput(result.tokenOutput());
@@ -398,8 +399,8 @@ public class PracticeServiceImpl implements PracticeService {
             .count();
         practiceQuizRepository.updateAnsweredCount(quiz.getId(), (int) answered);
         if (answered < items.size()) {
-            practiceQuizRepository.updateStatus(quiz.getId(), PracticeQuizStatus.ANSWERED, null);
-            sessionRepository.updateStatus(quiz.getSessionId(), PracticeQuizStatus.ANSWERED.name());
+            practiceQuizRepository.updateStatus(quiz.getId(), PracticeQuizStatus.ANSWERING, null);
+            sessionRepository.updateStatus(quiz.getSessionId(), SessionStatus.PRACTICING);
             return;
         }
 
@@ -408,8 +409,8 @@ public class PracticeServiceImpl implements PracticeService {
             PracticeFeedbackReport report = practiceFeedbackReportGenerator.generate(quiz, items, submissions);
             practiceFeedbackReportRepository.save(report);
         }
-        practiceQuizRepository.updateStatus(quiz.getId(), PracticeQuizStatus.FEEDBACK_READY, null);
-        sessionRepository.updateStatus(quiz.getSessionId(), PracticeQuizStatus.FEEDBACK_READY.name());
+        practiceQuizRepository.updateStatus(quiz.getId(), PracticeQuizStatus.REPORT_READY, null);
+        sessionRepository.updateStatus(quiz.getSessionId(), SessionStatus.REPORT_READY);
         logFeedbackGenerated(quiz.getSessionId(), userId, quiz.getTaskId(), quiz.getId());
     }
 

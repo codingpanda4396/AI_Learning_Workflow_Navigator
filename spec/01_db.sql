@@ -5,7 +5,7 @@ exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  create type run_status as enum ('PENDING','RUNNING','SUCCEEDED','FAILED','CANCELLED');
+  create type run_status as enum ('PENDING','RUNNING','SUCCEEDED','FAILED');
 exception when duplicate_object then null;
 end $$;
 
@@ -21,6 +21,7 @@ create table if not exists learning_session (
 
   current_node_id bigint,
   current_stage task_stage,
+  status varchar(32) not null default 'ANALYZING',
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -29,6 +30,10 @@ create table if not exists learning_session (
   -- 如果你允许多个并行会话，可删掉这个约束
   unique (user_id, chapter_id)
 );
+
+alter table learning_session
+  add constraint ck_learning_session_status
+  check (status in ('ANALYZING','PLANNING','LEARNING','PRACTICING','REPORT_READY','COMPLETED','FAILED'));
 
 -- current_node_id 需要引用 concept_node，所以要先建 concept_node，再补 FK
 create index if not exists idx_session_user on learning_session(user_id);

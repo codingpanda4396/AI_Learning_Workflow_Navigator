@@ -2,6 +2,7 @@ package com.pandanav.learning.infrastructure.persistence;
 
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.enums.Stage;
+import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,7 +42,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
             ps.setString(5, session.getGoalText());
             ps.setLong(6, session.getCurrentNodeId());
             ps.setString(7, session.getCurrentStage().name());
-            ps.setString(8, session.getStatus() == null ? "ACTIVE" : session.getStatus());
+            ps.setString(8, session.getStatus() == null ? SessionStatus.ANALYZING.name() : session.getStatus().name());
             return ps;
         }, keyHolder);
         Number key = keyHolder.getKey();
@@ -120,7 +121,10 @@ public class JdbcLearningSessionRepository implements SessionRepository {
                            status, completed_at, last_active_at, created_at, updated_at
                     FROM learning_session
                     WHERE user_pk = ?
-                      AND status = 'ACTIVE'
+                      AND status IN (
+                        'ACTIVE', 'GENERATING', 'QUIZ_READY', 'ANSWERED', 'FEEDBACK_READY', 'REVIEWING', 'NEXT_ROUND',
+                        'ANALYZING', 'PLANNING', 'LEARNING', 'PRACTICING', 'REPORT_READY'
+                      )
                     ORDER BY created_at DESC, id DESC
                     LIMIT 1
                     """,
@@ -134,8 +138,8 @@ public class JdbcLearningSessionRepository implements SessionRepository {
     }
 
     @Override
-    public List<LearningSession> findHistoryByUserPk(Long userPk, String status, int limit, int offset) {
-        if (status == null || status.isBlank()) {
+    public List<LearningSession> findHistoryByUserPk(Long userPk, SessionStatus status, int limit, int offset) {
+        if (status == null) {
             return jdbcTemplate.query(
                 """
                     SELECT id, user_id, user_pk, course_id, chapter_id, goal_text, current_node_id, current_stage,
@@ -163,15 +167,15 @@ public class JdbcLearningSessionRepository implements SessionRepository {
                 """,
             (rs, rowNum) -> mapSession(rs),
             userPk,
-            status,
+            status.name(),
             limit,
             offset
         );
     }
 
     @Override
-    public long countHistoryByUserPk(Long userPk, String status) {
-        if (status == null || status.isBlank()) {
+    public long countHistoryByUserPk(Long userPk, SessionStatus status) {
+        if (status == null) {
             Long count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM learning_session WHERE user_pk = ?",
                 Long.class,
@@ -183,7 +187,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
             "SELECT COUNT(*) FROM learning_session WHERE user_pk = ? AND status = ?",
             Long.class,
             userPk,
-            status
+            status.name()
         );
         return count == null ? 0L : count;
     }
@@ -206,7 +210,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
     }
 
     @Override
-    public void updateStatus(Long sessionId, String status) {
+    public void updateStatus(Long sessionId, SessionStatus status) {
         jdbcTemplate.update(
             """
                 UPDATE learning_session
@@ -215,7 +219,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
                     last_active_at = now()
                 WHERE id = ?
                 """,
-            status,
+            status.name(),
             sessionId
         );
     }
@@ -244,7 +248,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
         item.setCurrentNodeId(rs.getLong("current_node_id"));
         String stage = rs.getString("current_stage");
         item.setCurrentStage(stage == null ? null : Stage.valueOf(stage));
-        item.setStatus(rs.getString("status"));
+        item.setStatus(SessionStatus.fromDb(rs.getString("status")));
         item.setCompletedAt(rs.getObject("completed_at", java.time.OffsetDateTime.class));
         item.setLastActiveAt(rs.getObject("last_active_at", java.time.OffsetDateTime.class));
         item.setCreatedAt(rs.getObject("created_at", java.time.OffsetDateTime.class));

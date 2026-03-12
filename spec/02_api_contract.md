@@ -22,6 +22,29 @@
 - `SUCCEEDED`
 - `FAILED`
 
+### SessionStatus
+- `ANALYZING`
+- `PLANNING`
+- `LEARNING`
+- `PRACTICING`
+- `REPORT_READY`
+- `COMPLETED`
+- `FAILED`
+
+### PracticeQuizStatus
+- `GENERATING`
+- `READY`
+- `ANSWERING`
+- `REVIEWING`
+- `REPORT_READY`
+- `NEXT_ROUND`
+- `FAILED`
+
+### PracticeItemStatus
+- `READY`
+- `ANSWERED`
+- `ARCHIVED`
+
 ### ErrorTag (Evaluator output)
 - `CONCEPT_CONFUSION`  # 概念混淆
 - `MISSING_STEPS`      # 步骤缺失

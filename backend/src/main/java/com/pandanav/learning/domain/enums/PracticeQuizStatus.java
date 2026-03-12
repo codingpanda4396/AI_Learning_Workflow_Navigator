@@ -2,10 +2,10 @@ package com.pandanav.learning.domain.enums;
 
 public enum PracticeQuizStatus {
     GENERATING,
-    QUIZ_READY,
-    ANSWERED,
-    FEEDBACK_READY,
+    READY,
+    ANSWERING,
     REVIEWING,
+    REPORT_READY,
     NEXT_ROUND,
     FAILED;
 
@@ -13,6 +13,11 @@ public enum PracticeQuizStatus {
         if (value == null || value.isBlank()) {
             return GENERATING;
         }
-        return PracticeQuizStatus.valueOf(value.trim().toUpperCase());
+        return switch (value.trim().toUpperCase()) {
+            case "QUIZ_READY" -> READY;
+            case "ANSWERED" -> ANSWERING;
+            case "FEEDBACK_READY" -> REPORT_READY;
+            default -> PracticeQuizStatus.valueOf(value.trim().toUpperCase());
+        };
     }
 }

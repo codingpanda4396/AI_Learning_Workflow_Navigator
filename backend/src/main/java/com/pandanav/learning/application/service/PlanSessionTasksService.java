@@ -8,6 +8,7 @@ import com.pandanav.learning.application.service.pathplan.PersonalizedPlanResult
 import com.pandanav.learning.application.usecase.PlanSessionTasksUseCase;
 import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.enums.PlanMode;
+import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.ConceptNode;
@@ -66,8 +67,10 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
 
         List<Task> existingTasks = taskRepository.findBySessionIdWithStatus(sessionId);
         if (!existingTasks.isEmpty()) {
+            sessionRepository.updateStatus(sessionId, SessionStatus.LEARNING);
             return buildPlanResponse(sessionId, existingTasks, nodes);
         }
+        sessionRepository.updateStatus(sessionId, SessionStatus.PLANNING);
 
         PersonalizedPlanResult planResult = personalizedPathPlannerService.plan(session, mode, false);
         Map<String, Task> uniqueTasks = new LinkedHashMap<>();
@@ -80,6 +83,7 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
         appendInsertedTasks(sessionId, session.getCourseId(), session.getChapterId(), session.getGoalText(), nodes, planResult.insertedTasks(), uniqueTasks);
 
         List<Task> saved = taskRepository.saveAll(new ArrayList<>(uniqueTasks.values()));
+        sessionRepository.updateStatus(sessionId, SessionStatus.LEARNING);
         return buildPlanResponse(sessionId, saved, nodes);
     }
 

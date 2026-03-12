@@ -8,7 +8,7 @@ import CurrentSessionPanel from '@/components/home/CurrentSessionPanel.vue';
 import StartLearningEntry from '@/components/home/StartLearningEntry.vue';
 import type { ActiveSession, StartLearningForm } from '@/types/home';
 import { useSessionStore } from '@/stores/session';
-import { formatStage } from '@/utils/format';
+import { formatSessionStatus } from '@/utils/format';
 import { emitInfo } from '@/utils/message';
 
 const router = useRouter();
@@ -30,7 +30,7 @@ const activeSession = computed<ActiveSession | null>(() => {
     goal: current.goalText || '',
     course: current.courseId || '',
     chapter: current.chapterId || '',
-    phase: formatStage(current.currentStage),
+    phase: formatSessionStatus(current.sessionStatus),
   };
 });
 

@@ -16,6 +16,7 @@ import com.pandanav.learning.domain.llm.model.EvaluationResult;
 import com.pandanav.learning.application.usecase.SubmitTrainingAnswerUseCase;
 import com.pandanav.learning.domain.enums.ErrorTag;
 import com.pandanav.learning.domain.enums.NextAction;
+import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.AttemptLlmMetadata;
@@ -281,6 +282,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
 
         ConceptNode nextNode = nodes.get(currentIndex + 1);
         sessionRepository.updateCurrentPosition(session.getId(), nextNode.getId(), Stage.STRUCTURE);
+        sessionRepository.updateStatus(session.getId(), SessionStatus.LEARNING);
 
         return taskRepository.findFirstBySessionIdAndNodeIdAndStage(session.getId(), nextNode.getId(), Stage.STRUCTURE)
             .orElseGet(() -> {

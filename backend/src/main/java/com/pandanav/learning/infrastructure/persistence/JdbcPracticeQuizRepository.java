@@ -154,7 +154,7 @@ public class JdbcPracticeQuizRepository implements PracticeQuizRepository {
         jdbcTemplate.update(
             """
                 UPDATE practice_quiz
-                SET status = 'QUIZ_READY',
+                SET status = 'READY',
                     generation_status = 'SUCCEEDED'::run_status,
                     question_count = ?,
                     generation_source = ?,

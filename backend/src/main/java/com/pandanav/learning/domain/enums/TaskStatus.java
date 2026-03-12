@@ -13,7 +13,7 @@ public enum TaskStatus {
         if ("CANCELLED".equalsIgnoreCase(value)) {
             return FAILED;
         }
-        return TaskStatus.valueOf(value.toUpperCase());
+        return TaskStatus.valueOf(value.trim().toUpperCase());
     }
 }
 

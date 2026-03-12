@@ -1,3 +1,12 @@
+export type SessionBusinessStatus =
+  | 'ANALYZING'
+  | 'PLANNING'
+  | 'LEARNING'
+  | 'PRACTICING'
+  | 'REPORT_READY'
+  | 'COMPLETED'
+  | 'FAILED';
+
 export interface SessionCreatePayload {
   courseId: string;
   chapterId: string;
@@ -36,6 +45,7 @@ export interface SessionOverview {
   goalText?: string;
   currentNodeId?: number;
   currentStage?: string;
+  sessionStatus?: SessionBusinessStatus;
   timeline: SessionTimelineItem[];
   nextTask?: SessionNextTask | null;
   masterySummary: MasterySummaryItem[];
@@ -49,4 +59,5 @@ export interface CurrentSessionInfo {
   goalText?: string;
   currentNodeId?: number;
   currentStage?: string;
+  sessionStatus?: SessionBusinessStatus;
 }

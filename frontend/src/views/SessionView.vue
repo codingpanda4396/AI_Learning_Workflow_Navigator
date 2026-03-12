@@ -9,7 +9,7 @@ import PrimaryActionCard from '@/components/common/PrimaryActionCard.vue';
 import ProgressSummary from '@/components/common/ProgressSummary.vue';
 import SecondaryInfoCard from '@/components/common/SecondaryInfoCard.vue';
 import StagePill from '@/components/common/StagePill.vue';
-import { formatStage } from '@/utils/format';
+import { formatSessionStatus, formatStage } from '@/utils/format';
 import { useFeedbackStore } from '@/stores/feedback';
 import { useSessionStore } from '@/stores/session';
 
@@ -23,38 +23,63 @@ const overview = computed(() => sessionStore.overview);
 const report = computed(() => feedbackStore.report);
 
 const currentTaskTitle = computed(() => {
-  const stage = overview.value?.nextTask?.stage || overview.value?.currentStage;
-  if (!stage) {
-    return '等待系统生成下一步';
+  const sessionStatus = overview.value?.sessionStatus;
+  if (!sessionStatus) {
+    return '等待系统确定当前阶段';
   }
-  return `当前建议先完成：${formatStage(stage)}`;
+  return `当前会话阶段：${formatSessionStatus(sessionStatus)}`;
 });
 
 const currentTaskGoal = computed(() => {
+  switch (overview.value?.sessionStatus) {
+    case 'ANALYZING':
+      return '先完成诊断与分析，后续任务会按你的真实薄弱点来安排。';
+    case 'PLANNING':
+      return '系统正在整理学习路径与任务顺序，完成后会进入正式学习。';
+    case 'PRACTICING':
+      return '当前重点是做题检验掌握度，并让反馈报告更准确。';
+    case 'REPORT_READY':
+      return '这一轮练习反馈已经生成，可以查看报告并决定后续动作。';
+    case 'FAILED':
+      return '当前会话执行失败，需要回到上一步重新发起。';
+    case 'COMPLETED':
+      return '这轮学习已经结束，可以查看结果或开启新一轮。';
+    default:
+      break;
+  }
+
   const stage = overview.value?.nextTask?.stage || overview.value?.currentStage;
   switch (stage) {
     case 'STRUCTURE':
-      return '先搭起这一章的知识框架，知道要学哪些关键概念。';
+      return '先搭起这一章的知识骨架，知道要学什么、关系怎么连。';
     case 'UNDERSTANDING':
-      return '把原理真正讲清楚，确认你不是只记住结论。';
+      return '把原理真正讲清楚，确认自己不是只记住结论。';
     case 'TRAINING':
-      return '用题目检查自己是否真的掌握，并找出不稳的地方。';
+      return '用题目检验自己是否真的掌握，并找出不稳的地方。';
     case 'REFLECTION':
-      return '结合刚才的结果复盘原因，把易错点补上。';
-    case 'EVALUATE':
-      return '查看这一轮学习反馈，决定接下来该继续还是巩固。';
+      return '根据刚才的结果复盘错因，把易错点补上。';
     default:
-      return '系统正在为你安排下一步，请稍后刷新。';
+      return '系统正在整理下一步建议，请稍后刷新。';
   }
 });
 
 const nextStepText = computed(() => {
+  switch (overview.value?.sessionStatus) {
+    case 'ANALYZING':
+      return '完成后会进入路径规划。';
+    case 'PLANNING':
+      return '完成后会进入正式学习。';
+    case 'PRACTICING':
+      return '完成后会生成练习反馈报告。';
+    case 'REPORT_READY':
+      return '完成后可以根据反馈决定复习还是下一轮。';
+    default:
+      break;
+  }
+
   const stage = overview.value?.nextTask?.stage || overview.value?.currentStage;
   if (stage === 'TRAINING') {
     return '完成后会进入检测与反馈。';
-  }
-  if (stage === 'EVALUATE') {
-    return '完成后会看到这轮学习报告。';
   }
   return '完成后系统会继续推进到下一步学习。';
 });
@@ -63,9 +88,9 @@ const learningGoal = computed(() => overview.value?.goalText || '这轮学习还
 
 const recentTrainingSummary = computed(() => {
   if (!report.value) {
-    return '完成检测后，这里会汇总你最近一次训练的表现。';
+    return '完成练习后，这里会汇总你最近一次训练的表现。';
   }
-  return report.value.overallSummary || report.value.diagnosisSummary || '最近一次训练已经完成，可以继续往下走。';
+  return report.value.overallSummary || report.value.diagnosisSummary || '最近一次训练已经完成，可以继续往下推进。';
 });
 
 const progressSummaryText = computed(() => {
@@ -77,21 +102,24 @@ const progressSummaryText = computed(() => {
 });
 
 const simpleTimeline = computed(() =>
-  (overview.value?.timeline ?? []).slice(0, 5).map((item) => `${formatStage(item.stage)} · ${item.status || '待开始'}`),
+  (overview.value?.timeline ?? []).slice(0, 5).map((item) => `${formatStage(item.stage)} / ${item.status || 'PENDING'}`),
 );
 
 async function continueCurrentLearning() {
+  if (overview.value?.sessionStatus === 'REPORT_READY') {
+    await router.push(`/sessions/${sessionId.value}/report`);
+    return;
+  }
+
   const nextTaskId = overview.value?.nextTask?.taskId;
   if (nextTaskId) {
     await router.push(`/tasks/${nextTaskId}/run`);
     return;
   }
-  if (overview.value?.currentStage === 'TRAINING') {
+
+  if (overview.value?.sessionStatus === 'PRACTICING' || overview.value?.currentStage === 'TRAINING') {
     await router.push(`/sessions/${sessionId.value}/quiz`);
     return;
-  }
-  if (overview.value?.currentStage === 'EVALUATE') {
-    await router.push(`/sessions/${sessionId.value}/report`);
   }
 }
 
@@ -119,7 +147,8 @@ onMounted(async () => {
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">当前阶段</p>
             <div class="mt-2">
-              <StagePill :stage="overview.currentStage" />
+              <StagePill :stage="overview.currentStage || 'STRUCTURE'" />
+              <p class="mt-2 text-sm font-medium text-slate-700">{{ formatSessionStatus(overview.sessionStatus) }}</p>
             </div>
           </div>
           <div>
@@ -133,21 +162,24 @@ onMounted(async () => {
         eyebrow="当前学习导航"
         :title="currentTaskTitle"
         :description="currentTaskGoal"
-        :helper="`当前属于 ${formatStage(overview.nextTask?.stage || overview.currentStage)}。${nextStepText}`"
+        :helper="`当前属于 ${formatSessionStatus(overview.sessionStatus)}。${nextStepText}`"
         button-label="继续当前学习"
-        :disabled="!overview.nextTask && overview.currentStage !== 'TRAINING' && overview.currentStage !== 'EVALUATE'"
+        :disabled="!overview.nextTask && overview.sessionStatus !== 'PRACTICING' && overview.sessionStatus !== 'REPORT_READY'"
         @action="continueCurrentLearning"
       />
 
       <div class="grid gap-5 lg:grid-cols-3">
         <ProgressSummary :progress="overview.progress" />
-
-        <SecondaryInfoCard title="最近一次训练结果摘要" :description="recentTrainingSummary" />
-
+        <SecondaryInfoCard title="最近一次训练摘要" :description="recentTrainingSummary" />
         <SecondaryInfoCard title="学习目标" :description="learningGoal" />
       </div>
 
-      <PageSection v-if="simpleTimeline.length" compact title="已安排的学习步骤" description="这里只保留简化视图，帮助你快速确认这轮学习的大致顺序。">
+      <PageSection
+        v-if="simpleTimeline.length"
+        compact
+        title="已安排的学习步骤"
+        description="这里保留简化视图，帮助你快速确认这轮学习的推进顺序。"
+      >
         <div class="grid gap-3 md:grid-cols-2">
           <div v-for="(item, index) in simpleTimeline" :key="`${item}-${index}`" class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
             {{ item }}

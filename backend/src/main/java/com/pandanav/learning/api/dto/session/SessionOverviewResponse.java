@@ -25,6 +25,9 @@ public record SessionOverviewResponse(
     @JsonProperty("current_stage")
     @Schema(name = "current_stage", example = "UNDERSTANDING")
     String currentStage,
+    @JsonProperty("session_status")
+    @Schema(name = "session_status", example = "LEARNING")
+    String sessionStatus,
     List<TimelineItemResponse> timeline,
     @JsonProperty("next_task")
     NextTaskResponse nextTask,

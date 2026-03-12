@@ -4,6 +4,7 @@ import com.pandanav.learning.api.dto.session.ProgressResponse;
 import com.pandanav.learning.api.dto.session.SessionHistoryItemResponse;
 import com.pandanav.learning.api.dto.session.SessionHistoryResponse;
 import com.pandanav.learning.api.dto.session.SessionOverviewResponse;
+import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.application.usecase.GetSessionOverviewUseCase;
 import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.enums.TaskStatus;
@@ -48,7 +49,12 @@ public class SessionHistoryService {
             throw new BadRequestException("Invalid page or page_size.");
         }
         int offset = (normalizedPage - 1) * normalizedPageSize;
-        String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase();
+        SessionStatus normalizedStatus;
+        try {
+            normalizedStatus = status == null || status.isBlank() ? null : SessionStatus.fromDb(status);
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Invalid session status.");
+        }
 
         List<SessionHistoryItemResponse> items = sessionRepository
             .findHistoryByUserPk(userId, normalizedStatus, normalizedPageSize, offset)
@@ -58,7 +64,7 @@ public class SessionHistoryService {
                 session.getCourseId(),
                 session.getChapterId(),
                 session.getGoalText(),
-                session.getStatus(),
+                session.getStatus() == null ? null : session.getStatus().name(),
                 buildProgress(session.getId()),
                 session.getLastActiveAt()
             ))

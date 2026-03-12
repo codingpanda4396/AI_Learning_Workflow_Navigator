@@ -68,6 +68,7 @@ export function normalizeCurrentSession(data: Record<string, unknown>): CurrentS
     goalText: String(session.goal_text ?? session.goalText ?? ''),
     currentNodeId: toNumber(session.current_node_id ?? session.currentNodeId),
     currentStage: String(session.current_stage ?? session.currentStage ?? ''),
+    sessionStatus: String(session.session_status ?? session.sessionStatus ?? '') as CurrentSessionInfo['sessionStatus'],
   };
 }
 
@@ -86,6 +87,7 @@ export function normalizeOverview(data: Record<string, unknown>): SessionOvervie
     goalText: String(data.goal_text ?? data.goalText ?? ''),
     currentNodeId: toNumber(data.current_node_id ?? data.currentNodeId),
     currentStage: String(data.current_stage ?? data.currentStage ?? ''),
+    sessionStatus: String(data.session_status ?? data.sessionStatus ?? '') as SessionOverview['sessionStatus'],
     timeline: timeline.map((item) => {
       const row = item as Record<string, unknown>;
       return {
@@ -166,7 +168,7 @@ function normalizeQuestion(item: Record<string, unknown>): QuizQuestion {
     options,
     evaluationFocus: String(item.evaluation_focus ?? item.evaluationFocus ?? item.explanation ?? ''),
     difficulty: String(item.difficulty ?? ''),
-    status: String(item.status ?? ''),
+    status: String(item.status ?? '') as QuizQuestion['status'],
   };
 }
 
@@ -176,8 +178,8 @@ export function normalizeQuizSnapshot(data: Record<string, unknown>): QuizSnapsh
     sessionId: toNumber(data.session_id ?? data.sessionId) ?? 0,
     taskId: toNumber(data.task_id ?? data.taskId),
     quizId: toNumber(data.quiz_id ?? data.quizId),
-    generationStatus: String(data.generation_status ?? data.generationStatus ?? ''),
-    quizStatus: String(data.quiz_status ?? data.quizStatus ?? data.status ?? ''),
+    generationStatus: String(data.generation_status ?? data.generationStatus ?? '') as QuizSnapshot['generationStatus'],
+    quizStatus: String(data.quiz_status ?? data.quizStatus ?? data.status ?? '') as QuizSnapshot['quizStatus'],
     questionCount: toNumber(data.question_count ?? data.questionCount),
     answeredCount: toNumber(data.answered_count ?? data.answeredCount),
     failureReason: String(data.failure_reason ?? data.failureReason ?? ''),

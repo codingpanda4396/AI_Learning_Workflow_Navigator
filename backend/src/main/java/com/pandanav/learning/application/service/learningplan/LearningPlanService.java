@@ -12,6 +12,7 @@ import com.pandanav.learning.api.dto.plan.PlanTaskPreviewResponse;
 import com.pandanav.learning.application.command.ConfirmLearningPlanCommand;
 import com.pandanav.learning.application.command.PreviewLearningPlanCommand;
 import com.pandanav.learning.domain.enums.LearningPlanStatus;
+import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.ConceptNode;
@@ -122,7 +123,7 @@ public class LearningPlanService {
         session.setGoalText(aggregate.planningContext().goalText());
         session.setCurrentNodeId(startNode.getId());
         session.setCurrentStage(Stage.STRUCTURE);
-        session.setStatus("ACTIVE");
+        session.setStatus(SessionStatus.PLANNING);
         LearningSession savedSession = sessionRepository.save(session);
 
         List<Task> tasks = new ArrayList<>();
@@ -137,6 +138,7 @@ public class LearningPlanService {
             tasks.add(buildTask(savedSession.getId(), conceptNode.getId(), Stage.REFLECTION, conceptNode.getName()));
         }
         List<Task> savedTasks = taskRepository.saveAll(tasks);
+        sessionRepository.updateStatus(savedSession.getId(), SessionStatus.LEARNING);
 
         plan.setSessionId(savedSession.getId());
         plan.setStatus(LearningPlanStatus.CONFIRMED);

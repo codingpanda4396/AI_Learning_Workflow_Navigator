@@ -27,7 +27,8 @@ public class GetCurrentSessionService implements GetCurrentSessionUseCase {
                     session.getChapterId(),
                     session.getGoalText(),
                     session.getCurrentNodeId(),
-                    session.getCurrentStage() == null ? null : session.getCurrentStage().name()
+                    session.getCurrentStage() == null ? null : session.getCurrentStage().name(),
+                    session.getStatus() == null ? null : session.getStatus().name()
                 )
             ))
             .orElseGet(() -> new CurrentSessionResponse(false, null));

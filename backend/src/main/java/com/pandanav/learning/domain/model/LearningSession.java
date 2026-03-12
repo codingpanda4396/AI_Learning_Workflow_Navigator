@@ -1,6 +1,7 @@
 package com.pandanav.learning.domain.model;
 
 import com.pandanav.learning.domain.enums.Stage;
+import com.pandanav.learning.domain.enums.SessionStatus;
 
 import java.time.OffsetDateTime;
 
@@ -14,7 +15,7 @@ public class LearningSession {
     private String goalText;
     private Long currentNodeId;
     private Stage currentStage;
-    private String status;
+    private SessionStatus status;
     private OffsetDateTime completedAt;
     private OffsetDateTime lastActiveAt;
     private OffsetDateTime createdAt;
@@ -84,11 +85,11 @@ public class LearningSession {
         this.currentStage = currentStage;
     }
 
-    public String getStatus() {
+    public SessionStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(SessionStatus status) {
         this.status = status;
     }
 

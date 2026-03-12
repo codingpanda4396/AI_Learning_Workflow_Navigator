@@ -1,3 +1,14 @@
+export type QuizBusinessStatus =
+  | 'GENERATING'
+  | 'READY'
+  | 'ANSWERING'
+  | 'REVIEWING'
+  | 'REPORT_READY'
+  | 'NEXT_ROUND'
+  | 'FAILED';
+
+export type QuizRuntimeStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+
 export interface QuizQuestion {
   questionId: number;
   type?: string;
@@ -5,15 +16,15 @@ export interface QuizQuestion {
   options: string[];
   evaluationFocus?: string;
   difficulty?: string;
-  status?: string;
+  status?: 'READY' | 'ANSWERED' | 'ARCHIVED';
 }
 
 export interface QuizSnapshot {
   sessionId: number;
   taskId?: number;
   quizId?: number;
-  generationStatus?: string;
-  quizStatus?: string;
+  generationStatus?: QuizRuntimeStatus;
+  quizStatus?: QuizBusinessStatus;
   questionCount?: number;
   answeredCount?: number;
   failureReason?: string;

@@ -91,6 +91,7 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
             session.getGoalText(),
             session.getCurrentNodeId(),
             session.getCurrentStage() == null ? null : session.getCurrentStage().name(),
+            session.getStatus() == null ? null : session.getStatus().name(),
             timeline,
             nextTask,
             masterySummary,

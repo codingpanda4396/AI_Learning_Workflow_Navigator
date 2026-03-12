@@ -2,6 +2,32 @@ import { defineStore } from 'pinia';
 import { fetchQuizApi, fetchQuizStatusApi, generateQuizApi, submitQuizApi } from '@/api/modules/quiz';
 import type { QuizAnswerPayload, QuizSnapshot } from '@/types/quiz';
 
+function resolveQuizViewStatus(quiz: QuizSnapshot | null) {
+  const generationStatus = quiz?.generationStatus;
+  const quizStatus = quiz?.quizStatus;
+
+  if (generationStatus === 'PENDING' || generationStatus === 'RUNNING' || quizStatus === 'GENERATING') {
+    return 'generating';
+  }
+  if (generationStatus === 'FAILED' || quizStatus === 'FAILED') {
+    return 'failed';
+  }
+  switch (quizStatus) {
+    case 'READY':
+      return 'ready';
+    case 'ANSWERING':
+      return 'answering';
+    case 'REVIEWING':
+      return 'reviewing';
+    case 'REPORT_READY':
+      return 'report-ready';
+    case 'NEXT_ROUND':
+      return 'next-round';
+    default:
+      return 'idle';
+  }
+}
+
 export const useQuizStore = defineStore('quiz', {
   state: () => ({
     quiz: null as QuizSnapshot | null,
@@ -17,11 +43,11 @@ export const useQuizStore = defineStore('quiz', {
       this.status = 'generating';
       try {
         this.quiz = await generateQuizApi(sessionId);
-        this.status = this.quiz.generationStatus?.toLowerCase() ?? 'generating';
+        this.status = resolveQuizViewStatus(this.quiz);
         return this.quiz;
       } catch (error) {
-        this.status = 'error';
-        this.error = error instanceof Error ? error.message : '生成训练题失败';
+        this.status = 'failed';
+        this.error = error instanceof Error ? error.message : '获取练习题失败';
         throw error;
       } finally {
         this.loading = false;
@@ -32,21 +58,11 @@ export const useQuizStore = defineStore('quiz', {
       this.error = '';
       try {
         this.quiz = await fetchQuizStatusApi(sessionId);
-        const generationStatus = this.quiz.generationStatus?.toUpperCase();
-        const quizStatus = this.quiz.quizStatus?.toUpperCase();
-        if (generationStatus === 'PENDING' || generationStatus === 'RUNNING') {
-          this.status = 'generating';
-        } else if (generationStatus === 'FAILED') {
-          this.status = 'error';
-        } else if (quizStatus === 'COMPLETED' || quizStatus === 'SUBMITTED') {
-          this.status = 'completed';
-        } else {
-          this.status = 'ready';
-        }
+        this.status = resolveQuizViewStatus(this.quiz);
         return this.quiz;
       } catch (error) {
-        this.status = 'error';
-        this.error = error instanceof Error ? error.message : '获取训练状态失败';
+        this.status = 'failed';
+        this.error = error instanceof Error ? error.message : '获取练习状态失败';
         throw error;
       } finally {
         this.loading = false;
@@ -57,7 +73,7 @@ export const useQuizStore = defineStore('quiz', {
       this.error = '';
       try {
         this.quiz = await fetchQuizApi(sessionId);
-        this.status = 'ready';
+        this.status = resolveQuizViewStatus(this.quiz);
         return this.quiz;
       } catch (error) {
         this.error = error instanceof Error ? error.message : '获取题目失败';
@@ -72,9 +88,9 @@ export const useQuizStore = defineStore('quiz', {
       this.status = 'submitting';
       try {
         await submitQuizApi(sessionId, answers);
-        this.status = 'completed';
+        this.status = 'report-ready';
       } catch (error) {
-        this.status = 'error';
+        this.status = 'failed';
         this.error = error instanceof Error ? error.message : '提交答案失败';
         throw error;
       } finally {

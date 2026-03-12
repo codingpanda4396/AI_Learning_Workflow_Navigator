@@ -6,6 +6,7 @@ import com.pandanav.learning.application.usecase.CreateSessionUseCase;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningEvent;
 import com.pandanav.learning.domain.model.LearningSession;
+import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.LearningEventRepository;
@@ -52,7 +53,7 @@ public class CreateSessionService implements CreateSessionUseCase {
         session.setGoalText(normalizedGoal);
         session.setCurrentStage(Stage.STRUCTURE);
         session.setCurrentNodeId(firstNode.getId());
-        session.setStatus("ACTIVE");
+        session.setStatus(SessionStatus.ANALYZING);
 
         try {
             LearningSession saved = sessionRepository.save(session);

@@ -19,31 +19,50 @@ let timer: number | undefined;
 const statusText = computed(() => {
   switch (quizStore.status) {
     case 'generating':
-      return '正在生成题目';
+      return '正在生成本轮练习题';
     case 'submitting':
-      return '正在评估答案';
-    case 'completed':
-      return '检测已完成';
-    case 'error':
-      return '检测暂时不可用';
+      return '正在提交并生成反馈';
+    case 'answering':
+      return '可以继续完成未答完的题目';
+    case 'reviewing':
+      return '本轮已进入复盘阶段';
+    case 'report-ready':
+      return '反馈报告已生成';
+    case 'next-round':
+      return '已进入下一轮建议状态';
+    case 'failed':
+      return '当前练习不可用，请稍后重试';
     default:
       return '';
   }
 });
 
-function startPolling() {
+function stopPolling() {
   if (timer) {
     window.clearInterval(timer);
+    timer = undefined;
   }
+}
+
+async function handleSnapshot() {
+  const snapshot = await quizStore.fetchQuizStatus(sessionId.value);
+
+  if (snapshot.quizStatus === 'REPORT_READY' || snapshot.quizStatus === 'REVIEWING' || snapshot.quizStatus === 'NEXT_ROUND') {
+    stopPolling();
+    await router.push(`/sessions/${sessionId.value}/report`);
+    return;
+  }
+
+  if (snapshot.generationStatus === 'SUCCEEDED' && snapshot.quizStatus === 'READY') {
+    stopPolling();
+    await quizStore.fetchQuiz(sessionId.value);
+  }
+}
+
+function startPolling() {
+  stopPolling();
   timer = window.setInterval(async () => {
-    const snapshot = await quizStore.fetchQuizStatus(sessionId.value);
-    const done = snapshot.generationStatus === 'SUCCEEDED' || snapshot.quizStatus === 'READY';
-    if (done) {
-      if (timer) {
-        window.clearInterval(timer);
-      }
-      await quizStore.fetchQuiz(sessionId.value);
-    }
+    await handleSnapshot();
   }, 2000);
 }
 
@@ -64,9 +83,15 @@ async function submit() {
 onMounted(async () => {
   try {
     const status = await quizStore.fetchQuizStatus(sessionId.value);
-    if (status.generationStatus === 'SUCCEEDED' || status.quizStatus === 'READY') {
+    if (status.quizStatus === 'REPORT_READY' || status.quizStatus === 'REVIEWING' || status.quizStatus === 'NEXT_ROUND') {
+      await router.push(`/sessions/${sessionId.value}/report`);
+      return;
+    }
+    if (status.generationStatus === 'SUCCEEDED' && status.quizStatus === 'READY') {
       await quizStore.fetchQuiz(sessionId.value);
-    } else if (status.generationStatus === 'PENDING' || status.generationStatus === 'RUNNING') {
+      return;
+    }
+    if (status.generationStatus === 'PENDING' || status.generationStatus === 'RUNNING' || status.quizStatus === 'GENERATING') {
       startPolling();
     }
   } catch {
@@ -75,9 +100,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  if (timer) {
-    window.clearInterval(timer);
-  }
+  stopPolling();
 });
 </script>
 
@@ -85,9 +108,9 @@ onBeforeUnmount(() => {
   <AppShell>
     <div class="space-y-6 pb-26">
       <PageSection
-        eyebrow="在线检测"
-        title="完成检测后，系统会生成学习反馈"
-        description="先独立作答，再根据反馈确认你已经掌握了什么、还需要继续巩固什么。"
+        eyebrow="在线练习"
+        title="完成练习后，系统会生成本轮反馈"
+        description="先独立作答，再根据反馈确认自己已经掌握了什么、还需要继续巩固什么。"
       >
         <div v-if="statusText" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
           {{ statusText }}
@@ -107,7 +130,7 @@ onBeforeUnmount(() => {
       </section>
       <EmptyState
         v-else
-        title="检测题目还没准备好"
+        title="练习题还没有准备好"
         description="点击下方按钮开始生成题目。生成完成后，页面会自动切换到答题状态。"
       >
         <button class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" :disabled="quizStore.loading" @click="generate">

@@ -1,15 +1,17 @@
 package com.pandanav.learning.domain.enums;
 
 public enum PracticeItemStatus {
-    GENERATED,
-    ACTIVE,
+    READY,
     ANSWERED,
     ARCHIVED;
 
     public static PracticeItemStatus fromDb(String value) {
         if (value == null || value.isBlank()) {
-            return GENERATED;
+            return READY;
         }
-        return PracticeItemStatus.valueOf(value.toUpperCase());
+        return switch (value.trim().toUpperCase()) {
+            case "GENERATED", "ACTIVE" -> READY;
+            default -> PracticeItemStatus.valueOf(value.trim().toUpperCase());
+        };
     }
 }
