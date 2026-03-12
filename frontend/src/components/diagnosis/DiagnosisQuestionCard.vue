@@ -1,0 +1,89 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import type { DiagnosisAnswerValue, DiagnosisQuestion } from '@/types/diagnosis';
+
+const props = defineProps<{
+  question: DiagnosisQuestion;
+  modelValue?: DiagnosisAnswerValue;
+}>();
+
+const emit = defineEmits<{
+  (event: 'update:modelValue', value: DiagnosisAnswerValue): void;
+}>();
+
+const selectedList = computed(() => (Array.isArray(props.modelValue) ? props.modelValue : []));
+const textValue = computed(() => (typeof props.modelValue === 'string' ? props.modelValue : ''));
+
+function updateSingleChoice(option: string) {
+  emit('update:modelValue', option);
+}
+
+function updateMultipleChoice(option: string, checked: boolean) {
+  const nextValues = checked
+    ? [...selectedList.value, option]
+    : selectedList.value.filter((item) => item !== option);
+  emit('update:modelValue', nextValues);
+}
+
+function updateText(value: string) {
+  emit('update:modelValue', value);
+}
+</script>
+
+<template>
+  <section class="rounded-[1.9rem] border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">{{ question.dimension }}</p>
+        <h2 class="mt-2 text-xl font-semibold leading-8 text-slate-950">{{ question.title }}</h2>
+        <p v-if="question.description" class="mt-3 text-sm leading-6 text-slate-600">{{ question.description }}</p>
+      </div>
+      <span v-if="question.required" class="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-600">必答</span>
+    </div>
+
+    <div class="mt-6">
+      <div v-if="question.type === 'single_choice'" class="grid gap-3">
+        <label
+          v-for="option in question.options || []"
+          :key="option"
+          class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 px-4 py-3 transition hover:border-sky-300 hover:bg-sky-50/50"
+        >
+          <input
+            class="mt-1"
+            type="radio"
+            :name="question.questionId"
+            :checked="modelValue === option"
+            @change="updateSingleChoice(option)"
+          />
+          <span class="text-sm leading-6 text-slate-700">{{ option }}</span>
+        </label>
+      </div>
+
+      <div v-else-if="question.type === 'multiple_choice'" class="grid gap-3">
+        <label
+          v-for="option in question.options || []"
+          :key="option"
+          class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 px-4 py-3 transition hover:border-sky-300 hover:bg-sky-50/50"
+        >
+          <input
+            class="mt-1"
+            type="checkbox"
+            :checked="selectedList.includes(option)"
+            @change="updateMultipleChoice(option, ($event.target as HTMLInputElement).checked)"
+          />
+          <span class="text-sm leading-6 text-slate-700">{{ option }}</span>
+        </label>
+      </div>
+
+      <label v-else class="block">
+        <textarea
+          :value="textValue"
+          rows="6"
+          class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-sky-300 focus:bg-white"
+          :placeholder="question.placeholder || '请输入你的想法'"
+          @input="updateText(($event.target as HTMLTextAreaElement).value)"
+        />
+      </label>
+    </div>
+  </section>
+</template>
