@@ -37,7 +37,7 @@ onMounted(async () => {
           <p class="mt-2 text-sm text-slate-600">最近平均得分：{{ dashboard.recentPerformance?.averageScore ?? '--' }}</p>
           <p class="mt-2 text-sm text-slate-600">最近一次得分：{{ dashboard.recentPerformance?.latestScore ?? '--' }}</p>
           <p class="mt-4 text-sm text-slate-600">高频错误标签：{{ dashboard.recentPerformance?.topErrorTags.join('、') || '暂无' }}</p>
-          <p class="mt-4 text-sm text-slate-600">Top weak points：{{ dashboard.topWeakPoints.join('、') || '暂无' }}</p>
+          <p class="mt-4 text-sm text-slate-600">主要薄弱点：{{ dashboard.topWeakPoints.join('、') || '暂无' }}</p>
         </div>
 
         <div class="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200">

@@ -28,7 +28,7 @@ function logout() {
           class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           @click="logout"
         >
-          退出
+          退出登录
         </button>
       </div>
     </div>

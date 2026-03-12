@@ -50,6 +50,14 @@ export interface SessionOverview {
   nextTask?: SessionNextTask | null;
   masterySummary: MasterySummaryItem[];
   progress: SessionProgress;
+  summary?: {
+    currentTaskTitle: string;
+    currentTaskDescription: string;
+    nextStepHint: string;
+    primaryActionLabel: string;
+    primaryActionPath: string;
+    recentReportSummary: string;
+  };
 }
 
 export interface CurrentSessionInfo {

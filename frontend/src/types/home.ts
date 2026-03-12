@@ -4,8 +4,6 @@ export interface ActiveSession {
   course: string;
   chapter: string;
   phase: string;
-  currentTask?: string;
-  progress?: number;
 }
 
 export interface StartLearningForm {

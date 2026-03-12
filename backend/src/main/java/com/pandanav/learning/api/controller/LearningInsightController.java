@@ -1,6 +1,7 @@
 package com.pandanav.learning.api.controller;
 
 import com.pandanav.learning.api.dto.feedback.LearningReportResponse;
+import com.pandanav.learning.api.dto.feedback.SessionReportResponse;
 import com.pandanav.learning.api.dto.session.GrowthDashboardResponse;
 import com.pandanav.learning.application.service.LearningInsightQueryService;
 import com.pandanav.learning.auth.UserContextHolder;
@@ -27,6 +28,12 @@ public class LearningInsightController {
     @GetMapping("/learning-feedback/report")
     public LearningReportResponse getLearningReport(@PathVariable @Positive Long sessionId) {
         return learningInsightQueryService.getLearningReport(sessionId, UserContextHolder.getRequiredUserId());
+    }
+
+    @Operation(summary = "Get session report for current session")
+    @GetMapping("/report")
+    public SessionReportResponse getSessionReport(@PathVariable @Positive Long sessionId) {
+        return learningInsightQueryService.getSessionReport(sessionId, UserContextHolder.getRequiredUserId());
     }
 
     @Operation(summary = "Get growth dashboard for current session")

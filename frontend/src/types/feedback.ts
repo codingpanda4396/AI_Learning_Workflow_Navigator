@@ -53,6 +53,7 @@ export interface LearningReport {
   nextRoundAdvice?: string;
   nextStep?: NextStepRecommendation | null;
   growthRecorded?: boolean;
+  source?: string;
 }
 
 export interface GrowthDashboardNode {

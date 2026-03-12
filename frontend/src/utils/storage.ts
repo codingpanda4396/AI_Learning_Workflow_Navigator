@@ -17,11 +17,3 @@ export function clearStoredAuth() {
 export function getStoredUsername() {
   return localStorage.getItem(STORAGE_KEYS.username) ?? '';
 }
-
-export function getLastSessionId() {
-  return localStorage.getItem(STORAGE_KEYS.lastSessionId) ?? '';
-}
-
-export function setLastSessionId(sessionId: number | string) {
-  localStorage.setItem(STORAGE_KEYS.lastSessionId, String(sessionId));
-}

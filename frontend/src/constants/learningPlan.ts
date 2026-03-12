@@ -11,7 +11,7 @@ export const STAGE_LABELS: Record<LearningStage, string> = {
   STRUCTURE: '建立框架',
   UNDERSTANDING: '理解原理',
   TRAINING: '训练应用',
-  REFLECTION: '评估反思',
+  REFLECTION: '评估反馈',
 };
 
 export const STAGE_ORDER: LearningStage[] = ['STRUCTURE', 'UNDERSTANDING', 'TRAINING', 'REFLECTION'];

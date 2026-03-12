@@ -1,19 +1,10 @@
 import apiClient from '@/api/client';
-import { mergeReportPayloads, normalizeGrowthDashboard } from '@/api/normalizers';
+import { normalizeGrowthDashboard, normalizeSessionReport } from '@/api/normalizers';
 import type { GrowthDashboard, LearningReport } from '@/types/feedback';
 
 export async function fetchReportApi(sessionId: number): Promise<LearningReport> {
-  const [feedbackResponse, reportResponse, weakPointsResponse] = await Promise.allSettled([
-    apiClient.get(`/api/sessions/${sessionId}/feedback`),
-    apiClient.get(`/api/sessions/${sessionId}/learning-feedback/report`),
-    apiClient.get(`/api/sessions/${sessionId}/learning-feedback/weak-points`),
-  ]);
-
-  return mergeReportPayloads({
-    feedback: feedbackResponse.status === 'fulfilled' ? feedbackResponse.value.data : null,
-    report: reportResponse.status === 'fulfilled' ? reportResponse.value.data : null,
-    weakPoints: weakPointsResponse.status === 'fulfilled' ? weakPointsResponse.value.data : null,
-  });
+  const { data } = await apiClient.get(`/api/sessions/${sessionId}/report`);
+  return normalizeSessionReport(data);
 }
 
 export async function submitNextActionApi(sessionId: number, action: string): Promise<LearningReport> {

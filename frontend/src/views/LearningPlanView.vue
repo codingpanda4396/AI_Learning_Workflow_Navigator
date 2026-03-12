@@ -57,7 +57,7 @@ const viewState = computed(() => {
 
 async function loadPlan() {
   if (!context.value.goalId || !context.value.diagnosisId) {
-    learningPlanStore.error = '缺少 learning plan 所需的诊断或目标参数';
+    learningPlanStore.error = '缺少生成学习规划所需的诊断或目标参数';
     return;
   }
   try {
@@ -157,8 +157,8 @@ onBeforeUnmount(() => {
 
         <PageSection
           eyebrow="AI 正在生成"
-          title="正在把你的诊断结果转换成这一轮的行动决策"
-          description="系统会结合目标、薄弱点和当前基础，决定这轮从哪里开始以及如何推进。"
+          title="正在把你的诊断结果转成这一轮的行动决策"
+          description="系统会结合目标、薄弱点和当前基础，决定这一轮从哪里开始以及如何推进。"
         >
           <div class="grid gap-4 md:grid-cols-3">
             <div v-for="item in 3" :key="item" class="animate-pulse rounded-[1.7rem] border border-slate-200 bg-white p-5">
@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
-        <ErrorState :message="error || '学习规划生成失败，你可以重新再试一次。'" />
+        <ErrorState :message="error || '学习规划生成失败，你可以再试一次。'" />
         <div class="flex justify-start">
           <button
             type="button"
@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
         >
           {{
             viewState === 'confirming'
-              ? '系统正在创建本轮学习 session，并把这份决策接入后续执行链路。'
+              ? '系统正在创建本轮学习会话，并把这份决策接入后续执行链路。'
               : '系统正在根据你的偏好重新组织学习起点、解释依据和任务顺序。'
           }}
         </div>

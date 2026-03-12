@@ -10,7 +10,6 @@ import type {
 
 interface DiagnosisState {
   diagnosisId: string;
-  sessionId: string;
   questions: DiagnosisQuestion[];
   currentQuestionIndex: number;
   answers: Record<string, DiagnosisAnswerValue>;
@@ -24,7 +23,6 @@ interface DiagnosisState {
 export const useDiagnosisStore = defineStore('diagnosis', {
   state: (): DiagnosisState => ({
     diagnosisId: '',
-    sessionId: '',
     questions: [],
     currentQuestionIndex: 0,
     answers: {},
@@ -38,7 +36,6 @@ export const useDiagnosisStore = defineStore('diagnosis', {
     async generateDiagnosis(sessionId: string) {
       this.loading = true;
       this.error = '';
-      this.sessionId = sessionId;
       this.capabilityProfile = null;
       this.nextAction = null;
       this.currentQuestionIndex = 0;
@@ -91,7 +88,6 @@ export const useDiagnosisStore = defineStore('diagnosis', {
     },
     reset() {
       this.diagnosisId = '';
-      this.sessionId = '';
       this.questions = [];
       this.currentQuestionIndex = 0;
       this.answers = {};

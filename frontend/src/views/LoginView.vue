@@ -25,7 +25,7 @@ async function submit() {
   <div class="flex min-h-screen items-center justify-center px-6">
     <div class="grid w-full max-w-5xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
       <section class="rounded-[2rem] bg-slate-900 p-10 text-white">
-        <p class="text-xs uppercase tracking-[0.24em] text-slate-400">AI Learning Workflow</p>
+        <p class="text-xs uppercase tracking-[0.24em] text-slate-400">AI 学习工作流</p>
         <h1 class="mt-4 text-4xl font-semibold leading-tight">{{ APP_TITLE }}</h1>
         <p class="mt-6 max-w-lg text-sm leading-7 text-slate-300">
           从登录开始，围绕真实后端链路完成学习会话创建、任务执行、训练测验、反馈报告和成长看板。
@@ -63,7 +63,7 @@ async function submit() {
             class="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
             :disabled="authStore.loading"
           >
-            {{ mode === 'login' ? '登录进入首页' : '注册并登录' }}
+            {{ mode === 'login' ? '登录并进入首页' : '注册并登录' }}
           </button>
         </form>
 

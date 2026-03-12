@@ -40,7 +40,7 @@ export const useLearningPlanStore = defineStore('learningPlan', {
         };
         return preview;
       } catch (error) {
-        this.error = error instanceof Error ? error.message : '瀛︿範瑙勫垝鐢熸垚澶辫触';
+        this.error = error instanceof Error ? error.message : '生成学习规划预览失败';
         throw error;
       } finally {
         this.loading = false;
@@ -81,7 +81,7 @@ export const useLearningPlanStore = defineStore('learningPlan', {
         };
         return preview;
       } catch (error) {
-        this.error = error instanceof Error ? error.message : '瀛︿範瑙勫垝閲嶆柊鐢熸垚澶辫触';
+        this.error = error instanceof Error ? error.message : '重新生成学习规划失败';
         throw error;
       } finally {
         this.regenerating = false;
@@ -89,7 +89,7 @@ export const useLearningPlanStore = defineStore('learningPlan', {
     },
     async confirmPlan() {
       if (!this.preview?.planId) {
-        throw new Error('Missing learning plan id.');
+        throw new Error('缺少学习规划 ID。');
       }
       this.confirming = true;
       this.error = '';
@@ -97,7 +97,7 @@ export const useLearningPlanStore = defineStore('learningPlan', {
         const result = await confirmLearningPlanApi(this.preview.planId);
         return result.sessionId;
       } catch (error) {
-        this.error = error instanceof Error ? error.message : '纭瀛︿範瑙勫垝澶辫触';
+        this.error = error instanceof Error ? error.message : '确认学习规划失败';
         throw error;
       } finally {
         this.confirming = false;

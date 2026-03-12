@@ -6,6 +6,7 @@ import com.pandanav.learning.api.dto.feedback.LearningReportMasteryResponse;
 import com.pandanav.learning.api.dto.feedback.LearningReportQuestionResponse;
 import com.pandanav.learning.api.dto.feedback.LearningReportResponse;
 import com.pandanav.learning.api.dto.feedback.NextStepRecommendationResponse;
+import com.pandanav.learning.api.dto.feedback.SessionReportResponse;
 import com.pandanav.learning.api.dto.feedback.WeakPointNodeResponse;
 import com.pandanav.learning.api.dto.session.GrowthDashboardNodeResponse;
 import com.pandanav.learning.api.dto.session.GrowthDashboardRecentPerformanceResponse;
@@ -81,52 +82,61 @@ public class LearningInsightQueryService {
     }
 
     public LearningReportResponse getLearningReport(Long sessionId, Long userId) {
-        LearningSession session = requireSession(sessionId, userId);
-        Task trainingTask = resolveTrainingTask(session);
-        ConceptNode node = conceptNodeRepository.findById(trainingTask.getNodeId())
-            .orElseGet(() -> buildFallbackNode(trainingTask.getNodeId()));
-        Optional<PracticeQuiz> quiz = practiceQuizRepository.findLatestBySessionIdAndTaskIdAndUserPk(sessionId, trainingTask.getId(), userId);
-        PracticeFeedbackReport report = quiz.flatMap(item -> practiceFeedbackReportRepository.findByQuizId(item.getId())).orElse(null);
-        List<PracticeItem> items = quiz.map(item -> practiceRepository.findByQuizId(item.getId()))
-            .orElseGet(() -> practiceRepository.findBySessionIdAndTaskIdAndUserPk(sessionId, trainingTask.getId(), userId));
-        List<PracticeSubmission> submissions = practiceSubmissionRepository.findBySessionIdAndTaskIdAndUserPk(sessionId, trainingTask.getId(), userId);
-        NodeMastery mastery = nodeMasteryRepository.findByUserIdAndNodeId(userId, trainingTask.getNodeId()).orElse(null);
-        WeakPointDiagnosisService.WeakPointDiagnosisResult diagnosis = weakPointDiagnosisService.diagnoseWeakPoints(sessionId, userId);
-        RecommendationView recommendation = buildRecommendation(session, node, mastery, submissions, diagnosis.weakNodes());
-
-        int questionCount = items.isEmpty() ? submissions.size() : items.size();
-        int correctCount = (int) submissions.stream().filter(item -> Boolean.TRUE.equals(item.getCorrect())).count();
-        Integer overallScore = submissions.isEmpty() ? null : Math.round((float) submissions.stream()
-            .map(PracticeSubmission::getScore)
-            .filter(java.util.Objects::nonNull)
-            .mapToInt(Integer::intValue)
-            .sum() / submissions.size());
-        BigDecimal overallAccuracy = questionCount == 0
-            ? BigDecimal.ZERO
-            : BigDecimal.valueOf(correctCount)
-                .multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(questionCount), 2, RoundingMode.HALF_UP);
-
+        LearningReportView reportView = buildLearningReportView(sessionId, userId);
         return new LearningReportResponse(
-            sessionId,
-            trainingTask.getId(),
-            node.getId(),
-            node.getName(),
-            trainingTask.getStage().name(),
-            stageLabel(trainingTask.getStage()),
-            overallScore,
-            overallAccuracy,
-            correctCount,
-            questionCount,
-            report != null ? report.getDiagnosisSummary() : fallbackDiagnosis(overallAccuracy),
-            report != null ? readStringList(report.getStrengthsJson()) : fallbackStrengths(correctCount, questionCount),
-            report != null ? readStringList(report.getWeaknessesJson()) : fallbackWeaknesses(submissions),
-            report != null ? readStringList(report.getReviewFocusJson()) : fallbackReviewFocus(diagnosis.weakNodes()),
-            toMasteryResponse(mastery, node),
-            buildQuestionResults(items, submissions),
-            diagnosis.weakNodes().stream().limit(5).map(this::toWeakPointResponse).toList(),
-            recommendation.toResponse(),
-            mastery != null
+            reportView.sessionId(),
+            reportView.taskId(),
+            reportView.nodeId(),
+            reportView.nodeName(),
+            reportView.stageCode(),
+            reportView.stageLabel(),
+            reportView.overallScore(),
+            reportView.overallAccuracy(),
+            reportView.correctCount(),
+            reportView.questionCount(),
+            reportView.diagnosisSummary(),
+            reportView.strengths(),
+            reportView.weaknesses(),
+            reportView.reviewFocus(),
+            reportView.mastery(),
+            reportView.questionResults(),
+            reportView.weakPoints(),
+            reportView.nextStep(),
+            reportView.growthRecorded()
+        );
+    }
+
+    public SessionReportResponse getSessionReport(Long sessionId, Long userId) {
+        LearningReportView reportView = buildLearningReportView(sessionId, userId);
+        PracticeFeedbackReport feedbackReport = reportView.feedbackReport();
+
+        return new SessionReportResponse(
+            reportView.sessionId(),
+            reportView.taskId(),
+            reportView.nodeId(),
+            reportView.nodeName(),
+            reportView.stageCode(),
+            reportView.stageLabel(),
+            reportView.overallScore(),
+            reportView.overallAccuracy(),
+            reportView.correctCount(),
+            reportView.questionCount(),
+            reportView.diagnosisSummary(),
+            feedbackReport != null && feedbackReport.getDiagnosisSummary() != null && !feedbackReport.getDiagnosisSummary().isBlank()
+                ? feedbackReport.getDiagnosisSummary()
+                : reportView.diagnosisSummary(),
+            reportView.strengths(),
+            reportView.weaknesses(),
+            reportView.reviewFocus(),
+            reportView.questionResults(),
+            reportView.weakPoints(),
+            feedbackReport == null ? null : feedbackReport.getNextRoundAdvice(),
+            feedbackReport == null ? reportView.nextStep().recommendedAction() : feedbackReport.getRecommendedAction(),
+            feedbackReport == null ? reportView.nextStep().recommendedAction() : feedbackReport.getRecommendedAction(),
+            feedbackReport == null ? null : feedbackReport.getSelectedAction(),
+            reportView.nextStep(),
+            reportView.growthRecorded(),
+            feedbackReport == null ? "AGGREGATED" : feedbackReport.getSource()
         );
     }
 
@@ -205,6 +215,57 @@ public class LearningInsightQueryService {
     private LearningSession requireSession(Long sessionId, Long userId) {
         return sessionRepository.findByIdAndUserPk(sessionId, userId)
             .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
+    }
+
+    private LearningReportView buildLearningReportView(Long sessionId, Long userId) {
+        LearningSession session = requireSession(sessionId, userId);
+        Task trainingTask = resolveTrainingTask(session);
+        ConceptNode node = conceptNodeRepository.findById(trainingTask.getNodeId())
+            .orElseGet(() -> buildFallbackNode(trainingTask.getNodeId()));
+        Optional<PracticeQuiz> quiz = practiceQuizRepository.findLatestBySessionIdAndTaskIdAndUserPk(sessionId, trainingTask.getId(), userId);
+        PracticeFeedbackReport report = quiz.flatMap(item -> practiceFeedbackReportRepository.findByQuizId(item.getId())).orElse(null);
+        List<PracticeItem> items = quiz.map(item -> practiceRepository.findByQuizId(item.getId()))
+            .orElseGet(() -> practiceRepository.findBySessionIdAndTaskIdAndUserPk(sessionId, trainingTask.getId(), userId));
+        List<PracticeSubmission> submissions = practiceSubmissionRepository.findBySessionIdAndTaskIdAndUserPk(sessionId, trainingTask.getId(), userId);
+        NodeMastery mastery = nodeMasteryRepository.findByUserIdAndNodeId(userId, trainingTask.getNodeId()).orElse(null);
+        WeakPointDiagnosisService.WeakPointDiagnosisResult diagnosis = weakPointDiagnosisService.diagnoseWeakPoints(sessionId, userId);
+        RecommendationView recommendation = buildRecommendation(session, node, mastery, submissions, diagnosis.weakNodes());
+
+        int questionCount = items.isEmpty() ? submissions.size() : items.size();
+        int correctCount = (int) submissions.stream().filter(item -> Boolean.TRUE.equals(item.getCorrect())).count();
+        Integer overallScore = submissions.isEmpty() ? null : Math.round((float) submissions.stream()
+            .map(PracticeSubmission::getScore)
+            .filter(java.util.Objects::nonNull)
+            .mapToInt(Integer::intValue)
+            .sum() / submissions.size());
+        BigDecimal overallAccuracy = questionCount == 0
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(correctCount)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(questionCount), 2, RoundingMode.HALF_UP);
+
+        return new LearningReportView(
+            sessionId,
+            trainingTask.getId(),
+            node.getId(),
+            node.getName(),
+            trainingTask.getStage().name(),
+            stageLabel(trainingTask.getStage()),
+            overallScore,
+            overallAccuracy,
+            correctCount,
+            questionCount,
+            report != null ? report.getDiagnosisSummary() : fallbackDiagnosis(overallAccuracy),
+            report != null ? readStringList(report.getStrengthsJson()) : fallbackStrengths(correctCount, questionCount),
+            report != null ? readStringList(report.getWeaknessesJson()) : fallbackWeaknesses(submissions),
+            report != null ? readStringList(report.getReviewFocusJson()) : fallbackReviewFocus(diagnosis.weakNodes()),
+            toMasteryResponse(mastery, node),
+            buildQuestionResults(items, submissions),
+            diagnosis.weakNodes().stream().limit(5).map(this::toWeakPointResponse).toList(),
+            recommendation.toResponse(),
+            mastery != null,
+            report
+        );
     }
 
     private Task resolveTrainingTask(LearningSession session) {
@@ -513,5 +574,29 @@ public class LearningInsightQueryService {
                 confidence
             );
         }
+    }
+
+    record LearningReportView(
+        Long sessionId,
+        Long taskId,
+        Long nodeId,
+        String nodeName,
+        String stageCode,
+        String stageLabel,
+        Integer overallScore,
+        BigDecimal overallAccuracy,
+        Integer correctCount,
+        Integer questionCount,
+        String diagnosisSummary,
+        List<String> strengths,
+        List<String> weaknesses,
+        List<String> reviewFocus,
+        LearningReportMasteryResponse mastery,
+        List<LearningReportQuestionResponse> questionResults,
+        List<WeakPointNodeResponse> weakPoints,
+        NextStepRecommendationResponse nextStep,
+        boolean growthRecorded,
+        PracticeFeedbackReport feedbackReport
+    ) {
     }
 }

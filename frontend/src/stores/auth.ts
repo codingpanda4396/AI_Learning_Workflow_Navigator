@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { fetchMeApi, loginApi, registerApi } from '@/api/modules/auth';
+import { loginApi, registerApi } from '@/api/modules/auth';
 import type { LoginPayload, RegisterPayload } from '@/types/auth';
 import { clearStoredAuth, getStoredToken, getStoredUsername, setStoredAuth } from '@/utils/storage';
 
@@ -10,9 +10,6 @@ export const useAuthStore = defineStore('auth', {
     loading: false,
     error: '',
   }),
-  getters: {
-    isAuthenticated: (state) => Boolean(state.token),
-  },
   actions: {
     hydrateFromLocalStorage() {
       this.token = getStoredToken();
@@ -43,20 +40,6 @@ export const useAuthStore = defineStore('auth', {
         throw error;
       } finally {
         this.loading = false;
-      }
-    },
-    async refreshUser() {
-      if (!this.token) {
-        return;
-      }
-      try {
-        const user = await fetchMeApi();
-        if (user.username) {
-          this.username = user.username;
-          setStoredAuth(this.token, this.username);
-        }
-      } catch {
-        this.logout();
       }
     },
     logout() {

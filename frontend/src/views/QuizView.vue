@@ -19,19 +19,19 @@ let timer: number | undefined;
 const statusText = computed(() => {
   switch (quizStore.status) {
     case 'generating':
-      return '正在生成本轮练习题';
+      return '正在生成本轮练习题。';
     case 'submitting':
-      return '正在提交并生成反馈';
+      return '正在提交答案并生成反馈。';
     case 'answering':
-      return '可以继续完成未答完的题目';
+      return '你可以继续完成尚未作答的题目。';
     case 'reviewing':
-      return '本轮已进入复盘阶段';
+      return '本轮已经进入复盘阶段。';
     case 'report-ready':
-      return '反馈报告已生成';
+      return '反馈报告已生成。';
     case 'next-round':
-      return '已进入下一轮建议状态';
+      return '系统已进入下一轮建议状态。';
     case 'failed':
-      return '当前练习不可用，请稍后重试';
+      return '当前练习暂不可用，请稍后重试。';
     default:
       return '';
   }

@@ -79,6 +79,7 @@ export function normalizeOverview(data: Record<string, unknown>): SessionOvervie
   const masterySummary = (Array.isArray(data.mastery_summary ?? data.masterySummary)
     ? (data.mastery_summary ?? data.masterySummary)
     : []) as Record<string, unknown>[];
+  const summary = data.summary && typeof data.summary === 'object' ? (data.summary as Record<string, unknown>) : null;
 
   return {
     sessionId: toNumber(data.session_id ?? data.sessionId) ?? 0,
@@ -116,6 +117,16 @@ export function normalizeOverview(data: Record<string, unknown>): SessionOvervie
       totalTaskCount: toNumber(progress.total_task_count ?? progress.totalTaskCount) ?? 0,
       completionRate: toNumber(progress.completion_rate ?? progress.completionRate) ?? 0,
     },
+    summary: summary
+      ? {
+          currentTaskTitle: String(summary.current_task_title ?? summary.currentTaskTitle ?? ''),
+          currentTaskDescription: String(summary.current_task_description ?? summary.currentTaskDescription ?? ''),
+          nextStepHint: String(summary.next_step_hint ?? summary.nextStepHint ?? ''),
+          primaryActionLabel: String(summary.primary_action_label ?? summary.primaryActionLabel ?? ''),
+          primaryActionPath: String(summary.primary_action_path ?? summary.primaryActionPath ?? ''),
+          recentReportSummary: String(summary.recent_report_summary ?? summary.recentReportSummary ?? ''),
+        }
+      : undefined,
   };
 }
 
@@ -216,49 +227,38 @@ function normalizeNextStep(raw: unknown): NextStepRecommendation | null {
   };
 }
 
-export function mergeReportPayloads(payloads: {
-  feedback?: Record<string, unknown> | null;
-  report?: Record<string, unknown> | null;
-  weakPoints?: Record<string, unknown> | null;
-}): LearningReport {
-  const feedback = payloads.feedback ?? {};
-  const report = payloads.report ?? {};
-  const weakPayload = payloads.weakPoints ?? {};
-  const weakPoints = (Array.isArray(report.weak_points ?? report.weakPoints)
-    ? (report.weak_points ?? report.weakPoints)
-    : Array.isArray(weakPayload.weak_nodes ?? weakPayload.weakNodes)
-      ? (weakPayload.weak_nodes ?? weakPayload.weakNodes)
-      : []) as Record<string, unknown>[];
-  const questionResultsRaw = (Array.isArray(report.question_results ?? report.questionResults)
-    ? (report.question_results ?? report.questionResults)
-    : Array.isArray(feedback.question_results ?? feedback.questionResults)
-      ? (feedback.question_results ?? feedback.questionResults)
-      : []) as Record<string, unknown>[];
-
+export function normalizeSessionReport(data: Record<string, unknown>): LearningReport {
+  const weakPoints = (Array.isArray(data.weak_points ?? data.weakPoints)
+    ? (data.weak_points ?? data.weakPoints)
+    : []) as Record<string, unknown>[];
+  const questionResultsRaw = (Array.isArray(data.question_results ?? data.questionResults)
+    ? (data.question_results ?? data.questionResults)
+    : []) as Record<string, unknown>[];
   return {
-    sessionId: toNumber(report.session_id ?? feedback.session_id ?? report.sessionId ?? feedback.sessionId) ?? 0,
-    taskId: toNumber(report.task_id ?? feedback.task_id ?? report.taskId ?? feedback.taskId),
-    nodeId: toNumber(report.node_id ?? report.nodeId),
-    nodeName: String(report.node_name ?? report.nodeName ?? ''),
-    stageCode: String(report.stage_code ?? report.stageCode ?? ''),
-    stageLabel: String(report.stage_label ?? report.stageLabel ?? ''),
-    overallScore: toNumber(report.overall_score ?? report.overallScore),
-    overallAccuracy: toNumber(report.overall_accuracy ?? report.overallAccuracy),
-    correctCount: toNumber(report.correct_count ?? report.correctCount),
-    questionCount: toNumber(report.question_count ?? report.questionCount ?? feedback.question_count),
-    diagnosisSummary: String(report.diagnosis_summary ?? report.diagnosisSummary ?? ''),
-    overallSummary: String(feedback.overall_summary ?? feedback.overallSummary ?? ''),
-    strengths: readArray(report.strengths ?? feedback.strengths),
-    weaknesses: readArray(report.weaknesses ?? feedback.weaknesses),
-    reviewFocus: readArray(report.review_focus ?? report.reviewFocus ?? feedback.review_focus ?? feedback.reviewFocus),
+    sessionId: toNumber(data.session_id ?? data.sessionId) ?? 0,
+    taskId: toNumber(data.task_id ?? data.taskId),
+    nodeId: toNumber(data.node_id ?? data.nodeId),
+    nodeName: String(data.node_name ?? data.nodeName ?? ''),
+    stageCode: String(data.stage_code ?? data.stageCode ?? ''),
+    stageLabel: String(data.stage_label ?? data.stageLabel ?? ''),
+    overallScore: toNumber(data.overall_score ?? data.overallScore),
+    overallAccuracy: toNumber(data.overall_accuracy ?? data.overallAccuracy),
+    correctCount: toNumber(data.correct_count ?? data.correctCount),
+    questionCount: toNumber(data.question_count ?? data.questionCount),
+    diagnosisSummary: String(data.diagnosis_summary ?? data.diagnosisSummary ?? ''),
+    overallSummary: String(data.overall_summary ?? data.overallSummary ?? ''),
+    strengths: readArray(data.strengths),
+    weaknesses: readArray(data.weaknesses),
+    reviewFocus: readArray(data.review_focus ?? data.reviewFocus),
     weakPoints: weakPoints.map((item) => normalizeWeakPoint(item)),
     questionResults: questionResultsRaw.map((item) => normalizeQuestionResult(item)),
-    recommendedAction: String(feedback.recommended_action ?? feedback.recommendedAction ?? ''),
-    suggestedNextAction: String(feedback.suggested_next_action ?? feedback.suggestedNextAction ?? ''),
-    selectedAction: String(feedback.selected_action ?? feedback.selectedAction ?? ''),
-    nextRoundAdvice: String(feedback.next_round_advice ?? feedback.nextRoundAdvice ?? ''),
-    nextStep: normalizeNextStep(report.next_step ?? report.nextStep),
-    growthRecorded: Boolean(report.growth_recorded ?? report.growthRecorded),
+    recommendedAction: String(data.recommended_action ?? data.recommendedAction ?? ''),
+    suggestedNextAction: String(data.suggested_next_action ?? data.suggestedNextAction ?? ''),
+    selectedAction: String(data.selected_action ?? data.selectedAction ?? ''),
+    nextRoundAdvice: String(data.next_round_advice ?? data.nextRoundAdvice ?? ''),
+    nextStep: normalizeNextStep(data.next_step ?? data.nextStep),
+    growthRecorded: Boolean(data.growth_recorded ?? data.growthRecorded),
+    source: String(data.source ?? ''),
   };
 }
 

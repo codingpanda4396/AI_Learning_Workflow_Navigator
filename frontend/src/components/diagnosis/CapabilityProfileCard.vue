@@ -12,7 +12,7 @@ const profileCopy = computed(() => resolveCapabilityProfileCopy(props.profile));
 
 <template>
   <section class="rounded-[1.9rem] border border-slate-200 bg-white p-6 shadow-sm">
-    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">Profile</p>
+    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">画像</p>
     <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">你的能力画像</h2>
     <p class="mt-3 text-sm leading-6 text-slate-600">
       {{ profileCopy.summary }}
@@ -26,7 +26,7 @@ const profileCopy = computed(() => resolveCapabilityProfileCopy(props.profile));
       <div class="rounded-2xl bg-slate-50 p-4">
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">学习偏好</p>
         <p class="mt-2 text-sm leading-6 text-slate-800">
-          {{ profile.learningPreference || '系统将按清晰、循序渐进的方式为你安排内容。' }}
+          {{ profile.learningPreference || '系统会按清晰、循序渐进的方式为你安排内容。' }}
         </p>
       </div>
       <div class="rounded-2xl bg-slate-50 p-4">

@@ -1,11 +1,9 @@
 import { defineStore } from 'pinia';
 import { createSessionApi, fetchCurrentSessionApi, fetchOverviewApi, planSessionApi } from '@/api/modules/session';
 import type { CurrentSessionInfo, SessionCreatePayload, SessionOverview } from '@/types/session';
-import { getLastSessionId, setLastSessionId } from '@/utils/storage';
 
 export const useSessionStore = defineStore('session', {
   state: () => ({
-    currentSessionId: getLastSessionId(),
     overview: null as SessionOverview | null,
     currentSession: null as CurrentSessionInfo | null,
     loading: false,
@@ -17,12 +15,7 @@ export const useSessionStore = defineStore('session', {
       this.error = '';
       try {
         const response = await createSessionApi(payload);
-        const sessionId = String(response.session_id ?? '');
-        this.currentSessionId = sessionId;
-        if (sessionId) {
-          setLastSessionId(sessionId);
-        }
-        return Number(sessionId);
+        return Number(response.session_id ?? 0);
       } catch (error) {
         this.error = error instanceof Error ? error.message : '创建学习会话失败';
         throw error;
@@ -48,8 +41,6 @@ export const useSessionStore = defineStore('session', {
       try {
         const overview = await fetchOverviewApi(sessionId);
         this.overview = overview;
-        this.currentSessionId = String(sessionId);
-        setLastSessionId(sessionId);
         return overview;
       } catch (error) {
         this.error = error instanceof Error ? error.message : '获取总览失败';

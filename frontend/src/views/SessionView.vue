@@ -10,138 +10,57 @@ import ProgressSummary from '@/components/common/ProgressSummary.vue';
 import SecondaryInfoCard from '@/components/common/SecondaryInfoCard.vue';
 import StagePill from '@/components/common/StagePill.vue';
 import { formatSessionStatus, formatStage } from '@/utils/format';
-import { useFeedbackStore } from '@/stores/feedback';
 import { useSessionStore } from '@/stores/session';
 
 const route = useRoute();
 const router = useRouter();
 const sessionStore = useSessionStore();
-const feedbackStore = useFeedbackStore();
 
 const sessionId = computed(() => Number(route.params.sessionId));
 const overview = computed(() => sessionStore.overview);
-const report = computed(() => feedbackStore.report);
-
-const currentTaskTitle = computed(() => {
-  const sessionStatus = overview.value?.sessionStatus;
-  if (!sessionStatus) {
-    return '等待系统确定当前阶段';
-  }
-  return `当前会话阶段：${formatSessionStatus(sessionStatus)}`;
-});
-
-const currentTaskGoal = computed(() => {
-  switch (overview.value?.sessionStatus) {
-    case 'ANALYZING':
-      return '先完成诊断与分析，后续任务会按你的真实薄弱点来安排。';
-    case 'PLANNING':
-      return '系统正在整理学习路径与任务顺序，完成后会进入正式学习。';
-    case 'PRACTICING':
-      return '当前重点是做题检验掌握度，并让反馈报告更准确。';
-    case 'REPORT_READY':
-      return '这一轮练习反馈已经生成，可以查看报告并决定后续动作。';
-    case 'FAILED':
-      return '当前会话执行失败，需要回到上一步重新发起。';
-    case 'COMPLETED':
-      return '这轮学习已经结束，可以查看结果或开启新一轮。';
-    default:
-      break;
-  }
-
-  const stage = overview.value?.nextTask?.stage || overview.value?.currentStage;
-  switch (stage) {
-    case 'STRUCTURE':
-      return '先搭起这一章的知识骨架，知道要学什么、关系怎么连。';
-    case 'UNDERSTANDING':
-      return '把原理真正讲清楚，确认自己不是只记住结论。';
-    case 'TRAINING':
-      return '用题目检验自己是否真的掌握，并找出不稳的地方。';
-    case 'REFLECTION':
-      return '根据刚才的结果复盘错因，把易错点补上。';
-    default:
-      return '系统正在整理下一步建议，请稍后刷新。';
-  }
-});
-
-const nextStepText = computed(() => {
-  switch (overview.value?.sessionStatus) {
-    case 'ANALYZING':
-      return '完成后会进入路径规划。';
-    case 'PLANNING':
-      return '完成后会进入正式学习。';
-    case 'PRACTICING':
-      return '完成后会生成练习反馈报告。';
-    case 'REPORT_READY':
-      return '完成后可以根据反馈决定复习还是下一轮。';
-    default:
-      break;
-  }
-
-  const stage = overview.value?.nextTask?.stage || overview.value?.currentStage;
-  if (stage === 'TRAINING') {
-    return '完成后会进入检测与反馈。';
-  }
-  return '完成后系统会继续推进到下一步学习。';
-});
-
-const learningGoal = computed(() => overview.value?.goalText || '这轮学习还没有补充目标说明。');
-
-const recentTrainingSummary = computed(() => {
-  if (!report.value) {
-    return '完成练习后，这里会汇总你最近一次训练的表现。';
-  }
-  return report.value.overallSummary || report.value.diagnosisSummary || '最近一次训练已经完成，可以继续往下推进。';
-});
-
-const progressSummaryText = computed(() => {
-  const progress = overview.value?.progress;
-  if (!progress) {
-    return '系统正在整理当前进度。';
-  }
-  return `这轮学习已经完成 ${progress.completedTaskCount} 步，共规划 ${progress.totalTaskCount} 步。`;
-});
-
+const summary = computed(() => overview.value?.summary);
 const simpleTimeline = computed(() =>
   (overview.value?.timeline ?? []).slice(0, 5).map((item) => `${formatStage(item.stage)} / ${item.status || 'PENDING'}`),
 );
 
-async function continueCurrentLearning() {
-  if (overview.value?.sessionStatus === 'REPORT_READY') {
-    await router.push(`/sessions/${sessionId.value}/report`);
+async function loadOverview() {
+  if (!sessionId.value) {
     return;
   }
-
-  const nextTaskId = overview.value?.nextTask?.taskId;
-  if (nextTaskId) {
-    await router.push(`/tasks/${nextTaskId}/run`);
-    return;
-  }
-
-  if (overview.value?.sessionStatus === 'PRACTICING' || overview.value?.currentStage === 'TRAINING') {
-    await router.push(`/sessions/${sessionId.value}/quiz`);
-    return;
-  }
+  await sessionStore.fetchOverview(sessionId.value);
 }
 
-onMounted(async () => {
-  await sessionStore.fetchOverview(sessionId.value);
-  try {
-    await feedbackStore.fetchReport(sessionId.value);
-  } catch {
-    // Report may not exist yet.
+async function openPrimaryAction() {
+  const path = summary.value?.primaryActionPath;
+  if (!path) {
+    return;
   }
-});
+  await router.push(path);
+}
+
+onMounted(loadOverview);
 </script>
 
 <template>
   <AppShell>
     <LoadingState v-if="sessionStore.loading && !overview" />
-    <ErrorState v-else-if="sessionStore.error && !overview" :message="sessionStore.error" />
+
+    <div v-else-if="sessionStore.error && !overview" class="space-y-4">
+      <ErrorState :message="sessionStore.error" />
+      <button
+        type="button"
+        class="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        @click="loadOverview"
+      >
+        重试加载会话总览
+      </button>
+    </div>
+
     <div v-else-if="overview" class="space-y-6">
       <PageSection compact>
         <div class="grid gap-3 rounded-[1.6rem] border border-slate-200 bg-slate-50 p-4 md:grid-cols-3 md:p-5">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">当前课程</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">课程</p>
             <p class="mt-2 text-sm font-medium text-slate-900">{{ overview.courseId }} / {{ overview.chapterId }}</p>
           </div>
           <div>
@@ -152,36 +71,41 @@ onMounted(async () => {
             </div>
           </div>
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">当前进度</p>
-            <p class="mt-2 text-sm font-medium text-slate-900">{{ progressSummaryText }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">进度</p>
+            <p class="mt-2 text-sm font-medium text-slate-900">
+              {{ overview.progress.completedTaskCount }} / {{ overview.progress.totalTaskCount }}
+            </p>
           </div>
         </div>
       </PageSection>
 
       <PrimaryActionCard
-        eyebrow="当前学习导航"
-        :title="currentTaskTitle"
-        :description="currentTaskGoal"
-        :helper="`当前属于 ${formatSessionStatus(overview.sessionStatus)}。${nextStepText}`"
-        button-label="继续当前学习"
-        :disabled="!overview.nextTask && overview.sessionStatus !== 'PRACTICING' && overview.sessionStatus !== 'REPORT_READY'"
-        @action="continueCurrentLearning"
+        eyebrow="当前焦点"
+        :title="summary?.currentTaskTitle || '当前会话'"
+        :description="summary?.currentTaskDescription || '打开最新有效的会话入口。'"
+        :helper="summary?.nextStepHint || '下一步会在状态刷新后出现。'"
+        :button-label="summary?.primaryActionLabel || '打开会话'"
+        @action="openPrimaryAction"
       />
 
       <div class="grid gap-5 lg:grid-cols-3">
         <ProgressSummary :progress="overview.progress" />
-        <SecondaryInfoCard title="最近一次训练摘要" :description="recentTrainingSummary" />
-        <SecondaryInfoCard title="学习目标" :description="learningGoal" />
+        <SecondaryInfoCard title="最近报告" :description="summary?.recentReportSummary || '暂时还没有报告。'" />
+        <SecondaryInfoCard title="学习目标" :description="overview.goalText || '当前会话还没有目标说明。'" />
       </div>
 
       <PageSection
         v-if="simpleTimeline.length"
         compact
-        title="已安排的学习步骤"
-        description="这里保留简化视图，帮助你快速确认这轮学习的推进顺序。"
+        title="任务时间线"
+        description="这里只保留当前会话中已经真实规划出的步骤。"
       >
         <div class="grid gap-3 md:grid-cols-2">
-          <div v-for="(item, index) in simpleTimeline" :key="`${item}-${index}`" class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+          <div
+            v-for="(item, index) in simpleTimeline"
+            :key="`${item}-${index}`"
+            class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700"
+          >
             {{ item }}
           </div>
         </div>
