@@ -16,6 +16,8 @@ export interface PlanAdjustments {
 
 export interface LearningPlanRequest {
   sessionId?: number;
+  goalId: string;
+  diagnosisId: string;
   goalText: string;
   courseId: string;
   chapterId: string;
@@ -60,6 +62,7 @@ export interface PlanTaskPreview {
 }
 
 export interface LearningPlanPreview {
+  planId: number;
   summary: PlanSummary;
   reasons: PlanReason[];
   pathNodes: PlanPathNode[];
@@ -73,5 +76,9 @@ export interface LearningPlanPreview {
 }
 
 export interface PlanConfirmResult {
+  planId?: number;
   sessionId: number;
+  currentNodeId?: number;
+  firstTaskId?: number;
+  nextPage?: string;
 }

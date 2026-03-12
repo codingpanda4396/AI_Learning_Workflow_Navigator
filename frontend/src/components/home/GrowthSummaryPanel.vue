@@ -2,14 +2,18 @@
 import { useRouter } from 'vue-router';
 import type { LearningSummary } from '@/mocks/home';
 
-defineProps<{
+const props = defineProps<{
   summary: LearningSummary;
+  sessionId?: string;
 }>();
 
 const router = useRouter();
 
 function goToGrowth() {
-  router.push('/growth');
+  if (!props.sessionId) {
+    return;
+  }
+  router.push(`/sessions/${props.sessionId}/growth`);
 }
 </script>
 
@@ -65,7 +69,8 @@ function goToGrowth() {
 
     <button
       type="button"
-      class="mt-6 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+      class="mt-6 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+      :disabled="!sessionId"
       @click="goToGrowth"
     >
       查看成长轨迹

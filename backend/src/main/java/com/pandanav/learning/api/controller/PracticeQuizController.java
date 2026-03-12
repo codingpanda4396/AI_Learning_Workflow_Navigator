@@ -28,7 +28,7 @@ import java.util.List;
 
 @Validated
 @RestController
-@RequestMapping("/api/session/{sessionId}/tasks/{taskId}/quiz")
+@RequestMapping({"/api/sessions/{sessionId}/tasks/{taskId}/quiz", "/api/session/{sessionId}/tasks/{taskId}/quiz"})
 public class PracticeQuizController {
 
     private final PracticeService practiceService;

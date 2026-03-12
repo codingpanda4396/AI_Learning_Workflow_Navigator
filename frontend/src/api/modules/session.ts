@@ -3,7 +3,7 @@ import { normalizeCurrentSession, normalizeOverview } from '@/api/normalizers';
 import type { CurrentSessionInfo, SessionCreatePayload, SessionOverview } from '@/types/session';
 
 export async function createSessionApi(payload: SessionCreatePayload) {
-  const { data } = await apiClient.post('/api/session/create', {
+  const { data } = await apiClient.post('/api/sessions/create', {
     course_id: payload.courseId,
     chapter_id: payload.chapterId,
     goal_text: payload.goalText,
@@ -12,16 +12,16 @@ export async function createSessionApi(payload: SessionCreatePayload) {
 }
 
 export async function planSessionApi(sessionId: number) {
-  const { data } = await apiClient.post(`/api/session/${sessionId}/plan?mode=auto`);
+  const { data } = await apiClient.post(`/api/sessions/${sessionId}/plan?mode=auto`);
   return data as Record<string, unknown>;
 }
 
 export async function fetchOverviewApi(sessionId: number): Promise<SessionOverview> {
-  const { data } = await apiClient.get(`/api/session/${sessionId}/overview`);
+  const { data } = await apiClient.get(`/api/sessions/${sessionId}/overview`);
   return normalizeOverview(data);
 }
 
 export async function fetchCurrentSessionApi(): Promise<CurrentSessionInfo | null> {
-  const { data } = await apiClient.get('/api/session/current');
+  const { data } = await apiClient.get('/api/sessions/current');
   return normalizeCurrentSession(data);
 }

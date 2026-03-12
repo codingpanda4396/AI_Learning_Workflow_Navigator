@@ -21,7 +21,7 @@ import java.util.List;
 
 @Validated
 @RestController
-@RequestMapping("/api/session/{sessionId}/tasks/{taskId}/practice-submissions")
+@RequestMapping({"/api/sessions/{sessionId}/tasks/{taskId}/practice-submissions", "/api/session/{sessionId}/tasks/{taskId}/practice-submissions"})
 public class PracticeSubmissionController {
 
     private final PracticeService practiceService;

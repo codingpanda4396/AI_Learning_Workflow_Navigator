@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Validated
 @RestController
-@RequestMapping("/api/task")
+@RequestMapping({"/api/tasks", "/api/task"})
 public class TaskController {
 
     private final TaskQueryService taskQueryService;

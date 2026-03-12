@@ -25,7 +25,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Validated
 @RestController
-@RequestMapping("/api/session/{sessionId}/tasks/{taskId}/tutor/messages")
+@RequestMapping({"/api/sessions/{sessionId}/tasks/{taskId}/tutor/messages", "/api/session/{sessionId}/tasks/{taskId}/tutor/messages"})
 public class TutorMessageController {
 
     private final TutorMessageService tutorMessageService;

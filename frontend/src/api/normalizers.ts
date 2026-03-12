@@ -302,41 +302,48 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
   const summary = (data.summary as Record<string, unknown> | undefined) ?? {};
   const adjustments = normalizePlanAdjustments(data.adjustments, request.adjustments);
   const reasons = (Array.isArray(data.reasons) ? data.reasons : []) as Record<string, unknown>[];
-  const pathNodes = (Array.isArray(data.path_nodes ?? data.pathNodes) ? (data.path_nodes ?? data.pathNodes) : []) as Record<string, unknown>[];
-  const taskPreviews = (Array.isArray(data.task_previews ?? data.taskPreviews)
-    ? (data.task_previews ?? data.taskPreviews)
+  const pathNodes = (Array.isArray(data.path_preview ?? data.pathPreview ?? data.path_nodes ?? data.pathNodes)
+    ? (data.path_preview ?? data.pathPreview ?? data.path_nodes ?? data.pathNodes)
+    : []) as Record<string, unknown>[];
+  const taskPreviews = (Array.isArray(data.task_preview ?? data.taskPreview ?? data.task_previews ?? data.taskPreviews)
+    ? (data.task_preview ?? data.taskPreview ?? data.task_previews ?? data.taskPreviews)
     : []) as Record<string, unknown>[];
 
   return {
+    planId: toNumber(data.plan_id ?? data.planId) ?? 0,
     summary: {
-      recommendedStart: String(summary.recommended_start ?? summary.recommendedStart ?? ''),
-      recommendedRhythm: String(summary.recommended_rhythm ?? summary.recommendedRhythm ?? request.adjustments.intensity) as LearningPlanPreview['summary']['recommendedRhythm'],
+      recommendedStart: String(summary.recommended_start_node_name ?? summary.recommendedStartNodeName ?? summary.recommended_start ?? summary.recommendedStart ?? ''),
+      recommendedRhythm: String(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm ?? request.adjustments.intensity) as LearningPlanPreview['summary']['recommendedRhythm'],
       estimatedMinutes: toNumber(summary.estimated_minutes ?? summary.estimatedMinutes) ?? 0,
-      estimatedKnowledgeCount: toNumber(summary.estimated_knowledge_count ?? summary.estimatedKnowledgeCount) ?? 0,
-      stageCount: toNumber(summary.stage_count ?? summary.stageCount) ?? 4,
-      personalizedHeadline: String(summary.personalized_headline ?? summary.personalizedHeadline ?? ''),
-      personalizedSummary: String(summary.personalized_summary ?? summary.personalizedSummary ?? ''),
+      estimatedKnowledgeCount: toNumber(summary.estimated_node_count ?? summary.estimatedNodeCount ?? summary.estimated_knowledge_count ?? summary.estimatedKnowledgeCount) ?? 0,
+      stageCount: toNumber(summary.estimated_stage_count ?? summary.estimatedStageCount ?? summary.stage_count ?? summary.stageCount) ?? 4,
+      personalizedHeadline: String(summary.headline ?? summary.personalized_headline ?? summary.personalizedHeadline ?? ''),
+      personalizedSummary: String(data.learner_profile_summary ?? data.learnerProfileSummary ?? data.diagnosis_summary ?? data.diagnosisSummary ?? ''),
     },
     reasons: reasons.map((item, index) => ({
-      key: String(item.key ?? `reason-${index + 1}`),
+      key: String(item.key ?? item.type ?? `reason-${index + 1}`),
       title: String(item.title ?? ''),
-      label: String(item.label ?? ''),
+      label: String(item.label ?? item.type ?? ''),
       description: String(item.description ?? ''),
     })),
     pathNodes: pathNodes.map((item, index) => ({
-      id: String(item.id ?? `path-${index + 1}`),
-      name: String(item.name ?? ''),
-      masteryStatus: String(item.mastery_status ?? item.masteryStatus ?? 'PARTIAL') as LearningPlanPreview['pathNodes'][number]['masteryStatus'],
+      id: String(item.node_id ?? item.nodeId ?? item.id ?? `path-${index + 1}`),
+      name: String(item.node_name ?? item.nodeName ?? item.name ?? ''),
+      masteryStatus: String(item.status ?? item.mastery_status ?? item.masteryStatus ?? 'PARTIAL') as LearningPlanPreview['pathNodes'][number]['masteryStatus'],
       difficulty: String(item.difficulty ?? 'CORE') as LearningPlanPreview['pathNodes'][number]['difficulty'],
-      reasonTags: readArray(item.reason_tags ?? item.reasonTags),
+      reasonTags: readArray(item.reason_tags ?? item.reasonTags).length
+        ? readArray(item.reason_tags ?? item.reasonTags)
+        : item.reasonTag
+          ? [String(item.reasonTag)]
+          : [],
       estimatedMinutes: toNumber(item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
-      isStartingPoint: Boolean(item.is_starting_point ?? item.isStartingPoint),
+      isStartingPoint: Boolean(item.is_recommended_start ?? item.isRecommendedStart ?? item.is_starting_point ?? item.isStartingPoint),
       isPrerequisite: Boolean(item.is_prerequisite ?? item.isPrerequisite),
       isFocus: Boolean(item.is_focus ?? item.isFocus),
     })),
     taskPreviews: taskPreviews.map((item) => ({
       stage: String(item.stage ?? '') as LearningPlanPreview['taskPreviews'][number]['stage'],
-      stageGoal: String(item.stage_goal ?? item.stageGoal ?? ''),
+      stageGoal: String(item.goal ?? item.stage_goal ?? item.stageGoal ?? ''),
       learnerAction: String(item.learner_action ?? item.learnerAction ?? ''),
       aiSupport: String(item.ai_support ?? item.aiSupport ?? ''),
       estimatedMinutes: toNumber(item.estimated_minutes ?? item.estimatedMinutes) ?? 0,

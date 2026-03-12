@@ -64,6 +64,7 @@ export function createMockLearningPlanPreview(input: Partial<LearningPlanRequest
   const totalMinutes = intensityTotalMinutes[adjustments.intensity];
 
   return {
+    planId: 0,
     summary: {
       recommendedStart: startPoint,
       recommendedRhythm: adjustments.intensity,

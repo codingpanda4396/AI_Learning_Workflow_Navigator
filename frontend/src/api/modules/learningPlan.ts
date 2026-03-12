@@ -1,84 +1,53 @@
 import apiClient from '@/api/client';
 import { normalizeLearningPlanPreview } from '@/api/normalizers';
-import { createSessionApi, planSessionApi } from '@/api/modules/session';
-import { createMockLearningPlanPreview } from '@/mocks/learningPlan';
 import type { LearningPlanPreview, LearningPlanRequest, PlanAdjustments, PlanConfirmResult } from '@/types/learningPlan';
 
-function toApiPayload(payload: { sessionId?: number; goalText: string; courseId: string; chapterId: string; adjustments: PlanAdjustments }) {
+function toApiPayload(payload: {
+  goalId: string;
+  diagnosisId: string;
+  goalText: string;
+  courseId: string;
+  chapterId: string;
+  adjustments: PlanAdjustments;
+}) {
   return {
-    session_id: payload.sessionId,
-    goal_text: payload.goalText,
-    course_id: payload.courseId,
-    chapter_id: payload.chapterId,
+    goalId: payload.goalId,
+    diagnosisId: payload.diagnosisId,
+    goalText: payload.goalText,
+    courseId: payload.courseId,
+    chapterId: payload.chapterId,
     adjustments: {
       intensity: payload.adjustments.intensity,
-      learning_mode: payload.adjustments.learningMode,
-      prioritize_foundation: payload.adjustments.prioritizeFoundation,
+      learningMode: payload.adjustments.learningMode,
+      preferPrerequisite: payload.adjustments.prioritizeFoundation,
     },
   };
 }
 
-export async function fetchLearningPlanPreviewApi(payload: LearningPlanRequest): Promise<LearningPlanPreview> {
-  try {
-    const response = await apiClient.post('/api/learning-plan/preview', toApiPayload(payload), {
-      validateStatus: () => true,
-    });
-    if (response.status >= 200 && response.status < 300 && response.data) {
-      return normalizeLearningPlanPreview(response.data as Record<string, unknown>, payload);
-    }
-  } catch {
-    // Fallback keeps the page runnable before backend endpoint is ready.
+function unwrapEnvelope<T>(payload: unknown): T {
+  if (payload && typeof payload === 'object' && 'data' in (payload as Record<string, unknown>)) {
+    return ((payload as Record<string, unknown>).data ?? {}) as T;
   }
-  return createMockLearningPlanPreview(payload);
+  return (payload ?? {}) as T;
+}
+
+export async function fetchLearningPlanPreviewApi(payload: LearningPlanRequest): Promise<LearningPlanPreview> {
+  const response = await apiClient.post('/api/learning-plans/preview', toApiPayload(payload));
+  return normalizeLearningPlanPreview(unwrapEnvelope<Record<string, unknown>>(response.data), payload);
 }
 
 export async function regenerateLearningPlanApi(payload: LearningPlanRequest): Promise<LearningPlanPreview> {
-  try {
-    const response = await apiClient.post('/api/learning-plan/regenerate', toApiPayload(payload), {
-      validateStatus: () => true,
-    });
-    if (response.status >= 200 && response.status < 300 && response.data) {
-      return normalizeLearningPlanPreview(response.data as Record<string, unknown>, payload);
-    }
-  } catch {
-    // Fallback keeps the page runnable before backend endpoint is ready.
-  }
-  return createMockLearningPlanPreview(payload);
+  return fetchLearningPlanPreviewApi(payload);
 }
 
-export async function confirmLearningPlanApi(payload: LearningPlanRequest): Promise<PlanConfirmResult> {
-  try {
-    const response = await apiClient.post('/api/learning-plan/confirm', toApiPayload(payload), {
-      validateStatus: () => true,
-    });
-    if (response.status >= 200 && response.status < 300) {
-      const sessionId = Number(
-        (response.data as Record<string, unknown>)?.session_id ??
-          (response.data as Record<string, unknown>)?.sessionId ??
-          0,
-      );
-      if (sessionId > 0) {
-        return { sessionId };
-      }
-    }
-  } catch {
-    // Fallback below keeps the flow available.
-  }
-
-  const sessionId = payload.sessionId ?? 0;
-  if (sessionId > 0) {
-    await planSessionApi(sessionId);
-    return { sessionId };
-  }
-
-  const createResponse = await createSessionApi({
-    goalText: payload.goalText,
-    courseId: payload.courseId,
-    chapterId: payload.chapterId,
-  });
-  const createdSessionId = Number(createResponse.session_id ?? 0);
-  if (createdSessionId > 0) {
-    await planSessionApi(createdSessionId);
-  }
-  return { sessionId: createdSessionId };
+export async function confirmLearningPlanApi(planId: number): Promise<PlanConfirmResult> {
+  const response = await apiClient.post(`/api/learning-plans/${planId}/confirm`);
+  const data = unwrapEnvelope<Record<string, unknown>>(response.data);
+  return {
+    planId: Number(data.plan_id ?? data.planId ?? 0) || undefined,
+    sessionId: Number(data.session_id ?? data.sessionId ?? 0),
+    currentNodeId: Number(data.current_node_id ?? data.currentNodeId ?? 0) || undefined,
+    firstTaskId: Number(data.first_task_id ?? data.firstTaskId ?? 0) || undefined,
+    nextPage: typeof data.next_page === 'string' ? String(data.next_page) : typeof data.nextPage === 'string' ? String(data.nextPage) : undefined,
+  };
 }

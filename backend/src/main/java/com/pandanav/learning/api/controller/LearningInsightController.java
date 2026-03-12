@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Validated
 @RestController
-@RequestMapping("/api/session/{sessionId}")
+@RequestMapping({"/api/sessions/{sessionId}", "/api/session/{sessionId}"})
 public class LearningInsightController {
 
     private final LearningInsightQueryService learningInsightQueryService;

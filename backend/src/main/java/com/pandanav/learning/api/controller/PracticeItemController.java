@@ -29,7 +29,7 @@ import java.util.List;
 
 @Validated
 @RestController
-@RequestMapping("/api/session/{sessionId}/tasks/{taskId}/practice-items")
+@RequestMapping({"/api/sessions/{sessionId}/tasks/{taskId}/practice-items", "/api/session/{sessionId}/tasks/{taskId}/practice-items"})
 public class PracticeItemController {
 
     private final PracticeService practiceService;

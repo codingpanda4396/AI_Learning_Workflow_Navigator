@@ -27,14 +27,15 @@ const adjustments = computed({
 
 const context = computed(() => {
   const sessionId = Number(route.query.sessionId ?? 0);
-  const goalText = String(route.query.goal ?? '').trim() || '掌握当前章节的关键内容';
-  const courseId = String(route.query.course ?? '').trim() || '通用课程';
-  const chapterId = String(route.query.chapter ?? '').trim() || '当前章节';
+  const goalId = String(route.query.goalId ?? route.query.sessionId ?? '').trim();
+  const diagnosisId = String(route.query.diagnosisId ?? '').trim();
   return {
     sessionId: Number.isFinite(sessionId) && sessionId > 0 ? sessionId : undefined,
-    goalText,
-    courseId,
-    chapterId,
+    goalId,
+    diagnosisId,
+    goalText: String(route.query.goal ?? '').trim() || '掌握当前章节的关键内容',
+    courseId: String(route.query.course ?? '').trim() || '通用课程',
+    chapterId: String(route.query.chapter ?? '').trim() || '当前章节',
   };
 });
 
@@ -55,6 +56,10 @@ const viewState = computed(() => {
 });
 
 async function loadPlan() {
+  if (!context.value.goalId || !context.value.diagnosisId) {
+    learningPlanStore.error = '缺少 learning plan 所需的诊断或目标参数';
+    return;
+  }
   await learningPlanStore.generatePreview({
     ...context.value,
     adjustments: learningPlanStore.request?.adjustments ?? DEFAULT_PLAN_ADJUSTMENTS,
@@ -79,6 +84,8 @@ async function goBackToGoal() {
       goal: context.value.goalText,
       course: context.value.courseId,
       chapter: context.value.chapterId,
+      goalId: context.value.goalId,
+      diagnosisId: context.value.diagnosisId,
     },
   });
 }
@@ -91,6 +98,8 @@ async function openDiagnosis() {
         goal: context.value.goalText,
         course: context.value.courseId,
         chapter: context.value.chapterId,
+        goalId: context.value.goalId,
+        diagnosisId: context.value.diagnosisId,
       },
     });
     return;
@@ -106,7 +115,7 @@ function focusConfirmSection() {
 }
 
 watch(
-  () => [route.query.sessionId, route.query.goal, route.query.course, route.query.chapter],
+  () => [route.query.sessionId, route.query.goalId, route.query.diagnosisId, route.query.goal, route.query.course, route.query.chapter],
   async () => {
     await loadPlan();
   },
@@ -136,7 +145,7 @@ onBeforeUnmount(() => {
         <PageSection
           eyebrow="AI 正在生成"
           title="正在把你的诊断结果转成这一轮的行动决策"
-          description="不是套模板，而是在结合目标、薄弱点和当前基础，决定这轮从哪里开始、为什么这样排，以及确认后如何进入执行。"
+          description="系统会结合目标、薄弱点和当前基础，决定这轮从哪里开始以及如何推进。"
         >
           <div class="grid gap-4 md:grid-cols-3">
             <div v-for="item in 3" :key="item" class="animate-pulse rounded-[1.7rem] border border-slate-200 bg-white p-5">
@@ -150,7 +159,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
-        <ErrorState :message="error || '学习规划暂时生成失败，你可以重新试一次。'" />
+        <ErrorState :message="error || '学习规划暂时生成失败，你可以重新再试一次。'" />
         <div class="flex justify-start">
           <button
             type="button"

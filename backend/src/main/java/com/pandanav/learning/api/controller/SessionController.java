@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Validated
 @RestController
-@RequestMapping({"/api/session", "/api/workflow"})
+@RequestMapping({"/api/sessions", "/api/session", "/api/workflow"})
 public class SessionController {
 
     private final CreateSessionUseCase createSessionUseCase;

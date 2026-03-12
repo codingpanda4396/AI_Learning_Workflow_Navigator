@@ -7,6 +7,7 @@ import GrowthSummaryPanel from '@/components/home/GrowthSummaryPanel.vue';
 import ModuleNavPanel from '@/components/home/ModuleNavPanel.vue';
 import StartLearningEntry from '@/components/home/StartLearningEntry.vue';
 import WorkflowPipeline from '@/components/home/WorkflowPipeline.vue';
+import type { ModuleEntry } from '@/mocks/home';
 import { useSessionStore } from '@/stores/session';
 import { formatStage } from '@/utils/format';
 import { emitInfo } from '@/utils/message';
@@ -44,6 +45,28 @@ const activeSession = computed<ActiveSession | null>(() => {
 });
 
 const hasActiveSession = computed(() => Boolean(activeSession.value));
+const currentSessionId = computed(() => activeSession.value?.id ?? '');
+const moduleEntries = computed<ModuleEntry[]>(() => {
+  const sessionId = currentSessionId.value;
+  return homeModuleEntries.map((entry) => {
+    if (!sessionId) {
+      return entry;
+    }
+    if (entry.key === 'diagnosis' || entry.key === 'plan') {
+      return { ...entry, route: `/diagnosis/${sessionId}` };
+    }
+    if (entry.key === 'task') {
+      return { ...entry, route: `/sessions/${sessionId}` };
+    }
+    if (entry.key === 'evaluation') {
+      return { ...entry, route: `/sessions/${sessionId}/report` };
+    }
+    if (entry.key === 'growth') {
+      return { ...entry, route: `/sessions/${sessionId}/growth` };
+    }
+    return entry;
+  });
+});
 
 async function startLearning() {
   if (hasActiveSession.value || sessionStore.loading) {
@@ -131,11 +154,11 @@ onMounted(async () => {
       </section>
 
       <section>
-        <ModuleNavPanel :entries="homeModuleEntries" />
+        <ModuleNavPanel :entries="moduleEntries" />
       </section>
 
       <section>
-        <GrowthSummaryPanel :summary="homeLearningSummary" />
+        <GrowthSummaryPanel :summary="homeLearningSummary" :session-id="currentSessionId" />
       </section>
     </div>
   </AppShell>

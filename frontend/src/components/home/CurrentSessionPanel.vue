@@ -15,7 +15,7 @@ function continueLearning() {
   if (!props.session) {
     return;
   }
-  router.push(`/session/${props.session.id}`);
+  router.push(`/sessions/${props.session.id}`);
 }
 </script>
 

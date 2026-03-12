@@ -16,7 +16,7 @@ import java.util.List;
 
 @Validated
 @RestController
-@RequestMapping("/api/session/{sessionId}/learning-feedback")
+@RequestMapping({"/api/sessions/{sessionId}/learning-feedback", "/api/session/{sessionId}/learning-feedback"})
 public class LearningFeedbackController {
 
     private final WeakPointDiagnosisService weakPointDiagnosisService;

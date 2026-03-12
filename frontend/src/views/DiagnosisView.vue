@@ -89,6 +89,8 @@ async function enterPlanFlow() {
     path: '/plan',
     query: {
       sessionId: numericSessionId,
+      goalId: String(numericSessionId),
+      diagnosisId: diagnosisStore.diagnosisId,
       goal: goalText.value,
       course: courseId.value,
       chapter: chapterId.value,
