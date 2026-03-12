@@ -16,7 +16,7 @@ const router = useRouter();
 const diagnosisStore = useDiagnosisStore();
 
 const sessionId = computed(() => String(route.params.sessionId || route.query.sessionId || '').trim());
-const goalText = computed(() => String(route.query.goal || '暂未提供学习目标，请从首页创建学习任务后进入诊断。'));
+const goalText = computed(() => String(route.query.goal || '暂未提供学习目标，请先从首页创建学习任务后进入诊断。'));
 const courseId = computed(() => String(route.query.course || '未填写课程'));
 const chapterId = computed(() => String(route.query.chapter || '未填写章节'));
 const questions = computed(() => diagnosisStore.questions);

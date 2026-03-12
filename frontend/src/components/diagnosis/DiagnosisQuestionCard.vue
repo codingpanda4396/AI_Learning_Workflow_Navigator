@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { resolveDiagnosisQuestionCopy } from '@/types/diagnosis';
 import type { DiagnosisAnswerValue, DiagnosisQuestion } from '@/types/diagnosis';
 
 const props = defineProps<{
@@ -13,6 +14,7 @@ const emit = defineEmits<{
 
 const selectedList = computed(() => (Array.isArray(props.modelValue) ? props.modelValue : []));
 const textValue = computed(() => (typeof props.modelValue === 'string' ? props.modelValue : ''));
+const questionCopy = computed(() => resolveDiagnosisQuestionCopy(props.question));
 
 function updateSingleChoice(option: string) {
   emit('update:modelValue', option);
@@ -33,10 +35,16 @@ function updateText(value: string) {
 <template>
   <section class="rounded-[1.9rem] border border-slate-200 bg-white p-6 shadow-sm">
     <div class="flex items-start justify-between gap-4">
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">{{ question.dimension }}</p>
-        <h2 class="mt-2 text-xl font-semibold leading-8 text-slate-950">{{ question.title }}</h2>
-        <p v-if="question.description" class="mt-3 text-sm leading-6 text-slate-600">{{ question.description }}</p>
+      <div class="min-w-0">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">
+          {{ questionCopy.sectionLabel }}
+        </p>
+        <h2 class="mt-2 line-clamp-2 text-xl font-semibold leading-8 text-slate-950">
+          {{ questionCopy.title }}
+        </h2>
+        <p class="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
+          {{ questionCopy.description }}
+        </p>
       </div>
       <span v-if="question.required" class="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-600">必答</span>
     </div>
@@ -80,10 +88,14 @@ function updateText(value: string) {
           :value="textValue"
           rows="6"
           class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-sky-300 focus:bg-white"
-          :placeholder="question.placeholder || '请输入你的想法'"
+          :placeholder="questionCopy.placeholder"
           @input="updateText(($event.target as HTMLTextAreaElement).value)"
         />
       </label>
     </div>
+
+    <p class="mt-4 text-sm leading-6 text-slate-500">
+      {{ questionCopy.submitHint }}
+    </p>
   </section>
 </template>

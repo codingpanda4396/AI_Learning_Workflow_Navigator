@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import { resolveCapabilityProfileCopy } from '@/types/diagnosis';
 import type { CapabilityProfile } from '@/types/diagnosis';
 
-defineProps<{
+const props = defineProps<{
   profile: CapabilityProfile;
 }>();
+
+const profileCopy = computed(() => resolveCapabilityProfileCopy(props.profile));
 </script>
 
 <template>
@@ -11,7 +15,7 @@ defineProps<{
     <p class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">Profile</p>
     <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">你的能力画像</h2>
     <p class="mt-3 text-sm leading-6 text-slate-600">
-      基于这份画像，系统会调整后续学习内容和训练难度，让后面的学习更贴近你现在的状态。
+      {{ profileCopy.summary }}
     </p>
 
     <div class="mt-6 grid gap-4 md:grid-cols-2">
@@ -21,15 +25,21 @@ defineProps<{
       </div>
       <div class="rounded-2xl bg-slate-50 p-4">
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">学习偏好</p>
-        <p class="mt-2 text-sm leading-6 text-slate-800">{{ profile.learningPreference || '系统将按清晰、循序渐进的方式为你安排内容。' }}</p>
+        <p class="mt-2 text-sm leading-6 text-slate-800">
+          {{ profile.learningPreference || '系统将按清晰、循序渐进的方式为你安排内容。' }}
+        </p>
       </div>
       <div class="rounded-2xl bg-slate-50 p-4">
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">时间安排</p>
-        <p class="mt-2 text-sm leading-6 text-slate-800">{{ profile.timeBudget || '建议每天安排稳定的学习时间，哪怕不长也没关系。' }}</p>
+        <p class="mt-2 text-sm leading-6 text-slate-800">
+          {{ profile.timeBudget || '建议每天安排稳定的学习时间，哪怕不长也没关系。' }}
+        </p>
       </div>
       <div class="rounded-2xl bg-slate-50 p-4">
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">学习方向</p>
-        <p class="mt-2 text-sm leading-6 text-slate-800">{{ profile.goalOrientation || '系统会先帮你补齐关键基础，再逐步进入训练。' }}</p>
+        <p class="mt-2 text-sm leading-6 text-slate-800">
+          {{ profile.goalOrientation || '系统会先帮你补齐关键基础，再逐步进入训练。' }}
+        </p>
       </div>
     </div>
 
@@ -60,8 +70,8 @@ defineProps<{
       </div>
     </div>
 
-    <div v-if="profile.summary" class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700">
-      {{ profile.summary }}
+    <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700">
+      {{ profileCopy.planExplanation }}
     </div>
   </section>
 </template>
