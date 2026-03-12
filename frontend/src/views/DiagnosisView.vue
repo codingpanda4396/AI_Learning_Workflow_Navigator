@@ -9,13 +9,11 @@ import DiagnosisGoalSummaryCard from '@/components/diagnosis/DiagnosisGoalSummar
 import DiagnosisProgressCard from '@/components/diagnosis/DiagnosisProgressCard.vue';
 import DiagnosisQuestionCard from '@/components/diagnosis/DiagnosisQuestionCard.vue';
 import { useDiagnosisStore } from '@/stores/diagnosis';
-import { useSessionStore } from '@/stores/session';
 import type { DiagnosisAnswerValue, DiagnosisQuestion } from '@/types/diagnosis';
 
 const route = useRoute();
 const router = useRouter();
 const diagnosisStore = useDiagnosisStore();
-const sessionStore = useSessionStore();
 
 const sessionId = computed(() => String(route.params.sessionId || route.query.sessionId || '').trim());
 const goalText = computed(() => String(route.query.goal || '暂未提供学习目标，请从首页创建学习任务后进入诊断。'));
@@ -87,20 +85,15 @@ async function enterPlanFlow() {
     await router.push('/');
     return;
   }
-
-  try {
-    await sessionStore.planSession(numericSessionId);
-  } catch {
-    // Keep navigation available even if planning is temporarily delayed.
-  }
-
-  try {
-    await sessionStore.fetchOverview(numericSessionId);
-  } catch {
-    // Overview may not be ready immediately.
-  }
-
-  await router.push(`/sessions/${numericSessionId}`);
+  await router.push({
+    path: '/plan',
+    query: {
+      sessionId: numericSessionId,
+      goal: goalText.value,
+      course: courseId.value,
+      chapter: chapterId.value,
+    },
+  });
 }
 
 onMounted(async () => {

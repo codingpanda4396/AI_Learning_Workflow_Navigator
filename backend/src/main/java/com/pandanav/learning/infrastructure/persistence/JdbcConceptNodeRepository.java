@@ -10,7 +10,10 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -68,6 +71,27 @@ public class JdbcConceptNodeRepository implements ConceptNodeRepository {
             (rs, rowNum) -> mapNode(rs),
             chapterId
         );
+    }
+
+    @Override
+    public Map<Long, List<Long>> findPrerequisiteNodeIdsByChapterId(String chapterId) {
+        Map<Long, List<Long>> result = new LinkedHashMap<>();
+        jdbcTemplate.query(
+            """
+                SELECT cp.node_id, cp.prereq_node_id
+                FROM concept_prerequisite cp
+                JOIN concept_node cn ON cn.id = cp.node_id
+                WHERE cn.chapter_id = ?
+                ORDER BY cp.node_id ASC, cp.prereq_node_id ASC
+                """,
+            rs -> {
+                Long nodeId = rs.getLong("node_id");
+                Long prereqNodeId = rs.getLong("prereq_node_id");
+                result.computeIfAbsent(nodeId, key -> new ArrayList<>()).add(prereqNodeId);
+            },
+            chapterId
+        );
+        return result;
     }
 
     @Override

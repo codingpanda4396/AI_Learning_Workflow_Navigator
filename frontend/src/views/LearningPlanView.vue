@@ -1,0 +1,196 @@
+<script setup lang="ts">
+import { computed, onBeforeUnmount, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import AppShell from '@/components/common/AppShell.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
+import PageSection from '@/components/common/PageSection.vue';
+import PlanActionBar from '@/components/plan/PlanActionBar.vue';
+import PlanAdjustPanel from '@/components/plan/PlanAdjustPanel.vue';
+import PlanPathPreviewPanel from '@/components/plan/PlanPathPreviewPanel.vue';
+import PlanReasonPanel from '@/components/plan/PlanReasonPanel.vue';
+import PlanSummaryPanel from '@/components/plan/PlanSummaryPanel.vue';
+import PlanTaskPreviewPanel from '@/components/plan/PlanTaskPreviewPanel.vue';
+import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
+import { useLearningPlanStore } from '@/stores/learningPlan';
+import type { PlanAdjustments } from '@/types/learningPlan';
+
+const route = useRoute();
+const router = useRouter();
+const learningPlanStore = useLearningPlanStore();
+
+const preview = computed(() => learningPlanStore.preview);
+const error = computed(() => learningPlanStore.error);
+const adjustments = computed({
+  get: () => learningPlanStore.adjustments,
+  set: (value: PlanAdjustments) => learningPlanStore.setAdjustments(value),
+});
+
+const context = computed(() => {
+  const sessionId = Number(route.query.sessionId ?? 0);
+  const goalText = String(route.query.goal ?? '').trim() || '掌握当前章节的关键内容';
+  const courseId = String(route.query.course ?? '').trim() || '通用课程';
+  const chapterId = String(route.query.chapter ?? '').trim() || '当前章节';
+  return {
+    sessionId: Number.isFinite(sessionId) && sessionId > 0 ? sessionId : undefined,
+    goalText,
+    courseId,
+    chapterId,
+  };
+});
+
+const viewState = computed(() => {
+  if (learningPlanStore.loading && !preview.value) {
+    return 'loading';
+  }
+  if (error.value && !preview.value) {
+    return 'error';
+  }
+  if (learningPlanStore.confirming) {
+    return 'confirming';
+  }
+  if (learningPlanStore.regenerating) {
+    return 'regenerating';
+  }
+  return 'ready';
+});
+
+async function loadPlan() {
+  await learningPlanStore.generatePreview({
+    ...context.value,
+    adjustments: learningPlanStore.request?.adjustments ?? DEFAULT_PLAN_ADJUSTMENTS,
+  });
+}
+
+async function regeneratePlan() {
+  await learningPlanStore.regeneratePreview();
+}
+
+async function confirmPlan() {
+  const sessionId = await learningPlanStore.confirmPlan();
+  if (sessionId) {
+    await router.push(`/sessions/${sessionId}`);
+  }
+}
+
+async function goBackToGoal() {
+  await router.push({
+    path: '/',
+    query: {
+      goal: context.value.goalText,
+      course: context.value.courseId,
+      chapter: context.value.chapterId,
+    },
+  });
+}
+
+async function openDiagnosis() {
+  if (context.value.sessionId) {
+    await router.push({
+      path: `/diagnosis/${context.value.sessionId}`,
+      query: {
+        goal: context.value.goalText,
+        course: context.value.courseId,
+        chapter: context.value.chapterId,
+      },
+    });
+    return;
+  }
+  await router.push('/diagnosis');
+}
+
+watch(
+  () => [route.query.sessionId, route.query.goal, route.query.course, route.query.chapter],
+  async () => {
+    await loadPlan();
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  learningPlanStore.reset();
+});
+</script>
+
+<template>
+  <AppShell>
+    <div class="space-y-6 pb-12">
+      <div v-if="viewState === 'loading'" class="space-y-6">
+        <section class="overflow-hidden rounded-[2.4rem] bg-[linear-gradient(135deg,#0f172a_0%,#13263f_48%,#1d4f6f_100%)] px-6 py-8 shadow-[0_28px_90px_rgba(15,23,42,0.22)] md:px-8">
+          <div class="animate-pulse">
+            <div class="h-3 w-32 rounded-full bg-white/20" />
+            <div class="mt-5 h-10 max-w-4xl rounded-2xl bg-white/18" />
+            <div class="mt-3 h-5 max-w-3xl rounded-2xl bg-white/14" />
+            <div class="mt-8 grid gap-3 md:grid-cols-5">
+              <div v-for="item in 5" :key="item" class="h-24 rounded-[1.5rem] bg-white/10" />
+            </div>
+          </div>
+        </section>
+
+        <PageSection
+          eyebrow="AI 正在生成"
+          title="系统正在把你的诊断结果转成这轮行动方案"
+          description="不是简单套模板，而是在结合目标、当前基础和已有画像决定这轮从哪里开始、先做什么、为什么这样排。"
+        >
+          <div class="grid gap-4 md:grid-cols-3">
+            <div v-for="item in 3" :key="item" class="animate-pulse rounded-[1.7rem] border border-slate-200 bg-white p-5">
+              <div class="h-3 w-24 rounded-full bg-slate-200" />
+              <div class="mt-4 h-5 rounded-full bg-slate-200" />
+              <div class="mt-3 h-4 rounded-full bg-slate-100" />
+              <div class="mt-2 h-4 w-5/6 rounded-full bg-slate-100" />
+            </div>
+          </div>
+        </PageSection>
+      </div>
+
+      <div v-else-if="viewState === 'error'" class="space-y-4">
+        <ErrorState :message="error || '学习规划暂时生成失败，你可以重试一次。'" />
+        <div class="flex justify-start">
+          <button
+            type="button"
+            class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            @click="loadPlan"
+          >
+            重新生成本轮方案
+          </button>
+        </div>
+      </div>
+
+      <template v-else-if="preview">
+        <div v-if="error" class="rounded-[1.6rem] border border-rose-100 bg-rose-50 px-5 py-4 text-sm leading-7 text-rose-700">
+          {{ error }}
+        </div>
+
+        <PlanSummaryPanel :preview="preview" />
+
+        <div
+          v-if="viewState === 'regenerating' || viewState === 'confirming'"
+          class="rounded-[1.6rem] border border-sky-100 bg-sky-50 px-5 py-4 text-sm leading-7 text-sky-700"
+        >
+          {{
+            viewState === 'confirming'
+              ? '系统正在创建本轮学习会话，并把这份规划接入后续执行链路。'
+              : '系统正在根据你的新偏好重新组织学习起点、解释依据和任务顺序。'
+          }}
+        </div>
+
+        <PlanReasonPanel :reasons="preview.reasons" :diagnosis-summary="preview.diagnosisSummary" />
+        <PlanPathPreviewPanel :nodes="preview.pathNodes" />
+        <PlanTaskPreviewPanel :tasks="preview.taskPreviews" :next-step-note="preview.nextStepNote" />
+        <PlanAdjustPanel
+          v-model="adjustments"
+          :disabled="learningPlanStore.confirming"
+          :regenerating="learningPlanStore.regenerating"
+          @regenerate="regeneratePlan"
+        />
+        <PlanActionBar
+          :confirming="learningPlanStore.confirming"
+          :regenerating="learningPlanStore.regenerating"
+          @confirm="confirmPlan"
+          @regenerate="regeneratePlan"
+          @back="goBackToGoal"
+          @diagnosis="openDiagnosis"
+        />
+      </template>
+    </div>
+  </AppShell>
+</template>
