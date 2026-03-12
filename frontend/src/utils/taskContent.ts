@@ -93,13 +93,13 @@ function pickText(source: JsonRecord, keys: string[]): string {
   return '';
 }
 
-export function normalizeLearningContent(output: unknown, fallbackTitle?: string): LearningContentViewModel {
+export function normalizeLearningContent(output: unknown, preferredTitle?: string): LearningContentViewModel {
   const parsed = parseOutput(output);
 
   if (isRecord(parsed)) {
     const title =
       pickText(parsed, ['title', 'taskTitle', 'topic', 'objective']) ||
-      fallbackTitle ||
+      preferredTitle ||
       '本次学习内容';
     const summary =
       pickText(parsed, ['summary', 'description', 'taskGoal', 'goal', 'objective', 'content']) ||
@@ -126,7 +126,7 @@ export function normalizeLearningContent(output: unknown, fallbackTitle?: string
     .filter(Boolean);
 
   return {
-    title: fallbackTitle || '本次学习内容',
+    title: preferredTitle || '本次学习内容',
     summary: lines[0] || '先完成这一轮学习，再回到总览查看下一步。',
     keyPoints: lines.slice(0, 4).length ? lines.slice(0, 4) : ['围绕当前任务目标完成学习'],
     misconceptions: [],

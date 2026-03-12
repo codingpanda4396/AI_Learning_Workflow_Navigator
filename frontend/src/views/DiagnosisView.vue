@@ -16,7 +16,7 @@ const router = useRouter();
 const diagnosisStore = useDiagnosisStore();
 
 const sessionId = computed(() => String(route.params.sessionId || route.query.sessionId || '').trim());
-const goalText = computed(() => String(route.query.goal || '暂未提供学习目标，请先从首页创建学习任务后进入诊断。'));
+const goalText = computed(() => String(route.query.goal || '暂未提供学习目标，请先从首页创建学习任务后再进入诊断。'));
 const courseId = computed(() => String(route.query.course || '未填写课程'));
 const chapterId = computed(() => String(route.query.chapter || '未填写章节'));
 const questions = computed(() => diagnosisStore.questions);
@@ -30,7 +30,7 @@ const isGenerating = computed(() => diagnosisStore.loading && questions.value.le
 const isSubmitting = computed(() => diagnosisStore.submitting);
 const isResult = computed(() => Boolean(diagnosisStore.capabilityProfile));
 const isError = computed(() => Boolean(diagnosisStore.error) && !isGenerating.value && !isSubmitting.value && !isResult.value);
-
+const canRetrySubmit = computed(() => Boolean(questions.value.length) && !isResult.value);
 const currentStep = computed(() => (questions.value.length ? diagnosisStore.currentQuestionIndex + 1 : 0));
 const submitButtonText = computed(() => diagnosisStore.nextAction?.label || '进入个性化学习路径');
 
@@ -69,14 +69,30 @@ async function submitDiagnosis() {
   if (!isCurrentAnswered.value) {
     return;
   }
-  await diagnosisStore.submitDiagnosis();
+  try {
+    await diagnosisStore.submitDiagnosis();
+  } catch {
+    return;
+  }
 }
 
 async function retryGenerate() {
   if (!sessionId.value) {
     return;
   }
-  await diagnosisStore.generateDiagnosis(sessionId.value);
+  try {
+    await diagnosisStore.generateDiagnosis(sessionId.value);
+  } catch {
+    return;
+  }
+}
+
+async function retryCurrentAction() {
+  if (canRetrySubmit.value) {
+    await submitDiagnosis();
+    return;
+  }
+  await retryGenerate();
 }
 
 async function enterPlanFlow() {
@@ -98,13 +114,21 @@ async function enterPlanFlow() {
   });
 }
 
-onMounted(async () => {
+async function loadDiagnosis() {
   diagnosisStore.reset();
   if (!sessionId.value) {
     diagnosisStore.error = '缺少学习会话信息，请先从首页创建学习目标。';
     return;
   }
-  await diagnosisStore.generateDiagnosis(sessionId.value);
+  try {
+    await diagnosisStore.generateDiagnosis(sessionId.value);
+  } catch {
+    return;
+  }
+}
+
+onMounted(async () => {
+  await loadDiagnosis();
 });
 </script>
 
@@ -139,7 +163,7 @@ onMounted(async () => {
 
         <div class="flex flex-col gap-3 rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
           <p class="text-sm leading-6 text-slate-600">
-            回答完成后，系统会生成能力画像，并把这份画像作为后续学习路径、Tutor 辅助和训练难度的参考。
+            回答完成后，系统会基于真实接口返回的诊断结果生成能力画像，并作为后续学习规划和训练难度的依据。
           </p>
           <div class="flex flex-wrap gap-3">
             <button
@@ -173,16 +197,16 @@ onMounted(async () => {
       </template>
 
       <div v-if="isSubmitting" class="rounded-[1.8rem] border border-sky-100 bg-sky-50 p-6 text-sm leading-7 text-sky-700">
-        系统正在分析你的回答并构建能力画像，请稍等一下。
+        系统正在分析你的回答并构建能力画像，请稍候。
       </div>
 
       <div v-if="isError" class="flex justify-start">
         <button
           type="button"
           class="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          @click="retryGenerate"
+          @click="retryCurrentAction"
         >
-          重新生成诊断问题
+          {{ canRetrySubmit ? '重新提交诊断' : '重新生成诊断问题' }}
         </button>
       </div>
     </div>

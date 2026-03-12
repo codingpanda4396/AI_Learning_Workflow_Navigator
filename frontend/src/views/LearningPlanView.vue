@@ -60,18 +60,31 @@ async function loadPlan() {
     learningPlanStore.error = '缺少 learning plan 所需的诊断或目标参数';
     return;
   }
-  await learningPlanStore.generatePreview({
-    ...context.value,
-    adjustments: learningPlanStore.request?.adjustments ?? DEFAULT_PLAN_ADJUSTMENTS,
-  });
+  try {
+    await learningPlanStore.generatePreview({
+      ...context.value,
+      adjustments: learningPlanStore.request?.adjustments ?? DEFAULT_PLAN_ADJUSTMENTS,
+    });
+  } catch {
+    return;
+  }
 }
 
 async function regeneratePlan() {
-  await learningPlanStore.regeneratePreview();
+  try {
+    await learningPlanStore.regeneratePreview();
+  } catch {
+    return;
+  }
 }
 
 async function confirmPlan() {
-  const sessionId = await learningPlanStore.confirmPlan();
+  let sessionId: number | undefined;
+  try {
+    sessionId = await learningPlanStore.confirmPlan();
+  } catch {
+    return;
+  }
   if (sessionId) {
     await router.push(`/sessions/${sessionId}`);
   }
@@ -144,7 +157,7 @@ onBeforeUnmount(() => {
 
         <PageSection
           eyebrow="AI 正在生成"
-          title="正在把你的诊断结果转成这一轮的行动决策"
+          title="正在把你的诊断结果转换成这一轮的行动决策"
           description="系统会结合目标、薄弱点和当前基础，决定这轮从哪里开始以及如何推进。"
         >
           <div class="grid gap-4 md:grid-cols-3">
@@ -159,7 +172,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
-        <ErrorState :message="error || '学习规划暂时生成失败，你可以重新再试一次。'" />
+        <ErrorState :message="error || '学习规划生成失败，你可以重新再试一次。'" />
         <div class="flex justify-start">
           <button
             type="button"

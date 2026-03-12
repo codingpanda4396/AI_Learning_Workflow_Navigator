@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { StartLearningForm } from '@/mocks/home';
+import type { StartLearningForm } from '@/types/home';
 
 const model = defineModel<StartLearningForm>({ required: true });
 
@@ -19,7 +19,7 @@ defineEmits<{
       <div class="max-w-xl">
         <p class="text-xs font-semibold uppercase tracking-[0.24em] text-sky-600">Start Learning</p>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-slate-950">开始新一轮学习目标</h2>
-        <p class="mt-2 text-sm leading-6 text-slate-600">输入目标后，系统会先发起能力诊断，再根据诊断结果生成个性化学习规划。</p>
+        <p class="mt-2 text-sm leading-6 text-slate-600">输入目标后，系统会先发起真实诊断，再根据真实诊断结果生成学习规划。</p>
       </div>
       <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">同一时间仅支持一个学习任务</div>
     </div>

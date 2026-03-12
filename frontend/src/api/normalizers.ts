@@ -19,15 +19,15 @@ function readArray(value: unknown): string[] {
   return [];
 }
 
-function normalizePlanAdjustments(value: unknown, fallback: PlanAdjustments): PlanAdjustments {
+function normalizePlanAdjustments(value: unknown, defaultAdjustments: PlanAdjustments): PlanAdjustments {
   if (!value || typeof value !== 'object') {
-    return fallback;
+    return defaultAdjustments;
   }
   const row = value as Record<string, unknown>;
   return {
-    intensity: String(row.intensity ?? fallback.intensity) as PlanAdjustments['intensity'],
-    learningMode: String(row.learning_mode ?? row.learningMode ?? fallback.learningMode) as PlanAdjustments['learningMode'],
-    prioritizeFoundation: Boolean(row.prioritize_foundation ?? row.prioritizeFoundation ?? fallback.prioritizeFoundation),
+    intensity: String(row.intensity ?? defaultAdjustments.intensity) as PlanAdjustments['intensity'],
+    learningMode: String(row.learning_mode ?? row.learningMode ?? defaultAdjustments.learningMode) as PlanAdjustments['learningMode'],
+    prioritizeFoundation: Boolean(row.prioritize_foundation ?? row.prioritizeFoundation ?? defaultAdjustments.prioritizeFoundation),
   };
 }
 

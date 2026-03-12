@@ -106,7 +106,7 @@ function normalizeDimensionKey(dimension: string) {
 
 export function resolveDiagnosisQuestionCopy(question: DiagnosisQuestion): Required<DiagnosisQuestionCopy> {
   const dimensionKey = normalizeDimensionKey(question.dimension);
-  const fallback = diagnosisQuestionCopyByDimension[dimensionKey] ?? {
+  const defaultCopy = diagnosisQuestionCopyByDimension[dimensionKey] ?? {
     sectionLabel: dimensionKey || question.dimension || 'DIAGNOSIS',
     title: '请根据你当前的学习情况回答这个问题。',
     description: DEFAULT_QUESTION_DESCRIPTION,
@@ -115,11 +115,11 @@ export function resolveDiagnosisQuestionCopy(question: DiagnosisQuestion): Requi
   };
 
   return {
-    sectionLabel: question.copy?.sectionLabel || fallback.sectionLabel,
-    title: question.copy?.title || question.title || fallback.title,
-    description: question.copy?.description || question.description || fallback.description,
-    placeholder: question.copy?.placeholder || question.placeholder || fallback.placeholder,
-    submitHint: question.copy?.submitHint || fallback.submitHint,
+    sectionLabel: question.copy?.sectionLabel || defaultCopy.sectionLabel,
+    title: question.copy?.title || question.title || defaultCopy.title,
+    description: question.copy?.description || question.description || defaultCopy.description,
+    placeholder: question.copy?.placeholder || question.placeholder || defaultCopy.placeholder,
+    submitHint: question.copy?.submitHint || defaultCopy.submitHint,
   };
 }
 

@@ -7,7 +7,7 @@ const props = defineProps<{
   diagnosisSummary: string;
 }>();
 
-const fallbackTitles = [
+const defaultTitles = [
   '这轮先补哪里',
   '为什么从这里开始',
   '现在直接推进的风险',
@@ -37,7 +37,7 @@ const fallbackTitles = [
         class="rounded-[1.85rem] border border-slate-200/90 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_65px_rgba(15,23,42,0.08)]"
       >
         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{{ reason.label || `判断 ${index + 1}` }}</p>
-        <h3 class="mt-3 text-xl font-semibold tracking-tight text-slate-950">{{ fallbackTitles[index] || reason.title }}</h3>
+        <h3 class="mt-3 text-xl font-semibold tracking-tight text-slate-950">{{ defaultTitles[index] || reason.title }}</h3>
         <p class="mt-3 text-sm leading-7 text-slate-600">{{ reason.description }}</p>
       </article>
     </div>
