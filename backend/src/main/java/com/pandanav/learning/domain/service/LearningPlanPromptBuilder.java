@@ -58,13 +58,13 @@ public class LearningPlanPromptBuilder {
             PromptTemplateKey.LEARNING_PLAN_V1,
             PromptTemplateKey.LEARNING_PLAN_V1.promptKey(),
             PromptTemplateKey.LEARNING_PLAN_V1.promptVersion(),
-            LlmInvocationProfile.HEAVY_REASONING_TASK,
+            LlmInvocationProfile.LIGHT_JSON_TASK,
             system,
             user,
             "{\"headline\":\"\",\"reasons\":[{\"type\":\"\",\"title\":\"\",\"description\":\"\"}],\"focuses\":[\"\"],\"task_preview\":[{\"stage\":\"STRUCTURE\",\"title\":\"\",\"goal\":\"\",\"learner_action\":\"\",\"ai_support\":\"\",\"estimated_minutes\":8}]}",
             "json_only",
             null,
-            500
+            320
         );
     }
 
