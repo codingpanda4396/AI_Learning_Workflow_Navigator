@@ -174,7 +174,7 @@ class PracticeSubmissionServiceTest {
         item.setQuestionType(PracticeQuestionType.SINGLE_CHOICE);
         item.setStandardAnswer("A");
         item.setSource(PracticeItemSource.RULE);
-        item.setStatus(PracticeItemStatus.ACTIVE);
+        item.setStatus(PracticeItemStatus.READY);
         return item;
     }
 }

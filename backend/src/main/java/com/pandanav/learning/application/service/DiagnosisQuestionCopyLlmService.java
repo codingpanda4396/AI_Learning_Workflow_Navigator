@@ -1,6 +1,8 @@
 package com.pandanav.learning.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class DiagnosisQuestionCopyLlmService {
+
+    private static final Logger log = LoggerFactory.getLogger(DiagnosisQuestionCopyLlmService.class);
 
     private final LlmGateway llmGateway;
     private final LlmJsonParser llmJsonParser;
@@ -85,6 +89,10 @@ public class DiagnosisQuestionCopyLlmService {
             JsonNode root = llmJsonParser.parse(result.text());
             JsonNode items = root.path("questions");
             if (!items.isArray() || items.size() != fallbackQuestions.size()) {
+                log.warn(
+                    "DiagnosisQuestionCopyLlmService: LLM response invalid, using fallback. questions isArray={}, size={}, expected={}",
+                    items.isArray(), items.isArray() ? items.size() : -1, fallbackQuestions.size()
+                );
                 return fallbackQuestions;
             }
 
@@ -96,10 +104,15 @@ public class DiagnosisQuestionCopyLlmService {
                 String questionId = item.path("questionId").asText("");
                 DiagnosisQuestion original = byId.get(questionId);
                 if (original == null) {
+                    log.warn("DiagnosisQuestionCopyLlmService: LLM returned unknown questionId={}, using fallback", questionId);
                     return fallbackQuestions;
                 }
                 List<String> options = readOptions(item.path("options"), original.options());
                 if (options.size() != original.options().size()) {
+                    log.warn(
+                        "DiagnosisQuestionCopyLlmService: LLM modified options count for questionId={}, got={}, expected={}, using fallback",
+                        questionId, options.size(), original.options().size()
+                    );
                     return fallbackQuestions;
                 }
                 DiagnosisQuestionCopy copy = readCopy(item.path("copy"), original.copy());
@@ -116,6 +129,7 @@ public class DiagnosisQuestionCopyLlmService {
             }
             return refined;
         } catch (Exception ex) {
+            log.warn("DiagnosisQuestionCopyLlmService: LLM enhance failed, using fallback. reason={}", ex.getMessage(), ex);
             return fallbackQuestions;
         }
     }

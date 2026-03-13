@@ -18,5 +18,5 @@ app:
       model: ${TUTOR_LLM_MODEL:deepseek-chat}
       timeout-ms: ${TUTOR_LLM_TIMEOUT_MS:10000}
   llm:
-    enabled: ${LLM_ENABLED:false}
+    enabled: ${LLM_ENABLED:true}
     fallback-to-rule: true
