@@ -84,12 +84,15 @@ public class LearningPlanService {
         LearningPlanPlanningContext context = planningContextAssembler.assemble(command);
         LearningPlanOrchestrator.OrchestratedPlan orchestrated = learningPlanOrchestrator.preview(context);
 
-        if (orchestrated.fallbackApplied()) {
-            log.info(
-                "LearningPlanService: preview used rule fallback. goalId={}, chapterId={}, userId={}, reasons={}",
-                command.goalId(), command.chapterId(), command.userId(), orchestrated.fallbackReasons()
-            );
-        }
+        log.info(
+            "LearningPlanService: preview resolved. goalId={}, chapterId={}, userId={}, planSource={}, fallbackApplied={}, fallbackReasons={}",
+            command.goalId(),
+            command.chapterId(),
+            command.userId(),
+            orchestrated.planSource(),
+            orchestrated.fallbackApplied(),
+            orchestrated.fallbackReasons()
+        );
 
         LearningPlan plan = new LearningPlan();
         plan.setUserId(command.userId());
@@ -100,12 +103,12 @@ public class LearningPlanService {
         writeSnapshot(plan, orchestrated.preview(), context);
 
         LearningPlan saved = learningPlanRepository.save(plan);
-        return toResponse(saved.getId(), orchestrated.preview(), orchestrated.fallbackApplied(), orchestrated.fallbackReasons());
+        return toResponse(saved.getId(), orchestrated.preview(), orchestrated.planSource(), orchestrated.fallbackApplied(), orchestrated.fallbackReasons());
     }
 
     public LearningPlanPreviewResponse get(Long planId, Long userId) {
         LearningPlanAggregate aggregate = load(planId, userId);
-        return toResponse(aggregate.plan().getId(), aggregate.preview(), null, null);
+        return toResponse(aggregate.plan().getId(), aggregate.preview(), null, null, null);
     }
 
     public ConfirmLearningPlanResponse confirm(ConfirmLearningPlanCommand command) {
@@ -220,6 +223,7 @@ public class LearningPlanService {
     private LearningPlanPreviewResponse toResponse(
         Long planId,
         LearningPlanPreview preview,
+        PlanSource planSource,
         Boolean fallbackApplied,
         List<String> fallbackReasons
     ) {
@@ -259,6 +263,7 @@ public class LearningPlanService {
                 preview.adjustments().learningMode(),
                 preview.adjustments().preferPrerequisite()
             ),
+            planSource == null ? null : planSource.name(),
             fallbackApplied,
             fallbackReasons
         );

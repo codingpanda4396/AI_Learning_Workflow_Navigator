@@ -14,8 +14,10 @@ public class LearningPlanPromptBuilder {
         String system = """
             You refine a rule-based personalized learning plan.
             Keep the chosen path fixed.
-            Return one JSON object only.
-            Do not output markdown.
+            Return exactly one JSON object and nothing else.
+            Do not output markdown code fences.
+            Do not output prefaces, explanations, notes, or trailing text.
+            Every required field must be present.
             """;
         String user = """
             goal_id=%s
@@ -30,19 +32,38 @@ public class LearningPlanPromptBuilder {
 
             Constraints:
             - Do not invent new path nodes.
+            - Only output one JSON object.
+            - No markdown fences.
+            - No prose before or after JSON.
             - reasons must sound individualized, not generic.
-            - stages must be STRUCTURE, UNDERSTANDING, TRAINING, REFLECTION.
+            - stages must be one of: STRUCTURE, UNDERSTANDING, TRAINING, REFLECTION.
             - task_preview must explain learner action, AI support, and stage purpose.
             - focus list 2-4 items.
             - reason count 2-4 items.
             - estimated minutes per task 4-20.
-            JSON keys:
+            Required JSON schema:
             {
-              "headline":"",
-              "reasons":[{"type":"","title":"","description":""}],
-              "focuses":[""],
-              "task_preview":[{"stage":"","title":"","goal":"","learner_action":"","ai_support":"","estimated_minutes":0}]
+              "headline":"string, min length 12",
+              "reasons":[
+                {
+                  "type":"string, required",
+                  "title":"string, min length 4",
+                  "description":"string, min length 18"
+                }
+              ],
+              "focuses":["string"],
+              "task_preview":[
+                {
+                  "stage":"enum STRUCTURE|UNDERSTANDING|TRAINING|REFLECTION",
+                  "title":"string, required",
+                  "goal":"string, required",
+                  "learner_action":"string, min length 8",
+                  "ai_support":"string, min length 8",
+                  "estimated_minutes":"integer 4-20"
+                }
+              ]
             }
+            task_preview length must equal the candidate task count exactly.
             """.formatted(
             context.goalId(),
             context.diagnosisId(),

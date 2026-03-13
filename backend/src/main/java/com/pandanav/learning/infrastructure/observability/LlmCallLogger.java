@@ -27,15 +27,23 @@ public class LlmCallLogger {
     }
 
     public void logStart(LlmCallContext context) {
-        log.info("LLM_CALL_START stage={} model={}", context.stage(), safe(context.model()));
+        log.info(
+            "LLM_CALL_START stage={} model={} traceId={} requestId={}",
+            context.stage(),
+            safe(context.model()),
+            safe(context.traceId()),
+            safe(context.requestId())
+        );
         increment("llm.call.total", context, List.of(Tag.of("result", "start")));
     }
 
     public void logSuccess(LlmCallContext context, LlmCallMetrics metrics) {
         log.info(
-            "LLM_CALL_SUCCESS stage={} model={} latencyMs={} promptTokens={} completionTokens={} totalTokens={}",
+            "LLM_CALL_SUCCESS stage={} model={} traceId={} requestId={} latencyMs={} promptTokens={} completionTokens={} totalTokens={}",
             context.stage(),
             safe(context.model()),
+            safe(context.traceId()),
+            safe(context.requestId()),
             metrics.latencyMs(),
             metrics.promptTokens(),
             metrics.completionTokens(),
@@ -47,9 +55,11 @@ public class LlmCallLogger {
 
     public void logFallback(LlmCallContext context, LlmFallbackReason reason, int latencyMs) {
         log.warn(
-            "LLM_CALL_FALLBACK stage={} model={} reason={} latencyMs={}",
+            "LLM_CALL_FALLBACK stage={} model={} traceId={} requestId={} reason={} latencyMs={}",
             context.stage(),
             safe(context.model()),
+            safe(context.traceId()),
+            safe(context.requestId()),
             reason,
             latencyMs
         );
@@ -59,15 +69,29 @@ public class LlmCallLogger {
 
     public void logFailure(LlmCallContext context, LlmFailureType failureType, String message, int latencyMs) {
         log.error(
-            "LLM_CALL_FAILURE stage={} model={} errorType={} latencyMs={} message={}",
+            "LLM_CALL_FAILURE stage={} model={} traceId={} requestId={} errorType={} latencyMs={} message={}",
             context.stage(),
             safe(context.model()),
+            safe(context.traceId()),
+            safe(context.requestId()),
             failureType,
             latencyMs,
             abbreviate(message)
         );
         increment("llm.call.failure", context, List.of(Tag.of("result", "failure"), Tag.of("reason", failureType.name())));
         recordLatency(context, latencyMs, "failure", failureType.name());
+    }
+
+    public void logStructuredOutputFailure(LlmCallContext context, String reasonCode, String details) {
+        log.warn(
+            "LLM_STRUCTURED_OUTPUT_FAILURE stage={} model={} traceId={} requestId={} reason={} details={}",
+            context.stage(),
+            safe(context.model()),
+            safe(context.traceId()),
+            safe(context.requestId()),
+            safe(reasonCode),
+            abbreviate(details)
+        );
     }
 
     private void increment(String name, LlmCallContext context, List<Tag> extraTags) {

@@ -7,9 +7,9 @@ import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
 import com.pandanav.learning.application.command.ConfirmLearningPlanCommand;
 import com.pandanav.learning.application.command.PreviewLearningPlanCommand;
 import com.pandanav.learning.domain.enums.LearningPlanStatus;
-import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningPlan;
+import com.pandanav.learning.domain.model.LearningPlanContextNode;
 import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
 import com.pandanav.learning.domain.model.LearningPlanPreview;
 import com.pandanav.learning.domain.model.LearningPlanSummary;
@@ -27,7 +27,6 @@ import com.pandanav.learning.domain.repository.TaskRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,7 +44,7 @@ class LearningPlanServiceTest {
         LearningPlanRepository repository = mock(LearningPlanRepository.class);
 
         when(assembler.assemble(any())).thenReturn(sampleContext());
-        when(orchestrator.preview(any())).thenReturn(new LearningPlanOrchestrator.OrchestratedPlan(samplePreview(), null, false, List.of()));
+        when(orchestrator.preview(any())).thenReturn(new LearningPlanOrchestrator.OrchestratedPlan(samplePreview(), null, PlanSource.LLM, false, List.of()));
         when(repository.save(any())).thenAnswer(invocation -> {
             LearningPlan plan = invocation.getArgument(0);
             plan.setId(88L);
@@ -64,7 +63,8 @@ class LearningPlanServiceTest {
         ));
 
         assertEquals("88", response.planId());
-        assertEquals("树的基础", response.summary().recommendedStartNodeName());
+        assertEquals("LLM", response.planSource());
+        assertEquals("tree basics", response.summary().recommendedStartNodeName());
     }
 
     @Test
@@ -92,7 +92,10 @@ class LearningPlanServiceTest {
         stored.setPlanningContextJson(objectMapper.writeValueAsString(sampleContext()));
 
         when(repository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.of(stored));
-        when(conceptNodeRepository.findByChapterIdOrderByOrderNoAsc("chapter-1")).thenReturn(List.of(node(101L, "树的基础", 1), node(102L, "二叉树遍历", 2)));
+        when(conceptNodeRepository.findByChapterIdOrderByOrderNoAsc("chapter-1")).thenReturn(List.of(
+            node(101L, "tree basics", 1),
+            node(102L, "binary tree traversal", 2)
+        ));
         when(sessionRepository.save(any())).thenAnswer(invocation -> {
             LearningSession session = invocation.getArgument(0);
             session.setId(500L);
@@ -131,16 +134,13 @@ class LearningPlanServiceTest {
         LearningPlanOrchestrator orchestrator,
         LearningPlanRepository repository
     ) {
-        SessionRepository sessionRepository = mock(SessionRepository.class);
-        TaskRepository taskRepository = mock(TaskRepository.class);
-        ConceptNodeRepository conceptNodeRepository = mock(ConceptNodeRepository.class);
         return new LearningPlanService(
             assembler,
             orchestrator,
             repository,
-            sessionRepository,
-            taskRepository,
-            conceptNodeRepository,
+            mock(SessionRepository.class),
+            mock(TaskRepository.class),
+            mock(ConceptNodeRepository.class),
             objectiveStrategy(),
             new ObjectMapper()
         );
@@ -157,28 +157,28 @@ class LearningPlanServiceTest {
             "diag-1",
             "course-1",
             "chapter-1",
-            "掌握二叉树",
+            "master binary trees",
             null,
             List.of(
-                new com.pandanav.learning.domain.model.LearningPlanContextNode("101", 101L, "树的基础", 1, 1, 40, 2, List.of("LOW_MASTERY"), List.of("CONCEPT_CONFUSION"), List.of()),
-                new com.pandanav.learning.domain.model.LearningPlanContextNode("102", 102L, "二叉树遍历", 2, 2, 55, 1, List.of(), List.of(), List.of("101"))
+                new LearningPlanContextNode("101", 101L, "tree basics", 1, 1, 40, 2, List.of("LOW_MASTERY"), List.of("CONCEPT_CONFUSION"), List.of()),
+                new LearningPlanContextNode("102", 102L, "binary tree traversal", 2, 2, 55, 1, List.of(), List.of(), List.of("101"))
             ),
             List.of("CONCEPT_CONFUSION"),
             List.of(55, 68),
-            List.of("树的基础"),
-            "薄弱点集中在树的基础",
+            List.of("tree basics"),
+            "Current weak point is tree basics",
             PlanAdjustments.defaults()
         );
     }
 
     private LearningPlanPreview samplePreview() {
         return new LearningPlanPreview(
-            new LearningPlanSummary("先补基础再推进", "101", "树的基础", "STANDARD", 36, 2, 4),
-            List.of(new PlanReason("START_POINT", "从树的基础开始", "因为当前掌握度低且它是后续节点的前置。")),
-            List.of("先稳住树的基础", "再进入二叉树遍历"),
+            new LearningPlanSummary("Strengthen basics before advancing", "101", "tree basics", "STANDARD", 36, 2, 4),
+            List.of(new PlanReason("START_POINT", "Start with the basics", "The learner still needs a stronger prerequisite foundation before moving ahead.")),
+            List.of("solidify tree basics", "connect traversal to the basics"),
             List.of(
-                new PlanPathNode("101", "树的基础", 1, 40, "LEARNING", true, 18, "前置核心"),
-                new PlanPathNode("102", "二叉树遍历", 2, 55, "LEARNING", false, 18, "当前主攻")
+                new PlanPathNode("101", "tree basics", 1, 40, "LEARNING", true, 18, "prerequisite core"),
+                new PlanPathNode("102", "binary tree traversal", 2, 55, "LEARNING", false, 18, "next focus")
             ),
             List.of(
                 new PlanTaskPreview("STRUCTURE", "t1", "g1", "a1a1a1a1", "s1s1s1s1", 6),

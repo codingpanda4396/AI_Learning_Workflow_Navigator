@@ -3,8 +3,8 @@ package com.pandanav.learning.application.service.learningplan;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.llm.LlmGateway;
-import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.model.LearningPlanContextNode;
 import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
@@ -20,6 +20,7 @@ import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,31 +31,64 @@ import static org.mockito.Mockito.when;
 class LearningPlanOrchestratorTest {
 
     @Test
-    void shouldFallbackWhenLlmReturnsInvalidStage() {
-        LlmGateway llmGateway = mock(LlmGateway.class);
-        when(llmGateway.generate(eq(LlmStage.LEARNING_PLAN), any())).thenReturn(new LlmTextResult(
-            """
+    void shouldUseLlmPlanWhenJsonIsValid() {
+        LearningPlanOrchestrator orchestrator = orchestrator(llmResult(validJson()));
+
+        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
+
+        assertFalse(result.fallbackApplied());
+        assertEquals(PlanSource.LLM, result.planSource());
+        assertEquals("provider:model", result.llmTraceId());
+    }
+
+    @Test
+    void shouldUseLlmPlanWhenDirtyTextContainsExtractableJson() {
+        LearningPlanOrchestrator orchestrator = orchestrator(llmResult("Plan preview:\n```json\n" + validJson() + "\n```"));
+
+        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
+
+        assertFalse(result.fallbackApplied());
+        assertEquals(PlanSource.LLM, result.planSource());
+    }
+
+    @Test
+    void shouldFallbackWhenJsonIsUnrecoverable() {
+        LearningPlanOrchestrator orchestrator = orchestrator(llmResult("```json\n{\"headline\":\"broken\"\n```"));
+
+        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
+
+        assertTrue(result.fallbackApplied());
+        assertEquals(PlanSource.RULE_FALLBACK, result.planSource());
+        assertEquals(List.of("JSON_EXTRA_TEXT"), result.fallbackReasons());
+    }
+
+    @Test
+    void shouldFallbackWhenJsonSchemaMismatches() {
+        LearningPlanOrchestrator orchestrator = orchestrator(llmResult("""
             {
-              "headline": "先补前置，再推进主节点",
-              "reasons": [{"type":"START_POINT","title":"从基础开始","description":"这段话足够长，可以通过长度校验。"}],
+              "headline": "This headline is long enough",
+              "reasons": [{"type":"START_POINT","title":"good"}],
               "focuses": ["focus-1", "focus-2"],
               "task_preview": [
                 {"stage":"STRUCTURE","title":"t1","goal":"g1","learner_action":"learner-1","ai_support":"support-1","estimated_minutes":8},
                 {"stage":"UNDERSTANDING","title":"t2","goal":"g2","learner_action":"learner-2","ai_support":"support-2","estimated_minutes":8},
                 {"stage":"TRAINING","title":"t3","goal":"g3","learner_action":"learner-3","ai_support":"support-3","estimated_minutes":8},
-                {"stage":"UNKNOWN","title":"t4","goal":"g4","learner_action":"learner-4","ai_support":"support-4","estimated_minutes":8}
+                {"stage":"REFLECTION","title":"t4","goal":"g4","learner_action":"learner-4","ai_support":"support-4","estimated_minutes":8}
               ]
             }
-            """,
-            "provider",
-            "model",
-            LlmInvocationProfile.HEAVY_REASONING_TASK,
-            null,
-            null,
-            null
-        ));
+            """));
 
-        LearningPlanOrchestrator orchestrator = new LearningPlanOrchestrator(
+        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
+
+        assertTrue(result.fallbackApplied());
+        assertEquals(List.of("JSON_SCHEMA_MISMATCH"), result.fallbackReasons());
+    }
+
+    private LearningPlanOrchestrator orchestrator(LlmTextResult llmTextResult) {
+        LlmGateway llmGateway = mock(LlmGateway.class);
+        when(llmGateway.generate(eq(LlmStage.LEARNING_PLAN), any())).thenReturn(llmTextResult);
+
+        return new LearningPlanOrchestrator(
             new RuleBasedPlanBuilder(),
             new LearningPlanPromptBuilder(),
             new LearningPlanResultValidator(),
@@ -64,11 +98,37 @@ class LearningPlanOrchestratorTest {
             new LlmCallLogger(mock(ObjectProvider.class)),
             new LlmFailureClassifier()
         );
+    }
 
-        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
+    private LlmTextResult llmResult(String text) {
+        return new LlmTextResult(
+            text,
+            "provider",
+            "model",
+            LlmInvocationProfile.HEAVY_REASONING_TASK,
+            null,
+            null,
+            null
+        );
+    }
 
-        assertTrue(result.fallbackApplied());
-        assertFalse(result.preview().reasons().isEmpty());
+    private String validJson() {
+        return """
+            {
+              "headline": "First strengthen foundations before advancing",
+              "reasons": [
+                {"type":"START_POINT","title":"Start from the basics","description":"Current weak points show the learner still needs stable understanding of the prerequisite node."},
+                {"type":"PACE","title":"Keep a steady pace","description":"Recent scores suggest a steady pace will reinforce understanding without adding unnecessary overload."}
+              ],
+              "focuses": ["solidify tree basics", "connect traversal to prior concepts"],
+              "task_preview": [
+                {"stage":"STRUCTURE","title":"Map the node structure","goal":"Understand the core node relationships","learner_action":"Draw the node relationships clearly","ai_support":"Check the structure map and point out gaps","estimated_minutes":8},
+                {"stage":"UNDERSTANDING","title":"Explain traversal logic","goal":"Explain why traversal works","learner_action":"Explain the traversal logic in your own words","ai_support":"Challenge each explanation with targeted why questions","estimated_minutes":8},
+                {"stage":"TRAINING","title":"Practice traversal steps","goal":"Apply traversal steps accurately","learner_action":"Solve two traversal exercises step by step","ai_support":"Review each step and correct mistakes immediately","estimated_minutes":8},
+                {"stage":"REFLECTION","title":"Summarize mistakes","goal":"Capture the next improvement focus","learner_action":"Write down the main mistake patterns and fixes","ai_support":"Summarize the mistake patterns and suggest next drills","estimated_minutes":8}
+              ]
+            }
+            """;
     }
 
     private LearningPlanPlanningContext sampleContext() {
@@ -88,7 +148,7 @@ class LearningPlanOrchestratorTest {
             List.of("CONCEPT_CONFUSION"),
             List.of(55, 68),
             List.of("树的基础"),
-            "薄弱点集中在树的基础",
+            "当前弱点集中在树的基础",
             PlanAdjustments.defaults()
         );
     }

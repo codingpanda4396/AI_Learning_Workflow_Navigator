@@ -13,6 +13,7 @@ public record LearningPlanPreviewResponse(
     List<PlanPathNodeResponse> pathPreview,
     List<PlanTaskPreviewResponse> taskPreview,
     LearningPlanAdjustmentsRequest adjustments,
+    String planSource,
     Boolean fallbackApplied,
     List<String> fallbackReasons
 ) {

@@ -2,7 +2,9 @@ package com.pandanav.learning.application.service.learningplan;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
+import com.pandanav.learning.application.service.llm.LlmJsonParseException;
 import com.pandanav.learning.domain.llm.LlmGateway;
+import com.pandanav.learning.domain.llm.model.LlmCallContext;
 import com.pandanav.learning.domain.llm.model.LlmFallbackReason;
 import com.pandanav.learning.domain.llm.model.LearningPlanLlmResult;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
@@ -11,6 +13,7 @@ import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
 import com.pandanav.learning.domain.model.LearningPlanPreview;
 import com.pandanav.learning.domain.model.LearningPlanSummary;
+import com.pandanav.learning.domain.service.LearningPlanSchemaValidationException;
 import com.pandanav.learning.domain.service.LearningPlanPromptBuilder;
 import com.pandanav.learning.domain.service.LearningPlanResultValidator;
 import com.pandanav.learning.domain.service.RuleBasedPlanBuilder;
@@ -74,43 +77,90 @@ public class LearningPlanOrchestrator {
                 LlmFallbackReason.UNKNOWN_ERROR,
                 -1
             );
-            return new OrchestratedPlan(rulePreview, null, true, List.of("llm_not_ready"));
+            return new OrchestratedPlan(rulePreview, null, PlanSource.RULE_FALLBACK, true, List.of("LLM_NOT_READY"));
         }
 
         Instant start = Instant.now();
         try {
             LlmPrompt prompt = learningPlanPromptBuilder.build(context, rulePreview);
             LlmTextResult llmResult = llmGateway.generate(LlmStage.LEARNING_PLAN, prompt);
-            JsonNode json = llmJsonParser.parse(llmResult.text());
+            LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmResult.model());
+            JsonNode json = llmJsonParser.parse(llmResult.text(), llmContext);
             LearningPlanLlmResult parsed = learningPlanResultValidator.parse(json);
             List<String> errors = learningPlanResultValidator.validate(parsed, rulePreview);
             if (!errors.isEmpty()) {
                 log.warn(
-                    "LearningPlanOrchestrator: LLM output validation failed, using rule fallback. {} errors={}",
-                    logCtx, errors
+                    "LearningPlanOrchestrator: LLM output contract validation failed, using rule fallback. {} traceId={} requestId={} model={} errors={}",
+                    logCtx,
+                    llmContext.traceId(),
+                    llmContext.requestId(),
+                    llmContext.model(),
+                    errors
                 );
+                llmCallLogger.logStructuredOutputFailure(llmContext, LlmFallbackReason.JSON_SCHEMA_MISMATCH.name(), String.join("; ", errors));
                 llmCallLogger.logFallback(
-                    LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmResult.model()),
-                    LlmFallbackReason.MISSING_REQUIRED_FIELDS,
+                    llmContext,
+                    LlmFallbackReason.JSON_SCHEMA_MISMATCH,
                     LlmObservabilityHelper.elapsedMs(start)
                 );
-                return new OrchestratedPlan(rulePreview, traceId(llmResult), true, errors);
+                return new OrchestratedPlan(rulePreview, traceId(llmResult), PlanSource.RULE_FALLBACK, true, List.of(LlmFallbackReason.JSON_SCHEMA_MISMATCH.name()));
             }
             LearningPlanPreview merged = merge(rulePreview, parsed);
-            log.debug("LearningPlanOrchestrator: LLM plan applied. {} trace={}", logCtx, traceId(llmResult));
-            return new OrchestratedPlan(merged, traceId(llmResult), false, List.of());
+            log.info(
+                "LearningPlanOrchestrator: LLM plan applied. {} traceId={} requestId={} model={} planSource={}",
+                logCtx,
+                llmContext.traceId(),
+                llmContext.requestId(),
+                llmContext.model(),
+                PlanSource.LLM
+            );
+            return new OrchestratedPlan(merged, traceId(llmResult), PlanSource.LLM, false, List.of());
+        } catch (LearningPlanSchemaValidationException ex) {
+            LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
+            llmCallLogger.logStructuredOutputFailure(llmContext, ex.fallbackReason().name(), String.join("; ", ex.errors()));
+            log.warn(
+                "LearningPlanOrchestrator: Learning plan schema mismatch, using rule fallback. {} traceId={} requestId={} model={} errors={}",
+                logCtx,
+                llmContext.traceId(),
+                llmContext.requestId(),
+                llmContext.model(),
+                ex.errors()
+            );
+            llmCallLogger.logFallback(llmContext, ex.fallbackReason(), LlmObservabilityHelper.elapsedMs(start));
+            return new OrchestratedPlan(rulePreview, null, PlanSource.RULE_FALLBACK, true, List.of(ex.fallbackReason().name()));
+        } catch (LlmJsonParseException ex) {
+            LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
+            llmCallLogger.logStructuredOutputFailure(llmContext, ex.fallbackReason().name(), ex.diagnosticSummary());
+            log.warn(
+                "LearningPlanOrchestrator: Learning plan JSON parse failed, using rule fallback. {} traceId={} requestId={} model={} reason={} diagnostics={}",
+                logCtx,
+                llmContext.traceId(),
+                llmContext.requestId(),
+                llmContext.model(),
+                ex.fallbackReason(),
+                ex.diagnosticSummary()
+            );
+            llmCallLogger.logFallback(llmContext, ex.fallbackReason(), LlmObservabilityHelper.elapsedMs(start));
+            return new OrchestratedPlan(rulePreview, null, PlanSource.RULE_FALLBACK, true, List.of(ex.fallbackReason().name()));
         } catch (Exception ex) {
             LlmFallbackReason reason = llmFailureClassifier.classifyFallback(ex);
+            LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
             log.warn(
-                "LearningPlanOrchestrator: LLM call failed, using rule fallback. {} reason={}",
-                logCtx, ex.getMessage(), ex
+                "LearningPlanOrchestrator: LLM call failed, using rule fallback. {} traceId={} requestId={} model={} reason={} error={}",
+                logCtx,
+                llmContext.traceId(),
+                llmContext.requestId(),
+                llmContext.model(),
+                reason,
+                ex.getMessage(),
+                ex
             );
             llmCallLogger.logFallback(
-                LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, null),
+                llmContext,
                 reason,
                 LlmObservabilityHelper.elapsedMs(start)
             );
-            return new OrchestratedPlan(rulePreview, null, true, List.of(reason.name()));
+            return new OrchestratedPlan(rulePreview, null, PlanSource.RULE_FALLBACK, true, List.of(reason.name()));
         }
     }
 
@@ -143,6 +193,7 @@ public class LearningPlanOrchestrator {
     public record OrchestratedPlan(
         LearningPlanPreview preview,
         String llmTraceId,
+        PlanSource planSource,
         boolean fallbackApplied,
         List<String> fallbackReasons
     ) {

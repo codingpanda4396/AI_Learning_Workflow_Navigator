@@ -1,14 +1,22 @@
 package com.pandanav.learning.infrastructure.observability;
 
+import com.pandanav.learning.application.service.llm.LlmJsonParseException;
 import com.pandanav.learning.domain.llm.model.LlmCallException;
 import com.pandanav.learning.domain.llm.model.LlmFailureType;
 import com.pandanav.learning.domain.llm.model.LlmFallbackReason;
+import com.pandanav.learning.domain.service.LearningPlanSchemaValidationException;
 
 import java.util.Locale;
 
 public class LlmFailureClassifier {
 
     public LlmFailureType classifyFailure(Throwable error) {
+        if (error instanceof LearningPlanSchemaValidationException) {
+            return LlmFailureType.VALIDATION_ERROR;
+        }
+        if (error instanceof LlmJsonParseException) {
+            return LlmFailureType.JSON_PARSE_ERROR;
+        }
         if (error instanceof LlmCallException llmCallException) {
             return llmCallException.failureType();
         }
@@ -32,12 +40,18 @@ public class LlmFailureClassifier {
     }
 
     public LlmFallbackReason classifyFallback(Throwable error) {
+        if (error instanceof LearningPlanSchemaValidationException schemaValidationException) {
+            return schemaValidationException.fallbackReason();
+        }
+        if (error instanceof LlmJsonParseException jsonParseException) {
+            return jsonParseException.fallbackReason();
+        }
         return switch (classifyFailure(error)) {
             case TIMEOUT -> LlmFallbackReason.LLM_TIMEOUT;
             case API_ERROR -> LlmFallbackReason.LLM_API_ERROR;
             case JSON_PARSE_ERROR -> LlmFallbackReason.JSON_PARSE_ERROR;
             case EMPTY_RESPONSE -> LlmFallbackReason.EMPTY_RESPONSE;
-            case VALIDATION_ERROR -> LlmFallbackReason.MISSING_REQUIRED_FIELDS;
+            case VALIDATION_ERROR -> LlmFallbackReason.JSON_SCHEMA_MISMATCH;
             case UNKNOWN_ERROR -> LlmFallbackReason.UNKNOWN_ERROR;
         };
     }

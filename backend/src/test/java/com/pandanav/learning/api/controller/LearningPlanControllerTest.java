@@ -58,7 +58,8 @@ class LearningPlanControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("OK"))
             .andExpect(jsonPath("$.data.planId").value("101"))
-            .andExpect(jsonPath("$.data.summary.recommendedStartNodeName").value("树的基础"));
+            .andExpect(jsonPath("$.data.planSource").value("LLM"))
+            .andExpect(jsonPath("$.data.summary.recommendedStartNodeName").value("tree basics"));
     }
 
     @Test
@@ -83,12 +84,13 @@ class LearningPlanControllerTest {
     private LearningPlanPreviewResponse samplePreview() {
         return new LearningPlanPreviewResponse(
             "101",
-            new LearningPlanSummaryResponse("先补基础再推进", "101", "树的基础", "STANDARD", 36, 2, 4),
-            List.of(new PlanReasonResponse("START_POINT", "从树的基础开始", "因为当前掌握度低且它是后续节点的前置。")),
-            List.of("先稳住树的基础", "再进入二叉树遍历"),
-            List.of(new PlanPathNodeResponse("101", "树的基础", 1, 40, "LEARNING", true, 18, "前置核心")),
+            new LearningPlanSummaryResponse("Strengthen basics before advancing", "101", "tree basics", "STANDARD", 36, 2, 4),
+            List.of(new PlanReasonResponse("START_POINT", "Start with the basics", "The learner still needs a stronger prerequisite foundation before moving ahead.")),
+            List.of("solidify tree basics", "connect traversal to the basics"),
+            List.of(new PlanPathNodeResponse("101", "tree basics", 1, 40, "LEARNING", true, 18, "prerequisite core")),
             List.of(new PlanTaskPreviewResponse("STRUCTURE", "t1", "g1", "a1", "s1", 6)),
             new LearningPlanAdjustmentsRequest("STANDARD", "LEARN_THEN_PRACTICE", true),
+            "LLM",
             null,
             null
         );
