@@ -7,6 +7,7 @@ import com.pandanav.learning.domain.llm.model.TutorPromptContext;
 import com.pandanav.learning.domain.llm.model.TutorReplyMode;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DefaultPromptTemplateProviderTest {
@@ -20,25 +21,25 @@ class DefaultPromptTemplateProviderTest {
             new StageGenerationContext(1L, 1L, "ch1", 1L, "TCP", Stage.STRUCTURE, "understand tcp", null, null)
         );
 
-        assertTrue(prompt.userPrompt().contains("阶段：STRUCTURE"));
+        assertTrue(prompt.userPrompt().contains("Stage: STRUCTURE"));
         assertTrue(prompt.userPrompt().contains("\"title\""));
-        assertTrue(prompt.promptKey().equals("STRUCTURE"));
-        assertTrue(prompt.promptVersion().equals("v2"));
+        assertEquals("STRUCTURE", prompt.promptKey());
+        assertEquals("v2", prompt.promptVersion());
     }
 
     @Test
     void shouldBuildTutorPromptWithModeSwitch() {
         String systemPrompt = provider.buildTutorSystemPrompt(new TutorPromptContext(
             "TRAINING",
-            "解释链式法则",
-            "复合函数求导",
-            "完成三道训练题",
+            "objective",
+            "concept",
+            "goal",
             TutorReplyMode.HINT_ONLY,
             TutorReplyMode.DIRECT_ANSWER
         ));
 
         assertTrue(systemPrompt.contains("hint_mode: HINT_ONLY"));
         assertTrue(systemPrompt.contains("direct_answer_mode: DIRECT_ANSWER"));
-        assertTrue(systemPrompt.contains("学习流程导师"));
+        assertTrue(systemPrompt.contains("You are a learning tutor."));
     }
 }

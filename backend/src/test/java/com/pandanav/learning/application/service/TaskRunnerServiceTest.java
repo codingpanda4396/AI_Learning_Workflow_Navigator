@@ -12,6 +12,8 @@ import com.pandanav.learning.domain.repository.MasteryRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -21,6 +23,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,7 +55,9 @@ class TaskRunnerServiceTest {
             stageContentGenerator,
             llmCallLogRepository,
             llmProperties,
-            new ObjectMapper()
+            new ObjectMapper(),
+            mock(LlmCallLogger.class),
+            new LlmFailureClassifier()
         );
         Task task = new Task();
         task.setId(1002L);

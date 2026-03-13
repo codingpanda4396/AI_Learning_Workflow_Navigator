@@ -3,6 +3,7 @@ package com.pandanav.learning.application.service.learningplan;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.llm.LlmGateway;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.model.LearningPlanContextNode;
@@ -12,13 +13,17 @@ import com.pandanav.learning.domain.service.LearningPlanPromptBuilder;
 import com.pandanav.learning.domain.service.LearningPlanResultValidator;
 import com.pandanav.learning.domain.service.RuleBasedPlanBuilder;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,7 +32,7 @@ class LearningPlanOrchestratorTest {
     @Test
     void shouldFallbackWhenLlmReturnsInvalidStage() {
         LlmGateway llmGateway = mock(LlmGateway.class);
-        when(llmGateway.generate(any())).thenReturn(new LlmTextResult(
+        when(llmGateway.generate(eq(LlmStage.LEARNING_PLAN), any())).thenReturn(new LlmTextResult(
             """
             {
               "headline": "先补前置，再推进主节点",
@@ -55,7 +60,9 @@ class LearningPlanOrchestratorTest {
             new LearningPlanResultValidator(),
             llmGateway,
             new LlmJsonParser(new ObjectMapper()),
-            readyProperties()
+            readyProperties(),
+            new LlmCallLogger(mock(ObjectProvider.class)),
+            new LlmFailureClassifier()
         );
 
         LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());

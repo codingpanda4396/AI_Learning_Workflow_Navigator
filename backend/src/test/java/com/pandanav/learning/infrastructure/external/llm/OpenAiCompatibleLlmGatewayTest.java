@@ -1,8 +1,11 @@
 package com.pandanav.learning.infrastructure.external.llm;
 
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.client.RestClient;
 
 import java.lang.reflect.Method;
@@ -15,7 +18,12 @@ class OpenAiCompatibleLlmGatewayTest {
 
     @Test
     void shouldTreatWrappedTimeoutAsRetryable() throws Exception {
-        OpenAiCompatibleLlmGateway gateway = new OpenAiCompatibleLlmGateway(mock(RestClient.Builder.class), new LlmProperties());
+        OpenAiCompatibleLlmGateway gateway = new OpenAiCompatibleLlmGateway(
+            mock(RestClient.Builder.class),
+            new LlmProperties(),
+            new LlmCallLogger(mock(ObjectProvider.class)),
+            new LlmFailureClassifier()
+        );
 
         Method method = OpenAiCompatibleLlmGateway.class.getDeclaredMethod("isRetryable", Exception.class);
         method.setAccessible(true);
@@ -30,7 +38,12 @@ class OpenAiCompatibleLlmGatewayTest {
 
     @Test
     void shouldNotTreatValidationErrorAsRetryable() throws Exception {
-        OpenAiCompatibleLlmGateway gateway = new OpenAiCompatibleLlmGateway(mock(RestClient.Builder.class), new LlmProperties());
+        OpenAiCompatibleLlmGateway gateway = new OpenAiCompatibleLlmGateway(
+            mock(RestClient.Builder.class),
+            new LlmProperties(),
+            new LlmCallLogger(mock(ObjectProvider.class)),
+            new LlmFailureClassifier()
+        );
 
         Method method = OpenAiCompatibleLlmGateway.class.getDeclaredMethod("isRetryable", Exception.class);
         method.setAccessible(true);

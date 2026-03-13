@@ -6,6 +6,7 @@ import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.StageContentGenerator;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.domain.llm.model.StageContent;
@@ -39,7 +40,7 @@ public class LlmStageContentGenerator implements StageContentGenerator {
     public StageContent generate(StageGenerationContext context) {
         PromptTemplateKey key = mapKey(context.stage());
         LlmPrompt prompt = promptTemplateProvider.buildStagePrompt(key, context);
-        LlmTextResult result = llmGateway.generate(prompt);
+        LlmTextResult result = llmGateway.generate(LlmStage.TASK_RUN, prompt);
         JsonNode parsed = llmJsonParser.parse(result.text());
         PromptOutputValidator.SanitizedStageOutput sanitized = promptOutputValidator.sanitizeStage(context.stage(), parsed);
 

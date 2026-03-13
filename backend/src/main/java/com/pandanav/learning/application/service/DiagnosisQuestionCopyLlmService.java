@@ -1,19 +1,23 @@
 package com.pandanav.learning.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.llm.LlmGateway;
+import com.pandanav.learning.domain.llm.model.LlmFallbackReason;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.domain.model.DiagnosisQuestion;
 import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
 import com.pandanav.learning.domain.model.LearningSession;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
+import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,17 +27,25 @@ import java.util.stream.Collectors;
 @Service
 public class DiagnosisQuestionCopyLlmService {
 
-    private static final Logger log = LoggerFactory.getLogger(DiagnosisQuestionCopyLlmService.class);
-
     private final LlmGateway llmGateway;
     private final LlmJsonParser llmJsonParser;
+    private final LlmCallLogger llmCallLogger;
+    private final LlmFailureClassifier llmFailureClassifier;
 
-    public DiagnosisQuestionCopyLlmService(LlmGateway llmGateway, LlmJsonParser llmJsonParser) {
+    public DiagnosisQuestionCopyLlmService(
+        LlmGateway llmGateway,
+        LlmJsonParser llmJsonParser,
+        LlmCallLogger llmCallLogger,
+        LlmFailureClassifier llmFailureClassifier
+    ) {
         this.llmGateway = llmGateway;
         this.llmJsonParser = llmJsonParser;
+        this.llmCallLogger = llmCallLogger;
+        this.llmFailureClassifier = llmFailureClassifier;
     }
 
-    public List<DiagnosisQuestion> enhanceQuestions(LearningSession session, List<DiagnosisQuestion> fallbackQuestions) {
+    public DiagnosisQuestionCopyResult enhanceQuestions(LearningSession session, List<DiagnosisQuestion> fallbackQuestions) {
+        Instant start = Instant.now();
         try {
             LlmPrompt prompt = new LlmPrompt(
                 PromptTemplateKey.DIAGNOSIS_QUESTION_V1,
@@ -85,15 +97,20 @@ public class DiagnosisQuestionCopyLlmService {
                 null,
                 800
             );
-            LlmTextResult result = llmGateway.generate(prompt);
+            LlmTextResult result = llmGateway.generate(LlmStage.DIAGNOSIS_QUESTION_COPY, prompt);
             JsonNode root = llmJsonParser.parse(result.text());
             JsonNode items = root.path("questions");
             if (!items.isArray() || items.size() != fallbackQuestions.size()) {
-                log.warn(
-                    "DiagnosisQuestionCopyLlmService: LLM response invalid, using fallback. questions isArray={}, size={}, expected={}",
-                    items.isArray(), items.isArray() ? items.size() : -1, fallbackQuestions.size()
+                llmCallLogger.logFallback(
+                    LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, result.model()),
+                    LlmFallbackReason.MISSING_REQUIRED_FIELDS,
+                    LlmObservabilityHelper.elapsedMs(start)
                 );
-                return fallbackQuestions;
+                return new DiagnosisQuestionCopyResult(
+                    fallbackQuestions,
+                    true,
+                    List.of(LlmFallbackReason.MISSING_REQUIRED_FIELDS.name())
+                );
             }
 
             Map<String, DiagnosisQuestion> byId = fallbackQuestions.stream()
@@ -104,16 +121,29 @@ public class DiagnosisQuestionCopyLlmService {
                 String questionId = item.path("questionId").asText("");
                 DiagnosisQuestion original = byId.get(questionId);
                 if (original == null) {
-                    log.warn("DiagnosisQuestionCopyLlmService: LLM returned unknown questionId={}, using fallback", questionId);
-                    return fallbackQuestions;
+                    llmCallLogger.logFallback(
+                        LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, result.model()),
+                        LlmFallbackReason.MISSING_REQUIRED_FIELDS,
+                        LlmObservabilityHelper.elapsedMs(start)
+                    );
+                    return new DiagnosisQuestionCopyResult(
+                        fallbackQuestions,
+                        true,
+                        List.of(LlmFallbackReason.MISSING_REQUIRED_FIELDS.name())
+                    );
                 }
                 List<String> options = readOptions(item.path("options"), original.options());
                 if (options.size() != original.options().size()) {
-                    log.warn(
-                        "DiagnosisQuestionCopyLlmService: LLM modified options count for questionId={}, got={}, expected={}, using fallback",
-                        questionId, options.size(), original.options().size()
+                    llmCallLogger.logFallback(
+                        LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, result.model()),
+                        LlmFallbackReason.MISSING_REQUIRED_FIELDS,
+                        LlmObservabilityHelper.elapsedMs(start)
                     );
-                    return fallbackQuestions;
+                    return new DiagnosisQuestionCopyResult(
+                        fallbackQuestions,
+                        true,
+                        List.of(LlmFallbackReason.MISSING_REQUIRED_FIELDS.name())
+                    );
                 }
                 DiagnosisQuestionCopy copy = readCopy(item.path("copy"), original.copy());
                 refined.add(new DiagnosisQuestion(
@@ -127,10 +157,15 @@ public class DiagnosisQuestionCopyLlmService {
                     copy
                 ));
             }
-            return refined;
+            return new DiagnosisQuestionCopyResult(refined, false, List.of());
         } catch (Exception ex) {
-            log.warn("DiagnosisQuestionCopyLlmService: LLM enhance failed, using fallback. reason={}", ex.getMessage(), ex);
-            return fallbackQuestions;
+            LlmFallbackReason reason = llmFailureClassifier.classifyFallback(ex);
+            llmCallLogger.logFallback(
+                LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, null),
+                reason,
+                LlmObservabilityHelper.elapsedMs(start)
+            );
+            return new DiagnosisQuestionCopyResult(fallbackQuestions, true, List.of(reason.name()));
         }
     }
 
@@ -180,5 +215,12 @@ public class DiagnosisQuestionCopyLlmService {
 
     private String safe(String value) {
         return value == null || value.isBlank() ? "" : value.trim();
+    }
+
+    public record DiagnosisQuestionCopyResult(
+        List<DiagnosisQuestion> questions,
+        boolean fallbackApplied,
+        List<String> fallbackReasons
+    ) {
     }
 }

@@ -10,9 +10,11 @@ import com.pandanav.learning.domain.enums.PlanSource;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
+import com.pandanav.learning.domain.llm.model.LlmFallbackReason;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.PersonalizedPathContext;
 import com.pandanav.learning.domain.llm.model.PersonalizedPathPlan;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
@@ -28,9 +30,13 @@ import com.pandanav.learning.domain.repository.MasteryRepository;
 import com.pandanav.learning.domain.repository.NodeMasteryRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
+import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -63,6 +69,8 @@ public class PersonalizedPathPlannerService {
     private final LlmJsonParser llmJsonParser;
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
+    private final LlmCallLogger llmCallLogger;
+    private final LlmFailureClassifier llmFailureClassifier;
 
     public PersonalizedPathPlannerService(
         ConceptNodeRepository conceptNodeRepository,
@@ -75,7 +83,9 @@ public class PersonalizedPathPlannerService {
         PromptOutputValidator promptOutputValidator,
         LlmJsonParser llmJsonParser,
         LlmProperties llmProperties,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        LlmCallLogger llmCallLogger,
+        LlmFailureClassifier llmFailureClassifier
     ) {
         this.conceptNodeRepository = conceptNodeRepository;
         this.masteryRepository = masteryRepository;
@@ -88,6 +98,8 @@ public class PersonalizedPathPlannerService {
         this.llmJsonParser = llmJsonParser;
         this.llmProperties = llmProperties;
         this.objectMapper = objectMapper;
+        this.llmCallLogger = llmCallLogger;
+        this.llmFailureClassifier = llmFailureClassifier;
     }
 
     public PersonalizedPlanResult plan(LearningSession session, PlanMode mode, boolean shadowMode) {
@@ -143,13 +155,14 @@ public class PersonalizedPathPlannerService {
         }
 
         LlmPrompt prompt = promptTemplateProvider.buildPersonalizedPathPlanPrompt(context);
+        Instant start = Instant.now();
         LlmTextResult llmResult = null;
         List<String> schemaErrors = new ArrayList<>();
         List<String> businessErrors = new ArrayList<>();
         PersonalizedPathPlan parsedPlan = null;
 
         try {
-            llmResult = llmGateway.generate(prompt);
+            llmResult = llmGateway.generate(LlmStage.PATH_PLAN, prompt);
             Integer completionTokens = llmResult.usage() == null ? null : llmResult.usage().tokenOutput();
             Integer threshold = llmProperties.resolveProfile(LlmInvocationProfile.HEAVY_REASONING_TASK, prompt.promptKey())
                 .completionWarningThreshold();
@@ -202,7 +215,13 @@ public class PersonalizedPathPlannerService {
             persistPlanEvent(session, mode, context, parsedPlan, result, schemaErrors, businessErrors, fallbackReason);
             return result;
         } catch (Exception ex) {
-            fallbackReason = ex.getMessage() == null ? "llm_failed" : ex.getMessage();
+            LlmFallbackReason reason = llmFailureClassifier.classifyFallback(ex);
+            fallbackReason = reason.name();
+            llmCallLogger.logFallback(
+                LlmObservabilityHelper.context(LlmStage.PATH_PLAN, llmResult == null ? null : llmResult.model()),
+                reason,
+                LlmObservabilityHelper.elapsedMs(start)
+            );
             PersonalizedPlanResult result = buildRuleResult(
                 baseline,
                 ruleApplied.orderedNodes(),

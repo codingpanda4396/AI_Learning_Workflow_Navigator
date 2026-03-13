@@ -15,6 +15,7 @@ import com.pandanav.learning.domain.enums.PracticeQuizStatus;
 import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningEvent;
 import com.pandanav.learning.domain.model.PracticeFeedbackReport;
@@ -31,6 +32,9 @@ import com.pandanav.learning.domain.repository.PracticeSubmissionRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
+import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.exception.ConflictException;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
@@ -70,6 +74,8 @@ public class PracticeServiceImpl implements PracticeService {
     private final MasteryService masteryService;
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
+    private final LlmCallLogger llmCallLogger;
+    private final LlmFailureClassifier llmFailureClassifier;
 
     public PracticeServiceImpl(
         PracticeRepository practiceRepository,
@@ -86,7 +92,9 @@ public class PracticeServiceImpl implements PracticeService {
         PracticeQuizAsyncService practiceQuizAsyncService,
         MasteryService masteryService,
         LlmProperties llmProperties,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        LlmCallLogger llmCallLogger,
+        LlmFailureClassifier llmFailureClassifier
     ) {
         this.practiceRepository = practiceRepository;
         this.practiceSubmissionRepository = practiceSubmissionRepository;
@@ -103,6 +111,8 @@ public class PracticeServiceImpl implements PracticeService {
         this.masteryService = masteryService;
         this.llmProperties = llmProperties;
         this.objectMapper = objectMapper;
+        this.llmCallLogger = llmCallLogger;
+        this.llmFailureClassifier = llmFailureClassifier;
     }
 
     @Override
@@ -286,6 +296,11 @@ public class PracticeServiceImpl implements PracticeService {
                 if (!llmProperties.isFallbackToRule()) {
                     throw ex;
                 }
+                llmCallLogger.logFallback(
+                    LlmObservabilityHelper.context(LlmStage.PRACTICE_GENERATION, llmProperties.getModel()),
+                    llmFailureClassifier.classifyFallback(ex),
+                    -1
+                );
                 log.warn(
                     "practice generation fell back to RULE after LLM failure: sessionId={}, taskId={}, userId={}, reason={}",
                     request.sessionId(), request.taskId(), request.userId(), sanitizeReason(ex.getMessage())

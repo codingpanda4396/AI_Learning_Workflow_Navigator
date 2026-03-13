@@ -3,14 +3,19 @@ package com.pandanav.learning.infrastructure.external.llm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.domain.llm.LlmGateway;
+import com.pandanav.learning.domain.llm.model.LlmCallContext;
+import com.pandanav.learning.domain.llm.model.LlmCallException;
+import com.pandanav.learning.domain.llm.model.LlmCallMetrics;
+import com.pandanav.learning.domain.llm.model.LlmFailureType;
 import com.pandanav.learning.domain.llm.model.LlmProfileConfig;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.LlmUsage;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
-import com.pandanav.learning.infrastructure.exception.InternalServerException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
+import com.pandanav.learning.infrastructure.observability.TraceContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -29,25 +34,44 @@ import java.util.Map;
 
 public class OpenAiCompatibleLlmGateway implements LlmGateway {
 
-    private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmGateway.class);
-
     private final RestClient.Builder restClientBuilder;
     private final LlmProperties properties;
     private final ObjectMapper objectMapper;
+    private final LlmCallLogger llmCallLogger;
+    private final LlmFailureClassifier failureClassifier;
 
-    public OpenAiCompatibleLlmGateway(RestClient.Builder restClientBuilder, LlmProperties properties) {
+    public OpenAiCompatibleLlmGateway(
+        RestClient.Builder restClientBuilder,
+        LlmProperties properties,
+        LlmCallLogger llmCallLogger,
+        LlmFailureClassifier failureClassifier
+    ) {
         this.restClientBuilder = restClientBuilder;
         this.properties = properties;
+        this.llmCallLogger = llmCallLogger;
+        this.failureClassifier = failureClassifier;
         this.objectMapper = new ObjectMapper();
     }
 
     @Override
-    public LlmTextResult generate(LlmPrompt prompt) {
+    public LlmTextResult generate(LlmStage stage, LlmPrompt prompt) {
         Instant start = Instant.now();
         LlmProfileConfig profile = properties.resolveProfile(prompt.invocationProfile(), prompt.promptKey());
         String model = (prompt.modelHint() == null || prompt.modelHint().isBlank())
             ? profile.model()
             : prompt.modelHint().trim();
+        LlmCallContext context = new LlmCallContext(TraceContext.traceId(), TraceContext.requestId(), stage, model);
+        if (properties.getObservability().isEnabled()) {
+            llmCallLogger.logStart(context);
+        }
+
+        if (properties.isForceFallback()) {
+            int latencyMs = elapsedMs(start);
+            if (properties.getObservability().isEnabled()) {
+                llmCallLogger.logFallback(context, com.pandanav.learning.domain.llm.model.LlmFallbackReason.FORCE_FALLBACK, latencyMs);
+            }
+            throw new LlmCallException(LlmFailureType.UNKNOWN_ERROR, "LLM force fallback is enabled.");
+        }
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", model);
@@ -68,64 +92,34 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
         }
 
         JsonNode requestPayload = objectMapper.valueToTree(payload);
-        if (properties.isLogRequest()) {
-            log.info(
-                "LLM request: profile={}, promptKey={}, model={}, timeoutMs={}, maxTokens={}, payload={}",
-                prompt.invocationProfile(),
-                prompt.promptKey(),
-                model,
-                profile.timeoutMs(),
-                maxOutputTokens,
-                toCompactJson(requestPayload)
-            );
-        }
-
-        boolean timeout = false;
-        JsonNode response;
         try {
-            response = invokeWithRetry(requestPayload, profile.timeoutMs());
-        } catch (InternalServerException ex) {
-            timeout = ex.getMessage() != null && ex.getMessage().toLowerCase().contains("timed out");
+            JsonNode response = invokeWithRetry(requestPayload, profile.timeoutMs());
+            JsonNode contentNode = response.path("choices").path(0).path("message").path("content");
+            if (contentNode.isMissingNode() || contentNode.isNull() || contentNode.asText().isBlank()) {
+                throw new LlmCallException(LlmFailureType.EMPTY_RESPONSE, "LLM provider response has no content.");
+            }
+
+            LlmUsage usage = extractUsage(response, elapsedMs(start));
+            LlmTextResult result = new LlmTextResult(
+                contentNode.asText(),
+                profile.provider(),
+                model,
+                prompt.invocationProfile(),
+                usage,
+                requestPayload,
+                response
+            );
+            if (properties.getObservability().isEnabled()) {
+                llmCallLogger.logSuccess(context, LlmCallMetrics.from(usage));
+            }
+            return result;
+        } catch (RuntimeException ex) {
+            int latencyMs = elapsedMs(start);
+            if (properties.getObservability().isEnabled()) {
+                llmCallLogger.logFailure(context, failureClassifier.classifyFailure(ex), ex.getMessage(), latencyMs);
+            }
             throw ex;
         }
-
-        JsonNode contentNode = response.path("choices").path(0).path("message").path("content");
-        if (contentNode.isMissingNode() || contentNode.isNull() || contentNode.asText().isBlank()) {
-            throw new InternalServerException("LLM provider response has no content.");
-        }
-
-        int latency = (int) Duration.between(start, Instant.now()).toMillis();
-        JsonNode usageNode = response.path("usage");
-        JsonNode completionDetails = usageNode.path("completion_tokens_details");
-        String finishReason = response.path("choices").path(0).path("finish_reason").asText("");
-        Integer promptTokens = usageNode.path("prompt_tokens").isNumber() ? usageNode.path("prompt_tokens").asInt() : null;
-        Integer completionTokens = usageNode.path("completion_tokens").isNumber() ? usageNode.path("completion_tokens").asInt() : null;
-        Integer reasoningTokens = completionDetails.path("reasoning_tokens").isNumber()
-            ? completionDetails.path("reasoning_tokens").asInt()
-            : null;
-        boolean truncated = "length".equalsIgnoreCase(finishReason);
-        if (properties.isLogResponse()) {
-            log.info(
-                "LLM response: profile={}, promptKey={}, finishReason={}, promptTokens={}, completionTokens={}, reasoningTokens={}, latencyMs={}",
-                prompt.invocationProfile(),
-                prompt.promptKey(),
-                finishReason,
-                promptTokens,
-                completionTokens,
-                reasoningTokens,
-                latency
-            );
-        }
-
-        return new LlmTextResult(
-            contentNode.asText(),
-            profile.provider(),
-            model,
-            prompt.invocationProfile(),
-            new LlmUsage(promptTokens, completionTokens, reasoningTokens, latency, finishReason, timeout, truncated),
-            requestPayload,
-            response
-        );
     }
 
     private JsonNode invokeWithRetry(JsonNode requestPayload, Integer timeoutMs) {
@@ -145,10 +139,10 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
             }
         }
 
-        if (lastError instanceof InternalServerException internalServerException) {
-            throw internalServerException;
+        if (lastError instanceof RuntimeException runtimeException) {
+            throw runtimeException;
         }
-        throw new InternalServerException("LLM provider call failed: " + (lastError == null ? "unknown" : lastError.getMessage()));
+        throw new LlmCallException(LlmFailureType.API_ERROR, "LLM provider call failed: " + (lastError == null ? "unknown" : lastError.getMessage()));
     }
 
     private ResponseEntity<byte[]> callProvider(JsonNode requestPayload, Integer timeoutMs) {
@@ -163,7 +157,8 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
                 .exchange((req, res) -> {
                     HttpStatusCode status = res.getStatusCode();
                     if (status.is4xxClientError() || status.is5xxServerError()) {
-                        throw new InternalServerException(
+                        throw new LlmCallException(
+                            LlmFailureType.API_ERROR,
                             "LLM provider returned " + status + ": " + readBodyAsString(res.getBody()));
                     }
                     byte[] body;
@@ -172,12 +167,12 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
                     }
                     return ResponseEntity.status(status).headers(res.getHeaders()).body(body);
                 });
-        } catch (InternalServerException e) {
+        } catch (LlmCallException e) {
             throw e;
         } catch (ResourceAccessException ex) {
-            throw new InternalServerException("LLM provider call timed out: " + ex.getMessage());
+            throw new LlmCallException(LlmFailureType.TIMEOUT, "LLM provider call timed out: " + ex.getMessage(), ex);
         } catch (Exception ex) {
-            throw new InternalServerException("LLM provider call failed: " + ex.getMessage());
+            throw new LlmCallException(LlmFailureType.API_ERROR, "LLM provider call failed: " + ex.getMessage(), ex);
         }
     }
 
@@ -192,7 +187,7 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
     private JsonNode parseResponse(ResponseEntity<byte[]> entity) {
         byte[] body = entity.getBody();
         if (body == null || body.length == 0) {
-            throw new InternalServerException("LLM provider returned empty response.");
+            throw new LlmCallException(LlmFailureType.EMPTY_RESPONSE, "LLM provider returned empty response.");
         }
 
         String text = new String(body, StandardCharsets.UTF_8);
@@ -201,10 +196,25 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
         } catch (Exception ex) {
             String contentType = entity.getHeaders().getFirst(HttpHeaders.CONTENT_TYPE);
             String preview = text.length() > 240 ? text.substring(0, 240) : text;
-            throw new InternalServerException(
+            throw new LlmCallException(
+                LlmFailureType.JSON_PARSE_ERROR,
                 "LLM provider response is not valid JSON. contentType=" + contentType + ", preview=" + preview
             );
         }
+    }
+
+    private LlmUsage extractUsage(JsonNode response, int latencyMs) {
+        JsonNode usageNode = response.path("usage");
+        JsonNode completionDetails = usageNode.path("completion_tokens_details");
+        String finishReason = response.path("choices").path(0).path("finish_reason").asText("");
+        Integer promptTokens = usageNode.path("prompt_tokens").isNumber() ? usageNode.path("prompt_tokens").asInt() : -1;
+        Integer completionTokens = usageNode.path("completion_tokens").isNumber() ? usageNode.path("completion_tokens").asInt() : -1;
+        Integer totalTokens = usageNode.path("total_tokens").isNumber() ? usageNode.path("total_tokens").asInt() : -1;
+        Integer reasoningTokens = completionDetails.path("reasoning_tokens").isNumber()
+            ? completionDetails.path("reasoning_tokens").asInt()
+            : -1;
+        boolean truncated = "length".equalsIgnoreCase(finishReason);
+        return new LlmUsage(promptTokens, completionTokens, totalTokens, reasoningTokens, latencyMs, finishReason, false, truncated);
     }
 
     private boolean isRetryable(Exception ex) {
@@ -254,11 +264,7 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
         }
     }
 
-    private String toCompactJson(JsonNode node) {
-        try {
-            return objectMapper.writeValueAsString(node);
-        } catch (Exception ex) {
-            return "{\"error\":\"failed to serialize request payload\"}";
-        }
+    private int elapsedMs(Instant start) {
+        return (int) Duration.between(start, Instant.now()).toMillis();
     }
 }

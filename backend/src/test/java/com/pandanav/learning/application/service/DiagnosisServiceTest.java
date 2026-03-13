@@ -11,6 +11,7 @@ import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.enums.DiagnosisStatus;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.model.CapabilityProfile;
 import com.pandanav.learning.domain.model.DiagnosisAnswer;
@@ -24,6 +25,8 @@ import com.pandanav.learning.domain.service.CapabilityProfileBuilder;
 import com.pandanav.learning.domain.service.DiagnosisQuestionCopyFactory;
 import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,10 +72,10 @@ class DiagnosisServiceTest {
             diagnosisAnswerRepository,
             capabilityProfileRepository,
             new DiagnosisTemplateFactory(new DiagnosisQuestionCopyFactory()),
-            new DiagnosisQuestionCopyLlmService(llmGateway, llmJsonParser),
+            new DiagnosisQuestionCopyLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class), new LlmFailureClassifier()),
             new CapabilityProfileBuilder(),
             new CapabilityProfileSummaryGenerator(),
-            new CapabilityProfileSummaryLlmService(llmGateway, llmJsonParser),
+            new CapabilityProfileSummaryLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class), new LlmFailureClassifier()),
             objectMapper
         );
     }
@@ -83,7 +87,7 @@ class DiagnosisServiceTest {
         savedDiagnosis.setId(501L);
 
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
-        when(llmGateway.generate(any(LlmPrompt.class))).thenReturn(llmText("""
+        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class))).thenReturn(llmText("""
             {
               "questions": [
                 {
@@ -156,6 +160,7 @@ class DiagnosisServiceTest {
         assertEquals(5, response.questions().size());
         assertEquals("你现在对链表掌握到什么程度？", response.questions().get(0).copy().title());
         assertEquals(4, response.questions().get(0).options().size());
+        assertEquals(Boolean.FALSE, response.fallbackApplied());
     }
 
     @Test
@@ -165,7 +170,7 @@ class DiagnosisServiceTest {
         savedDiagnosis.setId(501L);
 
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
-        when(llmGateway.generate(any(LlmPrompt.class))).thenThrow(new RuntimeException("llm down"));
+        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class))).thenThrow(new RuntimeException("llm down"));
         when(diagnosisSessionRepository.save(any(DiagnosisSession.class))).thenAnswer(invocation -> {
             DiagnosisSession diagnosis = invocation.getArgument(0);
             diagnosis.setId(savedDiagnosis.getId());
@@ -177,6 +182,7 @@ class DiagnosisServiceTest {
         assertEquals(5, response.questions().size());
         assertTrue(response.questions().get(0).copy().title().contains("掌握程度"));
         assertEquals(4, response.questions().get(0).options().size());
+        assertEquals(Boolean.TRUE, response.fallbackApplied());
     }
 
     @Test
@@ -192,7 +198,7 @@ class DiagnosisServiceTest {
         when(diagnosisSessionRepository.findByIdAndUserPk(501L, 10L)).thenReturn(Optional.of(diagnosisSession));
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
         when(capabilityProfileRepository.findLatestBySessionId(101L)).thenReturn(Optional.empty());
-        when(llmGateway.generate(any(LlmPrompt.class))).thenReturn(llmText("""
+        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class))).thenReturn(llmText("""
             {
               "summary": "从这轮诊断来看，你已经有一定基础，更适合边巩固边推进，目标也比较明确。",
               "planExplanation": "系统接下来会先帮你梳理关键概念，再逐步增加训练量，并尽量贴合你每周可投入的时间。"
@@ -205,6 +211,8 @@ class DiagnosisServiceTest {
         });
 
         SubmitDiagnosisResponse response = diagnosisService.submitDiagnosis(buildSubmitRequest(), 10L);
+        assertEquals(Boolean.FALSE, response.fallbackApplied());
+        assertEquals("LLM", response.contentSource());
 
         ArgumentCaptor<List<DiagnosisAnswer>> answersCaptor = ArgumentCaptor.forClass(List.class);
         verify(diagnosisAnswerRepository).saveAll(answersCaptor.capture());
@@ -212,6 +220,8 @@ class DiagnosisServiceTest {
         assertEquals("INTERMEDIATE", response.capabilityProfile().currentLevel());
         assertEquals("INTERVIEW", response.capabilityProfile().goalOrientation());
         assertEquals("PRACTICE_FIRST", response.capabilityProfile().learningPreference());
+        assertEquals(Boolean.FALSE, response.fallbackApplied());
+        assertEquals("LLM", response.contentSource());
         assertTrue(response.capabilityProfile().summary().contains("已经有一定基础"));
         assertTrue(response.capabilityProfile().planExplanation().contains("逐步增加训练量"));
     }
@@ -229,7 +239,7 @@ class DiagnosisServiceTest {
         when(diagnosisSessionRepository.findByIdAndUserPk(501L, 10L)).thenReturn(Optional.of(diagnosisSession));
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
         when(capabilityProfileRepository.findLatestBySessionId(101L)).thenReturn(Optional.empty());
-        when(llmGateway.generate(any(LlmPrompt.class))).thenThrow(new RuntimeException("llm down"));
+        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class))).thenThrow(new RuntimeException("llm down"));
         when(capabilityProfileRepository.save(any(CapabilityProfile.class))).thenAnswer(invocation -> {
             CapabilityProfile profile = invocation.getArgument(0);
             profile.setId(701L);
@@ -237,6 +247,8 @@ class DiagnosisServiceTest {
         });
 
         SubmitDiagnosisResponse response = diagnosisService.submitDiagnosis(buildSubmitRequest(), 10L);
+        assertEquals(Boolean.TRUE, response.fallbackApplied());
+        assertEquals("RULE_FALLBACK", response.contentSource());
 
         assertTrue(response.capabilityProfile().summary().contains("尽量贴合你的当前基础和节奏"));
         assertTrue(response.capabilityProfile().planExplanation().contains("逐步调整训练难度"));

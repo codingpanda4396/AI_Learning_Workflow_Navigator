@@ -4,6 +4,8 @@ import com.pandanav.learning.domain.llm.model.EvaluationContext;
 import com.pandanav.learning.domain.llm.model.EvaluationResult;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -14,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,7 +58,13 @@ class CompositeAnswerEvaluatorTest {
         when(llmAnswerEvaluator.evaluate(any())).thenThrow(new RuntimeException("boom"));
         when(ruleBasedAnswerEvaluator.evaluate(any())).thenReturn(fallback);
 
-        CompositeAnswerEvaluator evaluator = new CompositeAnswerEvaluator(llmAnswerEvaluator, ruleBasedAnswerEvaluator, properties);
+        CompositeAnswerEvaluator evaluator = new CompositeAnswerEvaluator(
+            llmAnswerEvaluator,
+            ruleBasedAnswerEvaluator,
+            properties,
+            mock(LlmCallLogger.class),
+            new LlmFailureClassifier()
+        );
         EvaluationResult result = evaluator.evaluate(context);
         assertEquals(60, result.score());
         assertEquals("rule", result.feedback());
@@ -92,7 +101,13 @@ class CompositeAnswerEvaluatorTest {
         when(llmAnswerEvaluator.evaluate(any())).thenThrow(new RuntimeException("Failed to parse LLM JSON output."));
         when(ruleBasedAnswerEvaluator.evaluate(any())).thenReturn(fallback);
 
-        CompositeAnswerEvaluator evaluator = new CompositeAnswerEvaluator(llmAnswerEvaluator, ruleBasedAnswerEvaluator, properties);
+        CompositeAnswerEvaluator evaluator = new CompositeAnswerEvaluator(
+            llmAnswerEvaluator,
+            ruleBasedAnswerEvaluator,
+            properties,
+            mock(LlmCallLogger.class),
+            new LlmFailureClassifier()
+        );
         EvaluationResult result = evaluator.evaluate(context);
         assertEquals(55, result.score());
         assertEquals("rule-fallback", result.feedback());

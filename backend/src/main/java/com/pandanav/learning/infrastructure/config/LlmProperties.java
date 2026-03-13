@@ -28,8 +28,10 @@ public class LlmProperties {
     private int pathPlanMaxOutputTokens = 300;
     private int tutorMaxOutputTokens = 450;
     private boolean fallbackToRule = true;
+    private boolean forceFallback = false;
     private boolean logRequest = false;
     private boolean logResponse = false;
+    private Observability observability = new Observability();
     private Profiles profiles = new Profiles();
 
     public boolean isEnabled() {
@@ -192,6 +194,22 @@ public class LlmProperties {
         this.logResponse = logResponse;
     }
 
+    public boolean isForceFallback() {
+        return forceFallback;
+    }
+
+    public void setForceFallback(boolean forceFallback) {
+        this.forceFallback = forceFallback;
+    }
+
+    public Observability getObservability() {
+        return observability;
+    }
+
+    public void setObservability(Observability observability) {
+        this.observability = observability == null ? new Observability() : observability;
+    }
+
     public Profiles getProfiles() {
         return profiles;
     }
@@ -273,6 +291,18 @@ public class LlmProperties {
 
         public void setChatTask(ProfileSettings chatTask) {
             this.chatTask = chatTask == null ? this.chatTask : chatTask;
+        }
+    }
+
+    public static class Observability {
+        private boolean enabled = true;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
         }
     }
 

@@ -4,36 +4,51 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.enums.DiagnosisDimension;
 import com.pandanav.learning.domain.llm.LlmGateway;
+import com.pandanav.learning.domain.llm.model.LlmFallbackReason;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.domain.model.CapabilityProfileDraft;
 import com.pandanav.learning.domain.model.CapabilityProfileSummaryCopy;
 import com.pandanav.learning.domain.model.LearningSession;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
+import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class CapabilityProfileSummaryLlmService {
 
     private final LlmGateway llmGateway;
     private final LlmJsonParser llmJsonParser;
+    private final LlmCallLogger llmCallLogger;
+    private final LlmFailureClassifier llmFailureClassifier;
 
-    public CapabilityProfileSummaryLlmService(LlmGateway llmGateway, LlmJsonParser llmJsonParser) {
+    public CapabilityProfileSummaryLlmService(
+        LlmGateway llmGateway,
+        LlmJsonParser llmJsonParser,
+        LlmCallLogger llmCallLogger,
+        LlmFailureClassifier llmFailureClassifier
+    ) {
         this.llmGateway = llmGateway;
         this.llmJsonParser = llmJsonParser;
+        this.llmCallLogger = llmCallLogger;
+        this.llmFailureClassifier = llmFailureClassifier;
     }
 
-    public Optional<CapabilityProfileSummaryCopy> generate(
+    public CapabilityProfileSummaryResult generate(
         LearningSession session,
         CapabilityProfileDraft draft,
         Map<DiagnosisDimension, List<String>> answersByDimension
     ) {
+        Instant start = Instant.now();
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("goal", safe(session.getGoalText()));
@@ -70,20 +85,45 @@ public class CapabilityProfileSummaryLlmService {
                 null,
                 400
             );
-            LlmTextResult result = llmGateway.generate(prompt);
+            LlmTextResult result = llmGateway.generate(LlmStage.CAPABILITY_SUMMARY, prompt);
             JsonNode root = llmJsonParser.parse(result.text());
             String summary = root.path("summary").asText("").trim();
             String planExplanation = root.path("planExplanation").asText("").trim();
             if (summary.isBlank() || planExplanation.isBlank()) {
-                return Optional.empty();
+                llmCallLogger.logFallback(
+                    LlmObservabilityHelper.context(LlmStage.CAPABILITY_SUMMARY, result.model()),
+                    LlmFallbackReason.MISSING_REQUIRED_FIELDS,
+                    LlmObservabilityHelper.elapsedMs(start)
+                );
+                return new CapabilityProfileSummaryResult(null, true, List.of(LlmFallbackReason.MISSING_REQUIRED_FIELDS.name()));
             }
-            return Optional.of(new CapabilityProfileSummaryCopy(summary, planExplanation));
+            return new CapabilityProfileSummaryResult(
+                new CapabilityProfileSummaryCopy(summary, planExplanation),
+                false,
+                List.of()
+            );
         } catch (Exception ex) {
-            return Optional.empty();
+            llmCallLogger.logFallback(
+                LlmObservabilityHelper.context(LlmStage.CAPABILITY_SUMMARY, null),
+                llmFailureClassifier.classifyFallback(ex),
+                LlmObservabilityHelper.elapsedMs(start)
+            );
+            return new CapabilityProfileSummaryResult(
+                null,
+                true,
+                List.of(llmFailureClassifier.classifyFallback(ex).name())
+            );
         }
     }
 
     private String safe(String value) {
         return value == null || value.isBlank() ? "" : value.trim();
+    }
+
+    public record CapabilityProfileSummaryResult(
+        CapabilityProfileSummaryCopy copy,
+        boolean fallbackApplied,
+        List<String> fallbackReasons
+    ) {
     }
 }

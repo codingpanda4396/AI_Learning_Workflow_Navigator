@@ -7,6 +7,7 @@ import com.pandanav.learning.application.usecase.RunTaskUseCase;
 import com.pandanav.learning.auth.UserContextHolder;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.llm.StageContentGenerator;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.StageContent;
 import com.pandanav.learning.domain.llm.model.StageGenerationContext;
 import com.pandanav.learning.domain.model.AttemptLlmMetadata;
@@ -24,6 +25,9 @@ import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.ConflictException;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
+import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -44,6 +48,8 @@ public class TaskRunnerService implements RunTaskUseCase {
     private final LlmCallLogRepository llmCallLogRepository;
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
+    private final LlmCallLogger llmCallLogger;
+    private final LlmFailureClassifier llmFailureClassifier;
 
     public TaskRunnerService(
         TaskRepository taskRepository,
@@ -53,7 +59,9 @@ public class TaskRunnerService implements RunTaskUseCase {
         StageContentGenerator stageContentGenerator,
         LlmCallLogRepository llmCallLogRepository,
         LlmProperties llmProperties,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        LlmCallLogger llmCallLogger,
+        LlmFailureClassifier llmFailureClassifier
     ) {
         this.taskRepository = taskRepository;
         this.sessionRepository = sessionRepository;
@@ -63,6 +71,8 @@ public class TaskRunnerService implements RunTaskUseCase {
         this.llmCallLogRepository = llmCallLogRepository;
         this.llmProperties = llmProperties;
         this.objectMapper = objectMapper;
+        this.llmCallLogger = llmCallLogger;
+        this.llmFailureClassifier = llmFailureClassifier;
     }
 
     @Override
@@ -140,6 +150,11 @@ public class TaskRunnerService implements RunTaskUseCase {
                 ));
                 throw ex;
             }
+            llmCallLogger.logFallback(
+                LlmObservabilityHelper.context(LlmStage.TASK_RUN, llmStageContent == null ? llmProperties.getModel() : llmStageContent.model()),
+                llmFailureClassifier.classifyFallback(ex),
+                -1
+            );
             generated = generateByStage(task);
             metadata = AttemptLlmMetadata.none("TEMPLATE_FALLBACK");
             generationReason = "LLM failed: " + sanitizeReason(ex.getMessage());

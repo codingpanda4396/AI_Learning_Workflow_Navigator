@@ -21,6 +21,8 @@ import com.pandanav.learning.domain.repository.PracticeSubmissionRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +35,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -88,7 +91,9 @@ class PracticeServiceImplTest {
             practiceQuizAsyncService,
             masteryService,
             llmProperties,
-            new ObjectMapper()
+            new ObjectMapper(),
+            mock(LlmCallLogger.class),
+            new LlmFailureClassifier()
         );
     }
 

@@ -6,9 +6,11 @@ import com.pandanav.learning.application.service.practice.RulePracticeGenerator;
 import com.pandanav.learning.domain.enums.PracticeItemSource;
 import com.pandanav.learning.domain.enums.PracticeItemStatus;
 import com.pandanav.learning.domain.enums.PracticeQuestionType;
+import com.pandanav.learning.domain.enums.PracticeQuizStatus;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.PracticeItem;
+import com.pandanav.learning.domain.model.PracticeQuiz;
 import com.pandanav.learning.domain.model.PracticeSubmission;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
@@ -22,6 +24,8 @@ import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.ConflictException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -88,7 +93,9 @@ class PracticeSubmissionServiceTest {
             practiceQuizAsyncService,
             masteryService,
             new LlmProperties(),
-            new ObjectMapper()
+            new ObjectMapper(),
+            mock(LlmCallLogger.class),
+            new LlmFailureClassifier()
         );
     }
 
@@ -118,6 +125,14 @@ class PracticeSubmissionServiceTest {
         when(taskRepository.findByIdAndUserPk(100L, 10L)).thenReturn(Optional.of(trainingTask()));
         when(sessionRepository.findByIdAndUserPk(200L, 10L)).thenReturn(Optional.of(new LearningSession()));
         when(practiceRepository.findByIdAndUserPk(300L, 10L)).thenReturn(Optional.of(item));
+        PracticeQuiz quiz = new PracticeQuiz();
+        quiz.setId(400L);
+        quiz.setSessionId(200L);
+        quiz.setTaskId(100L);
+        quiz.setStatus(PracticeQuizStatus.ANSWERING);
+        when(practiceQuizRepository.findLatestBySessionIdAndTaskIdAndUserPk(200L, 100L, 10L)).thenReturn(Optional.of(quiz));
+        when(practiceRepository.findByQuizId(400L)).thenReturn(java.util.List.of(item));
+        when(practiceSubmissionRepository.findByQuizId(400L)).thenReturn(java.util.List.of());
 
         AtomicLong id = new AtomicLong(500L);
         when(practiceSubmissionRepository.save(any(PracticeSubmission.class))).thenAnswer(invocation -> {

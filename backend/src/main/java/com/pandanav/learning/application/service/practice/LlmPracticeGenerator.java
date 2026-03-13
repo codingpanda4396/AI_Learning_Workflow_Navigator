@@ -10,6 +10,7 @@ import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmProfileConfig;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.domain.llm.model.PracticeGenerationContext;
@@ -66,7 +67,7 @@ public class LlmPracticeGenerator implements PracticeGenerator {
 
         LlmTextResult result = null;
         try {
-            result = llmGateway.generate(prompt);
+            result = llmGateway.generate(LlmStage.PRACTICE_GENERATION, prompt);
             Integer completionTokens = result.usage() == null ? null : result.usage().tokenOutput();
             Integer threshold = llmProperties.resolveProfile(LlmInvocationProfile.LIGHT_JSON_TASK, prompt.promptKey())
                 .completionWarningThreshold();

@@ -3,6 +3,8 @@ package com.pandanav.learning.infrastructure.config;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.infrastructure.external.llm.DisabledLlmGateway;
 import com.pandanav.learning.infrastructure.external.llm.OpenAiCompatibleLlmGateway;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -17,7 +19,12 @@ public class LlmConfig {
     private static final Logger log = LoggerFactory.getLogger(LlmConfig.class);
 
     @Bean
-    public LlmGateway llmGateway(LlmProperties properties, RestClient.Builder restClientBuilder) {
+    public LlmGateway llmGateway(
+        LlmProperties properties,
+        RestClient.Builder restClientBuilder,
+        LlmCallLogger llmCallLogger,
+        LlmFailureClassifier llmFailureClassifier
+    ) {
         if (!properties.isReady()) {
             log.warn(
                 "LLM is NOT ready, using DisabledLlmGateway. Diagnosis/capability-profile will use fallback. " +
@@ -30,7 +37,12 @@ public class LlmConfig {
             return new DisabledLlmGateway();
         }
         log.info("LLM is ready. Using OpenAiCompatibleLlmGateway with baseUrl={}", maskUrl(properties.getBaseUrl()));
-        return new OpenAiCompatibleLlmGateway(restClientBuilder, properties);
+        return new OpenAiCompatibleLlmGateway(restClientBuilder, properties, llmCallLogger, llmFailureClassifier);
+    }
+
+    @Bean
+    public LlmFailureClassifier llmFailureClassifier() {
+        return new LlmFailureClassifier();
     }
 
     private static String maskUrl(String url) {

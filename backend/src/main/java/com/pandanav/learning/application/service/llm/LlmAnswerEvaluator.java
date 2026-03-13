@@ -8,6 +8,7 @@ import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.model.EvaluationContext;
 import com.pandanav.learning.domain.llm.model.EvaluationResult;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
@@ -40,7 +41,7 @@ public class LlmAnswerEvaluator implements AnswerEvaluator {
     @Override
     public EvaluationResult evaluate(EvaluationContext context) {
         LlmPrompt prompt = promptTemplateProvider.buildEvaluationPrompt(PromptTemplateKey.EVALUATE_V1, context);
-        LlmTextResult result = llmGateway.generate(prompt);
+        LlmTextResult result = llmGateway.generate(LlmStage.EVALUATE, prompt);
         JsonNode parsed = llmJsonParser.parse(result.text());
 
         if (!(parsed instanceof ObjectNode objectNode)) {

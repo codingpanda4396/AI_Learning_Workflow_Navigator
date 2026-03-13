@@ -9,6 +9,7 @@ import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.domain.model.ConceptNode;
@@ -21,6 +22,8 @@ import com.pandanav.learning.domain.repository.MasteryRepository;
 import com.pandanav.learning.domain.repository.NodeMasteryRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -66,7 +69,9 @@ class PersonalizedPathPlannerServiceTest {
             new PromptOutputValidator(),
             new LlmJsonParser(new ObjectMapper()),
             readyLlmProperties(),
-            new ObjectMapper()
+            new ObjectMapper(),
+            mock(LlmCallLogger.class),
+            new LlmFailureClassifier()
         );
 
         PersonalizedPlanResult result = service.plan(session, PlanMode.RULE, false);
@@ -76,7 +81,7 @@ class PersonalizedPathPlannerServiceTest {
         assertFalse(result.insertedTasks().isEmpty());
         assertEquals("UNDERSTANDING", result.insertedTasks().get(0).stage());
         assertEquals("MISSING_STEPS", result.insertedTasks().get(0).trigger());
-        verify(llmGateway, never()).generate(any());
+        verify(llmGateway, never()).generate(any(LlmStage.class), any());
     }
 
     @Test
@@ -99,7 +104,7 @@ class PersonalizedPathPlannerServiceTest {
         when(promptTemplateProvider.buildPersonalizedPathPlanPrompt(any())).thenReturn(
             new LlmPrompt(PromptTemplateKey.PATH_PLAN_V1, "PATH_PLAN", "v1", LlmInvocationProfile.HEAVY_REASONING_TASK, "sys", "user", "{}", "", null, null)
         );
-        when(llmGateway.generate(any())).thenReturn(new LlmTextResult(
+        when(llmGateway.generate(any(LlmStage.class), any())).thenReturn(new LlmTextResult(
             """
             {
               "ordered_nodes": [
@@ -137,7 +142,9 @@ class PersonalizedPathPlannerServiceTest {
             new PromptOutputValidator(),
             new LlmJsonParser(new ObjectMapper()),
             readyLlmProperties(),
-            new ObjectMapper()
+            new ObjectMapper(),
+            mock(LlmCallLogger.class),
+            new LlmFailureClassifier()
         );
 
         PersonalizedPlanResult result = service.plan(session, PlanMode.LLM, false);

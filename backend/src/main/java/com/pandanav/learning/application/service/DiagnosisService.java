@@ -85,7 +85,9 @@ public class DiagnosisService {
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
 
         List<DiagnosisQuestion> fallbackQuestions = diagnosisTemplateFactory.buildQuestions(session);
-        List<DiagnosisQuestion> questions = diagnosisQuestionCopyLlmService.enhanceQuestions(session, fallbackQuestions);
+        DiagnosisQuestionCopyLlmService.DiagnosisQuestionCopyResult copyResult =
+            diagnosisQuestionCopyLlmService.enhanceQuestions(session, fallbackQuestions);
+        List<DiagnosisQuestion> questions = copyResult.questions();
 
         DiagnosisSession diagnosisSession = new DiagnosisSession();
         diagnosisSession.setLearningSessionId(session.getId());
@@ -95,7 +97,13 @@ public class DiagnosisService {
         diagnosisSession.setStartedAt(OffsetDateTime.now());
 
         DiagnosisSession saved = diagnosisSessionRepository.save(diagnosisSession);
-        return new GenerateDiagnosisResponse(saved.getId(), session.getId(), toQuestionDtos(questions));
+        return new GenerateDiagnosisResponse(
+            saved.getId(),
+            session.getId(),
+            toQuestionDtos(questions),
+            copyResult.fallbackApplied(),
+            copyResult.fallbackReasons()
+        );
     }
 
     public SubmitDiagnosisResponse submitDiagnosis(SubmitDiagnosisRequest request, Long userId) {
@@ -122,8 +130,9 @@ public class DiagnosisService {
 
         CapabilityProfileDraft draft = capabilityProfileBuilder.build(answersByDimension);
         CapabilityProfileSummaryCopy fallbackSummary = capabilityProfileSummaryGenerator.buildFallback(draft);
-        CapabilityProfileSummaryCopy summaryCopy = capabilityProfileSummaryLlmService.generate(learningSession, draft, answersByDimension)
-            .orElse(fallbackSummary);
+        CapabilityProfileSummaryLlmService.CapabilityProfileSummaryResult summaryResult =
+            capabilityProfileSummaryLlmService.generate(learningSession, draft, answersByDimension);
+        CapabilityProfileSummaryCopy summaryCopy = summaryResult.copy() == null ? fallbackSummary : summaryResult.copy();
 
         CapabilityProfile profile = new CapabilityProfile();
         profile.setLearningSessionId(learningSession.getId());
@@ -142,7 +151,13 @@ public class DiagnosisService {
         CapabilityProfile savedProfile = capabilityProfileRepository.save(profile);
         diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.PROFILED, OffsetDateTime.now());
 
-        return new SubmitDiagnosisResponse(toProfileDto(savedProfile), NEXT_ACTION);
+        return new SubmitDiagnosisResponse(
+            toProfileDto(savedProfile),
+            NEXT_ACTION,
+            summaryResult.fallbackApplied(),
+            summaryResult.fallbackReasons(),
+            summaryResult.fallbackApplied() ? "RULE_FALLBACK" : "LLM"
+        );
     }
 
     private void validateAnswers(Map<String, DiagnosisQuestion> questionMap, List<SubmitDiagnosisAnswerRequest> answerRequests) {

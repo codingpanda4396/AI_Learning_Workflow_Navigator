@@ -28,6 +28,8 @@ springdoc:
     path: /swagger-ui.html
 
 logging:
+  pattern:
+    level: "%5p [traceId=%X{traceId:-}] [requestId=%X{requestId:-}]"
   level:
     root: INFO
     com.pandanav.learning: DEBUG
@@ -59,5 +61,8 @@ app:
     evaluation-max-output-tokens: ${LLM_EVALUATION_MAX_OUTPUT_TOKENS:600}
     tutor-max-output-tokens: ${LLM_TUTOR_MAX_OUTPUT_TOKENS:700}
     fallback-to-rule: ${LLM_FALLBACK_TO_RULE:true}
+    force-fallback: ${LLM_FORCE_FALLBACK:false}
     log-request: ${LLM_LOG_REQUEST:false}
     log-response: ${LLM_LOG_RESPONSE:false}
+    observability:
+      enabled: ${LLM_OBSERVABILITY_ENABLED:true}

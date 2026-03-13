@@ -10,6 +10,7 @@ import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmProfileConfig;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
+import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.domain.model.LlmCallLog;
@@ -20,6 +21,9 @@ import com.pandanav.learning.domain.model.PracticeSubmission;
 import com.pandanav.learning.domain.repository.LlmCallLogRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
+import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
+import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -44,6 +48,8 @@ public class PracticeFeedbackReportGenerator {
     private final PromptOutputValidator promptOutputValidator;
     private final LlmCallLogRepository llmCallLogRepository;
     private final ObjectMapper objectMapper;
+    private final LlmCallLogger llmCallLogger;
+    private final LlmFailureClassifier llmFailureClassifier;
 
     public PracticeFeedbackReportGenerator(
         LlmGateway llmGateway,
@@ -51,7 +57,9 @@ public class PracticeFeedbackReportGenerator {
         LlmJsonParser llmJsonParser,
         PromptOutputValidator promptOutputValidator,
         LlmCallLogRepository llmCallLogRepository,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        LlmCallLogger llmCallLogger,
+        LlmFailureClassifier llmFailureClassifier
     ) {
         this.llmGateway = llmGateway;
         this.llmProperties = llmProperties;
@@ -59,6 +67,8 @@ public class PracticeFeedbackReportGenerator {
         this.promptOutputValidator = promptOutputValidator;
         this.llmCallLogRepository = llmCallLogRepository;
         this.objectMapper = objectMapper;
+        this.llmCallLogger = llmCallLogger;
+        this.llmFailureClassifier = llmFailureClassifier;
     }
 
     public PracticeFeedbackReport generate(PracticeQuiz quiz, List<PracticeItem> items, List<PracticeSubmission> submissions) {
@@ -69,6 +79,11 @@ public class PracticeFeedbackReportGenerator {
                 if (!llmProperties.isFallbackToRule()) {
                     throw ex;
                 }
+                llmCallLogger.logFallback(
+                    LlmObservabilityHelper.context(LlmStage.PRACTICE_FEEDBACK, llmProperties.getModel()),
+                    llmFailureClassifier.classifyFallback(ex),
+                    -1
+                );
                 log.warn("practice feedback fell back to rule mode: quizId={}, reason={}", quiz.getId(), ex.getMessage());
             }
         }
@@ -93,7 +108,7 @@ public class PracticeFeedbackReportGenerator {
 
         LlmTextResult result = null;
         try {
-            result = llmGateway.generate(prompt);
+            result = llmGateway.generate(LlmStage.PRACTICE_FEEDBACK, prompt);
             JsonNode parsed = llmJsonParser.parse(result.text());
             List<String> errors = promptOutputValidator.validatePracticeFeedback(parsed);
             if (!errors.isEmpty()) {
