@@ -1,26 +1,59 @@
 # AI Learning Workflow Navigator
 
-Spring Boot + PostgreSQL + Flyway 学习流程导航后端。
+面向 AI 学习流程导航的前后端一体项目，当前仓库包含：
 
-## 项目结构
-
-```
-├── backend/              # Java 后端（Maven）
-│   ├── pom.xml
-│   └── src/
-├── deploy/               # 生产部署配置
-│   ├── docker-compose.prod.yml
-│   └── .env.prod.example
-├── docs/                 # 文档
-│   └── cicd-guide.md     # CI/CD 操作手册
-├── Dockerfile
-└── .github/workflows/    # GitHub Actions
-    ├── backend-ci.yml    # push dev / PR 触发
-    └── backend-cd.yml    # push main 触发
-```
+- `backend/`：Spring Boot 3.4 + PostgreSQL + Flyway 后端
+- `frontend/`：Vue 3 + Pinia + Vite 前端
+- `docs/`：架构、开发、规划、排障与历史沉淀文档
+- `deploy/`：部署配置与生产环境样例
 
 ## 快速开始
 
-- **本地运行**：`cd backend && mvn spring-boot:run`（需配置 PostgreSQL）
-- **Docker 构建**：在仓库根目录执行 `docker build -t ai-learning-backend .`
-- **CI/CD 部署**：详见 [docs/cicd-guide.md](docs/cicd-guide.md)
+### 一键本地启动
+
+```bash
+npm install
+npm run dev
+```
+
+- 前端：`http://localhost:3000`
+- 后端：`http://localhost:8080`
+
+### 分别启动
+
+```bash
+npm run dev:backend
+npm run dev:frontend
+```
+
+## 常用验证
+
+- 后端：`mvn -q -DskipTests compile`
+- 前端：`pnpm build`
+
+## 文档入口
+
+- 文档总索引：[`docs/README.md`](docs/README.md)
+- 本地开发：[`docs/devops/local-dev.md`](docs/devops/local-dev.md)
+- 系统架构：[`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md)
+- 当前项目状态：[`docs/architecture/3.11_projstatus.md`](docs/architecture/3.11_projstatus.md)
+- 前端说明：[`frontend/README.md`](frontend/README.md)
+
+## 目录概览
+
+```text
+.
+├── backend/
+├── frontend/
+├── docs/
+│   ├── architecture/
+│   ├── backend/
+│   ├── devops/
+│   ├── frontend/
+│   ├── implementation-plans/
+│   ├── product-planning/
+│   ├── prompts/
+│   └── archive/
+├── deploy/
+└── spec/
+```
