@@ -85,6 +85,29 @@ public class LearningPlanOrchestrator {
             LlmPrompt prompt = learningPlanPromptBuilder.build(context, rulePreview);
             LlmTextResult llmResult = llmGateway.generate(LlmStage.LEARNING_PLAN, prompt);
             LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmResult.model());
+            if (isTruncated(llmResult)) {
+                String details = "finishReason=%s truncated=%s completionTokens=%s maxOutputTokens=%s".formatted(
+                    llmResult.usage() == null ? "unknown" : String.valueOf(llmResult.usage().finishReason()),
+                    llmResult.usage() != null && llmResult.usage().truncated(),
+                    llmResult.usage() == null ? "unknown" : String.valueOf(llmResult.usage().tokenOutput()),
+                    prompt.maxOutputTokens() == null ? "unknown" : String.valueOf(prompt.maxOutputTokens())
+                );
+                llmCallLogger.logStructuredOutputFailure(llmContext, LlmFallbackReason.OUTPUT_TRUNCATED.name(), details);
+                log.warn(
+                    "LearningPlanOrchestrator: Learning plan output truncated, using rule fallback. {} traceId={} requestId={} model={} details={}",
+                    logCtx,
+                    llmContext.traceId(),
+                    llmContext.requestId(),
+                    llmContext.model(),
+                    details
+                );
+                llmCallLogger.logFallback(
+                    llmContext,
+                    LlmFallbackReason.OUTPUT_TRUNCATED,
+                    LlmObservabilityHelper.elapsedMs(start)
+                );
+                return new OrchestratedPlan(rulePreview, traceId(llmResult), PlanSource.RULE_FALLBACK, true, List.of(LlmFallbackReason.OUTPUT_TRUNCATED.name()));
+            }
             JsonNode json = llmJsonParser.parse(llmResult.text(), llmContext);
             LearningPlanLlmResult parsed = learningPlanResultValidator.parse(json);
             LearningPlanLlmResult normalized = learningPlanResultValidator.normalize(parsed, rulePreview);
@@ -191,6 +214,14 @@ public class LearningPlanOrchestrator {
             return null;
         }
         return (result.provider() == null ? "llm" : result.provider()) + ":" + (result.model() == null ? "unknown" : result.model());
+    }
+
+    private boolean isTruncated(LlmTextResult result) {
+        if (result == null || result.usage() == null) {
+            return false;
+        }
+        return result.usage().truncated()
+            || "length".equalsIgnoreCase(result.usage().finishReason());
     }
 
     public record OrchestratedPlan(

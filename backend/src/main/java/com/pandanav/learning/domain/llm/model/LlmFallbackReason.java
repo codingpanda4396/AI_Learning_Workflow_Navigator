@@ -3,6 +3,7 @@ package com.pandanav.learning.domain.llm.model;
 public enum LlmFallbackReason {
     LLM_TIMEOUT,
     LLM_API_ERROR,
+    OUTPUT_TRUNCATED,
     JSON_PARSE_ERROR,
     JSON_EXTRA_TEXT,
     JSON_SCHEMA_MISMATCH,

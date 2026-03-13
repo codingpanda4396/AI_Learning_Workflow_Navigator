@@ -6,6 +6,7 @@ import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
+import com.pandanav.learning.domain.llm.model.LlmUsage;
 import com.pandanav.learning.domain.model.LearningPlanContextNode;
 import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
 import com.pandanav.learning.domain.model.PlanAdjustments;
@@ -89,6 +90,20 @@ class LearningPlanOrchestratorTest {
     }
 
     @Test
+    void shouldFallbackWhenOutputIsTruncatedBeforeParsing() {
+        LearningPlanOrchestrator orchestrator = orchestrator(llmResult(
+            "{\"headline\":\"truncated",
+            new LlmUsage(587, 320, 907, -1, 6103, "length", false, true)
+        ));
+
+        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
+
+        assertTrue(result.fallbackApplied());
+        assertEquals(PlanSource.RULE_FALLBACK, result.planSource());
+        assertEquals(List.of("OUTPUT_TRUNCATED"), result.fallbackReasons());
+    }
+
+    @Test
     void shouldFallbackWhenJsonSchemaMismatches() {
         LearningPlanOrchestrator orchestrator = orchestrator(llmResult("""
             {
@@ -127,12 +142,16 @@ class LearningPlanOrchestratorTest {
     }
 
     private LlmTextResult llmResult(String text) {
+        return llmResult(text, null);
+    }
+
+    private LlmTextResult llmResult(String text, LlmUsage usage) {
         return new LlmTextResult(
             text,
             "provider",
             "model",
             LlmInvocationProfile.HEAVY_REASONING_TASK,
-            null,
+            usage,
             null,
             null
         );

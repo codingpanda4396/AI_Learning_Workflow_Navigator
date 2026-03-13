@@ -110,7 +110,12 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
                 response
             );
             if (properties.getObservability().isEnabled()) {
-                llmCallLogger.logSuccess(context, LlmCallMetrics.from(usage));
+                llmCallLogger.logSuccess(
+                    context,
+                    LlmCallMetrics.from(usage),
+                    usage == null ? null : usage.finishReason(),
+                    usage != null && usage.truncated()
+                );
             }
             return result;
         } catch (RuntimeException ex) {

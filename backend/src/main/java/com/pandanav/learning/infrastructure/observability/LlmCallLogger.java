@@ -38,8 +38,12 @@ public class LlmCallLogger {
     }
 
     public void logSuccess(LlmCallContext context, LlmCallMetrics metrics) {
+        logSuccess(context, metrics, null, false);
+    }
+
+    public void logSuccess(LlmCallContext context, LlmCallMetrics metrics, String finishReason, boolean truncated) {
         log.info(
-            "LLM_CALL_SUCCESS stage={} model={} traceId={} requestId={} latencyMs={} promptTokens={} completionTokens={} totalTokens={}",
+            "LLM_CALL_SUCCESS stage={} model={} traceId={} requestId={} latencyMs={} promptTokens={} completionTokens={} totalTokens={} finishReason={} truncated={}",
             context.stage(),
             safe(context.model()),
             safe(context.traceId()),
@@ -47,7 +51,9 @@ public class LlmCallLogger {
             metrics.latencyMs(),
             metrics.promptTokens(),
             metrics.completionTokens(),
-            metrics.totalTokens()
+            metrics.totalTokens(),
+            safe(finishReason),
+            truncated
         );
         increment("llm.call.success", context, List.of(Tag.of("result", "success")));
         recordLatency(context, metrics.latencyMs(), "success", null);
