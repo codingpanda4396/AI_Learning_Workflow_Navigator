@@ -35,6 +35,8 @@ import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -46,6 +48,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class LearningPlanService {
+
+    private static final Logger log = LoggerFactory.getLogger(LearningPlanService.class);
 
     private final PlanningContextAssembler planningContextAssembler;
     private final LearningPlanOrchestrator learningPlanOrchestrator;
@@ -80,6 +84,13 @@ public class LearningPlanService {
         LearningPlanPlanningContext context = planningContextAssembler.assemble(command);
         LearningPlanOrchestrator.OrchestratedPlan orchestrated = learningPlanOrchestrator.preview(context);
 
+        if (orchestrated.fallbackApplied()) {
+            log.info(
+                "LearningPlanService: preview used rule fallback. goalId={}, chapterId={}, userId={}, reasons={}",
+                command.goalId(), command.chapterId(), command.userId(), orchestrated.fallbackReasons()
+            );
+        }
+
         LearningPlan plan = new LearningPlan();
         plan.setUserId(command.userId());
         plan.setGoalId(command.goalId());
@@ -89,12 +100,12 @@ public class LearningPlanService {
         writeSnapshot(plan, orchestrated.preview(), context);
 
         LearningPlan saved = learningPlanRepository.save(plan);
-        return toResponse(saved.getId(), orchestrated.preview());
+        return toResponse(saved.getId(), orchestrated.preview(), orchestrated.fallbackApplied(), orchestrated.fallbackReasons());
     }
 
     public LearningPlanPreviewResponse get(Long planId, Long userId) {
         LearningPlanAggregate aggregate = load(planId, userId);
-        return toResponse(aggregate.plan().getId(), aggregate.preview());
+        return toResponse(aggregate.plan().getId(), aggregate.preview(), null, null);
     }
 
     public ConfirmLearningPlanResponse confirm(ConfirmLearningPlanCommand command) {
@@ -206,7 +217,12 @@ public class LearningPlanService {
         }
     }
 
-    private LearningPlanPreviewResponse toResponse(Long planId, LearningPlanPreview preview) {
+    private LearningPlanPreviewResponse toResponse(
+        Long planId,
+        LearningPlanPreview preview,
+        Boolean fallbackApplied,
+        List<String> fallbackReasons
+    ) {
         return new LearningPlanPreviewResponse(
             String.valueOf(planId),
             new LearningPlanSummaryResponse(
@@ -242,7 +258,9 @@ public class LearningPlanService {
                 preview.adjustments().intensity(),
                 preview.adjustments().learningMode(),
                 preview.adjustments().preferPrerequisite()
-            )
+            ),
+            fallbackApplied,
+            fallbackReasons
         );
     }
 

@@ -1,12 +1,18 @@
-# 诊断题 LLM Fallback 排查指南
+# LLM Fallback 排查指南
 
-## 问题现象
+本文档涵盖诊断题、能力画像、学习计划等模块的 LLM 调用与 fallback 排查。
+
+---
+
+## 一、诊断题 Fallback
+
+### 问题现象
 
 调用 `POST /api/diagnosis/generate` 时，返回的题目为模板文案（fallback），而非 LLM 润色后的个性化文案。
 
-## 排查步骤
+### 排查步骤
 
-### 步骤 1：确认当前 profile 和 LLM 配置
+#### 步骤 1：确认当前 profile 和 LLM 配置
 
 **当前配置概览：**
 
@@ -26,7 +32,7 @@
 
 ---
 
-### 步骤 2：查看启动日志
+#### 步骤 2：查看启动日志
 
 启动后端后，在日志中查找：
 
@@ -45,7 +51,7 @@
 
 ---
 
-### 步骤 3：Fallback 时的具体原因日志
+#### 步骤 3：Fallback 时的具体原因日志
 
 调用诊断生成接口时，若发生 fallback，会在日志中看到类似信息：
 
@@ -60,7 +66,7 @@
 
 ---
 
-### 步骤 4：启用 LLM 并验证
+#### 步骤 4：启用 LLM 并验证
 
 **方式 A：环境变量（推荐）**
 
@@ -92,6 +98,47 @@ mvn spring-boot:run
 
 - 启动日志出现 `LLM is ready`
 - 调用诊断生成接口后，题目 `title` 与 `copy.title` 一致（表示使用 LLM 润色结果）
+
+---
+
+## 二、学习计划 Fallback
+
+### 问题现象
+
+调用 `POST /api/learning-plans/preview` 时，返回的 headline、reasons、focuses、task_preview 为规则模板（fallback），而非 LLM 润色后的个性化文案。
+
+### 排查步骤
+
+#### 1. 查看日志
+
+学习计划 fallback 时会有明确日志：
+
+| 日志内容 | 可能原因 |
+|----------|----------|
+| `LearningPlanOrchestrator: LLM not ready, using rule fallback. goalId=..., enabled=false, ready=false` | LLM 未启用或未配置完成 |
+| `LearningPlanOrchestrator: LLM output validation failed, using rule fallback. ... errors=[headline is too short, ...]` | LLM 返回内容未通过校验（headline 过短、reasons/focuses 不达标、task_preview 数量或格式不符等） |
+| `LearningPlanOrchestrator: LLM call failed, using rule fallback. ... reason=...` | LLM 调用异常（网络超时、API 错误、JSON 解析失败等） |
+| `LearningPlanService: preview used rule fallback. goalId=..., reasons=[...]` | 汇总日志，确认本次 preview 使用了 rule fallback |
+
+#### 2. 通过 API 响应判断
+
+`POST /api/learning-plans/preview` 的响应中新增了 `fallbackApplied` 和 `fallbackReasons`：
+
+- `fallbackApplied: true` 表示使用了规则 fallback
+- `fallbackReasons` 列出具体原因（如 `["llm_not_ready"]`、`["headline is too short", "focuses must contain at least 2 items"]` 等）
+
+#### 3. 校验规则说明
+
+LLM 输出需满足以下约束，否则会 fallback：
+
+| 校验项 | 规则 |
+|--------|------|
+| headline | 不少于 12 个字符 |
+| reasons | 非空，每个 title ≥ 4 字符，description ≥ 18 字符 |
+| focuses | 至少 2 项 |
+| task_preview | 必须为 4 个阶段（STRUCTURE / UNDERSTANDING / TRAINING / REFLECTION） |
+| estimated_minutes | 每个 task 在 4–20 之间 |
+| learner_action / ai_support | 各不少于 8 个字符 |
 
 ---
 

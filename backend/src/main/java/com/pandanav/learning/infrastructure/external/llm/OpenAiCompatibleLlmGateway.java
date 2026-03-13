@@ -210,10 +210,26 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
     private boolean isRetryable(Exception ex) {
         if (ex instanceof ResourceAccessException) {
             String msg = ex.getMessage();
-            return msg != null && (msg.contains("Read timed out") || msg.contains("Connection reset") || msg.contains("I/O error"));
+            return isRetryableMessage(msg);
         }
         String msg = ex.getMessage();
-        return msg != null && (msg.contains(" 429 ") || msg.contains(" 500 ") || msg.contains(" 502 ") || msg.contains(" 503 "));
+        return isRetryableMessage(msg);
+    }
+
+    private boolean isRetryableMessage(String msg) {
+        if (msg == null || msg.isBlank()) {
+            return false;
+        }
+        String normalized = msg.toLowerCase();
+        return normalized.contains("timed out")
+            || normalized.contains("connection reset")
+            || normalized.contains("i/o error")
+            || normalized.contains(" 408 ")
+            || normalized.contains(" 429 ")
+            || normalized.contains(" 500 ")
+            || normalized.contains(" 502 ")
+            || normalized.contains(" 503 ")
+            || normalized.contains(" 504 ");
     }
 
     private void sleepBackoff() {

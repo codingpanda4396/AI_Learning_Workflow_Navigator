@@ -13,12 +13,16 @@ import com.pandanav.learning.domain.service.LearningPlanPromptBuilder;
 import com.pandanav.learning.domain.service.LearningPlanResultValidator;
 import com.pandanav.learning.domain.service.RuleBasedPlanBuilder;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
 public class LearningPlanOrchestrator {
+
+    private static final Logger log = LoggerFactory.getLogger(LearningPlanOrchestrator.class);
 
     private final RuleBasedPlanBuilder ruleBasedPlanBuilder;
     private final LearningPlanPromptBuilder learningPlanPromptBuilder;
@@ -45,7 +49,14 @@ public class LearningPlanOrchestrator {
 
     public OrchestratedPlan preview(LearningPlanPlanningContext context) {
         LearningPlanPreview rulePreview = ruleBasedPlanBuilder.build(context);
+        String logCtx = "goalId=%s, chapterId=%s, userId=%s".formatted(
+            context.goalId(), context.chapterId(), context.userId());
+
         if (!llmProperties.isEnabled() || !llmProperties.isReady()) {
+            log.warn(
+                "LearningPlanOrchestrator: LLM not ready, using rule fallback. {} enabled={}, ready={}",
+                logCtx, llmProperties.isEnabled(), llmProperties.isReady()
+            );
             return new OrchestratedPlan(rulePreview, null, true, List.of("llm_not_ready"));
         }
 
@@ -56,11 +67,20 @@ public class LearningPlanOrchestrator {
             LearningPlanLlmResult parsed = learningPlanResultValidator.parse(json);
             List<String> errors = learningPlanResultValidator.validate(parsed, rulePreview);
             if (!errors.isEmpty()) {
+                log.warn(
+                    "LearningPlanOrchestrator: LLM output validation failed, using rule fallback. {} errors={}",
+                    logCtx, errors
+                );
                 return new OrchestratedPlan(rulePreview, traceId(llmResult), true, errors);
             }
             LearningPlanPreview merged = merge(rulePreview, parsed);
+            log.debug("LearningPlanOrchestrator: LLM plan applied. {} trace={}", logCtx, traceId(llmResult));
             return new OrchestratedPlan(merged, traceId(llmResult), false, List.of());
         } catch (Exception ex) {
+            log.warn(
+                "LearningPlanOrchestrator: LLM call failed, using rule fallback. {} reason={}",
+                logCtx, ex.getMessage(), ex
+            );
             return new OrchestratedPlan(rulePreview, null, true, List.of(ex.getMessage() == null ? "llm_failed" : ex.getMessage()));
         }
     }

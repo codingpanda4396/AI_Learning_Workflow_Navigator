@@ -88,7 +88,9 @@ class LearningPlanControllerTest {
             List.of("先稳住树的基础", "再进入二叉树遍历"),
             List.of(new PlanPathNodeResponse("101", "树的基础", 1, 40, "LEARNING", true, 18, "前置核心")),
             List.of(new PlanTaskPreviewResponse("STRUCTURE", "t1", "g1", "a1", "s1", 6)),
-            new LearningPlanAdjustmentsRequest("STANDARD", "LEARN_THEN_PRACTICE", true)
+            new LearningPlanAdjustmentsRequest("STANDARD", "LEARN_THEN_PRACTICE", true),
+            null,
+            null
         );
     }
 }

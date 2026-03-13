@@ -392,7 +392,7 @@ public class LlmProperties {
         }
 
         public void setThinkingBudget(Integer thinkingBudget) {
-            this.thinkingBudget = thinkingBudget;
+            this.thinkingBudget = thinkingBudget != null && thinkingBudget > 0 ? thinkingBudget : null;
         }
 
         Map<String, Object> toExtraParams() {
@@ -400,7 +400,7 @@ public class LlmProperties {
             if (disableThinking) {
                 params.put("enable_thinking", false);
             }
-            if (thinkingBudget != null && thinkingBudget >= 0) {
+            if (thinkingBudget != null && thinkingBudget > 0) {
                 params.put("thinking_budget", thinkingBudget);
             }
             return params;
