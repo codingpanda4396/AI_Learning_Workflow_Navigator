@@ -87,7 +87,10 @@ public class LearningPlanOrchestrator {
             LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmResult.model());
             JsonNode json = llmJsonParser.parse(llmResult.text(), llmContext);
             LearningPlanLlmResult parsed = learningPlanResultValidator.parse(json);
-            List<String> errors = learningPlanResultValidator.validate(parsed, rulePreview);
+            LearningPlanLlmResult normalized = learningPlanResultValidator.normalize(parsed, rulePreview);
+            List<String> errors = new java.util.ArrayList<>();
+            errors.addAll(learningPlanResultValidator.validateRawTaskPreview(parsed, rulePreview));
+            errors.addAll(learningPlanResultValidator.validate(normalized, rulePreview));
             if (!errors.isEmpty()) {
                 log.warn(
                     "LearningPlanOrchestrator: LLM output contract validation failed, using rule fallback. {} traceId={} requestId={} model={} errors={}",
@@ -105,7 +108,7 @@ public class LearningPlanOrchestrator {
                 );
                 return new OrchestratedPlan(rulePreview, traceId(llmResult), PlanSource.RULE_FALLBACK, true, List.of(LlmFallbackReason.JSON_SCHEMA_MISMATCH.name()));
             }
-            LearningPlanPreview merged = merge(rulePreview, parsed);
+            LearningPlanPreview merged = merge(rulePreview, normalized);
             log.info(
                 "LearningPlanOrchestrator: LLM plan applied. {} traceId={} requestId={} model={} planSource={}",
                 logCtx,

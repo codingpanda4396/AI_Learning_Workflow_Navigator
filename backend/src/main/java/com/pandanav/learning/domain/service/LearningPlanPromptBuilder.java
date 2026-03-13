@@ -35,6 +35,8 @@ public class LearningPlanPromptBuilder {
             - Only output one JSON object.
             - No markdown fences.
             - No prose before or after JSON.
+            - task_preview must contain exactly 4 items.
+            - task_preview stages must appear exactly once each in this order: STRUCTURE, UNDERSTANDING, TRAINING, REFLECTION.
             - reasons must sound individualized, not generic.
             - stages must be one of: STRUCTURE, UNDERSTANDING, TRAINING, REFLECTION.
             - task_preview must explain learner action, AI support, and stage purpose.
@@ -64,6 +66,7 @@ public class LearningPlanPromptBuilder {
               ]
             }
             task_preview length must equal the candidate task count exactly.
+            Output all 4 stages even if some stage descriptions are brief.
             """.formatted(
             context.goalId(),
             context.diagnosisId(),

@@ -6,9 +6,12 @@ import com.pandanav.learning.domain.model.LearningPlanPreview;
 import com.pandanav.learning.domain.model.PlanReason;
 import com.pandanav.learning.domain.model.PlanTaskPreview;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class LearningPlanResultValidator {
@@ -75,6 +78,54 @@ public class LearningPlanResultValidator {
         return new LearningPlanLlmResult(headline, reasons, focuses, tasks);
     }
 
+    public LearningPlanLlmResult normalize(LearningPlanLlmResult result, LearningPlanPreview fallback) {
+        if (result == null || result.taskPreview() == null || result.taskPreview().isEmpty()) {
+            return result;
+        }
+
+        Map<String, PlanTaskPreview> llmByStage = new LinkedHashMap<>();
+        for (PlanTaskPreview task : result.taskPreview()) {
+            if (task == null || !StringUtils.hasText(task.stage())) {
+                continue;
+            }
+            llmByStage.putIfAbsent(task.stage(), task);
+        }
+
+        List<PlanTaskPreview> normalizedTasks = new ArrayList<>();
+        for (PlanTaskPreview fallbackTask : fallback.taskPreview()) {
+            PlanTaskPreview llmTask = llmByStage.get(fallbackTask.stage());
+            normalizedTasks.add(llmTask == null ? fallbackTask : mergeTask(llmTask, fallbackTask));
+        }
+
+        return new LearningPlanLlmResult(
+            result.headline(),
+            result.reasons(),
+            result.focuses(),
+            normalizedTasks
+        );
+    }
+
+    public List<String> validateRawTaskPreview(LearningPlanLlmResult result, LearningPlanPreview fallback) {
+        List<String> errors = new ArrayList<>();
+        if (result == null || result.taskPreview() == null || result.taskPreview().isEmpty()) {
+            errors.add("$.task_preview must not be empty");
+            return errors;
+        }
+        Map<String, Integer> stageCounts = new LinkedHashMap<>();
+        for (PlanTaskPreview task : result.taskPreview()) {
+            stageCounts.merge(task.stage(), 1, Integer::sum);
+        }
+        stageCounts.forEach((stage, count) -> {
+            if (count > 1) {
+                errors.add("$.task_preview duplicate stage " + stage);
+            }
+        });
+        if (result.taskPreview().size() > fallback.taskPreview().size()) {
+            errors.add("$.task_preview size must be <= fallback size " + fallback.taskPreview().size());
+        }
+        return errors;
+    }
+
     public List<String> validate(LearningPlanLlmResult result, LearningPlanPreview fallback) {
         List<String> errors = new ArrayList<>();
         if (result.headline() == null || result.headline().trim().length() < 12) {
@@ -96,8 +147,8 @@ public class LearningPlanResultValidator {
         if (result.focuses() == null || result.focuses().size() < 2) {
             errors.add("$.focuses must contain at least 2 items");
         }
-        if (result.taskPreview() == null || result.taskPreview().size() != fallback.taskPreview().size()) {
-            errors.add("$.task_preview size must equal fallback size " + fallback.taskPreview().size());
+        if (result.taskPreview() == null || result.taskPreview().isEmpty()) {
+            errors.add("$.task_preview must not be empty");
         } else {
             for (int i = 0; i < result.taskPreview().size(); i++) {
                 PlanTaskPreview task = result.taskPreview().get(i);
@@ -113,6 +164,23 @@ public class LearningPlanResultValidator {
             }
         }
         return errors;
+    }
+
+    private PlanTaskPreview mergeTask(PlanTaskPreview llmTask, PlanTaskPreview fallbackTask) {
+        return new PlanTaskPreview(
+            fallbackTask.stage(),
+            pick(llmTask.title(), fallbackTask.title()),
+            pick(llmTask.goal(), fallbackTask.goal()),
+            pick(llmTask.learnerAction(), fallbackTask.learnerAction()),
+            pick(llmTask.aiSupport(), fallbackTask.aiSupport()),
+            llmTask.estimatedMinutes() == null || llmTask.estimatedMinutes() <= 0
+                ? fallbackTask.estimatedMinutes()
+                : llmTask.estimatedMinutes()
+        );
+    }
+
+    private String pick(String primary, String fallback) {
+        return StringUtils.hasText(primary) ? primary : fallback;
     }
 
     private void requireObject(JsonNode node, String path, List<String> errors) {

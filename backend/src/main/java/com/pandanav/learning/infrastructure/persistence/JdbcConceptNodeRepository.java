@@ -2,6 +2,7 @@ package com.pandanav.learning.infrastructure.persistence;
 
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -112,11 +113,35 @@ public class JdbcConceptNodeRepository implements ConceptNodeRepository {
             return statement;
         }, keyHolder);
 
-        Number id = keyHolder.getKey();
+        Number id = extractGeneratedId(keyHolder);
         if (id != null) {
             node.setId(id.longValue());
         }
         return node;
+    }
+
+    private Number extractGeneratedId(KeyHolder keyHolder) {
+        try {
+            Number directKey = keyHolder.getKey();
+            if (directKey != null) {
+                return directKey;
+            }
+        } catch (InvalidDataAccessApiUsageException ignored) {
+            // Some drivers return multiple generated columns. Fall back to getKeys().
+        }
+        Map<String, Object> keys = keyHolder.getKeys();
+        if (keys == null || keys.isEmpty()) {
+            return null;
+        }
+        Object idValue = keys.get("id");
+        if (idValue instanceof Number number) {
+            return number;
+        }
+        Object firstNumber = keys.values().stream()
+            .filter(Number.class::isInstance)
+            .findFirst()
+            .orElse(null);
+        return firstNumber instanceof Number number ? number : null;
     }
 
     private ConceptNode mapNode(java.sql.ResultSet rs) throws java.sql.SQLException {

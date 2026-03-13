@@ -52,6 +52,32 @@ class LearningPlanOrchestratorTest {
     }
 
     @Test
+    void shouldUseLlmPlanWhenTaskPreviewIsPartialButRecoverable() {
+        LearningPlanOrchestrator orchestrator = orchestrator(llmResult("""
+            {
+              "headline": "First strengthen foundations before advancing",
+              "reasons": [
+                {"type":"START_POINT","title":"Start from the basics","description":"Current weak points show the learner still needs stable understanding of the prerequisite node."},
+                {"type":"PACE","title":"Keep a steady pace","description":"Recent scores suggest a steady pace will reinforce understanding without adding unnecessary overload."}
+              ],
+              "focuses": ["solidify tree basics", "connect traversal to prior concepts"],
+              "task_preview": [
+                {"stage":"STRUCTURE","title":"Map the node structure","goal":"Understand the core node relationships","learner_action":"Draw the node relationships clearly","ai_support":"Check the structure map and point out gaps","estimated_minutes":8},
+                {"stage":"TRAINING","title":"Practice traversal steps","goal":"Apply traversal steps accurately","learner_action":"Solve two traversal exercises step by step","ai_support":"Review each step and correct mistakes immediately","estimated_minutes":8}
+              ]
+            }
+            """));
+
+        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
+
+        assertFalse(result.fallbackApplied());
+        assertEquals(PlanSource.LLM, result.planSource());
+        assertEquals(4, result.preview().taskPreview().size());
+        assertEquals(List.of("STRUCTURE", "UNDERSTANDING", "TRAINING", "REFLECTION"),
+            result.preview().taskPreview().stream().map(task -> task.stage()).toList());
+    }
+
+    @Test
     void shouldFallbackWhenJsonIsUnrecoverable() {
         LearningPlanOrchestrator orchestrator = orchestrator(llmResult("```json\n{\"headline\":\"broken\"\n```"));
 
