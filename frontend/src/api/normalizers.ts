@@ -7,7 +7,13 @@ import type {
   WeakPointItem,
 } from '@/types/feedback';
 import type { QuizQuestion, QuizSnapshot } from '@/types/quiz';
-import type { LearningPlanPreview, LearningPlanRequest, PlanAdjustments } from '@/types/learningPlan';
+import type {
+  LearningPlanPreview,
+  LearningPlanRequest,
+  PathDifficulty,
+  PathMasteryStatus,
+  PlanAdjustments,
+} from '@/types/learningPlan';
 import type { CurrentSessionInfo, SessionOverview } from '@/types/session';
 import type { TaskDetail, TaskRunResult } from '@/types/task';
 import { toNumber } from '@/utils/format';
@@ -29,6 +35,44 @@ function normalizePlanAdjustments(value: unknown, defaultAdjustments: PlanAdjust
     learningMode: String(row.learning_mode ?? row.learningMode ?? defaultAdjustments.learningMode) as PlanAdjustments['learningMode'],
     prioritizeFoundation: Boolean(row.prioritize_foundation ?? row.prioritizeFoundation ?? defaultAdjustments.prioritizeFoundation),
   };
+}
+
+function normalizePathDifficulty(value: unknown): PathDifficulty {
+  if (typeof value === 'string') {
+    if (value === 'FOUNDATION' || value === 'CORE' || value === 'CHALLENGE') {
+      return value;
+    }
+    const numeric = Number(value);
+    if (!Number.isNaN(numeric)) {
+      return normalizePathDifficulty(numeric);
+    }
+  }
+  if (typeof value === 'number') {
+    if (value <= 1) {
+      return 'FOUNDATION';
+    }
+    if (value >= 3) {
+      return 'CHALLENGE';
+    }
+  }
+  return 'CORE';
+}
+
+function normalizePathMasteryStatus(status: unknown, mastery: unknown): PathMasteryStatus {
+  if (typeof status === 'string' && (status === 'WEAK' || status === 'PARTIAL' || status === 'STABLE' || status === 'NEW')) {
+    return status;
+  }
+  const masteryScore = toNumber(mastery);
+  if (masteryScore !== undefined) {
+    if (masteryScore < 50) {
+      return 'WEAK';
+    }
+    if (masteryScore < 80) {
+      return 'PARTIAL';
+    }
+    return 'STABLE';
+  }
+  return status === 'READY' ? 'STABLE' : 'PARTIAL';
 }
 
 function normalizeWeakPoint(item: Record<string, unknown>): WeakPointItem {
@@ -328,21 +372,29 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
       label: String(item.label ?? item.type ?? ''),
       description: String(item.description ?? ''),
     })),
-    pathNodes: pathNodes.map((item, index) => ({
-      id: String(item.node_id ?? item.nodeId ?? item.id ?? `path-${index + 1}`),
-      name: String(item.node_name ?? item.nodeName ?? item.name ?? ''),
-      masteryStatus: String(item.status ?? item.mastery_status ?? item.masteryStatus ?? 'PARTIAL') as LearningPlanPreview['pathNodes'][number]['masteryStatus'],
-      difficulty: String(item.difficulty ?? 'CORE') as LearningPlanPreview['pathNodes'][number]['difficulty'],
-      reasonTags: readArray(item.reason_tags ?? item.reasonTags).length
+    pathNodes: pathNodes.map((item, index) => {
+      const reasonTags = readArray(item.reason_tags ?? item.reasonTags).length
         ? readArray(item.reason_tags ?? item.reasonTags)
         : item.reasonTag
           ? [String(item.reasonTag)]
-          : [],
-      estimatedMinutes: toNumber(item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
-      isStartingPoint: Boolean(item.is_recommended_start ?? item.isRecommendedStart ?? item.is_starting_point ?? item.isStartingPoint),
-      isPrerequisite: Boolean(item.is_prerequisite ?? item.isPrerequisite),
-      isFocus: Boolean(item.is_focus ?? item.isFocus),
-    })),
+          : [];
+      const isStartingPoint = Boolean(item.is_recommended_start ?? item.isRecommendedStart ?? item.is_starting_point ?? item.isStartingPoint);
+      const explicitPrerequisite = item.is_prerequisite ?? item.isPrerequisite;
+      const explicitFocus = item.is_focus ?? item.isFocus;
+      const inferredPrerequisite = reasonTags.some((tag) => /prerequisite|前置|基础/i.test(tag));
+
+      return {
+        id: String(item.node_id ?? item.nodeId ?? item.id ?? `path-${index + 1}`),
+        name: String(item.node_name ?? item.nodeName ?? item.name ?? ''),
+        masteryStatus: normalizePathMasteryStatus(item.status ?? item.mastery_status ?? item.masteryStatus, item.mastery),
+        difficulty: normalizePathDifficulty(item.difficulty),
+        reasonTags,
+        estimatedMinutes: toNumber(item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
+        isStartingPoint,
+        isPrerequisite: explicitPrerequisite === undefined ? inferredPrerequisite : Boolean(explicitPrerequisite),
+        isFocus: explicitFocus === undefined ? !isStartingPoint && !inferredPrerequisite : Boolean(explicitFocus),
+      };
+    }),
     taskPreviews: taskPreviews.map((item) => ({
       stage: String(item.stage ?? '') as LearningPlanPreview['taskPreviews'][number]['stage'],
       stageGoal: String(item.goal ?? item.stage_goal ?? item.stageGoal ?? ''),
