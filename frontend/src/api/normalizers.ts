@@ -30,11 +30,31 @@ function normalizePlanAdjustments(value: unknown, defaultAdjustments: PlanAdjust
     return defaultAdjustments;
   }
   const row = value as Record<string, unknown>;
+  const rawLearningMode = String(row.learning_mode ?? row.learningMode ?? defaultAdjustments.learningMode);
   return {
     intensity: String(row.intensity ?? defaultAdjustments.intensity) as PlanAdjustments['intensity'],
-    learningMode: String(row.learning_mode ?? row.learningMode ?? defaultAdjustments.learningMode) as PlanAdjustments['learningMode'],
-    prioritizeFoundation: Boolean(row.prioritize_foundation ?? row.prioritizeFoundation ?? defaultAdjustments.prioritizeFoundation),
+    learningMode: normalizeLearningMode(rawLearningMode),
+    prioritizeFoundation: Boolean(
+      row.prioritize_foundation
+        ?? row.prioritizeFoundation
+        ?? row.prefer_prerequisite
+        ?? row.preferPrerequisite
+        ?? defaultAdjustments.prioritizeFoundation
+    ),
   };
+}
+
+function normalizeLearningMode(value: string): PlanAdjustments['learningMode'] {
+  switch (value) {
+    case 'PRACTICE_DRIVEN':
+    case 'LEARN_BY_DOING':
+      return 'LEARN_BY_DOING';
+    case 'LEARN_THEN_PRACTICE':
+    case 'MIXED':
+    case 'EXPLAIN_THEN_PRACTICE':
+    default:
+      return 'EXPLAIN_THEN_PRACTICE';
+  }
 }
 
 function normalizePathDifficulty(value: unknown): PathDifficulty {

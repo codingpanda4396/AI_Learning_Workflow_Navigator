@@ -2,6 +2,16 @@ import apiClient from '@/api/client';
 import { normalizeLearningPlanPreview } from '@/api/normalizers';
 import type { LearningPlanPreview, LearningPlanRequest, PlanAdjustments, PlanConfirmResult } from '@/types/learningPlan';
 
+function toBackendLearningMode(mode: PlanAdjustments['learningMode']): string {
+  switch (mode) {
+    case 'LEARN_BY_DOING':
+      return 'PRACTICE_DRIVEN';
+    case 'EXPLAIN_THEN_PRACTICE':
+    default:
+      return 'LEARN_THEN_PRACTICE';
+  }
+}
+
 function toApiPayload(payload: {
   goalId: string;
   diagnosisId: string;
@@ -18,7 +28,7 @@ function toApiPayload(payload: {
     chapterId: payload.chapterId,
     adjustments: {
       intensity: payload.adjustments.intensity,
-      learningMode: payload.adjustments.learningMode,
+      learningMode: toBackendLearningMode(payload.adjustments.learningMode),
       preferPrerequisite: payload.adjustments.prioritizeFoundation,
     },
   };
