@@ -26,20 +26,20 @@ const emit = defineEmits<{
 }>();
 
 const options: StrategyOption[] = [
-  { key: 'faster', title: '更快一点', description: '拉直路径，优先保留最核心的一步。' },
-  { key: 'steadier', title: '更稳一点', description: '放慢节奏，先把前置基础补牢。' },
-  { key: 'practice-first', title: '先做题再学', description: '先通过题目暴露问题，再决定补哪里。' },
-  { key: 'ten-minute', title: '压缩成 10 分钟版', description: '把当前任务压缩成可马上开学的小切片。' },
-  { key: 'already-know', title: '我已经会这个', description: '尝试跳过当前建议，重新判断下一步。' },
-  { key: 'not-enough-time', title: '我现在时间不够', description: '让路径优先适配你的可用时间。' },
-  { key: 'not-clear', title: '这个解释我没看懂', description: '保留当前建议，但换一种解释方式。' },
+  { key: 'faster', title: '更快一点', description: '压缩路径，只保留现在最关键的一步。' },
+  { key: 'steadier', title: '更稳一点', description: '先把前置基础补牢，再往后推。' },
+  { key: 'practice-first', title: '先做再学', description: '先通过练习暴露问题，再回头补知识。' },
+  { key: 'ten-minute', title: '压缩到10分钟', description: '把这一步切成更轻的开始版本。' },
+  { key: 'already-know', title: '我已经会了', description: '尝试跳过当前建议，重算下一步。' },
+  { key: 'not-enough-time', title: '我现在时间不多', description: '让系统优先适配你当前的可用时间。' },
+  { key: 'not-clear', title: '这个解释不够清楚', description: '保留建议，但换一种表达方式。' },
 ];
 
 const panelTitle = computed(() => (props.mode === 'disagree' ? '我不认同这个建议' : '换一种学法'));
 const panelSubtitle = computed(() => (
   props.mode === 'disagree'
-    ? '可以直接告诉系统你哪里不同意，前端会优先尝试重新生成更贴近你的路径。'
-    : '选择一种更适合你当下状态的策略，系统会据此重新判断当前第一步。'
+    ? '告诉系统你不同意的点，它会按新的判断重新给你第一步。'
+    : '选一种更贴近你当下状态的策略，系统会据此重算路径。'
 ));
 
 function onMaskClick(event: MouseEvent) {

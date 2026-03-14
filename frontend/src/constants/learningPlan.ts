@@ -8,16 +8,16 @@ import type {
 } from '@/types/learningPlan';
 
 export const STAGE_LABELS: Record<LearningStage, string> = {
-  STRUCTURE: '搭建结构',
+  STRUCTURE: '基础结构',
   UNDERSTANDING: '理解原理',
-  TRAINING: '进入训练',
+  TRAINING: '练习强化',
   REFLECTION: '复盘巩固',
 };
 
 export const STAGE_ORDER: LearningStage[] = ['STRUCTURE', 'UNDERSTANDING', 'TRAINING', 'REFLECTION'];
 
 export const INTENSITY_LABELS: Record<LearningIntensity, string> = {
-  LIGHT: '轻松',
+  LIGHT: '轻量',
   STANDARD: '标准',
   INTENSIVE: '强化',
 };

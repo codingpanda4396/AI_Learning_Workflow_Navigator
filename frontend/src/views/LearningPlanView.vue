@@ -3,15 +3,14 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import AiExplainEntry from '@/components/plan/AiExplainEntry.vue';
 import DecisionReasonPanel from '@/components/plan/DecisionReasonPanel.vue';
-import LearningPathStatusCard from '@/components/plan/LearningPathStatusCard.vue';
+import LearningPathCard from '@/components/plan/LearningPathCard.vue';
 import RecommendationHeroCard from '@/components/plan/RecommendationHeroCard.vue';
 import StrategyAdjustPanel from '@/components/plan/StrategyAdjustPanel.vue';
+import StrategyPanel from '@/components/plan/StrategyPanel.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
 import InfoHint from '@/components/ui/InfoHint.vue';
-import SectionCard from '@/components/ui/SectionCard.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { useLearningPlanStore } from '@/stores/learningPlan';
@@ -31,10 +30,9 @@ const adjustPanelOpen = ref(false);
 const adjustPanelMode = ref<'strategy' | 'disagree'>('strategy');
 
 const explainPrompts = [
-  { key: 'harder', label: '为什么我现在不适合直接学更难的内容？' },
-  { key: 'goal', label: '这一步和我的目标有什么关系？' },
-  { key: 'fast', label: '给我一个 5 分钟极速版' },
-  { key: 'example', label: '用一个例子解释为什么先学这个' },
+  { key: 'why-first', label: '为什么我要先学这个？' },
+  { key: 'goal-link', label: '这一步和目标有什么关系？' },
+  { key: 'fast', label: '给我一个5分钟极速版' },
 ];
 
 const context = computed(() => {
@@ -43,7 +41,7 @@ const context = computed(() => {
   return {
     sessionId: Number.isFinite(sessionId) && sessionId > 0 ? sessionId : undefined,
     diagnosisId,
-    goalText: String(route.query.goal ?? '').trim() || '先把当前阶段最值得推进的一步学明白',
+    goalText: String(route.query.goal ?? '').trim() || '先把当前最值得推进的一步学明白',
     courseName: String(route.query.course ?? '').trim() || '当前学习主题',
     chapterName: String(route.query.chapter ?? '').trim() || '当前章节',
   };
@@ -169,21 +167,17 @@ onBeforeUnmount(() => {
 
 <template>
   <AppShell>
-    <div class="mx-auto max-w-[1180px] space-y-6 pb-8">
-      <div v-if="viewState === 'loading'" class="app-stack-md">
-        <section class="app-hero">
-          <div class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
-            <div class="space-y-4">
-              <div class="flex gap-2">
-                <SkeletonBlock width="88px" :height="28" rounded="999px" />
-                <SkeletonBlock width="88px" :height="28" rounded="999px" />
-              </div>
-              <SkeletonBlock width="48%" :height="18" rounded="10px" />
-              <SkeletonBlock width="72%" :height="44" rounded="16px" />
-              <SkeletonBlock width="84%" :height="18" rounded="10px" />
-              <SkeletonBlock :height="220" rounded="28px" />
+    <div class="mx-auto max-w-[1180px] space-y-10 pb-10">
+      <div v-if="viewState === 'loading'" class="space-y-6">
+        <section class="min-h-[calc(100vh-128px)] rounded-[36px] border border-slate-200 bg-slate-50 px-6 py-8 sm:px-8">
+          <div class="grid h-full gap-8 lg:grid-cols-[minmax(0,1.4fr)_320px] lg:items-end">
+            <div class="space-y-4 self-center">
+              <SkeletonBlock width="90px" :height="18" rounded="999px" />
+              <SkeletonBlock width="68%" :height="64" rounded="16px" />
+              <SkeletonBlock width="52%" :height="18" rounded="10px" />
+              <SkeletonBlock width="78%" :height="18" rounded="10px" />
             </div>
-            <SkeletonBlock :height="360" rounded="28px" />
+            <SkeletonBlock :height="320" rounded="28px" />
           </div>
         </section>
       </div>
@@ -195,80 +189,35 @@ onBeforeUnmount(() => {
 
       <template v-else-if="preview && navigatorVm">
         <RecommendationHeroCard
-          :source-label="navigatorVm.decisionCard.sourceLabel"
-          :source-type="navigatorVm.decisionCard.sourceType"
-          :confidence-label="navigatorVm.decisionCard.confidenceLabel"
-          :confidence-level="navigatorVm.decisionCard.confidenceLevel"
-          :recommendation-headline="navigatorVm.decisionCard.recommendationHeadline"
-          :recommendation-subtitle="navigatorVm.decisionCard.recommendationSubtitle"
-          :current-task-title="navigatorVm.decisionCard.currentTaskTitle"
-          :estimated-minutes="navigatorVm.decisionCard.estimatedMinutes"
-          :priority="navigatorVm.decisionCard.priority"
-          :current-status="navigatorVm.decisionCard.currentStatus"
+          :source-label="navigatorVm.hero.sourceLabel"
+          :source-type="navigatorVm.hero.sourceType"
+          :recommendation-headline="navigatorVm.hero.recommendationHeadline"
+          :recommendation-reason="navigatorVm.hero.recommendationReason"
+          :current-task-title="navigatorVm.hero.currentTaskTitle"
+          :estimated-minutes="navigatorVm.hero.estimatedMinutes"
+          :current-status="navigatorVm.hero.currentStatus"
           :loading="learningPlanStore.confirming"
           @start="startLearning"
           @adjust="openAdjustPanel('strategy')"
           @mastered="onMastered"
         />
 
-        <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div class="space-y-5">
-            <SectionCard
-              strong
-              title="学完这一步你会立刻获得"
-              description="只保留最直接、最能感知到的变化。"
-            >
-              <div class="grid gap-3 md:grid-cols-2">
-                <div v-for="item in navigatorVm.benefits" :key="item.key" class="app-option app-option-selected">
-                  <p class="text-sm font-semibold text-slate-950">{{ item.title }}</p>
-                  <p class="mt-2 text-sm leading-7 text-slate-600">{{ item.description }}</p>
-                </div>
-              </div>
+        <DecisionReasonPanel :cards="navigatorVm.reasonCards" />
 
-              <div class="app-divider my-5" />
+        <LearningPathCard
+          :current-focus="navigatorVm.currentFocus"
+          :current-status="navigatorVm.hero.currentStatus"
+          :next-step="navigatorVm.nextStep"
+          :stages="navigatorVm.pathStages"
+        />
 
-              <div>
-                <p class="text-sm font-semibold text-slate-950">解锁后续</p>
-                <div class="mt-3 grid gap-3 md:grid-cols-2">
-                  <div v-for="item in navigatorVm.nextUnlocks" :key="item.key" class="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4">
-                    <p class="text-sm font-semibold text-slate-950">{{ item.title }}</p>
-                    <p class="mt-2 text-sm leading-7 text-slate-600">{{ item.description }}</p>
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-
-            <DecisionReasonPanel
-              :learner-goal="navigatorVm.learnerGoal"
-              :current-weaknesses="navigatorVm.currentWeaknesses"
-              :mastery-score="navigatorVm.masteryScore"
-              :based-on-current-state="navigatorVm.basedOnCurrentState"
-              :decision-reasons="navigatorVm.decisionReasons"
-              :alternatives="navigatorVm.alternatives"
-            />
-
-            <SectionCard
-              title="不想照单全收，也可以立刻改策略"
-              description="你可以换一种学法，也可以直接表达不同意这个判断。"
-            >
-              <div class="flex flex-col gap-3 sm:flex-row">
-                <AppButton size="lg" @click="openAdjustPanel('strategy')">换一种学法</AppButton>
-                <AppButton size="lg" variant="secondary" @click="openAdjustPanel('disagree')">我不认同这个建议</AppButton>
-              </div>
-              <InfoHint v-if="strategyNote" class="mt-4">{{ strategyNote }}</InfoHint>
-            </SectionCard>
-          </div>
-
-          <LearningPathStatusCard
-            :current-focus="navigatorVm.currentFocus"
-            :current-status="navigatorVm.decisionCard.currentStatus"
-            :next-step="navigatorVm.nextStep"
-            :path-risk="navigatorVm.pathRisk"
-            :stages="navigatorVm.pathStages"
-          />
-        </div>
-
-        <AiExplainEntry :prompts="explainPrompts" @ask="onAskAi" />
+        <StrategyPanel
+          :prompts="explainPrompts"
+          :strategy-note="strategyNote || ''"
+          @adjust="openAdjustPanel('strategy')"
+          @disagree="openAdjustPanel('disagree')"
+          @ask="onAskAi"
+        />
 
         <InfoHint v-if="error" tone="danger">{{ error }}</InfoHint>
 

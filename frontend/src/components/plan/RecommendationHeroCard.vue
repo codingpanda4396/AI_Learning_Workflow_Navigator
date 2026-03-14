@@ -4,13 +4,10 @@ import AppButton from '@/components/ui/AppButton.vue';
 defineProps<{
   sourceLabel: string;
   sourceType: 'llm' | 'fallback';
-  confidenceLabel: string;
-  confidenceLevel: 'high' | 'medium' | 'low';
   recommendationHeadline: string;
-  recommendationSubtitle: string;
+  recommendationReason: string;
   currentTaskTitle: string;
   estimatedMinutes: string;
-  priority: string;
   currentStatus: string;
   loading?: boolean;
 }>();
@@ -20,48 +17,44 @@ defineEmits<{
   adjust: [];
   mastered: [];
 }>();
-
-function confidenceClass(level: 'high' | 'medium' | 'low') {
-  switch (level) {
-    case 'high':
-      return 'bg-emerald-100 text-emerald-700';
-    case 'low':
-      return 'bg-amber-100 text-amber-700';
-    case 'medium':
-    default:
-      return 'bg-sky-100 text-sky-700';
-  }
-}
 </script>
 
 <template>
-  <section class="app-hero">
-    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
-      <div>
-        <div class="flex flex-wrap gap-2">
-          <span class="app-badge" :class="sourceType === 'llm' ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 bg-slate-100 text-slate-700'">
+  <section class="relative flex min-h-[calc(100vh-128px)] items-center overflow-hidden rounded-[36px] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(186,230,253,0.85),transparent_32%),linear-gradient(135deg,#f8fafc_0%,#e2e8f0_52%,#f8fafc_100%)] px-6 py-8 shadow-[0_28px_90px_rgba(15,23,42,0.08)] sm:px-8 lg:px-10">
+    <div class="absolute inset-y-10 right-[-80px] hidden w-[320px] rounded-full bg-slate-900/6 blur-3xl lg:block" />
+    <div class="relative grid w-full gap-8 lg:grid-cols-[minmax(0,1.4fr)_320px] lg:items-end">
+      <div class="max-w-3xl">
+        <div class="flex flex-wrap items-center gap-3">
+          <p class="app-eyebrow !mb-0">AI建议</p>
+          <span
+            v-if="sourceLabel"
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="sourceType === 'llm' ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-slate-200 bg-slate-100 text-slate-700'"
+          >
             {{ sourceLabel }}
-          </span>
-          <span class="app-badge" :class="confidenceClass(confidenceLevel)">
-            {{ confidenceLabel }}
           </span>
         </div>
 
-        <p class="app-eyebrow mt-5">AI 决策结论</p>
-        <h1 class="app-title-lg mt-3">{{ recommendationHeadline }}</h1>
-        <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600">{{ recommendationSubtitle }}</p>
+        <h1 class="mt-4 max-w-2xl text-[38px] font-semibold leading-[1.08] tracking-[-0.05em] text-slate-950 sm:text-[48px]">
+          {{ recommendationHeadline }}
+        </h1>
 
-        <div class="mt-6 rounded-[28px] border border-slate-200/80 bg-white/80 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">当前学习动作</p>
-          <h2 class="mt-3 text-[28px] font-semibold leading-[1.15] tracking-[-0.04em] text-slate-950">{{ currentTaskTitle }}</h2>
-          <div class="mt-5 grid gap-3 sm:grid-cols-3">
+        <p class="mt-5 text-sm font-medium text-slate-500">原因</p>
+        <p class="mt-2 max-w-2xl text-lg leading-8 text-slate-700">
+          {{ recommendationReason }}
+        </p>
+      </div>
+
+      <div class="rounded-[28px] border border-slate-900/10 bg-white/92 p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div class="space-y-4">
+          <div>
+            <p class="text-sm text-slate-500">当前任务</p>
+            <p class="mt-1 text-xl font-semibold text-slate-950">{{ currentTaskTitle }}</p>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <div class="rounded-[20px] bg-slate-50 px-4 py-3">
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">预计耗时</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">预计时间</p>
               <p class="mt-2 text-base font-semibold text-slate-950">{{ estimatedMinutes }}</p>
-            </div>
-            <div class="rounded-[20px] bg-slate-50 px-4 py-3">
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">当前优先级</p>
-              <p class="mt-2 text-base font-semibold text-slate-950">{{ priority }}</p>
             </div>
             <div class="rounded-[20px] bg-slate-50 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">当前状态</p>
@@ -69,21 +62,11 @@ function confidenceClass(level: 'high' | 'medium' | 'low') {
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="flex flex-col justify-between rounded-[28px] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92))] p-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.2)]">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">现在最值得开始的一步</p>
-          <p class="mt-4 text-2xl font-semibold leading-tight">{{ currentTaskTitle }}</p>
-          <p class="mt-4 text-sm leading-7 text-slate-200">
-            先把这一步打通，再决定要不要提速、跳学或换策略，会更稳。
-          </p>
-        </div>
-
-        <div class="mt-8 space-y-3">
+        <div class="mt-6 space-y-3">
           <AppButton size="lg" block :loading="loading" @click="$emit('start')">开始这一小步</AppButton>
           <AppButton size="lg" block variant="secondary" @click="$emit('adjust')">换一种学法</AppButton>
-          <button type="button" class="text-sm font-medium text-slate-200 transition hover:text-white" @click="$emit('mastered')">
+          <button type="button" class="w-full text-center text-sm font-medium text-slate-600 transition hover:text-slate-950" @click="$emit('mastered')">
             我已经会了，调整路径
           </button>
         </div>
