@@ -7,6 +7,7 @@ import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsDto;
 import com.pandanav.learning.api.dto.plan.LearningPlanContextResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanLearnerSnapshotResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanMetadataResponse;
+import com.pandanav.learning.api.dto.plan.LearningPlanPersonalizationResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanRecommendationResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanSummaryResponse;
@@ -156,6 +157,16 @@ class LearningPlanControllerTest {
             List.of("solidify tree basics", "connect traversal to the basics"),
             new LearningPlanRecommendationResponse("Strengthen basics before advancing", "Start from the biggest blocker first", "Map the structure", 8, "HIGH", "This prerequisite still blocks later traversal work."),
             new LearningPlanLearnerSnapshotResponse("Strengthen tree traversal basics", List.of("prerequisite gap"), 40, "Skipping this step increases later confusion.", "tree basics"),
+            new LearningPlanPersonalizationResponse(
+                "你当前主要卡在前置基础不稳。",
+                List.of("系统看到你最近薄弱点集中在基础。", "当前推荐节点直接影响后续路径。"),
+                "先补基础能减少后续反复。",
+                "跳过会导致后续训练更容易卡住。",
+                "本轮不追求拓展新内容，先追求基础稳定。",
+                "完成后会根据本轮表现动态调整。",
+                "已有部分证据，可信度中等。",
+                "MEDIUM"
+            ),
             "Recommend strengthening the prerequisite first.",
             List.of("prerequisite gap", "recent confusion"),
             List.of(new PlanPriorityNodeResponse("101", "tree basics", "This node still blocks later traversal work.")),

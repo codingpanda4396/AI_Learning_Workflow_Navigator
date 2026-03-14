@@ -9,6 +9,7 @@ import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsDto;
 import com.pandanav.learning.api.dto.plan.LearningPlanContextResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanLearnerSnapshotResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanMetadataResponse;
+import com.pandanav.learning.api.dto.plan.LearningPlanPersonalizationResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanRecommendationResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanSummaryResponse;
@@ -32,12 +33,14 @@ import com.pandanav.learning.domain.model.LearningPlanContextNode;
 import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
 import com.pandanav.learning.domain.model.LearningPlanPreview;
 import com.pandanav.learning.domain.model.LearningPlanSummary;
+import com.pandanav.learning.domain.model.LearnerStateSnapshot;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.PlanAdjustments;
 import com.pandanav.learning.domain.model.PlanAlternative;
 import com.pandanav.learning.domain.model.PlanPathNode;
 import com.pandanav.learning.domain.model.PlanReason;
 import com.pandanav.learning.domain.model.PlanTaskPreview;
+import com.pandanav.learning.domain.model.PersonalizedNarrative;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.policy.TaskObjectiveTemplateStrategy;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
@@ -77,6 +80,7 @@ public class LearningPlanService {
     private final ConceptNodeRepository conceptNodeRepository;
     private final TaskObjectiveTemplateStrategy taskObjectiveTemplateStrategy;
     private final ObjectMapper objectMapper;
+    private final LearnerStateInterpreter learnerStateInterpreter;
 
     public LearningPlanService(
         PlanningContextAssembler planningContextAssembler,
@@ -87,7 +91,8 @@ public class LearningPlanService {
         TaskRepository taskRepository,
         ConceptNodeRepository conceptNodeRepository,
         TaskObjectiveTemplateStrategy taskObjectiveTemplateStrategy,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        LearnerStateInterpreter learnerStateInterpreter
     ) {
         this.planningContextAssembler = planningContextAssembler;
         this.learningPlanOrchestrator = learningPlanOrchestrator;
@@ -98,6 +103,7 @@ public class LearningPlanService {
         this.conceptNodeRepository = conceptNodeRepository;
         this.taskObjectiveTemplateStrategy = taskObjectiveTemplateStrategy;
         this.objectMapper = objectMapper;
+        this.learnerStateInterpreter = learnerStateInterpreter;
     }
 
     public LearningPlanPreviewResponse preview(PreviewLearningPlanCommand command) {
@@ -110,6 +116,7 @@ public class LearningPlanService {
         );
         LearningPlanPlanningContext context = planningContextAssembler.assemble(command);
         LearningPlanOrchestrator.OrchestratedPlan orchestrated = learningPlanOrchestrator.preview(context);
+        LearningPlanPlanningContext snapshotContext = enrichContextForSnapshot(context, orchestrated);
 
         LearningPlan previewDraft = new LearningPlan();
         previewDraft.setUserId(command.userId());
@@ -117,23 +124,26 @@ public class LearningPlanService {
         previewDraft.setDiagnosisId(command.diagnosisId());
         previewDraft.setStatus(LearningPlanStatus.DRAFT);
         previewDraft.setLlmTraceId(orchestrated.llmTraceId());
-        writeSnapshot(previewDraft, orchestrated.preview(), context);
+        writeSnapshot(previewDraft, orchestrated.preview(), snapshotContext);
 
         LearningPlan saved = learningPlanRepository.save(previewDraft);
         LearningPlanPreviewResponse response = toResponse(
             saved,
             orchestrated.preview(),
-            context,
+            snapshotContext,
             orchestrated.planSource(),
             orchestrated.fallbackApplied(),
             orchestrated.fallbackReasons()
         );
         log.info(
-            "LearningPlan preview built. previewId={} contentSourceType={} fallbackApplied={} fallbackReasons={}",
+            "LearningPlan preview built. previewId={} contentSourceType={} fallbackApplied={} fallbackReasons={} personalization={} whatISawCount={} confidence={}",
             response.previewId(),
             response.contentSourceType(),
             response.fallbackApplied(),
-            response.fallbackReasons()
+            response.fallbackReasons(),
+            response.personalization() != null,
+            response.personalization() == null || response.personalization().whatISaw() == null ? 0 : response.personalization().whatISaw().size(),
+            response.confidence()
         );
         return response;
     }
@@ -176,6 +186,7 @@ public class LearningPlanService {
 
         LearningPlanPlanningContext adjustedContext = withAdjustmentIntent(baseContext, command, basedOnPreviewId);
         LearningPlanOrchestrator.OrchestratedPlan orchestrated = learningPlanOrchestrator.preview(adjustedContext);
+        LearningPlanPlanningContext snapshotContext = enrichContextForSnapshot(adjustedContext, orchestrated);
 
         LearningPlan previewDraft = new LearningPlan();
         previewDraft.setUserId(command.userId());
@@ -183,13 +194,13 @@ public class LearningPlanService {
         previewDraft.setDiagnosisId(adjustedContext.diagnosisId());
         previewDraft.setStatus(LearningPlanStatus.DRAFT);
         previewDraft.setLlmTraceId(orchestrated.llmTraceId());
-        writeSnapshot(previewDraft, orchestrated.preview(), adjustedContext);
+        writeSnapshot(previewDraft, orchestrated.preview(), snapshotContext);
         LearningPlan saved = learningPlanRepository.save(previewDraft);
 
         LearningPlanPreviewResponse result = toResponse(
             saved,
             orchestrated.preview(),
-            adjustedContext,
+            snapshotContext,
             orchestrated.planSource(),
             orchestrated.fallbackApplied(),
             orchestrated.fallbackReasons()
@@ -355,6 +366,7 @@ public class LearningPlanService {
             resolveRiskIfSkipped(preview.reasons(), summary),
             summary.currentFocusLabel()
         );
+        LearningPlanPersonalizationResponse personalization = mapPersonalization(context);
 
         return new LearningPlanPreviewResponse(
             String.valueOf(plan.getId()),
@@ -387,6 +399,7 @@ public class LearningPlanService {
             preview.focuses() == null ? List.of() : preview.focuses(),
             recommendation,
             learnerSnapshot,
+            personalization,
             planExplanation.whyStartHere(),
             planExplanation.keyWeaknesses(),
             planExplanation.priorityNodes(),
@@ -446,7 +459,7 @@ public class LearningPlanService {
         Long basedOnPreviewId
     ) {
         PlanAdjustments adjustments = resolveAdjustments(baseContext.adjustments(), command.strategy(), command.timeBudget());
-        return new LearningPlanPlanningContext(
+        LearningPlanPlanningContext adjusted = new LearningPlanPlanningContext(
             baseContext.userId(),
             baseContext.goalId(),
             baseContext.diagnosisId(),
@@ -464,7 +477,80 @@ public class LearningPlanService {
             command.timeBudget(),
             command.reason(),
             normalizeFeedback(command.userFeedback()),
-            basedOnPreviewId
+            basedOnPreviewId,
+            null,
+            null
+        );
+        return new LearningPlanPlanningContext(
+            adjusted.userId(),
+            adjusted.goalId(),
+            adjusted.diagnosisId(),
+            adjusted.courseId(),
+            adjusted.chapterId(),
+            adjusted.goalText(),
+            adjusted.sourceSessionId(),
+            adjusted.nodes(),
+            adjusted.recentErrorTags(),
+            adjusted.recentScores(),
+            adjusted.weakPointLabels(),
+            adjusted.learnerProfileSummary(),
+            adjusted.adjustments(),
+            adjusted.requestedStrategy(),
+            adjusted.requestedTimeBudgetMinutes(),
+            adjusted.adjustmentReason(),
+            adjusted.userFeedback(),
+            adjusted.basedOnPreviewId(),
+            learnerStateInterpreter.interpret(adjusted),
+            null
+        );
+    }
+
+    private LearningPlanPlanningContext enrichContextForSnapshot(
+        LearningPlanPlanningContext context,
+        LearningPlanOrchestrator.OrchestratedPlan orchestrated
+    ) {
+        LearnerStateSnapshot learnerState = orchestrated.learnerStateSnapshot() != null
+            ? orchestrated.learnerStateSnapshot()
+            : (context.learnerStateSnapshot() != null ? context.learnerStateSnapshot() : learnerStateInterpreter.interpret(context));
+        return new LearningPlanPlanningContext(
+            context.userId(),
+            context.goalId(),
+            context.diagnosisId(),
+            context.courseId(),
+            context.chapterId(),
+            context.goalText(),
+            context.sourceSessionId(),
+            context.nodes(),
+            context.recentErrorTags(),
+            context.recentScores(),
+            context.weakPointLabels(),
+            context.learnerProfileSummary(),
+            context.adjustments(),
+            context.requestedStrategy(),
+            context.requestedTimeBudgetMinutes(),
+            context.adjustmentReason(),
+            context.userFeedback(),
+            context.basedOnPreviewId(),
+            learnerState,
+            orchestrated.personalizedNarrative()
+        );
+    }
+
+    private LearningPlanPersonalizationResponse mapPersonalization(LearningPlanPlanningContext context) {
+        if (context == null || context.personalizedNarrative() == null) {
+            return null;
+        }
+        PersonalizedNarrative narrative = context.personalizedNarrative();
+        LearnerStateSnapshot snapshot = context.learnerStateSnapshot();
+        return new LearningPlanPersonalizationResponse(
+            narrative.learnerState(),
+            narrative.whatISaw() == null ? List.of() : narrative.whatISaw(),
+            narrative.whyThisPlanFitsYou(),
+            narrative.mainRiskIfSkip(),
+            narrative.thisRoundBoundary(),
+            narrative.adaptationHint(),
+            snapshot == null ? null : snapshot.confidenceReasonSummary(),
+            snapshot == null ? null : snapshot.motivationRisk().name()
         );
     }
 

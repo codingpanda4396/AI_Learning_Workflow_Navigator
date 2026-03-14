@@ -75,6 +75,8 @@ class LearningPlanOrchestratorTest {
         assertTrue(result.fallbackApplied());
         assertEquals(PlanSource.RULE_FALLBACK, result.planSource());
         assertEquals(List.of("JSON_EXTRA_TEXT"), result.fallbackReasons());
+        assertTrue(result.personalizedNarrative() != null);
+        assertEquals(NarrativeSource.FALLBACK, result.narrativeSource());
     }
 
     @Test
@@ -133,7 +135,10 @@ class LearningPlanOrchestratorTest {
             new LlmJsonParser(new ObjectMapper()),
             readyProperties(),
             new LlmCallLogger(mock(ObjectProvider.class)),
-            new LlmFailureClassifier()
+            new LlmFailureClassifier(),
+            new DefaultLearnerStateInterpreter(),
+            new RuleBasedPersonalizedNarrativeGenerator(),
+            new LlmEnhancedPersonalizedNarrativeGenerator(new RuleBasedPersonalizedNarrativeGenerator())
         );
     }
 
@@ -238,6 +243,8 @@ class LearningPlanOrchestratorTest {
             List.of("tree basics"),
             "Current weak point is tree basics",
             PlanAdjustments.defaults(),
+            null,
+            null,
             null,
             null,
             null,

@@ -32,19 +32,22 @@ public class PlanningContextAssembler {
     private final NodeMasteryRepository nodeMasteryRepository;
     private final TaskRepository taskRepository;
     private final WeakPointDiagnosisService weakPointDiagnosisService;
+    private final LearnerStateInterpreter learnerStateInterpreter;
 
     public PlanningContextAssembler(
         SessionRepository sessionRepository,
         ConceptNodeRepository conceptNodeRepository,
         NodeMasteryRepository nodeMasteryRepository,
         TaskRepository taskRepository,
-        WeakPointDiagnosisService weakPointDiagnosisService
+        WeakPointDiagnosisService weakPointDiagnosisService,
+        LearnerStateInterpreter learnerStateInterpreter
     ) {
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
         this.nodeMasteryRepository = nodeMasteryRepository;
         this.taskRepository = taskRepository;
         this.weakPointDiagnosisService = weakPointDiagnosisService;
+        this.learnerStateInterpreter = learnerStateInterpreter;
     }
 
     public LearningPlanPlanningContext assemble(PreviewLearningPlanCommand command) {
@@ -106,7 +109,7 @@ public class PlanningContextAssembler {
             ? "当前可用历史证据较少，系统会优先根据目标与知识顺序给出稳健预览。"
             : "结合最近的薄弱点表现，本轮会优先补齐 " + String.join("、", weakLabels) + " 相关的关键连接。";
 
-        return new LearningPlanPlanningContext(
+        LearningPlanPlanningContext baseContext = new LearningPlanPlanningContext(
             command.userId(),
             goalKey,
             command.diagnosisId(),
@@ -124,6 +127,30 @@ public class PlanningContextAssembler {
             null,
             null,
             null,
+            null,
+            null,
+            null
+        );
+        return new LearningPlanPlanningContext(
+            baseContext.userId(),
+            baseContext.goalId(),
+            baseContext.diagnosisId(),
+            baseContext.courseId(),
+            baseContext.chapterId(),
+            baseContext.goalText(),
+            baseContext.sourceSessionId(),
+            baseContext.nodes(),
+            baseContext.recentErrorTags(),
+            baseContext.recentScores(),
+            baseContext.weakPointLabels(),
+            baseContext.learnerProfileSummary(),
+            baseContext.adjustments(),
+            baseContext.requestedStrategy(),
+            baseContext.requestedTimeBudgetMinutes(),
+            baseContext.adjustmentReason(),
+            baseContext.userFeedback(),
+            baseContext.basedOnPreviewId(),
+            learnerStateInterpreter.interpret(baseContext),
             null
         );
     }

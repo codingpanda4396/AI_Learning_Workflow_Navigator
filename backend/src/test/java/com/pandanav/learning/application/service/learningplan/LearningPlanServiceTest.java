@@ -9,7 +9,14 @@ import com.pandanav.learning.application.command.AdjustLearningPlanCommand;
 import com.pandanav.learning.application.command.ConfirmLearningPlanCommand;
 import com.pandanav.learning.application.command.PreviewLearningPlanCommand;
 import com.pandanav.learning.domain.enums.LearningPlanStatus;
+import com.pandanav.learning.domain.enums.MotivationRisk;
+import com.pandanav.learning.domain.enums.CurrentBlockType;
+import com.pandanav.learning.domain.enums.EvidenceLevel;
+import com.pandanav.learning.domain.enums.GoalOrientation;
+import com.pandanav.learning.domain.enums.PacePreference;
+import com.pandanav.learning.domain.enums.PreferredLearningMode;
 import com.pandanav.learning.domain.model.ConceptNode;
+import com.pandanav.learning.domain.model.LearnerStateSnapshot;
 import com.pandanav.learning.domain.model.LearningPlan;
 import com.pandanav.learning.domain.model.LearningPlanContextNode;
 import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
@@ -21,6 +28,7 @@ import com.pandanav.learning.domain.model.PlanAlternative;
 import com.pandanav.learning.domain.model.PlanPathNode;
 import com.pandanav.learning.domain.model.PlanReason;
 import com.pandanav.learning.domain.model.PlanTaskPreview;
+import com.pandanav.learning.domain.model.PersonalizedNarrative;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.policy.TaskObjectiveTemplateStrategy;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
@@ -47,7 +55,7 @@ class LearningPlanServiceTest {
         LearningPlanRepository repository = mock(LearningPlanRepository.class);
 
         when(assembler.assemble(any())).thenReturn(sampleContext());
-        when(orchestrator.preview(any())).thenReturn(new LearningPlanOrchestrator.OrchestratedPlan(samplePreview(), null, PlanSource.LLM, false, List.of()));
+        when(orchestrator.preview(any())).thenReturn(sampleOrchestratedPlan(samplePreview(), false, List.of()));
         when(repository.save(any())).thenAnswer(invocation -> {
             LearningPlan plan = invocation.getArgument(0);
             plan.setId(88L);
@@ -101,7 +109,7 @@ class LearningPlanServiceTest {
             plan.setId(100L);
             return plan;
         });
-        when(orchestrator.preview(any())).thenReturn(new LearningPlanOrchestrator.OrchestratedPlan(samplePreview(), null, PlanSource.LLM, false, List.of()));
+        when(orchestrator.preview(any())).thenReturn(sampleOrchestratedPlan(samplePreview(), false, List.of()));
 
         LearningPlanService service = new LearningPlanService(
             assembler,
@@ -112,7 +120,8 @@ class LearningPlanServiceTest {
             mock(TaskRepository.class),
             mock(ConceptNodeRepository.class),
             objectiveStrategy(),
-            objectMapper
+            objectMapper,
+            new DefaultLearnerStateInterpreter()
         );
 
         AdjustLearningPlanResponse response = service.adjust(new AdjustLearningPlanCommand(
@@ -183,7 +192,8 @@ class LearningPlanServiceTest {
             taskRepository,
             conceptNodeRepository,
             objectiveStrategy(),
-            objectMapper
+            objectMapper,
+            new DefaultLearnerStateInterpreter()
         );
 
         ConfirmLearningPlanResponse response = service.confirm(new ConfirmLearningPlanCommand(99L, 1L));
@@ -207,7 +217,8 @@ class LearningPlanServiceTest {
             mock(TaskRepository.class),
             mock(ConceptNodeRepository.class),
             objectiveStrategy(),
-            new ObjectMapper()
+            new ObjectMapper(),
+            new DefaultLearnerStateInterpreter()
         );
     }
 
@@ -237,7 +248,48 @@ class LearningPlanServiceTest {
             null,
             null,
             null,
+            null,
+            null,
             null
+        );
+    }
+
+    private LearningPlanOrchestrator.OrchestratedPlan sampleOrchestratedPlan(
+        LearningPlanPreview preview,
+        boolean fallback,
+        List<String> fallbackReasons
+    ) {
+        LearnerStateSnapshot learnerState = new LearnerStateSnapshot(
+            GoalOrientation.UNDERSTAND_PRINCIPLE,
+            PreferredLearningMode.LEARN_THEN_PRACTICE,
+            PacePreference.NORMAL,
+            CurrentBlockType.FOUNDATION_GAP,
+            EvidenceLevel.MEDIUM,
+            MotivationRisk.MEDIUM,
+            "已有部分学习证据，推荐可信度中等。",
+            "你当前主要卡在前置基础不稳。",
+            null
+        );
+        PersonalizedNarrative narrative = new PersonalizedNarrative(
+            "你当前主要卡在前置基础不稳。",
+            List.of("系统检测到你的薄弱点集中在基础节点。", "当前推荐节点直接影响后续路径。"),
+            "先稳住基础有助于后续连续推进。",
+            "如果跳过当前步骤，后续训练容易反复卡住。",
+            "本轮先不追求覆盖更多新内容，先追求基础稳定。",
+            "完成本轮后会根据新表现动态调整。"
+        );
+        return new LearningPlanOrchestrator.OrchestratedPlan(
+            preview,
+            null,
+            fallback ? PlanSource.RULE_FALLBACK : PlanSource.LLM,
+            fallback,
+            fallbackReasons,
+            learnerState,
+            new DecisionPlan(preview.summary().recommendedStartNodeId(), preview.summary().recommendedPace(), preview.summary().alternatives(), preview.summary().whyNow(), preview.reasons()),
+            narrative,
+            fallback ? NarrativeSource.FALLBACK : NarrativeSource.LLM,
+            !fallback,
+            fallback ? String.join(",", fallbackReasons) : null
         );
     }
 

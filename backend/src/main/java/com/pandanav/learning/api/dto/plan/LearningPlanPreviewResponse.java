@@ -27,6 +27,7 @@ public record LearningPlanPreviewResponse(
     List<String> focuses,
     LearningPlanRecommendationResponse recommendation,
     LearningPlanLearnerSnapshotResponse learnerSnapshot,
+    LearningPlanPersonalizationResponse personalization,
     String whyStartHere,
     List<String> keyWeaknesses,
     List<PlanPriorityNodeResponse> priorityNodes,

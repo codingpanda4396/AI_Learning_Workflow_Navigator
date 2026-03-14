@@ -20,6 +20,8 @@ public record LearningPlanPlanningContext(
     Integer requestedTimeBudgetMinutes,
     String adjustmentReason,
     String userFeedback,
-    Long basedOnPreviewId
+    Long basedOnPreviewId,
+    LearnerStateSnapshot learnerStateSnapshot,
+    PersonalizedNarrative personalizedNarrative
 ) {
 }
