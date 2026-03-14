@@ -4,11 +4,13 @@ import type {
   CapabilityProfile,
   DiagnosisAnswer,
   DiagnosisAnswerValue,
+  DiagnosisEvidenceSource,
   DiagnosisFallback,
   DiagnosisInsights,
   DiagnosisMetadata,
   DiagnosisNextAction,
   DiagnosisQuestion,
+  DiagnosisReasoningStep,
 } from '@/types/diagnosis';
 
 interface DiagnosisState {
@@ -22,6 +24,9 @@ interface DiagnosisState {
   nextAction: DiagnosisNextAction | null;
   fallback: DiagnosisFallback | null;
   metadata: DiagnosisMetadata | null;
+  reasoningSteps: DiagnosisReasoningStep[];
+  strengthSources: DiagnosisEvidenceSource[];
+  weaknessSources: DiagnosisEvidenceSource[];
   status: string;
   loading: boolean;
   submitting: boolean;
@@ -40,6 +45,9 @@ export const useDiagnosisStore = defineStore('diagnosis', {
     nextAction: null,
     fallback: null,
     metadata: null,
+    reasoningSteps: [],
+    strengthSources: [],
+    weaknessSources: [],
     status: '',
     loading: false,
     submitting: false,
@@ -54,6 +62,9 @@ export const useDiagnosisStore = defineStore('diagnosis', {
       this.nextAction = null;
       this.fallback = null;
       this.metadata = null;
+      this.reasoningSteps = [];
+      this.strengthSources = [];
+      this.weaknessSources = [];
       this.status = '';
       this.currentQuestionIndex = 0;
       this.answers = {};
@@ -66,6 +77,9 @@ export const useDiagnosisStore = defineStore('diagnosis', {
         this.nextAction = response.nextAction ?? null;
         this.fallback = response.fallback;
         this.metadata = response.metadata ?? null;
+        this.reasoningSteps = [];
+        this.strengthSources = [];
+        this.weaknessSources = [];
         this.status = response.status;
         return response;
       } catch (error) {
@@ -118,6 +132,9 @@ export const useDiagnosisStore = defineStore('diagnosis', {
         this.nextAction = response.nextAction ?? null;
         this.fallback = response.fallback;
         this.metadata = response.metadata ?? null;
+        this.reasoningSteps = response.reasoningSteps ?? [];
+        this.strengthSources = response.strengthSources ?? [];
+        this.weaknessSources = response.weaknessSources ?? [];
         this.status = response.status;
         return response;
       } catch (error) {
@@ -138,6 +155,9 @@ export const useDiagnosisStore = defineStore('diagnosis', {
       this.nextAction = null;
       this.fallback = null;
       this.metadata = null;
+      this.reasoningSteps = [];
+      this.strengthSources = [];
+      this.weaknessSources = [];
       this.status = '';
       this.loading = false;
       this.submitting = false;

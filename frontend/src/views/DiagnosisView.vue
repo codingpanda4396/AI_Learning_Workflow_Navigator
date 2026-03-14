@@ -152,6 +152,9 @@ onMounted(async () => {
       <DiagnosisResultView
         v-else-if="isResult && diagnosisStore.capabilityProfile"
         :result="diagnosisResult"
+        :reasoning-steps="diagnosisStore.reasoningSteps"
+        :strength-sources="diagnosisStore.strengthSources"
+        :weakness-sources="diagnosisStore.weaknessSources"
         @action="enterPlanFlow"
       />
 

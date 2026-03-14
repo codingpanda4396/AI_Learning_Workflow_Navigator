@@ -2,10 +2,14 @@
 import DiagnosisExplanationCard from '@/components/panels/DiagnosisExplanationCard.vue';
 import DiagnosisHeroCard from '@/components/panels/DiagnosisHeroCard.vue';
 import NextStepActionCard from '@/components/panels/NextStepActionCard.vue';
-import type { DiagnosisResultViewModel } from '@/types/diagnosis';
+import DiagnosisReasoningCard from '@/components/diagnosis/DiagnosisReasoningCard.vue';
+import type { DiagnosisEvidenceSource, DiagnosisReasoningStep, DiagnosisResultViewModel } from '@/types/diagnosis';
 
 defineProps<{
   result: DiagnosisResultViewModel;
+  reasoningSteps: DiagnosisReasoningStep[];
+  strengthSources: DiagnosisEvidenceSource[];
+  weaknessSources: DiagnosisEvidenceSource[];
   actionDisabled?: boolean;
 }>();
 
@@ -21,6 +25,11 @@ defineEmits<{
       :summary="result.summary"
       :strengths="result.strengths"
       :weaknesses="result.weaknesses"
+    />
+    <DiagnosisReasoningCard
+      :reasoning-steps="reasoningSteps"
+      :strength-sources="strengthSources"
+      :weakness-sources="weaknessSources"
     />
     <NextStepActionCard :suggestion="result.suggestion" :disabled="actionDisabled" @action="$emit('action')" />
   </div>

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import PageSection from '@/components/common/PageSection.vue';
+import PlanWhyStartHereCard from '@/components/learning-plan/PlanWhyStartHereCard.vue';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { useLearningPlanStore } from '@/stores/learningPlan';
 
@@ -233,21 +234,28 @@ onBeforeUnmount(() => {
         </PageSection>
 
         <PageSection eyebrow="SECTION 4" compact>
-          <details class="group rounded-[1.6rem] border border-slate-200 bg-slate-50 px-5 py-4">
-            <summary class="cursor-pointer list-none text-base font-semibold text-slate-950">
-              为什么这样安排
-            </summary>
-            <div class="mt-4 space-y-3 text-sm leading-7 text-slate-600">
-              <p v-if="preview.context.diagnosisSummary">{{ preview.context.diagnosisSummary }}</p>
-              <p v-for="reason in preview.reasons" :key="reason.key">
-                <span class="font-semibold text-slate-900">{{ reason.title || reason.label || 'AI 规划依据' }}：</span>
-                {{ reason.description }}
-              </p>
-              <p v-if="!preview.context.diagnosisSummary && !preview.reasons.length">
-                AI 已根据当前诊断结果选择最合适的起点，并优先给出能立即开始的任务。
-              </p>
-            </div>
-          </details>
+          <div class="space-y-3">
+            <PlanWhyStartHereCard
+              :why-start-here="preview.whyStartHere"
+              :key-weaknesses="preview.keyWeaknesses"
+              :priority-nodes="preview.priorityNodes"
+            />
+            <details class="group rounded-[1.6rem] border border-slate-200 bg-slate-50 px-5 py-4">
+              <summary class="cursor-pointer list-none text-base font-semibold text-slate-950">
+                为什么这样安排
+              </summary>
+              <div class="mt-4 space-y-3 text-sm leading-7 text-slate-600">
+                <p v-if="preview.context.diagnosisSummary">{{ preview.context.diagnosisSummary }}</p>
+                <p v-for="reason in preview.reasons" :key="reason.key">
+                  <span class="font-semibold text-slate-900">{{ reason.title || reason.label || 'AI 规划依据' }}：</span>
+                  {{ reason.description }}
+                </p>
+                <p v-if="!preview.context.diagnosisSummary && !preview.reasons.length">
+                  AI 已根据当前诊断结果选择最合适的起点，并优先给出能立即开始的任务。
+                </p>
+              </div>
+            </details>
+          </div>
         </PageSection>
       </template>
     </div>
