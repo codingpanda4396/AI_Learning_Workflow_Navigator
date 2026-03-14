@@ -15,6 +15,11 @@ public record LearningPlanPlanningContext(
     List<Integer> recentScores,
     List<String> weakPointLabels,
     String learnerProfileSummary,
-    PlanAdjustments adjustments
+    PlanAdjustments adjustments,
+    String requestedStrategy,
+    Integer requestedTimeBudgetMinutes,
+    String adjustmentReason,
+    String userFeedback,
+    Long basedOnPreviewId
 ) {
 }

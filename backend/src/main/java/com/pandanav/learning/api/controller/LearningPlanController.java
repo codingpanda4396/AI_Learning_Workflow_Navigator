@@ -1,9 +1,12 @@
 package com.pandanav.learning.api.controller;
 
 import com.pandanav.learning.api.dto.ApiEnvelope;
+import com.pandanav.learning.api.dto.plan.AdjustLearningPlanRequest;
+import com.pandanav.learning.api.dto.plan.AdjustLearningPlanResponse;
 import com.pandanav.learning.api.dto.plan.ConfirmLearningPlanResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
 import com.pandanav.learning.api.dto.plan.PreviewLearningPlanRequest;
+import com.pandanav.learning.application.command.AdjustLearningPlanCommand;
 import com.pandanav.learning.application.command.ConfirmLearningPlanCommand;
 import com.pandanav.learning.application.command.PreviewLearningPlanCommand;
 import com.pandanav.learning.application.service.learningplan.LearningPlanService;
@@ -40,7 +43,21 @@ public class LearningPlanController {
             request.goalText(),
             request.adjustments()
         ));
-        return ApiEnvelope.ok(response, response.contentSource() == null ? null : response.contentSource().code());
+        return ApiEnvelope.ok(response, response.contentSourceType());
+    }
+
+    @PostMapping("/adjust")
+    public ApiEnvelope<AdjustLearningPlanResponse> adjust(@Valid @RequestBody AdjustLearningPlanRequest request) {
+        AdjustLearningPlanResponse response = learningPlanService.adjust(new AdjustLearningPlanCommand(
+            UserContextHolder.getRequiredUserId(),
+            request.sessionId(),
+            request.previewId(),
+            request.strategy(),
+            request.reason(),
+            request.timeBudget(),
+            request.userFeedback()
+        ));
+        return ApiEnvelope.ok(response, response.result() == null ? null : response.result().contentSourceType());
     }
 
     @PostMapping("/{previewId}/confirm")

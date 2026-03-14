@@ -52,8 +52,8 @@ class CapabilityProfileQueryServiceTest {
         CapabilityProfileResponse response = service.getLatestProfile(88L, 10L);
         CapabilityProfileContext context = service.getContextForSession(88L, 10L);
 
-        assertEquals("BEGINNER", response.capabilityProfile().currentLevel());
-        assertEquals("INTERVIEW", response.capabilityProfile().goalOrientation());
+        assertEquals("BEGINNER", response.capabilityProfile().currentLevel().code());
+        assertEquals("INTERVIEW", response.capabilityProfile().goalOrientation().code());
         assertEquals("每周 4-6 小时", context.timeBudget());
         assertEquals("PRACTICE_FIRST", context.learningPreference());
         assertEquals("系统会先补基础，再逐步增加训练。", response.insights().planExplanation());

@@ -119,7 +119,12 @@ public class PlanningContextAssembler {
             recentScores,
             weakLabels,
             learnerProfileSummary,
-            adjustments
+            adjustments,
+            null,
+            null,
+            null,
+            null,
+            null
         );
     }
 

@@ -1,9 +1,11 @@
 package com.pandanav.learning.application.service.learningplan;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pandanav.learning.api.dto.plan.AdjustLearningPlanResponse;
 import com.pandanav.learning.api.dto.plan.ConfirmLearningPlanResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsDto;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
+import com.pandanav.learning.application.command.AdjustLearningPlanCommand;
 import com.pandanav.learning.application.command.ConfirmLearningPlanCommand;
 import com.pandanav.learning.application.command.PreviewLearningPlanCommand;
 import com.pandanav.learning.domain.enums.LearningPlanStatus;
@@ -15,6 +17,7 @@ import com.pandanav.learning.domain.model.LearningPlanPreview;
 import com.pandanav.learning.domain.model.LearningPlanSummary;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.PlanAdjustments;
+import com.pandanav.learning.domain.model.PlanAlternative;
 import com.pandanav.learning.domain.model.PlanPathNode;
 import com.pandanav.learning.domain.model.PlanReason;
 import com.pandanav.learning.domain.model.PlanTaskPreview;
@@ -65,13 +68,70 @@ class LearningPlanServiceTest {
         assertEquals("88", response.previewId());
         assertEquals("LLM", response.contentSource().code());
         assertEquals("tree basics", response.summary().recommendedStartNode().nodeName());
-        assertNotNull(response.whyStartHere());
-        assertEquals(2, response.priorityNodes().size());
-        assertNotNull(response.keyWeaknesses());
+        assertNotNull(response.recommendation());
+        assertNotNull(response.learnerSnapshot());
+        assertEquals("HIGH", response.confidence());
     }
 
     @Test
-    void shouldConfirmLearningPlanIntoSessionAndTasks() throws Exception {
+    void shouldAdjustLearningPlan() {
+        PlanningContextAssembler assembler = mock(PlanningContextAssembler.class);
+        LearningPlanOrchestrator orchestrator = mock(LearningPlanOrchestrator.class);
+        LearningPlanRepository repository = mock(LearningPlanRepository.class);
+        SessionRepository sessionRepository = mock(SessionRepository.class);
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        LearningPlan stored = new LearningPlan();
+        stored.setId(99L);
+        stored.setUserId(1L);
+        stored.setGoalId("goal-1");
+        stored.setDiagnosisId("diag-1");
+        stored.setStatus(LearningPlanStatus.DRAFT);
+        stored.setSummaryJson(write(objectMapper, samplePreview().summary()));
+        stored.setReasonsJson(write(objectMapper, samplePreview().reasons()));
+        stored.setFocusesJson(write(objectMapper, samplePreview().focuses()));
+        stored.setPathPreviewJson(write(objectMapper, samplePreview().pathPreview()));
+        stored.setTaskPreviewJson(write(objectMapper, samplePreview().taskPreview()));
+        stored.setAdjustmentsJson(write(objectMapper, samplePreview().adjustments()));
+        stored.setPlanningContextJson(write(objectMapper, sampleContext()));
+
+        when(repository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.of(stored));
+        when(repository.save(any())).thenAnswer(invocation -> {
+            LearningPlan plan = invocation.getArgument(0);
+            plan.setId(100L);
+            return plan;
+        });
+        when(orchestrator.preview(any())).thenReturn(new LearningPlanOrchestrator.OrchestratedPlan(samplePreview(), null, PlanSource.LLM, false, List.of()));
+
+        LearningPlanService service = new LearningPlanService(
+            assembler,
+            orchestrator,
+            repository,
+            new LearningPlanExplanationAssembler(),
+            sessionRepository,
+            mock(TaskRepository.class),
+            mock(ConceptNodeRepository.class),
+            objectiveStrategy(),
+            objectMapper
+        );
+
+        AdjustLearningPlanResponse response = service.adjust(new AdjustLearningPlanCommand(
+            1L,
+            null,
+            99L,
+            "FAST_TRACK",
+            "Need a faster route",
+            10,
+            "TIME_LIMITED"
+        ));
+
+        assertNotNull(response.result());
+        assertNotNull(response.changeSummary());
+        assertTrueContains(response.adjustmentReason(), "FAST_TRACK");
+    }
+
+    @Test
+    void shouldConfirmLearningPlanIntoSessionAndTasks() {
         PlanningContextAssembler assembler = mock(PlanningContextAssembler.class);
         LearningPlanOrchestrator orchestrator = mock(LearningPlanOrchestrator.class);
         LearningPlanRepository repository = mock(LearningPlanRepository.class);
@@ -86,13 +146,13 @@ class LearningPlanServiceTest {
         stored.setGoalId("goal-1");
         stored.setDiagnosisId("diag-1");
         stored.setStatus(LearningPlanStatus.DRAFT);
-        stored.setSummaryJson(objectMapper.writeValueAsString(samplePreview().summary()));
-        stored.setReasonsJson(objectMapper.writeValueAsString(samplePreview().reasons()));
-        stored.setFocusesJson(objectMapper.writeValueAsString(samplePreview().focuses()));
-        stored.setPathPreviewJson(objectMapper.writeValueAsString(samplePreview().pathPreview()));
-        stored.setTaskPreviewJson(objectMapper.writeValueAsString(samplePreview().taskPreview()));
-        stored.setAdjustmentsJson(objectMapper.writeValueAsString(samplePreview().adjustments()));
-        stored.setPlanningContextJson(objectMapper.writeValueAsString(sampleContext()));
+        stored.setSummaryJson(write(objectMapper, samplePreview().summary()));
+        stored.setReasonsJson(write(objectMapper, samplePreview().reasons()));
+        stored.setFocusesJson(write(objectMapper, samplePreview().focuses()));
+        stored.setPathPreviewJson(write(objectMapper, samplePreview().pathPreview()));
+        stored.setTaskPreviewJson(write(objectMapper, samplePreview().taskPreview()));
+        stored.setAdjustmentsJson(write(objectMapper, samplePreview().adjustments()));
+        stored.setPlanningContextJson(write(objectMapper, sampleContext()));
 
         when(repository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.of(stored));
         when(conceptNodeRepository.findByChapterIdOrderByOrderNoAsc("chapter-1")).thenReturn(List.of(
@@ -172,14 +232,46 @@ class LearningPlanServiceTest {
             List.of(55, 68),
             List.of("tree basics"),
             "Current weak point is tree basics",
-            PlanAdjustments.defaults()
+            PlanAdjustments.defaults(),
+            null,
+            null,
+            null,
+            null,
+            null
         );
     }
 
     private LearningPlanPreview samplePreview() {
         return new LearningPlanPreview(
-            new LearningPlanSummary("Strengthen basics before advancing", "101", "tree basics", "STANDARD", 36, 2, 4),
-            List.of(new PlanReason("START_POINT", "Start with the basics", "The learner still needs a stronger prerequisite foundation before moving ahead.")),
+            new LearningPlanSummary(
+                "Strengthen basics before advancing",
+                "101",
+                "tree basics",
+                "STANDARD",
+                36,
+                2,
+                4,
+                "Start from the biggest blocker first",
+                "This prerequisite still blocks later traversal work.",
+                "HIGH",
+                "tree basics",
+                "Map the structure",
+                8,
+                "HIGH",
+                List.of(
+                    new PlanAlternative("FAST_TRACK", "Fast track", "Move faster", "Higher risk"),
+                    new PlanAlternative("FOUNDATION_FIRST", "Foundation first", "Stay stable", "Slower"),
+                    new PlanAlternative("PRACTICE_FIRST", "Practice first", "Expose gaps", "Can feel harder"),
+                    new PlanAlternative("COMPRESSED_10_MIN", "10 minute version", "Shrink current step", "Needs follow-up")
+                ),
+                List.of("Reduce backtracking", "Unlock later traversal"),
+                List.of("binary tree traversal"),
+                "Move into traversal understanding",
+                "LLM",
+                false,
+                List.of()
+            ),
+            List.of(new PlanReason("WEAKNESS_MATCH", "Start with the basics", "The learner still needs a stronger prerequisite foundation before moving ahead.")),
             List.of("solidify tree basics", "connect traversal to the basics"),
             List.of(
                 new PlanPathNode("101", "tree basics", 1, 40, "LEARNING", true, 18, "prerequisite core"),
@@ -201,5 +293,19 @@ class LearningPlanServiceTest {
         node.setName(name);
         node.setOrderNo(orderNo);
         return node;
+    }
+
+    private String write(ObjectMapper objectMapper, Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    private void assertTrueContains(String text, String expected) {
+        if (text == null || !text.contains(expected)) {
+            throw new AssertionError("Expected [" + text + "] to contain [" + expected + "]");
+        }
     }
 }
