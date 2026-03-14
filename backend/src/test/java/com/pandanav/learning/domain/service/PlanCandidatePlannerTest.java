@@ -83,6 +83,8 @@ class PlanCandidatePlannerTest {
         assertEquals(4, candidateSet.actionTemplates().size());
         assertFalse(candidateSet.strategies().isEmpty());
         assertFalse(candidateSet.intensities().isEmpty());
+        List<String> contextNodeIds = context.nodes().stream().map(LearningPlanContextNode::planNodeId).toList();
+        assertTrue(candidateSet.entries().stream().allMatch(item -> contextNodeIds.contains(item.conceptId())));
 
         LlmPlanDecisionResult decision = defaultDecisionFactory.create(learnerState, candidateSet);
         assertNotNull(decision.selectedConceptId());

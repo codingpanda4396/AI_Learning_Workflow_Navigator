@@ -83,6 +83,14 @@ class LearningPlanServiceTest {
         assertNotNull(response.learnerSnapshot());
         assertNotNull(response.recommendedStrategy());
         assertEquals("FOUNDATION_FIRST", response.recommendedStrategy().code());
+        assertNotNull(response.status());
+        assertNotNull(response.previewOnly());
+        assertNotNull(response.committed());
+        assertNotNull(response.nextActions());
+        assertEquals(3, response.nextActions().size());
+        assertNotNull(response.adjustments());
+        assertNotNull(response.startGuide());
+        assertNotNull(response.traceId());
     }
 
     @Test
