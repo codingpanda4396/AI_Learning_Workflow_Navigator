@@ -19,6 +19,7 @@ import type {
 import type {
   LearningPlanPreview,
   LearningPlanRequest,
+  LearningPlanPersonalization,
   PathDifficulty,
   PathMasteryStatus,
   PlanAdjustments,
@@ -336,6 +337,36 @@ function normalizePlanStageStatuses(value: unknown): PlanStageStatus[] {
   }).filter((item) => item.stage);
 }
 
+function normalizePersonalization(value: unknown): LearningPlanPersonalization | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const row = value as Record<string, unknown>;
+  const rawWhatISaw = row.what_i_saw ?? row.whatISaw;
+  const whatISaw = (Array.isArray(rawWhatISaw) ? rawWhatISaw : [])
+    .map((item: unknown) => {
+      if (typeof item === 'string') {
+        return item.trim();
+      }
+      if (item && typeof item === 'object') {
+        const text = (item as Record<string, unknown>).text ?? (item as Record<string, unknown>).label ?? (item as Record<string, unknown>).description;
+        return String(text ?? '').trim();
+      }
+      return String(item ?? '').trim();
+    })
+    .filter(Boolean);
+
+  return {
+    learnerState: String(row.learner_state ?? row.learnerState ?? '').trim() || undefined,
+    whatISaw,
+    whyThisPlanFitsYou: String(row.why_this_plan_fits_you ?? row.whyThisPlanFitsYou ?? '').trim() || undefined,
+    mainRiskIfSkip: String(row.main_risk_if_skip ?? row.mainRiskIfSkip ?? '').trim() || undefined,
+    thisRoundBoundary: String(row.this_round_boundary ?? row.thisRoundBoundary ?? '').trim() || undefined,
+    adaptationHint: String(row.adaptation_hint ?? row.adaptationHint ?? '').trim() || undefined,
+  };
+}
+
 function normalizeWeakPoint(item: Record<string, unknown>): WeakPointItem {
   return {
     nodeId: toNumber(item.node_id ?? item.nodeId) ?? 0,
@@ -627,6 +658,7 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
   const benefits = normalizePlanBenefits(data.benefits ?? data.outcomes ?? data.immediate_gains ?? data.immediateGains);
   const nextUnlocks = normalizePlanUnlocks(data.next_unlocks ?? data.nextUnlocks);
   const stageStatuses = normalizePlanStageStatuses(data.stage_statuses ?? data.stageStatuses);
+  const personalization = normalizePersonalization(data.personalization);
 
   return {
     id: String(data.id ?? data.preview_id ?? data.previewId ?? data.plan_id ?? data.planId ?? ''),
@@ -810,5 +842,7 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     currentFocus: String(data.current_focus ?? data.currentFocus ?? ''),
     nextStep: String(data.next_step ?? data.nextStep ?? ''),
     stageStatuses,
+    nextStepLabel: String(data.next_step_label ?? data.nextStepLabel ?? ''),
+    personalization,
   };
 }

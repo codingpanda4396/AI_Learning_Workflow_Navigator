@@ -3,11 +3,12 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import DecisionReasonPanel from '@/components/plan/DecisionReasonPanel.vue';
-import LearningPathCard from '@/components/plan/LearningPathCard.vue';
-import RecommendationHeroCard from '@/components/plan/RecommendationHeroCard.vue';
+import AdaptationHintCard from '@/components/plan/AdaptationHintCard.vue';
+import AlternativeStrategiesPanel from '@/components/plan/AlternativeStrategiesPanel.vue';
+import CurrentStepCard from '@/components/plan/CurrentStepCard.vue';
+import PersonalizedInsightCard from '@/components/plan/PersonalizedInsightCard.vue';
 import StrategyAdjustPanel from '@/components/plan/StrategyAdjustPanel.vue';
-import StrategyPanel from '@/components/plan/StrategyPanel.vue';
+import WhyThisPlanCard from '@/components/plan/WhyThisPlanCard.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
 import InfoHint from '@/components/ui/InfoHint.vue';
@@ -15,7 +16,7 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { useLearningPlanStore } from '@/stores/learningPlan';
 import type { PlanAdjustments, StrategyAdjustAction } from '@/types/learningPlan';
-import { adaptLearningPlanPreview } from '@/utils/learningPlanAdapter';
+import { buildLearningPlanViewModel } from '@/utils/buildLearningPlanViewModel';
 
 const route = useRoute();
 const router = useRouter();
@@ -24,10 +25,11 @@ const learningPlanStore = useLearningPlanStore();
 const preview = computed(() => learningPlanStore.preview);
 const error = computed(() => learningPlanStore.error);
 const strategyNote = computed(() => learningPlanStore.strategyNote);
-const navigatorVm = computed(() => (preview.value ? adaptLearningPlanPreview(preview.value) : null));
+const planVm = computed(() => (preview.value ? buildLearningPlanViewModel(preview.value) : null));
 
 const adjustPanelOpen = ref(false);
 const adjustPanelMode = ref<'strategy' | 'disagree'>('strategy');
+const alternativesOpen = ref(false);
 
 const explainPrompts = [
   { key: 'why-first', label: '为什么我要先学这个？' },
@@ -187,39 +189,72 @@ onBeforeUnmount(() => {
         <AppButton @click="loadPlan">重新生成学习规划</AppButton>
       </div>
 
-      <template v-else-if="preview && navigatorVm">
-        <RecommendationHeroCard
-          :source-label="navigatorVm.hero.sourceLabel"
-          :source-type="navigatorVm.hero.sourceType"
-          :recommendation-headline="navigatorVm.hero.recommendationHeadline"
-          :recommendation-reason="navigatorVm.hero.recommendationReason"
-          :current-task-title="navigatorVm.hero.currentTaskTitle"
-          :estimated-minutes="navigatorVm.hero.estimatedMinutes"
-          :current-status="navigatorVm.hero.currentStatus"
-          :loading="learningPlanStore.confirming"
-          @start="startLearning"
-          @adjust="openAdjustPanel('strategy')"
-          @mastered="onMastered"
-        />
+      <template v-else-if="preview && planVm">
+        <section class="space-y-5">
+          <PersonalizedInsightCard
+            :title="planVm.learnerInsightTitle"
+            :learner-state="planVm.learnerState"
+          />
 
-        <DecisionReasonPanel :cards="navigatorVm.reasonCards" />
+          <WhyThisPlanCard
+            :title="planVm.whySectionTitle"
+            :what-i-saw="planVm.whatISaw"
+            :why-this-plan-fits-you="planVm.whyThisPlanFitsYou"
+          />
 
-        <LearningPathCard
-          :current-focus="navigatorVm.currentFocus"
-          :current-status="navigatorVm.hero.currentStatus"
-          :next-step="navigatorVm.nextStep"
-          :stages="navigatorVm.pathStages"
-        />
+          <CurrentStepCard
+            :title="planVm.stepSectionTitle"
+            :task-title="planVm.taskTitle"
+            :estimated-minutes-text="planVm.estimatedMinutesText"
+            :this-round-boundary="planVm.thisRoundBoundary"
+            :next-step-label="planVm.nextStepLabel"
+            :cta-hint="planVm.ctaHint"
+            :has-alternatives="planVm.alternatives.length > 0"
+            :loading="learningPlanStore.confirming"
+            @start="startLearning"
+            @show-alternatives="alternativesOpen = true"
+          />
 
-        <StrategyPanel
-          :prompts="explainPrompts"
-          :strategy-note="strategyNote || ''"
-          @adjust="openAdjustPanel('strategy')"
-          @disagree="openAdjustPanel('disagree')"
-          @ask="onAskAi"
-        />
+          <AdaptationHintCard
+            :title="planVm.riskTitle"
+            :main-risk-if-skip="planVm.mainRiskIfSkip"
+            :adaptation-hint="planVm.adaptationHint"
+          />
 
-        <InfoHint v-if="error" tone="danger">{{ error }}</InfoHint>
+          <AlternativeStrategiesPanel
+            :alternatives="planVm.alternatives"
+            :open-by-default="alternativesOpen"
+          />
+
+          <section class="rounded-[24px] border border-slate-200 bg-white px-5 py-5">
+            <p class="text-sm font-semibold text-slate-900">需要微调推荐时</p>
+            <div class="mt-3 flex flex-wrap gap-3">
+              <AppButton variant="secondary" @click="openAdjustPanel('strategy')">调整学习节奏</AppButton>
+              <AppButton variant="ghost" @click="openAdjustPanel('disagree')">我不认同这个建议</AppButton>
+              <button
+                type="button"
+                class="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-100"
+                @click="onMastered"
+              >
+                我已经会了
+              </button>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button
+                v-for="item in explainPrompts"
+                :key="item.key"
+                type="button"
+                class="rounded-full border border-slate-200 px-3 py-2 text-xs text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                @click="onAskAi(item.label)"
+              >
+                {{ item.label }}
+              </button>
+            </div>
+            <p v-if="strategyNote" class="mt-3 text-sm leading-7 text-slate-600">{{ strategyNote }}</p>
+          </section>
+
+          <InfoHint v-if="error" tone="danger">{{ error }}</InfoHint>
+        </section>
 
         <StrategyAdjustPanel
           :open="adjustPanelOpen"

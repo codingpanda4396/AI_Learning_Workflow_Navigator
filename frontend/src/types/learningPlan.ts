@@ -90,6 +90,15 @@ export interface PlanUnlock {
   description: string;
 }
 
+export interface LearningPlanPersonalization {
+  learnerState?: string;
+  whatISaw: string[];
+  whyThisPlanFitsYou?: string;
+  mainRiskIfSkip?: string;
+  thisRoundBoundary?: string;
+  adaptationHint?: string;
+}
+
 export interface PlanStageStatus {
   stage: LearningStage;
   label?: string;
@@ -156,6 +165,8 @@ export interface LearningPlanPreview {
   currentFocus?: string;
   nextStep?: string;
   stageStatuses?: PlanStageStatus[];
+  nextStepLabel?: string;
+  personalization?: LearningPlanPersonalization;
 }
 
 export interface PlanConfirmResult {
