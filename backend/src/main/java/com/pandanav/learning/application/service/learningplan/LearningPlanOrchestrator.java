@@ -6,7 +6,7 @@ import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.model.LearningPlanLlmResult;
 import com.pandanav.learning.domain.llm.model.LlmCallContext;
-import com.pandanav.learning.domain.llm.model.LlmFallbackReason;
+import com.pandanav.learning.domain.llm.model.LlmFailureType;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
@@ -21,8 +21,8 @@ import com.pandanav.learning.domain.service.LearningPlanSchemaValidationExceptio
 import com.pandanav.learning.domain.service.RuleBasedPlanBuilder;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
-import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -43,9 +43,7 @@ public class LearningPlanOrchestrator {
     private final LlmJsonParser llmJsonParser;
     private final LlmProperties llmProperties;
     private final LlmCallLogger llmCallLogger;
-    private final LlmFailureClassifier llmFailureClassifier;
     private final LearnerStateInterpreter learnerStateInterpreter;
-    private final RuleBasedPersonalizedNarrativeGenerator ruleBasedNarrativeGenerator;
     private final LlmEnhancedPersonalizedNarrativeGenerator llmEnhancedNarrativeGenerator;
 
     public LearningPlanOrchestrator(
@@ -56,9 +54,7 @@ public class LearningPlanOrchestrator {
         LlmJsonParser llmJsonParser,
         LlmProperties llmProperties,
         LlmCallLogger llmCallLogger,
-        LlmFailureClassifier llmFailureClassifier,
         LearnerStateInterpreter learnerStateInterpreter,
-        RuleBasedPersonalizedNarrativeGenerator ruleBasedNarrativeGenerator,
         LlmEnhancedPersonalizedNarrativeGenerator llmEnhancedNarrativeGenerator
     ) {
         this.ruleBasedPlanBuilder = ruleBasedPlanBuilder;
@@ -68,9 +64,7 @@ public class LearningPlanOrchestrator {
         this.llmJsonParser = llmJsonParser;
         this.llmProperties = llmProperties;
         this.llmCallLogger = llmCallLogger;
-        this.llmFailureClassifier = llmFailureClassifier;
         this.learnerStateInterpreter = learnerStateInterpreter;
-        this.ruleBasedNarrativeGenerator = ruleBasedNarrativeGenerator;
         this.llmEnhancedNarrativeGenerator = llmEnhancedNarrativeGenerator;
     }
 
@@ -92,15 +86,16 @@ public class LearningPlanOrchestrator {
 
         if (!llmProperties.isEnabled() || !llmProperties.isReady()) {
             log.warn(
-                "LearningPlan LLM unavailable, using fallback. {} enabled={} ready={}",
+                "LearningPlan LLM unavailable. {} enabled={} ready={}",
                 logCtx, llmProperties.isEnabled(), llmProperties.isReady()
             );
-            llmCallLogger.logFallback(
+            llmCallLogger.logFailure(
                 LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel()),
-                LlmFallbackReason.UNKNOWN_ERROR,
+                LlmFailureType.API_ERROR,
+                "LLM_NOT_READY",
                 -1
             );
-            return fallback(context, learnerState, rulePreview, null, List.of("LLM_NOT_READY"));
+            throw new AiGenerationException("PLAN_PREVIEW", "LLM_NOT_READY");
         }
 
         Instant start = Instant.now();
@@ -116,17 +111,17 @@ public class LearningPlanOrchestrator {
                     llmResult.usage() == null ? "unknown" : String.valueOf(llmResult.usage().tokenOutput()),
                     prompt.maxOutputTokens() == null ? "unknown" : String.valueOf(prompt.maxOutputTokens())
                 );
-                llmCallLogger.logStructuredOutputFailure(llmContext, LlmFallbackReason.OUTPUT_TRUNCATED.name(), details);
+                llmCallLogger.logStructuredOutputFailure(llmContext, "OUTPUT_TRUNCATED", details);
                 log.warn(
-                    "LearningPlan LLM output truncated, fallback hit. {} traceId={} requestId={} model={} details={}",
+                    "LearningPlan LLM output truncated. {} traceId={} requestId={} model={} details={}",
                     logCtx,
                     llmContext.traceId(),
                     llmContext.requestId(),
                     llmContext.model(),
                     details
                 );
-                llmCallLogger.logFallback(llmContext, LlmFallbackReason.OUTPUT_TRUNCATED, LlmObservabilityHelper.elapsedMs(start));
-                return fallback(context, learnerState, rulePreview, traceId(llmResult), List.of(LlmFallbackReason.OUTPUT_TRUNCATED.name()));
+                llmCallLogger.logFailure(llmContext, LlmFailureType.VALIDATION_ERROR, details, LlmObservabilityHelper.elapsedMs(start));
+                throw new AiGenerationException("PLAN_PREVIEW", "OUTPUT_TRUNCATED");
             }
 
             JsonNode json = llmJsonParser.parse(llmResult.text(), llmContext);
@@ -137,16 +132,16 @@ public class LearningPlanOrchestrator {
             errors.addAll(learningPlanResultValidator.validate(normalized, rulePreview));
             if (!errors.isEmpty()) {
                 log.warn(
-                    "LearningPlan LLM schema validation failed, fallback hit. {} traceId={} requestId={} model={} errors={}",
+                    "LearningPlan LLM schema validation failed. {} traceId={} requestId={} model={} errors={}",
                     logCtx,
                     llmContext.traceId(),
                     llmContext.requestId(),
                     llmContext.model(),
                     errors
                 );
-                llmCallLogger.logStructuredOutputFailure(llmContext, LlmFallbackReason.JSON_SCHEMA_MISMATCH.name(), String.join("; ", errors));
-                llmCallLogger.logFallback(llmContext, LlmFallbackReason.JSON_SCHEMA_MISMATCH, LlmObservabilityHelper.elapsedMs(start));
-                return fallback(context, learnerState, rulePreview, traceId(llmResult), List.of(LlmFallbackReason.JSON_SCHEMA_MISMATCH.name()));
+                llmCallLogger.logStructuredOutputFailure(llmContext, "JSON_SCHEMA_MISMATCH", String.join("; ", errors));
+                llmCallLogger.logFailure(llmContext, LlmFailureType.VALIDATION_ERROR, String.join("; ", errors), LlmObservabilityHelper.elapsedMs(start));
+                throw new AiGenerationException("PLAN_PREVIEW", "JSON_SCHEMA_MISMATCH");
             }
 
             LearningPlanPreview merged = merge(rulePreview, normalized, "LLM", false, List.of());
@@ -175,22 +170,22 @@ public class LearningPlanOrchestrator {
             );
         } catch (LearningPlanSchemaValidationException ex) {
             LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
-            llmCallLogger.logStructuredOutputFailure(llmContext, ex.fallbackReason().name(), String.join("; ", ex.errors()));
+            llmCallLogger.logStructuredOutputFailure(llmContext, "JSON_SCHEMA_MISMATCH", String.join("; ", ex.errors()));
             log.warn(
-                "LearningPlan schema mismatch, fallback hit. {} traceId={} requestId={} model={} errors={}",
+                "LearningPlan schema mismatch. {} traceId={} requestId={} model={} errors={}",
                 logCtx,
                 llmContext.traceId(),
                 llmContext.requestId(),
                 llmContext.model(),
                 ex.errors()
             );
-            llmCallLogger.logFallback(llmContext, ex.fallbackReason(), LlmObservabilityHelper.elapsedMs(start));
-            return fallback(context, learnerState, rulePreview, null, List.of(ex.fallbackReason().name()));
+            llmCallLogger.logFailure(llmContext, LlmFailureType.VALIDATION_ERROR, String.join("; ", ex.errors()), LlmObservabilityHelper.elapsedMs(start));
+            throw new AiGenerationException("PLAN_PREVIEW", "JSON_SCHEMA_MISMATCH");
         } catch (LlmJsonParseException ex) {
             LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
-            llmCallLogger.logStructuredOutputFailure(llmContext, ex.fallbackReason().name(), ex.diagnosticSummary());
+            llmCallLogger.logStructuredOutputFailure(llmContext, "JSON_PARSE_FAILED", ex.diagnosticSummary());
             log.warn(
-                "LearningPlan JSON parse failed, fallback hit. {} traceId={} requestId={} model={} reason={} diagnostics={}",
+                "LearningPlan JSON parse failed. {} traceId={} requestId={} model={} reason={} diagnostics={}",
                 logCtx,
                 llmContext.traceId(),
                 llmContext.requestId(),
@@ -198,56 +193,24 @@ public class LearningPlanOrchestrator {
                 ex.fallbackReason(),
                 ex.diagnosticSummary()
             );
-            llmCallLogger.logFallback(llmContext, ex.fallbackReason(), LlmObservabilityHelper.elapsedMs(start));
-            return fallback(context, learnerState, rulePreview, null, List.of(ex.fallbackReason().name()));
+            llmCallLogger.logFailure(llmContext, LlmFailureType.JSON_PARSE_ERROR, ex.diagnosticSummary(), LlmObservabilityHelper.elapsedMs(start));
+            throw new AiGenerationException("PLAN_PREVIEW", "JSON_PARSE_FAILED");
+        } catch (AiGenerationException ex) {
+            throw ex;
         } catch (Exception ex) {
-            LlmFallbackReason reason = llmFailureClassifier.classifyFallback(ex);
             LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
             log.warn(
-                "LearningPlan LLM call failed, fallback hit. {} traceId={} requestId={} model={} reason={} error={}",
+                "LearningPlan LLM call failed. {} traceId={} requestId={} model={} error={}",
                 logCtx,
                 llmContext.traceId(),
                 llmContext.requestId(),
                 llmContext.model(),
-                reason,
                 ex.getMessage(),
                 ex
             );
-            llmCallLogger.logFallback(llmContext, reason, LlmObservabilityHelper.elapsedMs(start));
-            return fallback(context, learnerState, rulePreview, null, List.of(reason.name()));
+            llmCallLogger.logFailure(llmContext, LlmFailureType.UNKNOWN_ERROR, ex.getMessage(), LlmObservabilityHelper.elapsedMs(start));
+            throw new AiGenerationException("PLAN_PREVIEW", "UNKNOWN_ERROR");
         }
-    }
-
-    private OrchestratedPlan fallback(
-        LearningPlanPlanningContext context,
-        LearnerStateSnapshot learnerState,
-        LearningPlanPreview rulePreview,
-        String llmTraceId,
-        List<String> fallbackReasons
-    ) {
-        log.warn("LearningPlan fallback applied. fallbackReasons={}", fallbackReasons);
-        LearningPlanPreview preview = withDecisionMetadata(rulePreview, "FALLBACK", true, fallbackReasons);
-        DecisionPlan decisionPlan = buildDecisionPlan(preview);
-        PersonalizedNarrative narrative = ruleBasedNarrativeGenerator.generate(context, learnerState, decisionPlan, preview);
-        log.info(
-            "Narrative generated. source={} usedLlm={} fallbackReason={}",
-            NarrativeSource.FALLBACK,
-            false,
-            String.join(",", fallbackReasons)
-        );
-        return new OrchestratedPlan(
-            preview,
-            llmTraceId,
-            PlanSource.RULE_FALLBACK,
-            true,
-            fallbackReasons,
-            learnerState,
-            decisionPlan,
-            narrative,
-            NarrativeSource.FALLBACK,
-            false,
-            String.join(",", fallbackReasons)
-        );
     }
 
     private DecisionPlan buildDecisionPlan(LearningPlanPreview preview) {
@@ -303,45 +266,6 @@ public class LearningPlanOrchestrator {
             rulePreview.pathPreview(),
             parsed.taskPreview(),
             rulePreview.adjustments()
-        );
-    }
-
-    private LearningPlanPreview withDecisionMetadata(
-        LearningPlanPreview preview,
-        String contentSourceType,
-        boolean fallbackApplied,
-        List<String> fallbackReasons
-    ) {
-        LearningPlanSummary summary = preview.summary();
-        return new LearningPlanPreview(
-            new LearningPlanSummary(
-                summary.headline(),
-                summary.recommendedStartNodeId(),
-                summary.recommendedStartNodeName(),
-                summary.recommendedPace(),
-                summary.estimatedMinutes(),
-                summary.estimatedNodeCount(),
-                summary.estimatedStageCount(),
-                summary.subtitle(),
-                summary.whyNow(),
-                summary.confidence(),
-                summary.currentFocusLabel(),
-                summary.taskTitle(),
-                summary.taskEstimatedMinutes(),
-                summary.taskPriority(),
-                summary.alternatives(),
-                summary.benefits(),
-                summary.nextUnlocks(),
-                summary.nextStepLabel(),
-                contentSourceType,
-                fallbackApplied,
-                fallbackReasons
-            ),
-            preview.reasons(),
-            preview.focuses(),
-            preview.pathPreview(),
-            preview.taskPreview(),
-            preview.adjustments()
         );
     }
 

@@ -2,9 +2,6 @@ package com.pandanav.learning.application.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.application.service.practice.LlmPracticeGenerator;
-import com.pandanav.learning.application.service.practice.PracticeDraftItem;
-import com.pandanav.learning.application.service.practice.PracticeGeneratorResult;
-import com.pandanav.learning.application.service.practice.RulePracticeGenerator;
 import com.pandanav.learning.domain.enums.PracticeQuestionType;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
@@ -21,8 +18,7 @@ import com.pandanav.learning.domain.repository.PracticeSubmissionRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
-import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
-import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,11 +27,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -60,8 +54,6 @@ class PracticeServiceImplTest {
     @Mock
     private LearningEventRepository learningEventRepository;
     @Mock
-    private RulePracticeGenerator rulePracticeGenerator;
-    @Mock
     private LlmPracticeGenerator llmPracticeGenerator;
     @Mock
     private PracticeFeedbackReportGenerator practiceFeedbackReportGenerator;
@@ -85,15 +77,12 @@ class PracticeServiceImplTest {
             sessionRepository,
             conceptNodeRepository,
             learningEventRepository,
-            rulePracticeGenerator,
             llmPracticeGenerator,
             practiceFeedbackReportGenerator,
             practiceQuizAsyncService,
             masteryService,
             llmProperties,
-            new ObjectMapper(),
-            mock(LlmCallLogger.class),
-            new LlmFailureClassifier()
+            new ObjectMapper()
         );
     }
 
@@ -111,11 +100,10 @@ class PracticeServiceImplTest {
 
         assertEquals(1, result.size());
         verify(llmPracticeGenerator, never()).generate(any());
-        verify(rulePracticeGenerator, never()).generate(any());
     }
 
     @Test
-    void shouldFallbackToRuleWhenLlmFails() {
+    void shouldFailWhenLlmFails() {
         Long sessionId = 201L;
         Long taskId = 101L;
         Long userId = 11L;
@@ -124,7 +112,6 @@ class PracticeServiceImplTest {
         llmProperties.setBaseUrl("http://localhost");
         llmProperties.setApiKey("test-key");
         llmProperties.setModel("test-model");
-        llmProperties.setFallbackToRule(true);
 
         when(taskRepository.findByIdAndUserPk(taskId, userId)).thenReturn(Optional.of(trainingTask(taskId, sessionId)));
         when(sessionRepository.findByIdAndUserPk(sessionId, userId)).thenReturn(Optional.of(new LearningSession()));
@@ -135,38 +122,13 @@ class PracticeServiceImplTest {
         node.setName("TCP Handshake");
         when(conceptNodeRepository.findById(301L)).thenReturn(Optional.of(node));
 
-        when(llmPracticeGenerator.generate(any())).thenThrow(new RuntimeException("llm broken"));
-        when(rulePracticeGenerator.generate(any())).thenReturn(new PracticeGeneratorResult(
-            List.of(
-                draft(PracticeQuestionType.SINGLE_CHOICE),
-                draft(PracticeQuestionType.TRUE_FALSE),
-                draft(PracticeQuestionType.SHORT_ANSWER)
-            ),
-            "RULE",
-            false,
-            false,
-            "rule-v1",
-            null,
-            null,
-            null,
-            null,
-            null
-        ));
+        when(llmPracticeGenerator.generate(any())).thenThrow(new AiGenerationException("PRACTICE_GENERATION", "UNKNOWN_ERROR"));
 
-        AtomicLong idGen = new AtomicLong(1000L);
-        when(practiceRepository.save(any(PracticeItem.class))).thenAnswer(invocation -> {
-            PracticeItem item = invocation.getArgument(0);
-            item.setId(idGen.incrementAndGet());
-            return item;
-        });
-
-        List<PracticeItem> items = practiceService.getOrCreatePracticeItems(sessionId, taskId, userId);
-
-        assertEquals(3, items.size());
-        assertEquals("RULE", items.get(0).getSource().name());
+        org.junit.jupiter.api.Assertions.assertThrows(
+            AiGenerationException.class,
+            () -> practiceService.getOrCreatePracticeItems(sessionId, taskId, userId)
+        );
         verify(llmPracticeGenerator).generate(any());
-        verify(rulePracticeGenerator).generate(any());
-        verify(learningEventRepository).save(any());
     }
 
     private Task trainingTask(Long taskId, Long sessionId) {
@@ -187,16 +149,5 @@ class PracticeServiceImplTest {
         item.setQuestionType(PracticeQuestionType.SINGLE_CHOICE);
         item.setStem("existing");
         return item;
-    }
-
-    private PracticeDraftItem draft(PracticeQuestionType questionType) {
-        return new PracticeDraftItem(
-            questionType,
-            "stem",
-            List.of("A", "B"),
-            "A",
-            "explanation",
-            "EASY"
-        );
     }
 }

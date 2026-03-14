@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.domain.enums.TutorMessageRole;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.domain.llm.model.LlmCallMetrics;
-import com.pandanav.learning.domain.llm.model.LlmFailureType;
 import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.TutorPromptContext;
 import com.pandanav.learning.domain.model.TutorMessage;
@@ -13,6 +12,7 @@ import com.pandanav.learning.infrastructure.config.TutorLlmProperties;
 import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
 import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -33,7 +33,6 @@ import java.util.function.Consumer;
 
 public class RealTutorProvider implements TutorProvider {
 
-    private static final String FALLBACK_MESSAGE = "当前 AI 导师暂时不可用，请先描述你卡住的步骤，我会继续帮助你。";
     private static final Logger log = LoggerFactory.getLogger(RealTutorProvider.class);
 
     private final RestClient restClient;
@@ -74,12 +73,7 @@ public class RealTutorProvider implements TutorProvider {
                 ? null
                 : response.path("choices").path(0).path("message").path("content").asText(null);
             if (content == null || content.isBlank()) {
-                llmCallLogger.logFallback(
-                    LlmObservabilityHelper.context(LlmStage.TUTOR_REPLY, properties.getModel()),
-                    com.pandanav.learning.domain.llm.model.LlmFallbackReason.EMPTY_RESPONSE,
-                    LlmObservabilityHelper.elapsedMs(start)
-                );
-                return fallbackReply();
+                throw new AiGenerationException("TUTOR_REPLY", "EMPTY_RESPONSE");
             }
             llmCallLogger.logSuccess(
                 LlmObservabilityHelper.context(LlmStage.TUTOR_REPLY, properties.getModel()),
@@ -93,13 +87,11 @@ public class RealTutorProvider implements TutorProvider {
                 ex.getMessage(),
                 LlmObservabilityHelper.elapsedMs(start)
             );
-            llmCallLogger.logFallback(
-                LlmObservabilityHelper.context(LlmStage.TUTOR_REPLY, properties.getModel()),
-                llmFailureClassifier.classifyFallback(ex),
-                LlmObservabilityHelper.elapsedMs(start)
-            );
             log.warn("Tutor LLM call failed. provider={}, model={}, reason={}", properties.getProvider(), properties.getModel(), ex.getMessage());
-            return fallbackReply();
+            if (ex instanceof AiGenerationException aiEx) {
+                throw aiEx;
+            }
+            throw new AiGenerationException("TUTOR_REPLY", "UNKNOWN_ERROR");
         }
     }
 
@@ -127,7 +119,7 @@ public class RealTutorProvider implements TutorProvider {
                     return null;
                 });
             if (fullContent.length() == 0) {
-                return fallbackReply();
+                throw new AiGenerationException("TUTOR_REPLY", "EMPTY_RESPONSE");
             }
             llmCallLogger.logSuccess(
                 LlmObservabilityHelper.context(LlmStage.TUTOR_REPLY, properties.getModel()),
@@ -141,12 +133,11 @@ public class RealTutorProvider implements TutorProvider {
                 ex.getMessage(),
                 LlmObservabilityHelper.elapsedMs(start)
             );
-            log.warn("Tutor LLM stream failed, fallback to sync. provider={}, model={}, reason={}", properties.getProvider(), properties.getModel(), ex.getMessage());
-            TutorProviderReply fallback = generateReply(request);
-            if (onDelta != null && fallback != null && fallback.content() != null && !fallback.content().isBlank() && fullContent.length() == 0) {
-                onDelta.accept(fallback.content());
+            log.warn("Tutor LLM stream failed. provider={}, model={}, reason={}", properties.getProvider(), properties.getModel(), ex.getMessage());
+            if (ex instanceof AiGenerationException aiEx) {
+                throw aiEx;
             }
-            return fallback;
+            throw new AiGenerationException("TUTOR_REPLY", "UNKNOWN_ERROR");
         }
     }
 
@@ -227,10 +218,6 @@ public class RealTutorProvider implements TutorProvider {
         } catch (Exception ex) {
             throw new IllegalStateException("Tutor stream parse failed: " + ex.getMessage(), ex);
         }
-    }
-
-    private TutorProviderReply fallbackReply() {
-        return new TutorProviderReply(FALLBACK_MESSAGE, properties.getProvider(), properties.getModel());
     }
 
     private String safe(String input) {

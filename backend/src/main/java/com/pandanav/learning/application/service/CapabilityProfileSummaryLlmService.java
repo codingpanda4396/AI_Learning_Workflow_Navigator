@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.enums.DiagnosisDimension;
 import com.pandanav.learning.domain.llm.LlmGateway;
-import com.pandanav.learning.domain.llm.model.LlmFallbackReason;
+import com.pandanav.learning.domain.llm.model.LlmCallContext;
+import com.pandanav.learning.domain.llm.model.LlmCallMetrics;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmStage;
@@ -14,8 +15,8 @@ import com.pandanav.learning.domain.model.CapabilityProfileDraft;
 import com.pandanav.learning.domain.model.CapabilityProfileSummaryCopy;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
-import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -29,21 +30,18 @@ public class CapabilityProfileSummaryLlmService {
     private final LlmGateway llmGateway;
     private final LlmJsonParser llmJsonParser;
     private final LlmCallLogger llmCallLogger;
-    private final LlmFailureClassifier llmFailureClassifier;
 
     public CapabilityProfileSummaryLlmService(
         LlmGateway llmGateway,
         LlmJsonParser llmJsonParser,
-        LlmCallLogger llmCallLogger,
-        LlmFailureClassifier llmFailureClassifier
+        LlmCallLogger llmCallLogger
     ) {
         this.llmGateway = llmGateway;
         this.llmJsonParser = llmJsonParser;
         this.llmCallLogger = llmCallLogger;
-        this.llmFailureClassifier = llmFailureClassifier;
     }
 
-    public CapabilityProfileSummaryResult generate(
+    public CapabilityProfileSummaryCopy generate(
         LearningSession session,
         CapabilityProfileDraft draft,
         Map<DiagnosisDimension, List<String>> answersByDimension
@@ -85,34 +83,47 @@ public class CapabilityProfileSummaryLlmService {
                 null,
                 400
             );
+            LlmCallContext startContext = LlmObservabilityHelper.context(LlmStage.CAPABILITY_SUMMARY, null);
+            llmCallLogger.logStart(startContext);
             LlmTextResult result = llmGateway.generate(LlmStage.CAPABILITY_SUMMARY, prompt);
+            LlmCallContext successContext = LlmObservabilityHelper.context(LlmStage.CAPABILITY_SUMMARY, result.model());
             JsonNode root = llmJsonParser.parse(result.text());
             String summary = root.path("summary").asText("").trim();
             String planExplanation = root.path("planExplanation").asText("").trim();
-            if (summary.isBlank() || planExplanation.isBlank()) {
-                llmCallLogger.logFallback(
-                    LlmObservabilityHelper.context(LlmStage.CAPABILITY_SUMMARY, result.model()),
-                    LlmFallbackReason.MISSING_REQUIRED_FIELDS,
-                    LlmObservabilityHelper.elapsedMs(start)
-                );
-                return new CapabilityProfileSummaryResult(null, true, List.of(LlmFallbackReason.MISSING_REQUIRED_FIELDS.name()));
-            }
-            return new CapabilityProfileSummaryResult(
-                new CapabilityProfileSummaryCopy(summary, planExplanation),
-                false,
-                List.of()
+            CapabilityProfileSummaryCopy copy = new CapabilityProfileSummaryCopy(summary, planExplanation);
+            validate(copy);
+            llmCallLogger.logSuccess(
+                successContext,
+                toMetrics(result, start),
+                result.usage() == null ? null : result.usage().finishReason(),
+                result.usage() != null && result.usage().truncated()
             );
-        } catch (Exception ex) {
-            llmCallLogger.logFallback(
+            return copy;
+        } catch (AiGenerationException ex) {
+            llmCallLogger.logFailure(
                 LlmObservabilityHelper.context(LlmStage.CAPABILITY_SUMMARY, null),
-                llmFailureClassifier.classifyFallback(ex),
+                com.pandanav.learning.domain.llm.model.LlmFailureType.UNKNOWN_ERROR,
+                ex.getMessage(),
                 LlmObservabilityHelper.elapsedMs(start)
             );
-            return new CapabilityProfileSummaryResult(
-                null,
-                true,
-                List.of(llmFailureClassifier.classifyFallback(ex).name())
+            throw ex;
+        } catch (Exception ex) {
+            if (isTimeout(ex)) {
+                llmCallLogger.logFailure(
+                    LlmObservabilityHelper.context(LlmStage.CAPABILITY_SUMMARY, null),
+                    com.pandanav.learning.domain.llm.model.LlmFailureType.TIMEOUT,
+                    ex.getMessage(),
+                    LlmObservabilityHelper.elapsedMs(start)
+                );
+                throw new AiGenerationException("CAPABILITY_PROFILE_SUMMARY", "TIMEOUT");
+            }
+            llmCallLogger.logFailure(
+                LlmObservabilityHelper.context(LlmStage.CAPABILITY_SUMMARY, null),
+                com.pandanav.learning.domain.llm.model.LlmFailureType.UNKNOWN_ERROR,
+                ex.getMessage(),
+                LlmObservabilityHelper.elapsedMs(start)
             );
+            throw new AiGenerationException("CAPABILITY_PROFILE_SUMMARY", "UNKNOWN_ERROR");
         }
     }
 
@@ -120,10 +131,34 @@ public class CapabilityProfileSummaryLlmService {
         return value == null || value.isBlank() ? "" : value.trim();
     }
 
-    public record CapabilityProfileSummaryResult(
-        CapabilityProfileSummaryCopy copy,
-        boolean fallbackApplied,
-        List<String> fallbackReasons
-    ) {
+    private void validate(CapabilityProfileSummaryCopy summary) {
+        if (summary == null) {
+            throw new AiGenerationException("CAPABILITY_PROFILE_SUMMARY", "NULL_RESULT");
+        }
+        if (summary.summary() == null || summary.summary().isBlank()) {
+            throw new AiGenerationException("CAPABILITY_PROFILE_SUMMARY", "EMPTY_CONTENT");
+        }
+        if (summary.planExplanation() == null || summary.planExplanation().isBlank()) {
+            throw new AiGenerationException("CAPABILITY_PROFILE_SUMMARY", "MISSING_REQUIRED_FIELDS");
+        }
+    }
+
+    private LlmCallMetrics toMetrics(LlmTextResult result, Instant start) {
+        if (result == null || result.usage() == null) {
+            return new LlmCallMetrics(LlmObservabilityHelper.elapsedMs(start), -1, -1, -1);
+        }
+        return new LlmCallMetrics(
+            LlmObservabilityHelper.elapsedMs(start),
+            result.usage().tokenInput() == null ? -1 : result.usage().tokenInput(),
+            result.usage().tokenOutput() == null ? -1 : result.usage().tokenOutput(),
+            result.usage().totalTokens() == null ? -1 : result.usage().totalTokens()
+        );
+    }
+
+    private boolean isTimeout(Exception ex) {
+        String message = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase();
+        return message.contains("timeout")
+            || message.contains("timed out")
+            || ex.getClass().getSimpleName().toLowerCase().contains("timeout");
     }
 }

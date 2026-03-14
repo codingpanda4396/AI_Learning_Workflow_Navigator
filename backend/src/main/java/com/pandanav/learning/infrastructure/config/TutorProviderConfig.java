@@ -1,8 +1,8 @@
 package com.pandanav.learning.infrastructure.config;
 
-import com.pandanav.learning.application.service.tutor.MockTutorProvider;
 import com.pandanav.learning.application.service.tutor.RealTutorProvider;
 import com.pandanav.learning.application.service.tutor.TutorProvider;
+import com.pandanav.learning.application.service.tutor.UnavailableTutorProvider;
 import com.pandanav.learning.domain.llm.PromptTemplateProvider;
 import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
 import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
@@ -25,7 +25,7 @@ public class TutorProviderConfig {
         LlmFailureClassifier llmFailureClassifier
     ) {
         if (!properties.isReady()) {
-            return new MockTutorProvider();
+            return new UnavailableTutorProvider();
         }
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();

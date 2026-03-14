@@ -2,7 +2,6 @@ package com.pandanav.learning.application.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.application.service.practice.LlmPracticeGenerator;
-import com.pandanav.learning.application.service.practice.RulePracticeGenerator;
 import com.pandanav.learning.domain.enums.PracticeItemSource;
 import com.pandanav.learning.domain.enums.PracticeItemStatus;
 import com.pandanav.learning.domain.enums.PracticeQuestionType;
@@ -24,8 +23,6 @@ import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.ConflictException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
-import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
-import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +36,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,8 +60,6 @@ class PracticeSubmissionServiceTest {
     @Mock
     private LearningEventRepository learningEventRepository;
     @Mock
-    private RulePracticeGenerator rulePracticeGenerator;
-    @Mock
     private LlmPracticeGenerator llmPracticeGenerator;
     @Mock
     private PracticeFeedbackReportGenerator practiceFeedbackReportGenerator;
@@ -87,15 +81,12 @@ class PracticeSubmissionServiceTest {
             sessionRepository,
             conceptNodeRepository,
             learningEventRepository,
-            rulePracticeGenerator,
             llmPracticeGenerator,
             practiceFeedbackReportGenerator,
             practiceQuizAsyncService,
             masteryService,
             new LlmProperties(),
-            new ObjectMapper(),
-            mock(LlmCallLogger.class),
-            new LlmFailureClassifier()
+            new ObjectMapper()
         );
     }
 

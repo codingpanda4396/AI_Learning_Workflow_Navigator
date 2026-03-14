@@ -12,12 +12,11 @@ import com.pandanav.learning.domain.llm.model.LlmProfileConfig;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
-import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.domain.llm.model.PracticeGenerationContext;
 import com.pandanav.learning.domain.model.LlmCallLog;
 import com.pandanav.learning.domain.repository.LlmCallLogRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
-import com.pandanav.learning.infrastructure.exception.InternalServerException;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -72,13 +71,13 @@ public class LlmPracticeGenerator implements PracticeGenerator {
             Integer threshold = llmProperties.resolveProfile(LlmInvocationProfile.LIGHT_JSON_TASK, prompt.promptKey())
                 .completionWarningThreshold();
             if (completionTokens != null && threshold != null && completionTokens > threshold) {
-                throw new InternalServerException("practice generation completion tokens exceed threshold");
+                throw new AiGenerationException("PRACTICE_GENERATION", "OUTPUT_TOKEN_LIMIT_EXCEEDED");
             }
             JsonNode parsed = llmJsonParser.parse(result.text());
             List<String> errors = promptOutputValidator.validatePracticeGeneration(parsed);
             if (!errors.isEmpty()) {
                 saveAudit("FAILED", result, prompt, parsed, false, false);
-                throw new InternalServerException("Invalid practice generation output: " + String.join("; ", errors));
+                throw new AiGenerationException("PRACTICE_GENERATION", "JSON_SCHEMA_MISMATCH");
             }
 
             List<PracticeDraftItem> items = new ArrayList<>();
@@ -96,6 +95,7 @@ public class LlmPracticeGenerator implements PracticeGenerator {
                     item.path("difficulty").asText()
                 ));
             }
+            validate(items);
 
             saveAudit("SUCCEEDED", result, prompt, parsed, true, true);
             return new PracticeGeneratorResult(
@@ -110,7 +110,12 @@ public class LlmPracticeGenerator implements PracticeGenerator {
                 result.usage() == null ? null : result.usage().tokenOutput(),
                 result.usage() == null ? null : result.usage().latencyMs()
             );
+        } catch (AiGenerationException ex) {
+            throw ex;
         } catch (Exception ex) {
+            if (isTimeout(ex)) {
+                throw new AiGenerationException("PRACTICE_GENERATION", "TIMEOUT");
+            }
             if (result == null) {
                 llmCallLogRepository.save(new LlmCallLog(
                     null,
@@ -136,7 +141,7 @@ public class LlmPracticeGenerator implements PracticeGenerator {
                     false
                 ));
             }
-            throw ex;
+            throw new AiGenerationException("PRACTICE_GENERATION", "UNKNOWN_ERROR");
         }
     }
 
@@ -175,9 +180,30 @@ public class LlmPracticeGenerator implements PracticeGenerator {
 
     private PracticeQuestionType mapType(String raw) {
         if (raw == null || raw.isBlank()) {
-            throw new InternalServerException("question_type is missing.");
+            throw new AiGenerationException("PRACTICE_GENERATION", "MISSING_REQUIRED_FIELDS");
         }
         return PracticeQuestionType.valueOf(raw.trim().toUpperCase());
+    }
+
+    private void validate(List<PracticeDraftItem> items) {
+        if (items == null || items.isEmpty()) {
+            throw new AiGenerationException("PRACTICE_GENERATION", "EMPTY_CONTENT");
+        }
+        for (PracticeDraftItem item : items) {
+            if (item == null
+                || item.stem() == null || item.stem().isBlank()
+                || item.standardAnswer() == null || item.standardAnswer().isBlank()
+                || item.explanation() == null || item.explanation().isBlank()) {
+                throw new AiGenerationException("PRACTICE_GENERATION", "MISSING_REQUIRED_FIELDS");
+            }
+        }
+    }
+
+    private boolean isTimeout(Exception ex) {
+        String message = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase();
+        return message.contains("timeout")
+            || message.contains("timed out")
+            || ex.getClass().getSimpleName().toLowerCase().contains("timeout");
     }
 
     private String toJson(JsonNode node) {

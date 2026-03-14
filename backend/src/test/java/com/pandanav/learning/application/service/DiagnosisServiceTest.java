@@ -24,9 +24,9 @@ import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.service.CapabilityProfileBuilder;
 import com.pandanav.learning.domain.service.DiagnosisQuestionCopyFactory;
 import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
-import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -71,11 +71,10 @@ class DiagnosisServiceTest {
             diagnosisAnswerRepository,
             capabilityProfileRepository,
             new DiagnosisTemplateFactory(new DiagnosisQuestionCopyFactory()),
-            new DiagnosisQuestionCopyLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class), new LlmFailureClassifier()),
+            new DiagnosisQuestionCopyLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class)),
             new CapabilityProfileBuilder(),
             new DiagnosisExplanationAssembler(objectMapper),
-            new CapabilityProfileSummaryGenerator(),
-            new CapabilityProfileSummaryLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class), new LlmFailureClassifier()),
+            new CapabilityProfileSummaryLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class)),
             objectMapper
         );
     }
@@ -180,25 +179,18 @@ class DiagnosisServiceTest {
     }
 
     @Test
-    void createDiagnosisSessionShouldFallbackWhenLlmFails() {
+    void createDiagnosisSessionShouldFailWhenLlmFails() {
         LearningSession session = learningSession(101L, 10L);
         DiagnosisSession savedDiagnosis = new DiagnosisSession();
         savedDiagnosis.setId(501L);
 
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
         when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class))).thenThrow(new RuntimeException("llm down"));
-        when(diagnosisSessionRepository.save(any(DiagnosisSession.class))).thenAnswer(invocation -> {
-            DiagnosisSession diagnosis = invocation.getArgument(0);
-            diagnosis.setId(savedDiagnosis.getId());
-            return diagnosis;
-        });
-
-        CreateDiagnosisSessionResponse response = diagnosisService.createDiagnosisSession(101L, 10L);
-
-        assertEquals(5, response.questions().size());
-        assertEquals(4, response.questions().get(0).options().size());
-        assertTrue(response.fallback().applied());
-        assertEquals("RULE_FALLBACK", response.fallback().contentSource());
+        AiGenerationException ex = assertThrows(
+            AiGenerationException.class,
+            () -> diagnosisService.createDiagnosisSession(101L, 10L)
+        );
+        assertEquals("DIAGNOSIS_QUESTION_COPY", ex.getStage());
     }
 
     @Test
@@ -245,7 +237,7 @@ class DiagnosisServiceTest {
     }
 
     @Test
-    void submitDiagnosisSessionShouldFallbackWhenLlmFails() {
+    void submitDiagnosisSessionShouldFailWhenLlmFails() {
         LearningSession session = learningSession(101L, 10L);
         DiagnosisSession diagnosisSession = new DiagnosisSession();
         diagnosisSession.setId(501L);
@@ -256,21 +248,13 @@ class DiagnosisServiceTest {
 
         when(diagnosisSessionRepository.findByIdAndUserPk(501L, 10L)).thenReturn(Optional.of(diagnosisSession));
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
-        when(capabilityProfileRepository.findLatestBySessionId(101L)).thenReturn(Optional.empty());
         when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class))).thenThrow(new RuntimeException("llm down"));
-        when(capabilityProfileRepository.save(any(CapabilityProfile.class))).thenAnswer(invocation -> {
-            CapabilityProfile profile = invocation.getArgument(0);
-            profile.setId(701L);
-            return profile;
-        });
 
-        SubmitDiagnosisSessionResponse response = diagnosisService.submitDiagnosisSession(501L, buildSubmitRequest(), 10L);
-        assertTrue(response.fallback().applied());
-        assertEquals("RULE_FALLBACK", response.fallback().contentSource());
-        assertTrue(response.insights().summary().length() > 0);
-        assertTrue(response.reasoningSteps().size() >= 1);
-        assertTrue(response.strengthSources().size() >= 1);
-        assertTrue(response.weaknessSources().size() >= 1);
+        AiGenerationException ex = assertThrows(
+            AiGenerationException.class,
+            () -> diagnosisService.submitDiagnosisSession(501L, buildSubmitRequest(), 10L)
+        );
+        assertEquals("CAPABILITY_PROFILE_SUMMARY", ex.getStage());
     }
 
     @Test

@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-@EnableConfigurationProperties(LlmProperties.class)
+@EnableConfigurationProperties({LlmProperties.class, AiProperties.class})
 public class LlmConfig {
 
     private static final Logger log = LoggerFactory.getLogger(LlmConfig.class);
@@ -21,13 +21,15 @@ public class LlmConfig {
     @Bean
     public LlmGateway llmGateway(
         LlmProperties properties,
+        AiProperties aiProperties,
         RestClient.Builder restClientBuilder,
         LlmCallLogger llmCallLogger,
         LlmFailureClassifier llmFailureClassifier
     ) {
+        log.info("AI runtime mode={}", aiProperties.getMode());
         if (!properties.isReady()) {
             log.warn(
-                "LLM is NOT ready, using DisabledLlmGateway. Diagnosis/capability-profile will use fallback. " +
+                "LLM is NOT ready, using DisabledLlmGateway. AI generation requests will fail with controlled error. " +
                 "Check: app.llm.enabled={}, baseUrl={}, apiKey={}, model={}",
                 properties.isEnabled(),
                 properties.getBaseUrl() != null && !properties.getBaseUrl().isBlank() ? "(set)" : "(empty)",

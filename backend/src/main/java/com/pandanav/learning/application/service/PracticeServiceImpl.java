@@ -6,7 +6,6 @@ import com.pandanav.learning.application.service.practice.LlmPracticeGenerator;
 import com.pandanav.learning.application.service.practice.PracticeDraftItem;
 import com.pandanav.learning.application.service.practice.PracticeGeneratorRequest;
 import com.pandanav.learning.application.service.practice.PracticeGeneratorResult;
-import com.pandanav.learning.application.service.practice.RulePracticeGenerator;
 import com.pandanav.learning.domain.enums.ErrorTag;
 import com.pandanav.learning.domain.enums.PracticeFeedbackAction;
 import com.pandanav.learning.domain.enums.PracticeItemSource;
@@ -15,7 +14,6 @@ import com.pandanav.learning.domain.enums.PracticeQuizStatus;
 import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
-import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningEvent;
 import com.pandanav.learning.domain.model.PracticeFeedbackReport;
@@ -32,9 +30,7 @@ import com.pandanav.learning.domain.repository.PracticeSubmissionRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
-import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
-import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
-import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.exception.ConflictException;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
@@ -67,15 +63,12 @@ public class PracticeServiceImpl implements PracticeService {
     private final SessionRepository sessionRepository;
     private final ConceptNodeRepository conceptNodeRepository;
     private final LearningEventRepository learningEventRepository;
-    private final RulePracticeGenerator rulePracticeGenerator;
     private final LlmPracticeGenerator llmPracticeGenerator;
     private final PracticeFeedbackReportGenerator practiceFeedbackReportGenerator;
     private final PracticeQuizAsyncService practiceQuizAsyncService;
     private final MasteryService masteryService;
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
-    private final LlmCallLogger llmCallLogger;
-    private final LlmFailureClassifier llmFailureClassifier;
 
     public PracticeServiceImpl(
         PracticeRepository practiceRepository,
@@ -86,15 +79,12 @@ public class PracticeServiceImpl implements PracticeService {
         SessionRepository sessionRepository,
         ConceptNodeRepository conceptNodeRepository,
         LearningEventRepository learningEventRepository,
-        RulePracticeGenerator rulePracticeGenerator,
         LlmPracticeGenerator llmPracticeGenerator,
         PracticeFeedbackReportGenerator practiceFeedbackReportGenerator,
         PracticeQuizAsyncService practiceQuizAsyncService,
         MasteryService masteryService,
         LlmProperties llmProperties,
-        ObjectMapper objectMapper,
-        LlmCallLogger llmCallLogger,
-        LlmFailureClassifier llmFailureClassifier
+        ObjectMapper objectMapper
     ) {
         this.practiceRepository = practiceRepository;
         this.practiceSubmissionRepository = practiceSubmissionRepository;
@@ -104,15 +94,12 @@ public class PracticeServiceImpl implements PracticeService {
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
         this.learningEventRepository = learningEventRepository;
-        this.rulePracticeGenerator = rulePracticeGenerator;
         this.llmPracticeGenerator = llmPracticeGenerator;
         this.practiceFeedbackReportGenerator = practiceFeedbackReportGenerator;
         this.practiceQuizAsyncService = practiceQuizAsyncService;
         this.masteryService = masteryService;
         this.llmProperties = llmProperties;
         this.objectMapper = objectMapper;
-        this.llmCallLogger = llmCallLogger;
-        this.llmFailureClassifier = llmFailureClassifier;
     }
 
     @Override
@@ -210,7 +197,7 @@ public class PracticeServiceImpl implements PracticeService {
             task.getOutputJson()
         );
 
-        PracticeGeneratorResult result = generateWithFallback(request);
+        PracticeGeneratorResult result = generateWithControlledFailure(request);
         List<PracticeItem> saved = saveGeneratedItems(null, task, userId, result);
         logGeneration(sessionId, userId, task, result, saved.size());
 
@@ -282,51 +269,17 @@ public class PracticeServiceImpl implements PracticeService {
         return practiceSubmissionRepository.findBySessionIdAndTaskIdAndUserPk(sessionId, taskId, userId);
     }
 
-    private PracticeGeneratorResult generateWithFallback(PracticeGeneratorRequest request) {
-        if (llmProperties.isReady() && llmProperties.isEnabled()) {
-            try {
-                PracticeGeneratorResult result = llmPracticeGenerator.generate(request);
-                log.info(
-                    "practice generation succeeded via LLM: sessionId={}, taskId={}, userId={}, items={}, provider={}, model={}, promptVersion={}",
-                    request.sessionId(), request.taskId(), request.userId(), result.items().size(),
-                    result.provider(), result.model(), result.promptVersion()
-                );
-                return result;
-            } catch (Exception ex) {
-                if (!llmProperties.isFallbackToRule()) {
-                    throw ex;
-                }
-                llmCallLogger.logFallback(
-                    LlmObservabilityHelper.context(LlmStage.PRACTICE_GENERATION, llmProperties.getModel()),
-                    llmFailureClassifier.classifyFallback(ex),
-                    -1
-                );
-                log.warn(
-                    "practice generation fell back to RULE after LLM failure: sessionId={}, taskId={}, userId={}, reason={}",
-                    request.sessionId(), request.taskId(), request.userId(), sanitizeReason(ex.getMessage())
-                );
-                PracticeGeneratorResult fallback = rulePracticeGenerator.generate(request);
-                return new PracticeGeneratorResult(
-                    fallback.items(),
-                    fallback.source(),
-                    true,
-                    false,
-                    fallback.promptVersion(),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
-                );
-            }
+    private PracticeGeneratorResult generateWithControlledFailure(PracticeGeneratorRequest request) {
+        if (!llmProperties.isEnabled() || !llmProperties.isReady()) {
+            throw new AiGenerationException("PRACTICE_GENERATION", "LLM_NOT_READY");
         }
-
-        PracticeGeneratorResult fallback = rulePracticeGenerator.generate(request);
+        PracticeGeneratorResult result = llmPracticeGenerator.generate(request);
         log.info(
-            "practice generation used RULE directly: sessionId={}, taskId={}, userId={}, llmEnabled={}, llmReady={}",
-            request.sessionId(), request.taskId(), request.userId(), llmProperties.isEnabled(), llmProperties.isReady()
+            "practice generation succeeded via LLM: sessionId={}, taskId={}, userId={}, items={}, provider={}, model={}, promptVersion={}",
+            request.sessionId(), request.taskId(), request.userId(), result.items().size(),
+            result.provider(), result.model(), result.promptVersion()
         );
-        return fallback;
+        return result;
     }
 
     void generateQuizInternal(Long quizId, Long sessionId, Long taskId, Long userId) {
@@ -344,7 +297,7 @@ public class PracticeServiceImpl implements PracticeService {
                 task.getObjective(),
                 task.getOutputJson()
             );
-            PracticeGeneratorResult result = generateWithFallback(request);
+            PracticeGeneratorResult result = generateWithControlledFailure(request);
             List<PracticeItem> saved = saveGeneratedItems(quizId, task, userId, result);
             practiceQuizRepository.markGenerated(quizId, saved.size(), result.source(), result.promptVersion());
             sessionRepository.updateStatus(sessionId, SessionStatus.PRACTICING);

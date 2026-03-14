@@ -59,7 +59,6 @@ public class DiagnosisService {
     private final DiagnosisQuestionCopyLlmService diagnosisQuestionCopyLlmService;
     private final CapabilityProfileBuilder capabilityProfileBuilder;
     private final DiagnosisExplanationAssembler diagnosisExplanationAssembler;
-    private final CapabilityProfileSummaryGenerator capabilityProfileSummaryGenerator;
     private final CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService;
     private final ObjectMapper objectMapper;
 
@@ -72,7 +71,6 @@ public class DiagnosisService {
         DiagnosisQuestionCopyLlmService diagnosisQuestionCopyLlmService,
         CapabilityProfileBuilder capabilityProfileBuilder,
         DiagnosisExplanationAssembler diagnosisExplanationAssembler,
-        CapabilityProfileSummaryGenerator capabilityProfileSummaryGenerator,
         CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService,
         ObjectMapper objectMapper
     ) {
@@ -84,7 +82,6 @@ public class DiagnosisService {
         this.diagnosisQuestionCopyLlmService = diagnosisQuestionCopyLlmService;
         this.capabilityProfileBuilder = capabilityProfileBuilder;
         this.diagnosisExplanationAssembler = diagnosisExplanationAssembler;
-        this.capabilityProfileSummaryGenerator = capabilityProfileSummaryGenerator;
         this.capabilityProfileSummaryLlmService = capabilityProfileSummaryLlmService;
         this.objectMapper = objectMapper;
     }
@@ -93,10 +90,8 @@ public class DiagnosisService {
         LearningSession session = sessionRepository.findByIdAndUserPk(sessionId, userId)
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
 
-        List<DiagnosisQuestion> fallbackQuestions = diagnosisTemplateFactory.buildQuestions(session);
-        DiagnosisQuestionCopyLlmService.DiagnosisQuestionCopyResult copyResult =
-            diagnosisQuestionCopyLlmService.enhanceQuestions(session, fallbackQuestions);
-        List<DiagnosisQuestion> questions = copyResult.questions();
+        List<DiagnosisQuestion> sourceQuestions = diagnosisTemplateFactory.buildQuestions(session);
+        List<DiagnosisQuestion> questions = diagnosisQuestionCopyLlmService.enhanceQuestions(session, sourceQuestions);
 
         DiagnosisSession diagnosisSession = new DiagnosisSession();
         diagnosisSession.setLearningSessionId(session.getId());
@@ -112,7 +107,7 @@ public class DiagnosisService {
             DiagnosisStatus.GENERATED.name(),
             toQuestionDtos(questions),
             buildNextAction(session.getId(), saved.getId()),
-            fallback(copyResult.fallbackApplied(), copyResult.fallbackReasons(), copyResult.fallbackApplied() ? "RULE_FALLBACK" : "LLM"),
+            sourceMeta(false, List.of(), "LLM"),
             new DiagnosisMetadataDto(questions.size(), null, null)
         );
     }
@@ -145,10 +140,8 @@ public class DiagnosisService {
             ));
 
         CapabilityProfileDraft draft = capabilityProfileBuilder.build(answerCodesByDimension);
-        CapabilityProfileSummaryCopy fallbackSummary = capabilityProfileSummaryGenerator.buildFallback(draft);
-        CapabilityProfileSummaryLlmService.CapabilityProfileSummaryResult summaryResult =
+        CapabilityProfileSummaryCopy summaryCopy =
             capabilityProfileSummaryLlmService.generate(learningSession, draft, answerCodesByDimension);
-        CapabilityProfileSummaryCopy summaryCopy = summaryResult.copy() == null ? fallbackSummary : summaryResult.copy();
 
         CapabilityProfile profile = new CapabilityProfile();
         profile.setLearningSessionId(learningSession.getId());
@@ -189,7 +182,7 @@ public class DiagnosisService {
             toProfileDto(savedProfile),
             new DiagnosisInsightsDto(savedProfile.getSummaryText(), savedProfile.getPlanExplanation()),
             buildNextAction(learningSession.getId(), diagnosisSession.getId()),
-            fallback(summaryResult.fallbackApplied(), summaryResult.fallbackReasons(), summaryResult.fallbackApplied() ? "RULE_FALLBACK" : "LLM"),
+            sourceMeta(false, List.of(), "LLM"),
             new DiagnosisMetadataDto(questions.size(), answers.size(), savedProfile.getVersion()),
             explanation.reasoningSteps(),
             explanation.strengthSources(),
@@ -208,7 +201,7 @@ public class DiagnosisService {
         );
     }
 
-    private DiagnosisFallbackDto fallback(boolean applied, List<String> reasons, String contentSource) {
+    private DiagnosisFallbackDto sourceMeta(boolean applied, List<String> reasons, String contentSource) {
         return new DiagnosisFallbackDto(applied, reasons == null ? List.of() : reasons, contentSource);
     }
 

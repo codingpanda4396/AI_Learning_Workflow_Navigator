@@ -3,7 +3,8 @@ package com.pandanav.learning.application.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.llm.LlmGateway;
-import com.pandanav.learning.domain.llm.model.LlmFallbackReason;
+import com.pandanav.learning.domain.llm.model.LlmCallContext;
+import com.pandanav.learning.domain.llm.model.LlmCallMetrics;
 import com.pandanav.learning.domain.llm.model.LlmInvocationProfile;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
 import com.pandanav.learning.domain.llm.model.LlmStage;
@@ -13,8 +14,8 @@ import com.pandanav.learning.domain.model.DiagnosisQuestion;
 import com.pandanav.learning.domain.model.DiagnosisQuestionOption;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
-import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import com.pandanav.learning.infrastructure.observability.LlmObservabilityHelper;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -30,21 +31,18 @@ public class DiagnosisQuestionCopyLlmService {
     private final LlmGateway llmGateway;
     private final LlmJsonParser llmJsonParser;
     private final LlmCallLogger llmCallLogger;
-    private final LlmFailureClassifier llmFailureClassifier;
 
     public DiagnosisQuestionCopyLlmService(
         LlmGateway llmGateway,
         LlmJsonParser llmJsonParser,
-        LlmCallLogger llmCallLogger,
-        LlmFailureClassifier llmFailureClassifier
+        LlmCallLogger llmCallLogger
     ) {
         this.llmGateway = llmGateway;
         this.llmJsonParser = llmJsonParser;
         this.llmCallLogger = llmCallLogger;
-        this.llmFailureClassifier = llmFailureClassifier;
     }
 
-    public DiagnosisQuestionCopyResult enhanceQuestions(LearningSession session, List<DiagnosisQuestion> fallbackQuestions) {
+    public List<DiagnosisQuestion> enhanceQuestions(LearningSession session, List<DiagnosisQuestion> sourceQuestions) {
         Instant start = Instant.now();
         try {
             LlmPrompt prompt = new LlmPrompt(
@@ -88,21 +86,24 @@ public class DiagnosisQuestionCopyLlmService {
                     safe(session.getGoalText()),
                     safe(session.getCourseId()),
                     safe(session.getChapterId()),
-                    serializeQuestions(fallbackQuestions)
+                    serializeQuestions(sourceQuestions)
                 ),
                 "{\"questions\":[{\"questionId\":\"\",\"title\":\"\",\"description\":\"\",\"placeholder\":\"\",\"submitHint\":\"\",\"sectionLabel\":\"\",\"options\":[{\"code\":\"\",\"label\":\"\"}]}]}",
                 "short_json_only",
                 null,
                 800
             );
+            LlmCallContext startContext = LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, null);
+            llmCallLogger.logStart(startContext);
             LlmTextResult result = llmGateway.generate(LlmStage.DIAGNOSIS_QUESTION_COPY, prompt);
+            LlmCallContext successContext = LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, result.model());
             JsonNode root = llmJsonParser.parse(result.text());
             JsonNode items = root.path("questions");
-            if (!items.isArray() || items.size() != fallbackQuestions.size()) {
-                return fallback(fallbackQuestions, start, result.model(), LlmFallbackReason.MISSING_REQUIRED_FIELDS);
+            if (!items.isArray() || items.size() != sourceQuestions.size()) {
+                throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "MISSING_REQUIRED_FIELDS");
             }
 
-            Map<String, DiagnosisQuestion> byId = fallbackQuestions.stream()
+            Map<String, DiagnosisQuestion> byId = sourceQuestions.stream()
                 .collect(Collectors.toMap(DiagnosisQuestion::questionId, question -> question, (left, right) -> left, LinkedHashMap::new));
 
             List<DiagnosisQuestion> refined = new ArrayList<>();
@@ -110,11 +111,11 @@ public class DiagnosisQuestionCopyLlmService {
                 String questionId = item.path("questionId").asText("");
                 DiagnosisQuestion original = byId.get(questionId);
                 if (original == null) {
-                    return fallback(fallbackQuestions, start, result.model(), LlmFallbackReason.MISSING_REQUIRED_FIELDS);
+                    throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "MISSING_REQUIRED_FIELDS");
                 }
                 List<DiagnosisQuestionOption> options = readOptions(item.path("options"), original.options());
                 if (options.size() != original.options().size()) {
-                    return fallback(fallbackQuestions, start, result.model(), LlmFallbackReason.MISSING_REQUIRED_FIELDS);
+                    throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "MISSING_REQUIRED_FIELDS");
                 }
                 refined.add(new DiagnosisQuestion(
                     original.questionId(),
@@ -129,25 +130,40 @@ public class DiagnosisQuestionCopyLlmService {
                     textOrDefault(item.path("sectionLabel").asText(""), original.sectionLabel())
                 ));
             }
-            return new DiagnosisQuestionCopyResult(refined, false, List.of());
+            validate(refined, sourceQuestions.size());
+            llmCallLogger.logSuccess(
+                successContext,
+                toMetrics(result, start),
+                result.usage() == null ? null : result.usage().finishReason(),
+                result.usage() != null && result.usage().truncated()
+            );
+            return refined;
+        } catch (AiGenerationException ex) {
+            llmCallLogger.logFailure(
+                LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, null),
+                com.pandanav.learning.domain.llm.model.LlmFailureType.UNKNOWN_ERROR,
+                ex.getMessage(),
+                LlmObservabilityHelper.elapsedMs(start)
+            );
+            throw ex;
         } catch (Exception ex) {
-            LlmFallbackReason reason = llmFailureClassifier.classifyFallback(ex);
-            return fallback(fallbackQuestions, start, null, reason);
+            if (isTimeout(ex)) {
+                llmCallLogger.logFailure(
+                    LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, null),
+                    com.pandanav.learning.domain.llm.model.LlmFailureType.TIMEOUT,
+                    ex.getMessage(),
+                    LlmObservabilityHelper.elapsedMs(start)
+                );
+                throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "TIMEOUT");
+            }
+            llmCallLogger.logFailure(
+                LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, null),
+                com.pandanav.learning.domain.llm.model.LlmFailureType.UNKNOWN_ERROR,
+                ex.getMessage(),
+                LlmObservabilityHelper.elapsedMs(start)
+            );
+            throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "UNKNOWN_ERROR");
         }
-    }
-
-    private DiagnosisQuestionCopyResult fallback(
-        List<DiagnosisQuestion> fallbackQuestions,
-        Instant start,
-        String model,
-        LlmFallbackReason reason
-    ) {
-        llmCallLogger.logFallback(
-            LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, model),
-            reason,
-            LlmObservabilityHelper.elapsedMs(start)
-        );
-        return new DiagnosisQuestionCopyResult(fallbackQuestions, true, List.of(reason.name()));
     }
 
     private List<Map<String, Object>> serializeQuestions(List<DiagnosisQuestion> questions) {
@@ -195,10 +211,39 @@ public class DiagnosisQuestionCopyLlmService {
         return value == null || value.isBlank() ? "" : value.trim();
     }
 
-    public record DiagnosisQuestionCopyResult(
-        List<DiagnosisQuestion> questions,
-        boolean fallbackApplied,
-        List<String> fallbackReasons
-    ) {
+    private void validate(List<DiagnosisQuestion> questions, int expectedCount) {
+        if (questions == null) {
+            throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "NULL_RESULT");
+        }
+        if (questions.size() != expectedCount) {
+            throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "MISSING_REQUIRED_FIELDS");
+        }
+        for (DiagnosisQuestion question : questions) {
+            if (question == null
+                || question.questionId() == null || question.questionId().isBlank()
+                || question.title() == null || question.title().isBlank()
+                || question.options() == null || question.options().isEmpty()) {
+                throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "EMPTY_CONTENT");
+            }
+        }
+    }
+
+    private LlmCallMetrics toMetrics(LlmTextResult result, Instant start) {
+        if (result == null || result.usage() == null) {
+            return new LlmCallMetrics(LlmObservabilityHelper.elapsedMs(start), -1, -1, -1);
+        }
+        return new LlmCallMetrics(
+            LlmObservabilityHelper.elapsedMs(start),
+            result.usage().tokenInput() == null ? -1 : result.usage().tokenInput(),
+            result.usage().tokenOutput() == null ? -1 : result.usage().tokenOutput(),
+            result.usage().totalTokens() == null ? -1 : result.usage().totalTokens()
+        );
+    }
+
+    private boolean isTimeout(Exception ex) {
+        String message = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase();
+        return message.contains("timeout")
+            || message.contains("timed out")
+            || ex.getClass().getSimpleName().toLowerCase().contains("timeout");
     }
 }

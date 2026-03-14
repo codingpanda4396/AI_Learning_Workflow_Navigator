@@ -14,8 +14,8 @@ import com.pandanav.learning.domain.service.LearningPlanPromptBuilder;
 import com.pandanav.learning.domain.service.LearningPlanResultValidator;
 import com.pandanav.learning.domain.service.RuleBasedPlanBuilder;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
-import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -23,7 +23,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -67,34 +67,28 @@ class LearningPlanOrchestratorTest {
     }
 
     @Test
-    void shouldFallbackWhenJsonIsUnrecoverable() {
+    void shouldFailWhenJsonIsUnrecoverable() {
         LearningPlanOrchestrator orchestrator = orchestrator(llmResult("```json\n{\"headline\":\"broken\"\n```"));
 
-        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
-
-        assertTrue(result.fallbackApplied());
-        assertEquals(PlanSource.RULE_FALLBACK, result.planSource());
-        assertEquals(List.of("JSON_EXTRA_TEXT"), result.fallbackReasons());
-        assertTrue(result.personalizedNarrative() != null);
-        assertEquals(NarrativeSource.FALLBACK, result.narrativeSource());
+        AiGenerationException ex = assertThrows(AiGenerationException.class, () -> orchestrator.preview(sampleContext()));
+        assertEquals("PLAN_PREVIEW", ex.getStage());
+        assertEquals("JSON_PARSE_FAILED", ex.getReason());
     }
 
     @Test
-    void shouldFallbackWhenOutputIsTruncatedBeforeParsing() {
+    void shouldFailWhenOutputIsTruncatedBeforeParsing() {
         LearningPlanOrchestrator orchestrator = orchestrator(llmResult(
             "{\"headline\":\"truncated",
             new LlmUsage(587, 320, 907, -1, 6103, "length", false, true)
         ));
 
-        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
-
-        assertTrue(result.fallbackApplied());
-        assertEquals(PlanSource.RULE_FALLBACK, result.planSource());
-        assertEquals(List.of("OUTPUT_TRUNCATED"), result.fallbackReasons());
+        AiGenerationException ex = assertThrows(AiGenerationException.class, () -> orchestrator.preview(sampleContext()));
+        assertEquals("PLAN_PREVIEW", ex.getStage());
+        assertEquals("OUTPUT_TRUNCATED", ex.getReason());
     }
 
     @Test
-    void shouldFallbackWhenJsonSchemaMismatches() {
+    void shouldFailWhenJsonSchemaMismatches() {
         LearningPlanOrchestrator orchestrator = orchestrator(llmResult("""
             {
               "headline": "This headline is long enough",
@@ -117,10 +111,9 @@ class LearningPlanOrchestratorTest {
             }
             """));
 
-        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
-
-        assertTrue(result.fallbackApplied());
-        assertEquals(List.of("JSON_SCHEMA_MISMATCH"), result.fallbackReasons());
+        AiGenerationException ex = assertThrows(AiGenerationException.class, () -> orchestrator.preview(sampleContext()));
+        assertEquals("PLAN_PREVIEW", ex.getStage());
+        assertEquals("JSON_SCHEMA_MISMATCH", ex.getReason());
     }
 
     private LearningPlanOrchestrator orchestrator(LlmTextResult llmTextResult) {
@@ -135,9 +128,7 @@ class LearningPlanOrchestratorTest {
             new LlmJsonParser(new ObjectMapper()),
             readyProperties(),
             new LlmCallLogger(mock(ObjectProvider.class)),
-            new LlmFailureClassifier(),
             new DefaultLearnerStateInterpreter(),
-            new RuleBasedPersonalizedNarrativeGenerator(),
             new LlmEnhancedPersonalizedNarrativeGenerator(new RuleBasedPersonalizedNarrativeGenerator())
         );
     }
