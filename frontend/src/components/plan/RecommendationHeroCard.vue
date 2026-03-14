@@ -36,10 +36,10 @@ defineEmits<{
         </div>
 
         <h1 class="mt-4 max-w-2xl text-[38px] font-semibold leading-[1.08] tracking-[-0.05em] text-slate-950 sm:text-[48px]">
-          {{ recommendationHeadline }}
+          第一步：{{ currentTaskTitle }}
         </h1>
 
-        <p class="mt-5 text-sm font-medium text-slate-500">原因</p>
+        <p class="mt-5 text-sm font-medium text-slate-500">接下来先学这里</p>
         <p class="mt-2 max-w-2xl text-lg leading-8 text-slate-700">
           {{ recommendationReason }}
         </p>
@@ -48,26 +48,26 @@ defineEmits<{
       <div class="rounded-[28px] border border-slate-900/10 bg-white/92 p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur">
         <div class="space-y-4">
           <div>
-            <p class="text-sm text-slate-500">当前任务</p>
+            <p class="text-sm text-slate-500">任务</p>
             <p class="mt-1 text-xl font-semibold text-slate-950">{{ currentTaskTitle }}</p>
           </div>
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <div class="rounded-[20px] bg-slate-50 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">预计时间</p>
-              <p class="mt-2 text-base font-semibold text-slate-950">{{ estimatedMinutes }}</p>
+              <p class="mt-2 text-base font-semibold text-slate-950">约 {{ estimatedMinutes }}</p>
             </div>
             <div class="rounded-[20px] bg-slate-50 px-4 py-3">
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">当前状态</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">现在状态</p>
               <p class="mt-2 text-base font-semibold text-slate-950">{{ currentStatus }}</p>
             </div>
           </div>
         </div>
 
         <div class="mt-6 space-y-3">
-          <AppButton size="lg" block :loading="loading" @click="$emit('start')">开始这一小步</AppButton>
+          <AppButton size="lg" block :loading="loading" @click="$emit('start')">开始第一步</AppButton>
           <AppButton size="lg" block variant="secondary" @click="$emit('adjust')">换一种学法</AppButton>
           <button type="button" class="w-full text-center text-sm font-medium text-slate-600 transition hover:text-slate-950" @click="$emit('mastered')">
-            我已经会了，调整路径
+            我已经会了
           </button>
         </div>
       </div>

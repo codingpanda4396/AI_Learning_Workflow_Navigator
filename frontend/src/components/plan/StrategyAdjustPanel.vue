@@ -26,20 +26,20 @@ const emit = defineEmits<{
 }>();
 
 const options: StrategyOption[] = [
-  { key: 'faster', title: '更快一点', description: '压缩路径，只保留现在最关键的一步。' },
-  { key: 'steadier', title: '更稳一点', description: '先把前置基础补牢，再往后推。' },
-  { key: 'practice-first', title: '先做再学', description: '先通过练习暴露问题，再回头补知识。' },
-  { key: 'ten-minute', title: '压缩到10分钟', description: '把这一步切成更轻的开始版本。' },
-  { key: 'already-know', title: '我已经会了', description: '尝试跳过当前建议，重算下一步。' },
-  { key: 'not-enough-time', title: '我现在时间不多', description: '让系统优先适配你当前的可用时间。' },
-  { key: 'not-clear', title: '这个解释不够清楚', description: '保留建议，但换一种表达方式。' },
+  { key: 'faster', title: '更快一点', description: '先走最短的一步。' },
+  { key: 'steadier', title: '更稳一点', description: '先把基础补齐。' },
+  { key: 'practice-first', title: '先做再学', description: '先试一题，再回头学。' },
+  { key: 'ten-minute', title: '压缩到10分钟', description: '先开始一个轻量版本。' },
+  { key: 'already-know', title: '我已经会了', description: '跳过这一步，继续重算。' },
+  { key: 'not-enough-time', title: '我现在时间不多', description: '先给我更短的版本。' },
+  { key: 'not-clear', title: '我还没看明白', description: '换一种更好懂的说法。' },
 ];
 
 const panelTitle = computed(() => (props.mode === 'disagree' ? '我不认同这个建议' : '换一种学法'));
 const panelSubtitle = computed(() => (
   props.mode === 'disagree'
-    ? '告诉系统你不同意的点，它会按新的判断重新给你第一步。'
-    : '选一种更贴近你当下状态的策略，系统会据此重算路径。'
+    ? '告诉我哪里不对。'
+    : '选一个更适合现在的方式。'
 ));
 
 function onMaskClick(event: MouseEvent) {
@@ -55,7 +55,7 @@ function onMaskClick(event: MouseEvent) {
       <div class="absolute inset-y-0 right-0 w-full max-w-[440px] overflow-y-auto border-l border-slate-200 bg-white px-5 py-6 shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:px-6">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <p class="app-eyebrow">策略调整</p>
+            <p class="app-eyebrow">调整方式</p>
             <h2 class="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-slate-950">{{ panelTitle }}</h2>
             <p class="mt-2 text-sm leading-7 text-slate-600">{{ panelSubtitle }}</p>
           </div>
@@ -83,7 +83,7 @@ function onMaskClick(event: MouseEvent) {
         </p>
 
         <div class="mt-6">
-          <AppButton variant="secondary" block @click="$emit('close')">先保留当前建议</AppButton>
+          <AppButton variant="secondary" block @click="$emit('close')">先按这个来</AppButton>
         </div>
       </div>
     </div>

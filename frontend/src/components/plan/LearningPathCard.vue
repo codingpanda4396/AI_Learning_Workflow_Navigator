@@ -18,8 +18,8 @@ defineProps<{
 <template>
   <SectionCard
     strong
-    title="你的学习地图"
-    description="先看现在主攻哪一步，再看后面怎么接。"
+    title="你的学习路径"
+    description="先看现在，再看下一步。"
   >
     <div class="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
       <div class="space-y-3">
@@ -46,8 +46,7 @@ defineProps<{
             class="flex items-center gap-3 rounded-[18px] px-4 py-3"
             :class="item.isCurrent ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-700'"
           >
-            <span class="text-sm font-semibold">{{ item.title }}</span>
-            <span v-if="item.isCurrent" class="text-xs text-slate-300">← 当前</span>
+            <span class="text-sm font-semibold">{{ item.title }}{{ item.isCurrent ? '（当前）' : '' }}</span>
           </div>
         </div>
       </div>
