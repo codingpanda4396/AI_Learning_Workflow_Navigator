@@ -9,9 +9,12 @@ import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsDto;
 import com.pandanav.learning.api.dto.plan.LearningPlanContextResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanLearnerSnapshotResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanMetadataResponse;
+import com.pandanav.learning.api.dto.plan.LearningPlanGuidanceResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanPersonalizationResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanRecommendationResponse;
+import com.pandanav.learning.api.dto.plan.LearningPlanStrategyComparisonResponse;
+import com.pandanav.learning.api.dto.plan.LearningPlanStrategyOptionResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanSummaryResponse;
 import com.pandanav.learning.api.dto.plan.PlanAlternativeResponse;
 import com.pandanav.learning.api.dto.plan.PlanNodeReferenceResponse;
@@ -41,6 +44,10 @@ import com.pandanav.learning.domain.model.PlanPathNode;
 import com.pandanav.learning.domain.model.PlanReason;
 import com.pandanav.learning.domain.model.PlanTaskPreview;
 import com.pandanav.learning.domain.model.PersonalizedNarrative;
+import com.pandanav.learning.domain.model.PlanGuidance;
+import com.pandanav.learning.domain.model.PreviewEnhancement;
+import com.pandanav.learning.domain.model.StrategyComparison;
+import com.pandanav.learning.domain.model.StrategyOptionComparison;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.policy.TaskObjectiveTemplateStrategy;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
@@ -114,7 +121,9 @@ public class LearningPlanService {
             command.diagnosisId(),
             command.sessionId()
         );
+        log.info("LearningPlan preview stage=CONTEXT_ASSEMBLE_START traceId={}", TraceContext.traceId());
         LearningPlanPlanningContext context = planningContextAssembler.assemble(command);
+        log.info("LearningPlan preview stage=CONTEXT_ASSEMBLE_SUCCESS traceId={} nodeCount={}", TraceContext.traceId(), context.nodes().size());
         LearningPlanOrchestrator.OrchestratedPlan orchestrated = learningPlanOrchestrator.preview(context);
         LearningPlanPlanningContext snapshotContext = enrichContextForSnapshot(context, orchestrated);
 
@@ -126,7 +135,14 @@ public class LearningPlanService {
         previewDraft.setLlmTraceId(orchestrated.llmTraceId());
         writeSnapshot(previewDraft, orchestrated.preview(), snapshotContext);
 
+        log.info(
+            "LearningPlan preview stage=PERSIST_DRAFT_START traceId={} diagnosisId={} sessionId={}",
+            TraceContext.traceId(),
+            command.diagnosisId(),
+            command.sessionId()
+        );
         LearningPlan saved = learningPlanRepository.save(previewDraft);
+        log.info("LearningPlan preview stage=PERSIST_DRAFT_SUCCESS traceId={} previewId={}", TraceContext.traceId(), saved.getId());
         LearningPlanPreviewResponse response = toResponse(
             saved,
             orchestrated.preview(),
@@ -136,12 +152,17 @@ public class LearningPlanService {
             orchestrated.fallbackReasons()
         );
         log.info(
-            "LearningPlan preview built. previewId={} contentSourceType={} fallbackApplied={} fallbackReasons={} personalization={} whatISawCount={} confidence={}",
+            "LearningPlan preview built. traceId={} previewId={} diagnosisId={} sessionId={} contentSourceType={} fallbackApplied={} fallbackReasons={} personalization={} guidance={} strategyComparison={} whatISawCount={} confidence={}",
+            TraceContext.traceId(),
             response.previewId(),
+            command.diagnosisId(),
+            command.sessionId(),
             response.contentSourceType(),
             response.fallbackApplied(),
             response.fallbackReasons(),
             response.personalization() != null,
+            response.planGuidance() != null,
+            response.strategyComparison() != null,
             response.personalization() == null || response.personalization().whatISaw() == null ? 0 : response.personalization().whatISaw().size(),
             response.confidence()
         );
@@ -367,6 +388,10 @@ public class LearningPlanService {
             summary.currentFocusLabel()
         );
         LearningPlanPersonalizationResponse personalization = mapPersonalization(context);
+        PreviewEnhancement enhancement = context == null ? null : context.previewEnhancement();
+        LearningPlanStrategyComparisonResponse strategyComparison = mapStrategyComparison(enhancement);
+        LearningPlanGuidanceResponse planGuidance = mapPlanGuidance(enhancement);
+        String confidenceExplanation = resolveConfidenceExplanation(context, planGuidance);
 
         return new LearningPlanPreviewResponse(
             String.valueOf(plan.getId()),
@@ -396,10 +421,13 @@ public class LearningPlanService {
             reasonResponses,
             reasonResponses,
             alternatives,
+            strategyComparison,
             preview.focuses() == null ? List.of() : preview.focuses(),
             recommendation,
             learnerSnapshot,
             personalization,
+            planGuidance,
+            confidenceExplanation,
             planExplanation.whyStartHere(),
             planExplanation.keyWeaknesses(),
             planExplanation.priorityNodes(),
@@ -444,7 +472,7 @@ public class LearningPlanService {
                 ? "正式学习计划已创建，可直接进入当前推荐步骤。"
                 : "确认预览后会创建正式学习计划，并从当前推荐步骤开始推进。",
             new LearningPlanMetadataResponse(
-                "plan-preview.v3",
+                "plan-preview.v4",
                 true,
                 "path_preview_total",
                 "per_path_node",
@@ -479,6 +507,7 @@ public class LearningPlanService {
             normalizeFeedback(command.userFeedback()),
             basedOnPreviewId,
             null,
+            null,
             null
         );
         return new LearningPlanPlanningContext(
@@ -501,6 +530,7 @@ public class LearningPlanService {
             adjusted.userFeedback(),
             adjusted.basedOnPreviewId(),
             learnerStateInterpreter.interpret(adjusted),
+            null,
             null
         );
     }
@@ -532,7 +562,8 @@ public class LearningPlanService {
             context.userFeedback(),
             context.basedOnPreviewId(),
             learnerState,
-            orchestrated.personalizedNarrative()
+            orchestrated.personalizedNarrative(),
+            orchestrated.previewEnhancement()
         );
     }
 
@@ -552,6 +583,69 @@ public class LearningPlanService {
             snapshot == null ? null : snapshot.confidenceReasonSummary(),
             snapshot == null ? null : snapshot.motivationRisk().name()
         );
+    }
+
+    private LearningPlanGuidanceResponse mapPlanGuidance(PreviewEnhancement enhancement) {
+        if (enhancement == null || enhancement.planGuidance() == null) {
+            return null;
+        }
+        PlanGuidance guidance = enhancement.planGuidance();
+        return new LearningPlanGuidanceResponse(
+            guidance.whyChosen(),
+            guidance.whyNotAlternatives(),
+            guidance.learnerMirror(),
+            guidance.firstAction(),
+            guidance.firstCheckpoint(),
+            guidance.planTradeoff(),
+            guidance.ifPerformWell(),
+            guidance.ifStillStruggle(),
+            guidance.ifNoTime(),
+            guidance.startPrompt(),
+            guidance.kickoffSteps() == null ? List.of() : guidance.kickoffSteps(),
+            guidance.warmupGoal(),
+            guidance.validationFocus(),
+            guidance.evidenceMode(),
+            guidance.adaptationPolicy(),
+            guidance.confidenceExplanation()
+        );
+    }
+
+    private LearningPlanStrategyComparisonResponse mapStrategyComparison(PreviewEnhancement enhancement) {
+        if (enhancement == null || enhancement.strategyComparison() == null) {
+            return null;
+        }
+        StrategyComparison strategyComparison = enhancement.strategyComparison();
+        return new LearningPlanStrategyComparisonResponse(
+            strategyComparison.currentRecommendedStrategy(),
+            strategyComparison.options() == null
+                ? List.of()
+                : strategyComparison.options().stream()
+                .map(this::mapStrategyOption)
+                .toList()
+        );
+    }
+
+    private LearningPlanStrategyOptionResponse mapStrategyOption(StrategyOptionComparison item) {
+        return new LearningPlanStrategyOptionResponse(
+            item.strategy(),
+            item.label(),
+            item.suitableFor(),
+            item.notIdealWhen(),
+            item.switchingCostRisk()
+        );
+    }
+
+    private String resolveConfidenceExplanation(
+        LearningPlanPlanningContext context,
+        LearningPlanGuidanceResponse guidance
+    ) {
+        if (guidance != null && guidance.confidenceExplanation() != null && !guidance.confidenceExplanation().isBlank()) {
+            return guidance.confidenceExplanation();
+        }
+        if (context == null || context.learnerStateSnapshot() == null) {
+            return null;
+        }
+        return context.learnerStateSnapshot().confidenceReasonSummary();
     }
 
     private PlanAdjustments resolveAdjustments(PlanAdjustments base, String strategy, Integer timeBudget) {

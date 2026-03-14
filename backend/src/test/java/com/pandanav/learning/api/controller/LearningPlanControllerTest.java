@@ -7,9 +7,12 @@ import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsDto;
 import com.pandanav.learning.api.dto.plan.LearningPlanContextResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanLearnerSnapshotResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanMetadataResponse;
+import com.pandanav.learning.api.dto.plan.LearningPlanGuidanceResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanPersonalizationResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanRecommendationResponse;
+import com.pandanav.learning.api.dto.plan.LearningPlanStrategyComparisonResponse;
+import com.pandanav.learning.api.dto.plan.LearningPlanStrategyOptionResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanSummaryResponse;
 import com.pandanav.learning.api.dto.plan.PlanAlternativeResponse;
 import com.pandanav.learning.api.dto.plan.PlanNodeReferenceResponse;
@@ -79,6 +82,8 @@ class LearningPlanControllerTest {
             .andExpect(jsonPath("$.metadata.strategy").value("LLM"))
             .andExpect(jsonPath("$.data.recommendation.taskTitle").value("Map the structure"))
             .andExpect(jsonPath("$.data.alternatives[0].strategy").value("FAST_TRACK"))
+            .andExpect(jsonPath("$.data.strategyComparison.currentRecommendedStrategy").value("FOUNDATION_FIRST"))
+            .andExpect(jsonPath("$.data.planGuidance.startPrompt").value("先把第一轮跑起来，我们马上开始。"))
             .andExpect(jsonPath("$.data.summary.recommendedStartNode.nodeName").value("tree basics"));
     }
 
@@ -154,6 +159,15 @@ class LearningPlanControllerTest {
                 new PlanAlternativeResponse("PRACTICE_FIRST", "Practice first", "Expose gaps", "Can feel harder"),
                 new PlanAlternativeResponse("COMPRESSED_10_MIN", "10 minute version", "Shrink current step", "Needs follow-up")
             ),
+            new LearningPlanStrategyComparisonResponse(
+                "FOUNDATION_FIRST",
+                List.of(
+                    new LearningPlanStrategyOptionResponse("FOUNDATION_FIRST", "Foundation first", "Need stable basics", "Very little time", "Slower short-term progress"),
+                    new LearningPlanStrategyOptionResponse("FAST_TRACK", "Fast track", "Already stable basics", "Current gaps are obvious", "Higher rollback risk"),
+                    new LearningPlanStrategyOptionResponse("PRACTICE_FIRST", "Practice first", "Need quick gap exposure", "Concept links are fragile", "Higher frustration risk"),
+                    new LearningPlanStrategyOptionResponse("COMPRESSED_10_MIN", "10 minute version", "Only have fragmented time", "Need deep understanding now", "Must schedule follow-up")
+                )
+            ),
             List.of("solidify tree basics", "connect traversal to the basics"),
             new LearningPlanRecommendationResponse("Strengthen basics before advancing", "Start from the biggest blocker first", "Map the structure", 8, "HIGH", "This prerequisite still blocks later traversal work."),
             new LearningPlanLearnerSnapshotResponse("Strengthen tree traversal basics", List.of("prerequisite gap"), 40, "Skipping this step increases later confusion.", "tree basics"),
@@ -167,6 +181,25 @@ class LearningPlanControllerTest {
                 "已有部分证据，可信度中等。",
                 "MEDIUM"
             ),
+            new LearningPlanGuidanceResponse(
+                "当前建议优先稳住基础节点，再往后推进。",
+                "其他策略并非不好，但在当前阶段会增加回退概率。",
+                "你现在更像在建立整体理解，而不是只差熟练度。",
+                "先用 2 分钟列出树节点关系并口头解释一次。",
+                "能否完整说出节点关系且无明显断链。",
+                "更稳但短期成就感稍慢，长期返工更少。",
+                "系统会加快节奏并提前解锁下一节点训练。",
+                "系统会切回更细颗粒解释并减少一次性任务量。",
+                "切换到 10 分钟压缩版并保留下一次补全任务。",
+                "先把第一轮跑起来，我们马上开始。",
+                List.of("画出节点关系图", "口述关键依赖", "完成首个微练习"),
+                "把框架说顺，不追求一次全对。",
+                "重点看你是否进入稳定节奏。",
+                "LOW_EVIDENCE_SAFE_START",
+                "每轮根据表现自动提速或回补。",
+                "证据偏少时先低风险起步，随后用新行为快速校准。"
+            ),
+            "证据偏少时先低风险起步，随后用新行为快速校准。",
             "Recommend strengthening the prerequisite first.",
             List.of("prerequisite gap", "recent confusion"),
             List.of(new PlanPriorityNodeResponse("101", "tree basics", "This node still blocks later traversal work.")),

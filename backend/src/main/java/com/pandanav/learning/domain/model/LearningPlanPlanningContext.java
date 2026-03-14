@@ -22,6 +22,7 @@ public record LearningPlanPlanningContext(
     String userFeedback,
     Long basedOnPreviewId,
     LearnerStateSnapshot learnerStateSnapshot,
-    PersonalizedNarrative personalizedNarrative
+    PersonalizedNarrative personalizedNarrative,
+    PreviewEnhancement previewEnhancement
 ) {
 }

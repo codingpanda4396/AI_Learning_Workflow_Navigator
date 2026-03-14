@@ -5,15 +5,20 @@ import com.pandanav.learning.domain.llm.model.LearningPlanLlmResult;
 import com.pandanav.learning.domain.model.LearningPlanPreview;
 import com.pandanav.learning.domain.model.LearningPlanSummary;
 import com.pandanav.learning.domain.model.PlanAlternative;
+import com.pandanav.learning.domain.model.PlanGuidance;
 import com.pandanav.learning.domain.model.PlanReason;
 import com.pandanav.learning.domain.model.PlanTaskPreview;
+import com.pandanav.learning.domain.model.StrategyComparison;
+import com.pandanav.learning.domain.model.StrategyOptionComparison;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class LearningPlanResultValidator {
@@ -61,21 +66,22 @@ public class LearningPlanResultValidator {
 
         List<PlanAlternative> alternatives = new ArrayList<>();
         JsonNode alternativesNode = json.path("alternatives");
-        if (!alternativesNode.isMissingNode() && !alternativesNode.isNull()) {
-            requireArray(alternativesNode, "$.alternatives", errors);
-            if (alternativesNode.isArray()) {
-                for (int i = 0; i < alternativesNode.size(); i++) {
-                    JsonNode item = alternativesNode.get(i);
-                    requireObject(item, "$.alternatives[" + i + "]", errors);
-                    alternatives.add(new PlanAlternative(
-                        normalizeStrategy(readRequiredText(item, "strategy", "$.alternatives[" + i + "].strategy", errors)),
-                        readRequiredText(item, "label", "$.alternatives[" + i + "].label", errors),
-                        readRequiredText(item, "description", "$.alternatives[" + i + "].description", errors),
-                        readRequiredText(item, "tradeoff", "$.alternatives[" + i + "].tradeoff", errors)
-                    ));
-                }
+        requireArray(alternativesNode, "$.alternatives", errors);
+        if (alternativesNode.isArray()) {
+            for (int i = 0; i < alternativesNode.size(); i++) {
+                JsonNode item = alternativesNode.get(i);
+                requireObject(item, "$.alternatives[" + i + "]", errors);
+                alternatives.add(new PlanAlternative(
+                    normalizeStrategy(readRequiredText(item, "strategy", "$.alternatives[" + i + "].strategy", errors)),
+                    readRequiredText(item, "label", "$.alternatives[" + i + "].label", errors),
+                    readRequiredText(item, "description", "$.alternatives[" + i + "].description", errors),
+                    readRequiredText(item, "tradeoff", "$.alternatives[" + i + "].tradeoff", errors)
+                ));
             }
         }
+
+        StrategyComparison strategyComparison = parseStrategyComparison(json.path("strategy_comparison"), errors);
+        PlanGuidance planGuidance = parsePlanGuidance(json.path("plan_guidance"), errors);
 
         List<PlanTaskPreview> tasks = new ArrayList<>();
         JsonNode tasksNode = json.path("task_preview");
@@ -113,51 +119,17 @@ public class LearningPlanResultValidator {
             reasons,
             focuses,
             alternatives,
+            strategyComparison,
             benefits,
             nextUnlocks,
             nextStepLabel,
-            tasks
+            tasks,
+            planGuidance
         );
     }
 
     public LearningPlanLlmResult normalize(LearningPlanLlmResult result, LearningPlanPreview fallback) {
-        if (result == null) {
-            return null;
-        }
-        LearningPlanSummary fallbackSummary = fallback.summary();
-        Map<String, PlanTaskPreview> llmByStage = new LinkedHashMap<>();
-        if (result.taskPreview() != null) {
-            for (PlanTaskPreview task : result.taskPreview()) {
-                if (task == null || !StringUtils.hasText(task.stage())) {
-                    continue;
-                }
-                llmByStage.putIfAbsent(task.stage(), task);
-            }
-        }
-
-        List<PlanTaskPreview> normalizedTasks = new ArrayList<>();
-        for (PlanTaskPreview fallbackTask : fallback.taskPreview()) {
-            PlanTaskPreview llmTask = llmByStage.get(fallbackTask.stage());
-            normalizedTasks.add(llmTask == null ? fallbackTask : mergeTask(llmTask, fallbackTask));
-        }
-
-        return new LearningPlanLlmResult(
-            pick(result.headline(), fallbackSummary.headline()),
-            pick(result.subtitle(), fallbackSummary.subtitle()),
-            pick(result.whyNow(), fallbackSummary.whyNow()),
-            normalizeConfidence(pick(result.confidence(), fallbackSummary.confidence())),
-            pick(result.currentFocusLabel(), fallbackSummary.currentFocusLabel()),
-            pick(result.taskTitle(), fallbackSummary.taskTitle()),
-            positiveOrFallback(result.taskEstimatedMinutes(), fallbackSummary.taskEstimatedMinutes()),
-            normalizePriority(pick(result.taskPriority(), fallbackSummary.taskPriority())),
-            result.reasons() == null || result.reasons().isEmpty() ? fallback.reasons() : result.reasons(),
-            result.focuses() == null || result.focuses().isEmpty() ? fallback.focuses() : result.focuses(),
-            result.alternatives() == null || result.alternatives().isEmpty() ? fallbackSummary.alternatives() : result.alternatives(),
-            result.benefits() == null || result.benefits().isEmpty() ? fallbackSummary.benefits() : result.benefits(),
-            result.nextUnlocks() == null || result.nextUnlocks().isEmpty() ? fallbackSummary.nextUnlocks() : result.nextUnlocks(),
-            pick(result.nextStepLabel(), fallbackSummary.nextStepLabel()),
-            normalizedTasks
-        );
+        return result;
     }
 
     public List<String> validateRawTaskPreview(LearningPlanLlmResult result, LearningPlanPreview fallback) {
@@ -175,9 +147,6 @@ public class LearningPlanResultValidator {
                 errors.add("$.task_preview duplicate stage " + stage);
             }
         });
-        if (result.taskPreview().size() > fallback.taskPreview().size()) {
-            errors.add("$.task_preview size must be <= fallback size " + fallback.taskPreview().size());
-        }
         return errors;
     }
 
@@ -210,12 +179,21 @@ public class LearningPlanResultValidator {
         }
         if (result.alternatives() == null || result.alternatives().size() < 4) {
             errors.add("$.alternatives must contain at least 4 items");
+        } else {
+            validateStrategies("$.alternatives", result.alternatives().stream().map(PlanAlternative::strategy).toList(), errors);
         }
         if (result.taskPreview() == null || result.taskPreview().isEmpty()) {
             errors.add("$.task_preview must not be empty");
         } else {
+            if (result.taskPreview().size() != 4) {
+                errors.add("$.task_preview must contain exactly 4 items");
+            }
+            List<String> expectedOrder = List.of("STRUCTURE", "UNDERSTANDING", "TRAINING", "REFLECTION");
             for (int i = 0; i < result.taskPreview().size(); i++) {
                 PlanTaskPreview task = result.taskPreview().get(i);
+                if (i < expectedOrder.size() && !expectedOrder.get(i).equals(task.stage())) {
+                    errors.add("$.task_preview[" + i + "].stage must be " + expectedOrder.get(i));
+                }
                 if (task.estimatedMinutes() == null || task.estimatedMinutes() < 4 || task.estimatedMinutes() > 20) {
                     errors.add("$.task_preview[" + i + "].estimated_minutes must be between 4 and 20");
                 }
@@ -227,7 +205,136 @@ public class LearningPlanResultValidator {
                 }
             }
         }
+        validateStrategyComparison(result.strategyComparison(), errors);
+        validatePlanGuidance(result.planGuidance(), errors);
         return errors;
+    }
+
+    private StrategyComparison parseStrategyComparison(JsonNode node, List<String> errors) {
+        requireObject(node, "$.strategy_comparison", errors);
+        String currentRecommended = normalizeStrategy(readRequiredText(
+            node,
+            "current_recommended_strategy",
+            "$.strategy_comparison.current_recommended_strategy",
+            errors
+        ));
+        JsonNode optionsNode = node.path("options");
+        requireArray(optionsNode, "$.strategy_comparison.options", errors);
+        List<StrategyOptionComparison> options = new ArrayList<>();
+        if (optionsNode.isArray()) {
+            for (int i = 0; i < optionsNode.size(); i++) {
+                JsonNode item = optionsNode.get(i);
+                requireObject(item, "$.strategy_comparison.options[" + i + "]", errors);
+                options.add(new StrategyOptionComparison(
+                    normalizeStrategy(readRequiredText(item, "strategy", "$.strategy_comparison.options[" + i + "].strategy", errors)),
+                    readRequiredText(item, "label", "$.strategy_comparison.options[" + i + "].label", errors),
+                    readRequiredText(item, "suitable_for", "$.strategy_comparison.options[" + i + "].suitable_for", errors),
+                    readRequiredText(item, "not_ideal_when", "$.strategy_comparison.options[" + i + "].not_ideal_when", errors),
+                    readRequiredText(item, "switching_cost_risk", "$.strategy_comparison.options[" + i + "].switching_cost_risk", errors)
+                ));
+            }
+        }
+        return new StrategyComparison(currentRecommended, options);
+    }
+
+    private PlanGuidance parsePlanGuidance(JsonNode node, List<String> errors) {
+        requireObject(node, "$.plan_guidance", errors);
+        List<String> kickoffSteps = readStringArray(node.path("kickoff_steps"), "$.plan_guidance.kickoff_steps", errors);
+        return new PlanGuidance(
+            readRequiredText(node, "why_chosen", "$.plan_guidance.why_chosen", errors),
+            readRequiredText(node, "why_not_alternatives", "$.plan_guidance.why_not_alternatives", errors),
+            readRequiredText(node, "learner_mirror", "$.plan_guidance.learner_mirror", errors),
+            readRequiredText(node, "first_action", "$.plan_guidance.first_action", errors),
+            readRequiredText(node, "first_checkpoint", "$.plan_guidance.first_checkpoint", errors),
+            readRequiredText(node, "plan_tradeoff", "$.plan_guidance.plan_tradeoff", errors),
+            readRequiredText(node, "if_perform_well", "$.plan_guidance.if_perform_well", errors),
+            readRequiredText(node, "if_still_struggle", "$.plan_guidance.if_still_struggle", errors),
+            readRequiredText(node, "if_no_time", "$.plan_guidance.if_no_time", errors),
+            readRequiredText(node, "start_prompt", "$.plan_guidance.start_prompt", errors),
+            kickoffSteps,
+            readRequiredText(node, "warmup_goal", "$.plan_guidance.warmup_goal", errors),
+            readRequiredText(node, "validation_focus", "$.plan_guidance.validation_focus", errors),
+            readRequiredText(node, "evidence_mode", "$.plan_guidance.evidence_mode", errors),
+            readRequiredText(node, "adaptation_policy", "$.plan_guidance.adaptation_policy", errors),
+            readRequiredText(node, "confidence_explanation", "$.plan_guidance.confidence_explanation", errors)
+        );
+    }
+
+    private void validateStrategyComparison(StrategyComparison strategyComparison, List<String> errors) {
+        if (strategyComparison == null) {
+            errors.add("$.strategy_comparison is required");
+            return;
+        }
+        if (!StringUtils.hasText(strategyComparison.currentRecommendedStrategy())) {
+            errors.add("$.strategy_comparison.current_recommended_strategy is required");
+        }
+        if (strategyComparison.options() == null || strategyComparison.options().size() < 4) {
+            errors.add("$.strategy_comparison.options must contain at least 4 items");
+            return;
+        }
+        validateStrategies(
+            "$.strategy_comparison.options",
+            strategyComparison.options().stream().map(StrategyOptionComparison::strategy).toList(),
+            errors
+        );
+        for (int i = 0; i < strategyComparison.options().size(); i++) {
+            StrategyOptionComparison option = strategyComparison.options().get(i);
+            if (!StringUtils.hasText(option.suitableFor()) || option.suitableFor().trim().length() < 6) {
+                errors.add("$.strategy_comparison.options[" + i + "].suitable_for length must be >= 6");
+            }
+            if (!StringUtils.hasText(option.notIdealWhen()) || option.notIdealWhen().trim().length() < 6) {
+                errors.add("$.strategy_comparison.options[" + i + "].not_ideal_when length must be >= 6");
+            }
+            if (!StringUtils.hasText(option.switchingCostRisk()) || option.switchingCostRisk().trim().length() < 6) {
+                errors.add("$.strategy_comparison.options[" + i + "].switching_cost_risk length must be >= 6");
+            }
+        }
+    }
+
+    private void validatePlanGuidance(PlanGuidance planGuidance, List<String> errors) {
+        if (planGuidance == null) {
+            errors.add("$.plan_guidance is required");
+            return;
+        }
+        requireMinLength(planGuidance.whyChosen(), "$.plan_guidance.why_chosen", 12, errors);
+        requireMinLength(planGuidance.whyNotAlternatives(), "$.plan_guidance.why_not_alternatives", 12, errors);
+        requireMinLength(planGuidance.learnerMirror(), "$.plan_guidance.learner_mirror", 10, errors);
+        requireMinLength(planGuidance.firstAction(), "$.plan_guidance.first_action", 8, errors);
+        requireMinLength(planGuidance.firstCheckpoint(), "$.plan_guidance.first_checkpoint", 8, errors);
+        requireMinLength(planGuidance.planTradeoff(), "$.plan_guidance.plan_tradeoff", 10, errors);
+        requireMinLength(planGuidance.ifPerformWell(), "$.plan_guidance.if_perform_well", 8, errors);
+        requireMinLength(planGuidance.ifStillStruggle(), "$.plan_guidance.if_still_struggle", 8, errors);
+        requireMinLength(planGuidance.ifNoTime(), "$.plan_guidance.if_no_time", 8, errors);
+        requireMinLength(planGuidance.startPrompt(), "$.plan_guidance.start_prompt", 6, errors);
+        requireMinLength(planGuidance.warmupGoal(), "$.plan_guidance.warmup_goal", 6, errors);
+        requireMinLength(planGuidance.validationFocus(), "$.plan_guidance.validation_focus", 6, errors);
+        requireMinLength(planGuidance.evidenceMode(), "$.plan_guidance.evidence_mode", 6, errors);
+        requireMinLength(planGuidance.adaptationPolicy(), "$.plan_guidance.adaptation_policy", 8, errors);
+        requireMinLength(planGuidance.confidenceExplanation(), "$.plan_guidance.confidence_explanation", 8, errors);
+        if (planGuidance.kickoffSteps() == null || planGuidance.kickoffSteps().size() < 2 || planGuidance.kickoffSteps().size() > 4) {
+            errors.add("$.plan_guidance.kickoff_steps size must be between 2 and 4");
+            return;
+        }
+        for (int i = 0; i < planGuidance.kickoffSteps().size(); i++) {
+            String step = planGuidance.kickoffSteps().get(i);
+            if (!StringUtils.hasText(step) || step.trim().length() < 6) {
+                errors.add("$.plan_guidance.kickoff_steps[" + i + "] length must be >= 6");
+            }
+        }
+    }
+
+    private void validateStrategies(String path, List<String> strategies, List<String> errors) {
+        Set<String> expected = Set.of("FAST_TRACK", "FOUNDATION_FIRST", "PRACTICE_FIRST", "COMPRESSED_10_MIN");
+        Set<String> actual = new HashSet<>(strategies);
+        if (!actual.containsAll(expected)) {
+            errors.add(path + " must include FAST_TRACK, FOUNDATION_FIRST, PRACTICE_FIRST, COMPRESSED_10_MIN");
+        }
+    }
+
+    private void requireMinLength(String value, String path, int minLength, List<String> errors) {
+        if (!StringUtils.hasText(value) || value.trim().length() < minLength) {
+            errors.add(path + " length must be >= " + minLength);
+        }
     }
 
     private JsonNode firstPresentArray(JsonNode root, String primary, String fallbackField) {

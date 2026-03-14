@@ -37,6 +37,7 @@ class DefaultLearnerStateInterpreterTest {
             null,
             null,
             null,
+            null,
             null
         );
 
@@ -69,6 +70,7 @@ class DefaultLearnerStateInterpreterTest {
             null,
             null,
             null,
+            null,
             null
         );
 
@@ -94,6 +96,7 @@ class DefaultLearnerStateInterpreterTest {
             List.of("综合题"),
             "应用表现不稳定",
             PlanAdjustments.defaults(),
+            null,
             null,
             null,
             null,

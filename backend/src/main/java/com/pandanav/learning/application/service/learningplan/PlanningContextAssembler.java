@@ -129,6 +129,7 @@ public class PlanningContextAssembler {
             null,
             null,
             null,
+            null,
             null
         );
         return new LearningPlanPlanningContext(
@@ -151,6 +152,7 @@ public class PlanningContextAssembler {
             baseContext.userFeedback(),
             baseContext.basedOnPreviewId(),
             learnerStateInterpreter.interpret(baseContext),
+            null,
             null
         );
     }

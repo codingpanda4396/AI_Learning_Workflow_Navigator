@@ -197,7 +197,7 @@ public class DefaultLearnerStateInterpreter implements LearnerStateInterpreter {
         return switch (evidenceLevel) {
             case HIGH -> "近期练习与薄弱点证据较完整（尝试次数 " + attempts + "，得分记录 " + scoreCount + "），当前推荐可信度较高。";
             case MEDIUM -> "已有部分学习证据（薄弱点 " + weakCount + " 项，得分记录 " + scoreCount + "），推荐可信度中等并会继续校准。";
-            case LOW -> "历史练习和诊断证据较少，系统先采用稳健起步策略，后续会根据新表现快速调整。";
+            case LOW -> "当前可用证据较少，系统会先采用低风险起步策略，并在首轮后根据行为数据快速提速或回补。";
         };
     }
 

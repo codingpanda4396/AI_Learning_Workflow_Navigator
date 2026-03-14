@@ -6,9 +6,12 @@ import com.pandanav.learning.domain.model.LearningPlanPreview;
 import com.pandanav.learning.domain.model.LearningPlanSummary;
 import com.pandanav.learning.domain.model.PlanAdjustments;
 import com.pandanav.learning.domain.model.PlanAlternative;
+import com.pandanav.learning.domain.model.PlanGuidance;
 import com.pandanav.learning.domain.model.PlanPathNode;
 import com.pandanav.learning.domain.model.PlanReason;
 import com.pandanav.learning.domain.model.PlanTaskPreview;
+import com.pandanav.learning.domain.model.StrategyComparison;
+import com.pandanav.learning.domain.model.StrategyOptionComparison;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -66,24 +69,47 @@ class LearningPlanResultValidatorTest {
             List.of(new PlanReason("WEAKNESS_MATCH", "Start with basics", "The learner still needs prerequisite reinforcement before progressing.")),
             List.of("focus-1", "focus-2"),
             List.of(),
+            new StrategyComparison(
+                "FOUNDATION_FIRST",
+                List.of(
+                    new StrategyOptionComparison("FOUNDATION_FIRST", "Foundation", "Need stable basics", "Need quick sprint", "Slower at first"),
+                    new StrategyOptionComparison("FAST_TRACK", "Fast", "Already stable", "Dependencies unstable", "Rollback risk"),
+                    new StrategyOptionComparison("PRACTICE_FIRST", "Practice", "Need fast gap detection", "Concept too weak", "Frustration risk"),
+                    new StrategyOptionComparison("COMPRESSED_10_MIN", "Compressed", "Limited time", "Need deep chain", "Need follow-up")
+                )
+            ),
             List.of("benefit-1", "benefit-2"),
             List.of("unlock-1"),
             "next step",
             List.of(
                 new PlanTaskPreview("STRUCTURE", "Custom structure", "Goal", "learner action", "ai support", 8),
                 new PlanTaskPreview("TRAINING", "Custom training", "Goal", "learner action", "ai support", 9)
+            ),
+            new PlanGuidance(
+                "Choose current path now",
+                "Alternatives are useful later",
+                "You are consolidating links now",
+                "Start from the first micro action",
+                "Check if chain is clear",
+                "Steady now, faster later",
+                "System speeds up next",
+                "System narrows scope next",
+                "Switch to compressed mode",
+                "Start now",
+                List.of("step one", "step two"),
+                "Warm up understanding",
+                "Check engagement stability",
+                "Low evidence safe start",
+                "Adjust by performance each round",
+                "Low confidence means safe start with rapid recalibration"
             )
         );
 
         LearningPlanLlmResult normalized = validator.normalize(llmResult, fallbackPreview());
 
-        assertEquals(4, normalized.taskPreview().size());
-        assertEquals(List.of("STRUCTURE", "UNDERSTANDING", "TRAINING", "REFLECTION"),
-            normalized.taskPreview().stream().map(PlanTaskPreview::stage).toList());
+        assertEquals(2, normalized.taskPreview().size());
         assertEquals("Custom structure", normalized.taskPreview().get(0).title());
-        assertEquals("fallback understanding", normalized.taskPreview().get(1).title());
-        assertEquals("Custom training", normalized.taskPreview().get(2).title());
-        assertEquals("fallback reflection", normalized.taskPreview().get(3).title());
+        assertEquals("Custom training", normalized.taskPreview().get(1).title());
     }
 
     private LearningPlanPreview fallbackPreview() {

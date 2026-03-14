@@ -28,7 +28,11 @@ import com.pandanav.learning.domain.model.PlanAlternative;
 import com.pandanav.learning.domain.model.PlanPathNode;
 import com.pandanav.learning.domain.model.PlanReason;
 import com.pandanav.learning.domain.model.PlanTaskPreview;
+import com.pandanav.learning.domain.model.PlanGuidance;
 import com.pandanav.learning.domain.model.PersonalizedNarrative;
+import com.pandanav.learning.domain.model.PreviewEnhancement;
+import com.pandanav.learning.domain.model.StrategyComparison;
+import com.pandanav.learning.domain.model.StrategyOptionComparison;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.policy.TaskObjectiveTemplateStrategy;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
@@ -78,6 +82,8 @@ class LearningPlanServiceTest {
         assertEquals("tree basics", response.summary().recommendedStartNode().nodeName());
         assertNotNull(response.recommendation());
         assertNotNull(response.learnerSnapshot());
+        assertNotNull(response.planGuidance());
+        assertNotNull(response.strategyComparison());
         assertEquals("HIGH", response.confidence());
     }
 
@@ -250,6 +256,7 @@ class LearningPlanServiceTest {
             null,
             null,
             null,
+            null,
             null
         );
     }
@@ -287,9 +294,42 @@ class LearningPlanServiceTest {
             learnerState,
             new DecisionPlan(preview.summary().recommendedStartNodeId(), preview.summary().recommendedPace(), preview.summary().alternatives(), preview.summary().whyNow(), preview.reasons()),
             narrative,
+            sampleEnhancement(),
             fallback ? NarrativeSource.FALLBACK : NarrativeSource.LLM,
             !fallback,
             fallback ? String.join(",", fallbackReasons) : null
+        );
+    }
+
+    private PreviewEnhancement sampleEnhancement() {
+        return new PreviewEnhancement(
+            new PlanGuidance(
+                "先补基础更稳。",
+                "其他策略会放大当前阻塞。",
+                "你在建立整体理解阶段。",
+                "先画出本轮概念关系并口述。",
+                "检查是否能完整说出依赖链。",
+                "更稳但短期偏慢。",
+                "表现好会提速推进。",
+                "仍卡住会回补解释。",
+                "时间少就切到压缩版。",
+                "先开始第一步。",
+                List.of("画关系图", "说依赖链"),
+                "把框架说顺。",
+                "是否进入稳定节奏。",
+                "LOW_EVIDENCE_SAFE_START",
+                "每轮根据表现自动校准。",
+                "证据少时先低风险起步，再快速校准。"
+            ),
+            new StrategyComparison(
+                "FOUNDATION_FIRST",
+                List.of(
+                    new StrategyOptionComparison("FOUNDATION_FIRST", "先补基础", "基础薄弱", "需要极速冲刺", "短期速度慢"),
+                    new StrategyOptionComparison("FAST_TRACK", "快速推进", "基础较稳", "当前依赖断裂", "后续回退风险高"),
+                    new StrategyOptionComparison("PRACTICE_FIRST", "先做题带学", "需要快速暴露盲点", "概念理解薄弱", "挫败感上升"),
+                    new StrategyOptionComparison("COMPRESSED_10_MIN", "10分钟压缩版", "可用时间碎片化", "需要完整学习链路", "后续需要补课")
+                )
+            )
         );
     }
 

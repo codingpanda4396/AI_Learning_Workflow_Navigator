@@ -5,6 +5,7 @@ import com.pandanav.learning.application.service.llm.LlmJsonParseException;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.llm.LlmGateway;
 import com.pandanav.learning.domain.llm.model.LearningPlanLlmResult;
+import com.pandanav.learning.domain.llm.model.LlmCallMetrics;
 import com.pandanav.learning.domain.llm.model.LlmCallContext;
 import com.pandanav.learning.domain.llm.model.LlmFailureType;
 import com.pandanav.learning.domain.llm.model.LlmPrompt;
@@ -15,6 +16,7 @@ import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
 import com.pandanav.learning.domain.model.LearningPlanPreview;
 import com.pandanav.learning.domain.model.LearningPlanSummary;
 import com.pandanav.learning.domain.model.PersonalizedNarrative;
+import com.pandanav.learning.domain.model.PreviewEnhancement;
 import com.pandanav.learning.domain.service.LearningPlanPromptBuilder;
 import com.pandanav.learning.domain.service.LearningPlanResultValidator;
 import com.pandanav.learning.domain.service.LearningPlanSchemaValidationException;
@@ -69,7 +71,20 @@ public class LearningPlanOrchestrator {
     }
 
     public OrchestratedPlan preview(LearningPlanPlanningContext context) {
+        log.info(
+            "LearningPlan preview stage=RULE_SKELETON_START traceId={} diagnosisId={} sessionId={} userId={}",
+            com.pandanav.learning.infrastructure.observability.TraceContext.traceId(),
+            context.diagnosisId(),
+            context.sourceSessionId(),
+            context.userId()
+        );
         LearningPlanPreview rulePreview = ruleBasedPlanBuilder.build(context);
+        log.info(
+            "LearningPlan preview stage=RULE_SKELETON_SUCCESS traceId={} startNode={} pace={}",
+            com.pandanav.learning.infrastructure.observability.TraceContext.traceId(),
+            rulePreview.summary().recommendedStartNodeId(),
+            rulePreview.summary().recommendedPace()
+        );
         LearnerStateSnapshot learnerState = context.learnerStateSnapshot() == null
             ? learnerStateInterpreter.interpret(context)
             : context.learnerStateSnapshot();
@@ -101,9 +116,25 @@ public class LearningPlanOrchestrator {
         Instant start = Instant.now();
         try {
             LlmPrompt prompt = learningPlanPromptBuilder.build(context, rulePreview);
-            log.info("LearningPlan LLM call starting. {} model={} promptKey={}", logCtx, llmProperties.getModel(), prompt.promptKey());
+            LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
+            llmCallLogger.logStart(llmContext);
+            log.info(
+                "LearningPlan preview stage=LLM_ENHANCEMENT_START {} model={} promptKey={} traceId={} diagnosisId={} sessionId={}",
+                logCtx,
+                llmProperties.getModel(),
+                prompt.promptKey(),
+                llmContext.traceId(),
+                context.diagnosisId(),
+                context.sourceSessionId()
+            );
             LlmTextResult llmResult = llmGateway.generate(LlmStage.LEARNING_PLAN, prompt);
-            LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmResult.model());
+            llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmResult.model());
+            llmCallLogger.logSuccess(
+                llmContext,
+                LlmCallMetrics.from(llmResult.usage()),
+                llmResult.usage() == null ? null : llmResult.usage().finishReason(),
+                llmResult.usage() != null && llmResult.usage().truncated()
+            );
             if (isTruncated(llmResult)) {
                 String details = "finishReason=%s truncated=%s completionTokens=%s maxOutputTokens=%s".formatted(
                     llmResult.usage() == null ? "unknown" : String.valueOf(llmResult.usage().finishReason()),
@@ -126,13 +157,12 @@ public class LearningPlanOrchestrator {
 
             JsonNode json = llmJsonParser.parse(llmResult.text(), llmContext);
             LearningPlanLlmResult parsed = learningPlanResultValidator.parse(json);
-            LearningPlanLlmResult normalized = learningPlanResultValidator.normalize(parsed, rulePreview);
             List<String> errors = new ArrayList<>();
             errors.addAll(learningPlanResultValidator.validateRawTaskPreview(parsed, rulePreview));
-            errors.addAll(learningPlanResultValidator.validate(normalized, rulePreview));
+            errors.addAll(learningPlanResultValidator.validate(parsed, rulePreview));
             if (!errors.isEmpty()) {
                 log.warn(
-                    "LearningPlan LLM schema validation failed. {} traceId={} requestId={} model={} errors={}",
+                    "LearningPlan preview stage=LLM_SCHEMA_VALIDATE_FAILED {} traceId={} requestId={} model={} errors={}",
                     logCtx,
                     llmContext.traceId(),
                     llmContext.requestId(),
@@ -144,15 +174,34 @@ public class LearningPlanOrchestrator {
                 throw new AiGenerationException("PLAN_PREVIEW", "JSON_SCHEMA_MISMATCH");
             }
 
-            LearningPlanPreview merged = merge(rulePreview, normalized, "LLM", false, List.of());
+            LearningPlanPreview merged = merge(rulePreview, parsed, "LLM", false, List.of());
             DecisionPlan decisionPlan = buildDecisionPlan(merged);
-            PersonalizedNarrative narrative = llmEnhancedNarrativeGenerator.generate(context, learnerState, decisionPlan, merged);
+            PersonalizedNarrative narrative;
+            try {
+                narrative = llmEnhancedNarrativeGenerator.generate(context, learnerState, decisionPlan, merged);
+            } catch (Exception narrativeEx) {
+                log.warn(
+                    "LearningPlan preview stage=NARRATIVE_ASSEMBLY_FAILED {} traceId={} requestId={} model={} error={}",
+                    logCtx,
+                    llmContext.traceId(),
+                    llmContext.requestId(),
+                    llmContext.model(),
+                    narrativeEx.getMessage(),
+                    narrativeEx
+                );
+                throw new AiGenerationException("PLAN_PREVIEW", "NARRATIVE_ASSEMBLY_FAILED");
+            }
+            PreviewEnhancement previewEnhancement = new PreviewEnhancement(parsed.planGuidance(), parsed.strategyComparison());
             log.info(
-                "LearningPlan LLM applied successfully. {} traceId={} requestId={} model={}",
+                "LearningPlan preview stage=LLM_ENHANCEMENT_SUCCESS {} traceId={} requestId={} model={} tokenInput={} tokenOutput={} totalTokens={} latencyMs={}",
                 logCtx,
                 llmContext.traceId(),
                 llmContext.requestId(),
-                llmContext.model()
+                llmContext.model(),
+                llmResult.usage() == null ? null : llmResult.usage().tokenInput(),
+                llmResult.usage() == null ? null : llmResult.usage().tokenOutput(),
+                llmResult.usage() == null ? null : llmResult.usage().totalTokens(),
+                LlmObservabilityHelper.elapsedMs(start)
             );
             log.info("Narrative generated. source={} usedLlm={} fallbackReason={}", NarrativeSource.LLM, true, "");
             return new OrchestratedPlan(
@@ -164,6 +213,7 @@ public class LearningPlanOrchestrator {
                 learnerState,
                 decisionPlan,
                 narrative,
+                previewEnhancement,
                 NarrativeSource.LLM,
                 true,
                 null
@@ -172,7 +222,7 @@ public class LearningPlanOrchestrator {
             LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
             llmCallLogger.logStructuredOutputFailure(llmContext, "JSON_SCHEMA_MISMATCH", String.join("; ", ex.errors()));
             log.warn(
-                "LearningPlan schema mismatch. {} traceId={} requestId={} model={} errors={}",
+                "LearningPlan preview stage=LLM_SCHEMA_PARSE_FAILED {} traceId={} requestId={} model={} errors={}",
                 logCtx,
                 llmContext.traceId(),
                 llmContext.requestId(),
@@ -185,7 +235,7 @@ public class LearningPlanOrchestrator {
             LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
             llmCallLogger.logStructuredOutputFailure(llmContext, "JSON_PARSE_FAILED", ex.diagnosticSummary());
             log.warn(
-                "LearningPlan JSON parse failed. {} traceId={} requestId={} model={} reason={} diagnostics={}",
+                "LearningPlan preview stage=LLM_JSON_PARSE_FAILED {} traceId={} requestId={} model={} reason={} diagnostics={}",
                 logCtx,
                 llmContext.traceId(),
                 llmContext.requestId(),
@@ -200,7 +250,7 @@ public class LearningPlanOrchestrator {
         } catch (Exception ex) {
             LlmCallContext llmContext = LlmObservabilityHelper.context(LlmStage.LEARNING_PLAN, llmProperties.getModel());
             log.warn(
-                "LearningPlan LLM call failed. {} traceId={} requestId={} model={} error={}",
+                "LearningPlan preview stage=LLM_UNKNOWN_FAILED {} traceId={} requestId={} model={} error={}",
                 logCtx,
                 llmContext.traceId(),
                 llmContext.requestId(),
@@ -292,6 +342,7 @@ public class LearningPlanOrchestrator {
         LearnerStateSnapshot learnerStateSnapshot,
         DecisionPlan decisionPlan,
         PersonalizedNarrative personalizedNarrative,
+        PreviewEnhancement previewEnhancement,
         NarrativeSource narrativeSource,
         boolean narrativeUsedLlm,
         String narrativeFallbackReason

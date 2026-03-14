@@ -54,16 +54,12 @@ class LearningPlanOrchestratorTest {
     }
 
     @Test
-    void shouldUseLlmPlanWhenTaskPreviewIsPartialButRecoverable() {
+    void shouldFailWhenTaskPreviewIsPartial() {
         LearningPlanOrchestrator orchestrator = orchestrator(llmResult(partialJson()));
 
-        LearningPlanOrchestrator.OrchestratedPlan result = orchestrator.preview(sampleContext());
-
-        assertFalse(result.fallbackApplied());
-        assertEquals(PlanSource.LLM, result.planSource());
-        assertEquals(4, result.preview().taskPreview().size());
-        assertEquals(List.of("STRUCTURE", "UNDERSTANDING", "TRAINING", "REFLECTION"),
-            result.preview().taskPreview().stream().map(task -> task.stage()).toList());
+        AiGenerationException ex = assertThrows(AiGenerationException.class, () -> orchestrator.preview(sampleContext()));
+        assertEquals("PLAN_PREVIEW", ex.getStage());
+        assertEquals("JSON_SCHEMA_MISMATCH", ex.getReason());
     }
 
     @Test
@@ -169,6 +165,37 @@ class LearningPlanOrchestratorTest {
                 {"strategy":"PRACTICE_FIRST","label":"Practice first","description":"Expose gaps through exercises first.","tradeoff":"Can feel harder if concepts are shaky."},
                 {"strategy":"COMPRESSED_10_MIN","label":"10 minute version","description":"Shrink the current step to the minimum action.","tradeoff":"Needs follow-up reinforcement."}
               ],
+              "strategy_comparison": {
+                "current_recommended_strategy":"FOUNDATION_FIRST",
+                "options":[
+                  {"strategy":"FOUNDATION_FIRST","label":"Foundation first","suitable_for":"Need stable fundamentals first","not_ideal_when":"Need immediate speed-only sprint","switching_cost_risk":"Early progress feels slower but reduces later rollback"},
+                  {"strategy":"FAST_TRACK","label":"Fast track","suitable_for":"Already stable prerequisite mastery","not_ideal_when":"Current dependency is still unstable","switching_cost_risk":"Higher chance of repeated fallback"},
+                  {"strategy":"PRACTICE_FIRST","label":"Practice first","suitable_for":"Need to quickly expose blind spots","not_ideal_when":"Conceptual links are still fragmented","switching_cost_risk":"Can increase frustration if errors pile up"},
+                  {"strategy":"COMPRESSED_10_MIN","label":"10 minute version","suitable_for":"Only fragmented time is available","not_ideal_when":"Need deep uninterrupted understanding","switching_cost_risk":"Requires explicit follow-up reinforcement"}
+                ]
+              },
+              "plan_guidance": {
+                "why_chosen":"The recommendation prioritizes stabilizing the current dependency so later practice can stay continuous.",
+                "why_not_alternatives":"Other options are useful in the right moment, but now they increase rollback risk because the dependency is still fragile.",
+                "learner_mirror":"You are currently in a stage of consolidating conceptual links, not just polishing speed.",
+                "first_action":"Open the first node summary and draw a two-level concept relationship map in your own words.",
+                "first_checkpoint":"You can explain the dependency chain without pausing at key transitions and pass one micro-check.",
+                "plan_tradeoff":"This choice is steadier but gives slower short-term wins; the payoff is less repeated rework later.",
+                "if_perform_well":"The system will increase practice density and unlock the next node earlier in the next round.",
+                "if_still_struggle":"The system will narrow scope, add one extra explanation pass, and reduce jump distance.",
+                "if_no_time":"Switch to the compressed 10-minute version and keep one explicit follow-up task for the next session.",
+                "start_prompt":"先做第一轮启动动作，马上进入状态。",
+                "kickoff_steps":[
+                  "写下当前节点和后续节点的依赖关系",
+                  "口述一遍为什么必须先补这个节点",
+                  "完成1道微型校验题并记录卡点"
+                ],
+                "warmup_goal":"先把依赖链条讲顺，不追求一步到位。",
+                "validation_focus":"系统重点看你是否进入稳定理解节奏而非只看对错。",
+                "evidence_mode":"当前证据偏少，先用低风险起步模式收集有效行为信号。",
+                "adaptation_policy":"每轮根据你的实际表现提速、维持或回补，不会长期固定在同一强度。",
+                "confidence_explanation":"LOW 代表证据不足下的稳健起步，不代表系统无效；本轮后会快速重估。"
+              },
               "focuses": ["solidify tree basics", "connect traversal to prior concepts"],
               "benefits": ["Reduce repeated backtracking", "Unlock later traversal practice"],
               "next_unlocks": ["binary tree traversal", "later training"],
@@ -203,6 +230,37 @@ class LearningPlanOrchestratorTest {
                 {"strategy":"PRACTICE_FIRST","label":"Practice first","description":"Expose gaps through exercises first.","tradeoff":"Can feel harder if concepts are shaky."},
                 {"strategy":"COMPRESSED_10_MIN","label":"10 minute version","description":"Shrink the current step to the minimum action.","tradeoff":"Needs follow-up reinforcement."}
               ],
+              "strategy_comparison": {
+                "current_recommended_strategy":"FOUNDATION_FIRST",
+                "options":[
+                  {"strategy":"FOUNDATION_FIRST","label":"Foundation first","suitable_for":"Need stable fundamentals first","not_ideal_when":"Need immediate speed-only sprint","switching_cost_risk":"Early progress feels slower but reduces later rollback"},
+                  {"strategy":"FAST_TRACK","label":"Fast track","suitable_for":"Already stable prerequisite mastery","not_ideal_when":"Current dependency is still unstable","switching_cost_risk":"Higher chance of repeated fallback"},
+                  {"strategy":"PRACTICE_FIRST","label":"Practice first","suitable_for":"Need to quickly expose blind spots","not_ideal_when":"Conceptual links are still fragmented","switching_cost_risk":"Can increase frustration if errors pile up"},
+                  {"strategy":"COMPRESSED_10_MIN","label":"10 minute version","suitable_for":"Only fragmented time is available","not_ideal_when":"Need deep uninterrupted understanding","switching_cost_risk":"Requires explicit follow-up reinforcement"}
+                ]
+              },
+              "plan_guidance": {
+                "why_chosen":"The recommendation prioritizes stabilizing the current dependency so later practice can stay continuous.",
+                "why_not_alternatives":"Other options are useful in the right moment, but now they increase rollback risk because the dependency is still fragile.",
+                "learner_mirror":"You are currently in a stage of consolidating conceptual links, not just polishing speed.",
+                "first_action":"Open the first node summary and draw a two-level concept relationship map in your own words.",
+                "first_checkpoint":"You can explain the dependency chain without pausing at key transitions and pass one micro-check.",
+                "plan_tradeoff":"This choice is steadier but gives slower short-term wins; the payoff is less repeated rework later.",
+                "if_perform_well":"The system will increase practice density and unlock the next node earlier in the next round.",
+                "if_still_struggle":"The system will narrow scope, add one extra explanation pass, and reduce jump distance.",
+                "if_no_time":"Switch to the compressed 10-minute version and keep one explicit follow-up task for the next session.",
+                "start_prompt":"先做第一轮启动动作，马上进入状态。",
+                "kickoff_steps":[
+                  "写下当前节点和后续节点的依赖关系",
+                  "口述一遍为什么必须先补这个节点",
+                  "完成1道微型校验题并记录卡点"
+                ],
+                "warmup_goal":"先把依赖链条讲顺，不追求一步到位。",
+                "validation_focus":"系统重点看你是否进入稳定理解节奏而非只看对错。",
+                "evidence_mode":"当前证据偏少，先用低风险起步模式收集有效行为信号。",
+                "adaptation_policy":"每轮根据你的实际表现提速、维持或回补，不会长期固定在同一强度。",
+                "confidence_explanation":"LOW 代表证据不足下的稳健起步，不代表系统无效；本轮后会快速重估。"
+              },
               "focuses": ["solidify tree basics", "connect traversal to prior concepts"],
               "benefits": ["Reduce repeated backtracking", "Unlock later traversal practice"],
               "next_unlocks": ["binary tree traversal", "later training"],
@@ -234,6 +292,7 @@ class LearningPlanOrchestratorTest {
             List.of("tree basics"),
             "Current weak point is tree basics",
             PlanAdjustments.defaults(),
+            null,
             null,
             null,
             null,
