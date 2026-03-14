@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { confirmLearningPlanApi, fetchLearningPlanPreviewApi, regenerateLearningPlanApi } from '@/api/modules/learningPlan';
-import type { LearningPlanPreview, LearningPlanRequest, PlanAdjustments } from '@/types/learningPlan';
+import type { LearningPlanPreview, LearningPlanRequest, PlanAdjustments, PlanConfirmResult } from '@/types/learningPlan';
 
 export const useLearningPlanStore = defineStore('learningPlan', {
   state: () => ({
@@ -86,15 +86,14 @@ export const useLearningPlanStore = defineStore('learningPlan', {
         this.regenerating = false;
       }
     },
-    async confirmPlan() {
+    async confirmPlan(): Promise<PlanConfirmResult> {
       if (!this.preview?.id) {
         throw new Error('缺少预览 ID。');
       }
       this.confirming = true;
       this.error = '';
       try {
-        const result = await confirmLearningPlanApi(this.preview.id);
-        return result.sessionId;
+        return await confirmLearningPlanApi(this.preview.id);
       } catch (error) {
         this.error = error instanceof Error ? error.message : '确认学习计划失败。';
         throw error;
