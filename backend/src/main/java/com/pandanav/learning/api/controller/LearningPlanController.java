@@ -33,26 +33,26 @@ public class LearningPlanController {
     public ApiEnvelope<LearningPlanPreviewResponse> preview(@Valid @RequestBody PreviewLearningPlanRequest request) {
         LearningPlanPreviewResponse response = learningPlanService.preview(new PreviewLearningPlanCommand(
             UserContextHolder.getRequiredUserId(),
-            request.goalId(),
             request.diagnosisId(),
+            request.sessionId(),
             request.courseName(),
             request.chapterName(),
             request.goalText(),
             request.adjustments()
         ));
-        return ApiEnvelope.ok(response, response.planSource());
+        return ApiEnvelope.ok(response, response.contentSource() == null ? null : response.contentSource().code());
     }
 
-    @PostMapping("/{planId}/confirm")
-    public ApiEnvelope<ConfirmLearningPlanResponse> confirm(@PathVariable @Positive Long planId) {
+    @PostMapping("/{previewId}/confirm")
+    public ApiEnvelope<ConfirmLearningPlanResponse> confirm(@PathVariable @Positive Long previewId) {
         return ApiEnvelope.ok(learningPlanService.confirm(new ConfirmLearningPlanCommand(
-            planId,
+            previewId,
             UserContextHolder.getRequiredUserId()
         )));
     }
 
-    @GetMapping("/{planId}")
-    public ApiEnvelope<LearningPlanPreviewResponse> get(@PathVariable @Positive Long planId) {
-        return ApiEnvelope.ok(learningPlanService.get(planId, UserContextHolder.getRequiredUserId()));
+    @GetMapping("/{previewId}")
+    public ApiEnvelope<LearningPlanPreviewResponse> get(@PathVariable @Positive Long previewId) {
+        return ApiEnvelope.ok(learningPlanService.get(previewId, UserContextHolder.getRequiredUserId()));
     }
 }

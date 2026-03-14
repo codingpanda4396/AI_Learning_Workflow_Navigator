@@ -96,17 +96,20 @@ async function retryCurrentAction() {
 }
 
 async function enterPlanFlow() {
-  const numericSessionId = Number(sessionId.value);
+  const target = diagnosisStore.nextAction?.target;
+  const targetSessionId = String(target?.params?.sessionId ?? sessionId.value);
+  const targetDiagnosisId = String(target?.params?.diagnosisId ?? diagnosisStore.diagnosisId);
+  const numericSessionId = Number(targetSessionId);
   if (!Number.isFinite(numericSessionId) || numericSessionId <= 0) {
     await router.push('/');
     return;
   }
   await router.push({
-    path: '/plan',
+    path: target?.route || '/plan',
     query: {
       sessionId: numericSessionId,
       goalId: String(numericSessionId),
-      diagnosisId: diagnosisStore.diagnosisId,
+      diagnosisId: targetDiagnosisId,
       goal: goalText.value,
       course: courseId.value,
       chapter: chapterId.value,
@@ -142,7 +145,7 @@ onMounted(async () => {
       <ErrorState v-else-if="isError" :message="diagnosisStore.error" />
 
       <template v-else-if="isResult && diagnosisStore.capabilityProfile">
-        <CapabilityProfileCard :profile="diagnosisStore.capabilityProfile" />
+        <CapabilityProfileCard :profile="diagnosisStore.capabilityProfile" :insights="diagnosisStore.insights" />
 
         <div class="flex justify-end">
           <button
@@ -197,7 +200,7 @@ onMounted(async () => {
       </template>
 
       <div v-if="isSubmitting" class="rounded-[1.8rem] border border-sky-100 bg-sky-50 p-6 text-sm leading-7 text-sky-700">
-        系统正在分析你的回答并构建能力画像，请稍候。
+        系统正在分析你的回答并生成能力画像，请稍候。
       </div>
 
       <div v-if="isError" class="flex justify-start">
@@ -206,7 +209,7 @@ onMounted(async () => {
           class="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           @click="retryCurrentAction"
         >
-          {{ canRetrySubmit ? '重新提交诊断' : '重新生成诊断问题' }}
+          {{ canRetrySubmit ? '重新提交诊断' : '重新生成诊断问卷' }}
         </button>
       </div>
     </div>

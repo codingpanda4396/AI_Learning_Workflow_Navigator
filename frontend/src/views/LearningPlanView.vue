@@ -27,11 +27,9 @@ const adjustments = computed({
 
 const context = computed(() => {
   const sessionId = Number(route.query.sessionId ?? 0);
-  const goalId = String(route.query.goalId ?? route.query.sessionId ?? '').trim();
   const diagnosisId = String(route.query.diagnosisId ?? '').trim();
   return {
     sessionId: Number.isFinite(sessionId) && sessionId > 0 ? sessionId : undefined,
-    goalId,
     diagnosisId,
     goalText: String(route.query.goal ?? '').trim() || 'Master the current chapter focus',
     courseName: String(route.query.course ?? '').trim() || 'General Course',
@@ -56,7 +54,7 @@ const viewState = computed(() => {
 });
 
 async function loadPlan() {
-  if (!context.value.goalId || !context.value.diagnosisId) {
+  if (!context.value.diagnosisId || !context.value.goalText) {
     learningPlanStore.error = 'Missing diagnosis or goal parameters for plan preview.';
     return;
   }
@@ -97,7 +95,6 @@ async function goBackToGoal() {
       goal: context.value.goalText,
       course: context.value.courseName,
       chapter: context.value.chapterName,
-      goalId: context.value.goalId,
       diagnosisId: context.value.diagnosisId,
     },
   });
@@ -111,7 +108,6 @@ async function openDiagnosis() {
         goal: context.value.goalText,
         course: context.value.courseName,
         chapter: context.value.chapterName,
-        goalId: context.value.goalId,
         diagnosisId: context.value.diagnosisId,
       },
     });
@@ -128,7 +124,7 @@ function focusConfirmSection() {
 }
 
 watch(
-  () => [route.query.sessionId, route.query.goalId, route.query.diagnosisId, route.query.goal, route.query.course, route.query.chapter],
+  () => [route.query.sessionId, route.query.diagnosisId, route.query.goal, route.query.course, route.query.chapter],
   async () => {
     await loadPlan();
   },
@@ -202,7 +198,7 @@ onBeforeUnmount(() => {
           }}
         </div>
 
-        <PlanReasonPanel :reasons="preview.reasons" :diagnosis-summary="preview.diagnosisSummary" />
+        <PlanReasonPanel :reasons="preview.reasons" :diagnosis-summary="preview.context.diagnosisSummary" />
         <PlanPathPreviewPanel :nodes="preview.pathNodes" />
         <PlanTaskPreviewPanel
           :tasks="preview.taskPreviews"

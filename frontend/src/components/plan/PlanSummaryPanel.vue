@@ -9,28 +9,28 @@ const props = defineProps<{
 const metrics = [
   {
     label: '本轮起点',
-    value: () => props.preview.summary.recommendedStart,
-    hint: '从最该补齐的位置切入',
+    value: () => props.preview.summary.recommendedStartNode.nodeName,
+    hint: '从当前最值得优先补齐的位置切入',
   },
   {
-    label: '推荐推进方式',
+    label: '推荐节奏',
     value: () => props.preview.summary.recommendedRhythmLabel || INTENSITY_LABELS[props.preview.summary.recommendedRhythm],
-    hint: '按你当前节奏安排，不硬拉时长',
+    hint: '结合当前基础与任务密度给出的建议',
   },
   {
-    label: '预计投入',
-    value: () => `${props.preview.summary.estimatedMinutes} 分钟`,
-    hint: '这一轮的建议专注时间',
+    label: '预估总耗时',
+    value: () => `${props.preview.summary.estimatedTotalMinutes} 分钟`,
+    hint: '口径为本次 pathPreview 的总投入时间',
   },
   {
     label: '涉及节点',
     value: () => `${props.preview.summary.estimatedKnowledgeCount} 个`,
-    hint: '本轮会真正碰到的知识点',
+    hint: '本轮真正会推进的知识节点数量',
   },
   {
     label: '前置补齐数',
-    value: () => `${Math.max(0, props.preview.pathNodes.filter(node => node.isPrerequisite).length)} 个`,
-    hint: '先稳住再推进主线',
+    value: () => `${Math.max(0, props.preview.pathNodes.filter((node) => node.isPrerequisite).length)} 个`,
+    hint: '优先稳住再进入主线推进',
   },
 ];
 </script>
@@ -46,7 +46,7 @@ const metrics = [
         {{ preview.summary.personalizedHeadline }}
       </h1>
       <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-200/92 md:text-base">
-        基于你的学习目标、诊断结果和当前薄弱点，这一轮先帮你把最影响推进效率的环节排清楚。
+        基于学习目标、诊断结果和近期薄弱点，这份预览先帮你确定最合理的切入点与推进顺序。
         {{ preview.summary.personalizedSummary }}
       </p>
 
@@ -64,9 +64,9 @@ const metrics = [
 
       <div class="mt-6 flex flex-wrap items-center gap-2 text-[11px] text-slate-300/72">
         <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">规划依据</span>
-        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.goalText }}</span>
-        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.courseName }} / {{ preview.chapterName }}</span>
-        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">诊断薄弱点 + 学习偏好</span>
+        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.context.goalText }}</span>
+        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.context.courseName }} / {{ preview.context.chapterName }}</span>
+        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.status }}</span>
       </div>
     </div>
   </section>

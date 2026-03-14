@@ -1,14 +1,11 @@
 import type { CodeLabel } from '@/types/common';
 
 export type LearningStage = 'STRUCTURE' | 'UNDERSTANDING' | 'TRAINING' | 'REFLECTION';
-
 export type LearningIntensity = 'LIGHT' | 'STANDARD' | 'INTENSIVE';
-
 export type LearningMode = 'EXPLAIN_THEN_PRACTICE' | 'LEARN_BY_DOING';
-
 export type PathMasteryStatus = 'WEAK' | 'PARTIAL' | 'STABLE' | 'NEW';
-
 export type PathDifficulty = 'FOUNDATION' | 'CORE' | 'CHALLENGE';
+export type PlanPreviewStatus = 'PREVIEW_READY' | 'COMMITTED';
 
 export interface PlanAdjustments {
   intensity: LearningIntensity;
@@ -18,7 +15,6 @@ export interface PlanAdjustments {
 
 export interface LearningPlanRequest {
   sessionId?: number;
-  goalId: string;
   diagnosisId: string;
   goalText: string;
   courseName: string;
@@ -26,11 +22,17 @@ export interface LearningPlanRequest {
   adjustments: PlanAdjustments;
 }
 
+export interface PlanNodeRef {
+  id: string;
+  nodeKey: string;
+  nodeName: string;
+}
+
 export interface PlanSummary {
-  recommendedStart: string;
+  recommendedStartNode: PlanNodeRef;
   recommendedRhythm: LearningIntensity;
   recommendedRhythmLabel?: string;
-  estimatedMinutes: number;
+  estimatedTotalMinutes: number;
   estimatedKnowledgeCount: number;
   stageCount: number;
   personalizedHeadline: string;
@@ -45,12 +47,11 @@ export interface PlanReason {
 }
 
 export interface PlanPathNode {
-  id: string;
-  name: string;
+  node: PlanNodeRef;
   masteryStatus: PathMasteryStatus;
   difficulty: PathDifficulty;
   reasonTags: string[];
-  estimatedMinutes: number;
+  estimatedNodeMinutes: number;
   isStartingPoint: boolean;
   isPrerequisite: boolean;
   isFocus: boolean;
@@ -58,27 +59,47 @@ export interface PlanPathNode {
 
 export interface PlanTaskPreview {
   stage: LearningStage;
-  stageGoal: string;
+  title: string;
+  learningGoal: string;
   learnerAction: string;
   aiSupport: string;
-  estimatedMinutes: number;
+  estimatedTaskMinutes: number;
+}
+
+export interface LearningPlanContext {
+  sessionId?: number;
+  diagnosisId: string;
+  goalText: string;
+  courseName: string;
+  chapterName: string;
+  diagnosisSummary: string;
+}
+
+export interface LearningPlanMetadata {
+  schemaVersion: string;
+  persistedPreview: boolean;
+  estimatedTotalMinutesScope: string;
+  estimatedNodeMinutesScope: string;
+  estimatedTaskMinutesScope: string;
 }
 
 export interface LearningPlanPreview {
-  planId: number;
+  previewId: number;
+  status: PlanPreviewStatus;
+  previewOnly: boolean;
+  committed: boolean;
   summary: PlanSummary;
   reasons: PlanReason[];
   pathNodes: PlanPathNode[];
   taskPreviews: PlanTaskPreview[];
   adjustments: PlanAdjustments;
-  goalText: string;
-  courseName: string;
-  chapterName: string;
-  diagnosisSummary: string;
+  context: LearningPlanContext;
   nextStepNote: string;
   planSource?: CodeLabel;
+  contentSource?: CodeLabel;
   fallbackApplied?: boolean;
   fallbackReasons?: string[];
+  metadata?: LearningPlanMetadata;
 }
 
 export interface PlanConfirmResult {

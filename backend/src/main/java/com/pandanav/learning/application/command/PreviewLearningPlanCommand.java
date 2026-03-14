@@ -1,14 +1,14 @@
 package com.pandanav.learning.application.command;
 
-import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsRequest;
+import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsDto;
 
 public record PreviewLearningPlanCommand(
     Long userId,
-    String goalId,
     String diagnosisId,
-    String courseId,
-    String chapterId,
+    Long sessionId,
+    String courseName,
+    String chapterName,
     String goalText,
-    LearningPlanAdjustmentsRequest adjustments
+    LearningPlanAdjustmentsDto adjustments
 ) {
 }

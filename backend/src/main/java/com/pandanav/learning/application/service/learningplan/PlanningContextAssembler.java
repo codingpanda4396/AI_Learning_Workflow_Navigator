@@ -1,6 +1,6 @@
 package com.pandanav.learning.application.service.learningplan;
 
-import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsRequest;
+import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsDto;
 import com.pandanav.learning.application.command.PreviewLearningPlanCommand;
 import com.pandanav.learning.application.service.WeakPointDiagnosisService;
 import com.pandanav.learning.domain.model.ConceptNode;
@@ -52,14 +52,15 @@ public class PlanningContextAssembler {
         Optional<LearningSession> latestSession = sessionRepository.findLatestActiveByUserPk(command.userId())
             .or(() -> sessionRepository.findLatestByUserId("user-" + command.userId()));
 
-        String courseId = prefer(command.courseId(), latestSession.map(LearningSession::getCourseId).orElse("course-" + sanitize(command.goalId())));
-        String chapterId = prefer(command.chapterId(), latestSession.map(LearningSession::getChapterId).orElse("chapter-" + sanitize(command.goalId())));
-        String goalText = prefer(command.goalText(), latestSession.map(LearningSession::getGoalText).orElse("围绕 " + command.goalId() + " 完成本轮重点补强"));
+        String goalKey = command.sessionId() == null ? command.goalText() : "session-" + command.sessionId();
+        String courseName = prefer(command.courseName(), latestSession.map(LearningSession::getCourseId).orElse("course-" + sanitize(goalKey)));
+        String chapterName = prefer(command.chapterName(), latestSession.map(LearningSession::getChapterId).orElse("chapter-" + sanitize(goalKey)));
+        String goalText = prefer(command.goalText(), latestSession.map(LearningSession::getGoalText).orElse("围绕当前章节目标完成本轮重点补强"));
 
-        List<ConceptNode> persistedNodes = conceptNodeRepository.findByChapterIdOrderByOrderNoAsc(chapterId);
+        List<ConceptNode> persistedNodes = conceptNodeRepository.findByChapterIdOrderByOrderNoAsc(chapterName);
         Map<Long, List<Long>> prerequisiteMap = persistedNodes.isEmpty()
             ? Map.of()
-            : conceptNodeRepository.findPrerequisiteNodeIdsByChapterId(chapterId);
+            : conceptNodeRepository.findPrerequisiteNodeIdsByChapterId(chapterName);
 
         List<WeakPointDiagnosisService.WeakNode> weakNodes = latestSession.isPresent()
             ? weakPointDiagnosisService.diagnoseWeakPoints(latestSession.get().getId(), command.userId()).weakNodes()
@@ -67,7 +68,7 @@ public class PlanningContextAssembler {
         Map<Long, WeakPointDiagnosisService.WeakNode> weakNodeMap = weakNodes.stream()
             .collect(Collectors.toMap(WeakPointDiagnosisService.WeakNode::nodeId, node -> node, (left, right) -> left, LinkedHashMap::new));
 
-        Map<Long, NodeMastery> masteryMap = nodeMasteryRepository.findByUserIdAndChapterId(command.userId(), chapterId).stream()
+        Map<Long, NodeMastery> masteryMap = nodeMasteryRepository.findByUserIdAndChapterId(command.userId(), chapterName).stream()
             .collect(Collectors.toMap(NodeMastery::getNodeId, row -> row, (left, right) -> left, LinkedHashMap::new));
 
         List<TrainingAttemptSummary> recentAttempts = latestSession.isPresent()
@@ -84,7 +85,13 @@ public class PlanningContextAssembler {
             ? buildSyntheticNodes(goalText)
             : persistedNodes.stream()
                 .sorted(Comparator.comparing(ConceptNode::getOrderNo).thenComparing(ConceptNode::getId))
-                .map(node -> toContextNode(node, masteryMap.get(node.getId()), weakNodeMap.get(node.getId()), errorTagsByNode.getOrDefault(node.getId(), List.of()), prerequisiteMap.getOrDefault(node.getId(), List.of())))
+                .map(node -> toContextNode(
+                    node,
+                    masteryMap.get(node.getId()),
+                    weakNodeMap.get(node.getId()),
+                    errorTagsByNode.getOrDefault(node.getId(), List.of()),
+                    prerequisiteMap.getOrDefault(node.getId(), List.of())
+                ))
                 .toList();
 
         List<String> recentErrorTags = recentAttempts.stream()
@@ -96,17 +103,17 @@ public class PlanningContextAssembler {
         List<Integer> recentScores = recentAttempts.stream().map(TrainingAttemptSummary::score).filter(score -> score != null).toList();
         List<String> weakLabels = weakNodes.stream().map(WeakPointDiagnosisService.WeakNode::nodeName).limit(4).toList();
         String learnerProfileSummary = weakLabels.isEmpty()
-            ? "当前可用历史证据较少，系统优先依据目标与知识顺序保守规划。"
-            : "你的薄弱点主要集中在 " + String.join("、", weakLabels) + "，因此本轮更强调补前置和减跳跃。";
+            ? "当前可用历史证据较少，系统会优先根据目标与知识顺序给出稳健预览。"
+            : "结合最近的薄弱点表现，本轮会优先补齐 " + String.join("、", weakLabels) + " 相关的关键连接。";
 
         return new LearningPlanPlanningContext(
             command.userId(),
-            command.goalId(),
+            goalKey,
             command.diagnosisId(),
-            courseId,
-            chapterId,
+            courseName,
+            chapterName,
             goalText,
-            latestSession.map(LearningSession::getId).orElse(null),
+            latestSession.map(LearningSession::getId).orElse(command.sessionId()),
             nodes,
             recentErrorTags,
             recentScores,
@@ -160,13 +167,13 @@ public class PlanningContextAssembler {
         return nodes;
     }
 
-    private PlanAdjustments toAdjustments(LearningPlanAdjustmentsRequest request) {
+    private PlanAdjustments toAdjustments(LearningPlanAdjustmentsDto request) {
         if (request == null) {
             return PlanAdjustments.defaults();
         }
         return new PlanAdjustments(
-            request.intensity() == null ? null : request.intensity().code(),
-            request.learningMode() == null ? null : request.learningMode().code(),
+            request.intensity(),
+            request.learningMode(),
             request.prioritizeFoundation() == null || request.prioritizeFoundation()
         ).normalized();
     }

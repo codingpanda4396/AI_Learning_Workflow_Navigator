@@ -1,8 +1,10 @@
 package com.pandanav.learning.api.contract;
 
 import com.pandanav.learning.api.dto.CodeLabelDto;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisQuestionOptionDto;
 import com.pandanav.learning.domain.enums.CapabilityLevel;
 import com.pandanav.learning.domain.enums.DiagnosisDimension;
+import com.pandanav.learning.domain.model.DiagnosisQuestionOption;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -97,9 +99,19 @@ public final class ContractCatalog {
     );
 
     private static final Map<String, String> PLAN_SOURCE_LABELS = Map.of(
-        "LLM", "LLM",
-        "RULE", "规则",
+        "RULE_ENGINE", "规则规划",
         "RULE_FALLBACK", "规则兜底"
+    );
+
+    private static final Map<String, String> CONTENT_SOURCE_LABELS = Map.of(
+        "LLM", "AI 生成文案",
+        "RULE_TEMPLATE", "规则模板文案",
+        "RULE_FALLBACK", "规则兜底文案"
+    );
+
+    private static final Map<String, String> PREVIEW_STATUS_LABELS = Map.of(
+        "PREVIEW_READY", "预览草稿已生成",
+        "COMMITTED", "已确认并生成正式计划"
     );
 
     private static final Map<String, String> STAGE_LABELS = Map.of(
@@ -134,6 +146,10 @@ public final class ContractCatalog {
         return new CodeLabelDto(normalized, QUESTION_TYPE_LABELS.getOrDefault(normalized.toLowerCase(Locale.ROOT), normalized));
     }
 
+    public static String diagnosisQuestionTypeCode(String typeCode) {
+        return normalize(typeCode);
+    }
+
     public static List<CodeLabelDto> diagnosisOptions(DiagnosisDimension dimension, List<String> labels) {
         List<OptionDef> optionDefs = DIAGNOSIS_OPTIONS.getOrDefault(dimension, List.of());
         Map<String, CodeLabelDto> mapped = new LinkedHashMap<>();
@@ -154,6 +170,25 @@ public final class ContractCatalog {
             mapped.put(option.code(), new CodeLabelDto(option.code(), option.label()));
         }
         return mapped.values().stream().toList();
+    }
+
+    public static List<DiagnosisQuestionOption> diagnosisQuestionOptions(DiagnosisDimension dimension) {
+        List<OptionDef> optionDefs = DIAGNOSIS_OPTIONS.getOrDefault(dimension, List.of());
+        List<DiagnosisQuestionOption> options = new java.util.ArrayList<>();
+        for (int i = 0; i < optionDefs.size(); i++) {
+            OptionDef option = optionDefs.get(i);
+            options.add(new DiagnosisQuestionOption(option.code(), option.label(), i + 1));
+        }
+        return options;
+    }
+
+    public static List<DiagnosisQuestionOptionDto> diagnosisQuestionOptions(List<DiagnosisQuestionOption> options) {
+        if (options == null) {
+            return List.of();
+        }
+        return options.stream()
+            .map(option -> new DiagnosisQuestionOptionDto(option.code(), option.label(), option.order()))
+            .toList();
     }
 
     public static Optional<CodeLabelDto> diagnosisOption(DiagnosisDimension dimension, String raw) {
@@ -214,6 +249,14 @@ public final class ContractCatalog {
 
     public static CodeLabelDto planSource(String code) {
         return labeled(code, PLAN_SOURCE_LABELS);
+    }
+
+    public static CodeLabelDto contentSource(String code) {
+        return labeled(code, CONTENT_SOURCE_LABELS);
+    }
+
+    public static CodeLabelDto previewStatus(String code) {
+        return labeled(code, PREVIEW_STATUS_LABELS);
     }
 
     public static CodeLabelDto stage(String code) {

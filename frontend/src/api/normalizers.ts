@@ -48,7 +48,16 @@ function readCodeLabel(value: unknown, fallback = ''): CodeLabel {
 }
 
 function normalizePlanAdjustments(value: unknown, defaultAdjustments: PlanAdjustments): PlanAdjustments {
-  if (!value || typeof value !== 'object') {
+  if (!value) {
+    return defaultAdjustments;
+  }
+  if (typeof value === 'string') {
+    return {
+      ...defaultAdjustments,
+      intensity: value as PlanAdjustments['intensity'],
+    };
+  }
+  if (typeof value !== 'object') {
     return defaultAdjustments;
   }
   const row = value as Record<string, unknown>;
@@ -389,6 +398,8 @@ export function normalizeGrowthDashboard(data: Record<string, unknown>): GrowthD
 
 export function normalizeLearningPlanPreview(data: Record<string, unknown>, request: LearningPlanRequest): LearningPlanPreview {
   const summary = (data.summary as Record<string, unknown> | undefined) ?? {};
+  const context = (data.context as Record<string, unknown> | undefined) ?? {};
+  const metadata = (data.metadata as Record<string, unknown> | undefined) ?? {};
   const adjustments = normalizePlanAdjustments(data.adjustments, request.adjustments);
   const reasons = (Array.isArray(data.reasons) ? data.reasons : []) as Record<string, unknown>[];
   const pathNodes = (Array.isArray(data.path_preview ?? data.pathPreview ?? data.path_nodes ?? data.pathNodes)
@@ -399,16 +410,45 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     : []) as Record<string, unknown>[];
 
   return {
-    planId: toNumber(data.plan_id ?? data.planId) ?? 0,
+    previewId: toNumber(data.preview_id ?? data.previewId ?? data.plan_id ?? data.planId) ?? 0,
+    status: String(data.status ?? 'PREVIEW_READY') as LearningPlanPreview['status'],
+    previewOnly: Boolean(data.preview_only ?? data.previewOnly ?? true),
+    committed: Boolean(data.committed ?? false),
     summary: {
-      recommendedStart: String(summary.recommended_start_node_name ?? summary.recommendedStartNodeName ?? summary.recommended_start ?? summary.recommendedStart ?? ''),
+      recommendedStartNode: {
+        id: String(
+          (summary.recommended_start_node as Record<string, unknown> | undefined)?.id
+            ?? (summary.recommendedStartNode as Record<string, unknown> | undefined)?.id
+            ?? summary.recommended_start_node_id
+            ?? summary.recommendedStartNodeId
+            ?? ''
+        ),
+        nodeKey: String(
+          (summary.recommended_start_node as Record<string, unknown> | undefined)?.node_key
+            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.nodeKey
+            ?? (summary.recommendedStartNode as Record<string, unknown> | undefined)?.nodeKey
+            ?? summary.recommended_start_node_id
+            ?? summary.recommendedStartNodeId
+            ?? ''
+        ),
+        nodeName: String(
+          (summary.recommended_start_node as Record<string, unknown> | undefined)?.node_name
+            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.nodeName
+            ?? (summary.recommendedStartNode as Record<string, unknown> | undefined)?.nodeName
+            ?? summary.recommended_start_node_name
+            ?? summary.recommendedStartNodeName
+            ?? summary.recommended_start
+            ?? summary.recommendedStart
+            ?? ''
+        ),
+      },
       recommendedRhythm: (readCode(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm) || request.adjustments.intensity) as LearningPlanPreview['summary']['recommendedRhythm'],
       recommendedRhythmLabel: readLabel(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm),
-      estimatedMinutes: toNumber(summary.estimated_minutes ?? summary.estimatedMinutes) ?? 0,
+      estimatedTotalMinutes: toNumber(summary.estimated_total_minutes ?? summary.estimatedTotalMinutes ?? summary.estimated_minutes ?? summary.estimatedMinutes) ?? 0,
       estimatedKnowledgeCount: toNumber(summary.estimated_node_count ?? summary.estimatedNodeCount ?? summary.estimated_knowledge_count ?? summary.estimatedKnowledgeCount) ?? 0,
       stageCount: toNumber(summary.estimated_stage_count ?? summary.estimatedStageCount ?? summary.stage_count ?? summary.stageCount) ?? 4,
       personalizedHeadline: String(summary.headline ?? summary.personalized_headline ?? summary.personalizedHeadline ?? ''),
-      personalizedSummary: String(data.learner_profile_summary ?? data.learnerProfileSummary ?? data.diagnosis_summary ?? data.diagnosisSummary ?? data.diagnosisSummary ?? ''),
+      personalizedSummary: String(context.diagnosis_summary ?? context.diagnosisSummary ?? data.learner_profile_summary ?? data.learnerProfileSummary ?? data.diagnosis_summary ?? data.diagnosisSummary ?? ''),
     },
     reasons: reasons.map((item, index) => ({
       key: String(item.key ?? item.type ?? `reason-${index + 1}`),
@@ -428,12 +468,35 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
       const inferredPrerequisite = reasonTags.some((tag) => /prerequisite|前置|基础/i.test(tag));
 
       return {
-        id: String(item.node_id ?? item.nodeId ?? item.id ?? `path-${index + 1}`),
-        name: String(item.node_name ?? item.nodeName ?? item.name ?? ''),
+        node: {
+          id: String(
+            (item.node as Record<string, unknown> | undefined)?.id
+              ?? item.node_id
+              ?? item.nodeId
+              ?? item.id
+              ?? `path-${index + 1}`
+          ),
+          nodeKey: String(
+            (item.node as Record<string, unknown> | undefined)?.node_key
+              ?? (item.node as Record<string, unknown> | undefined)?.nodeKey
+              ?? item.node_id
+              ?? item.nodeId
+              ?? item.id
+              ?? `path-${index + 1}`
+          ),
+          nodeName: String(
+            (item.node as Record<string, unknown> | undefined)?.node_name
+              ?? (item.node as Record<string, unknown> | undefined)?.nodeName
+              ?? item.node_name
+              ?? item.nodeName
+              ?? item.name
+              ?? ''
+          ),
+        },
         masteryStatus: normalizePathMasteryStatus(readCode(item.status ?? item.mastery_status ?? item.masteryStatus), item.mastery),
         difficulty: normalizePathDifficulty(readCode(item.difficulty) || item.difficulty),
         reasonTags,
-        estimatedMinutes: toNumber(item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
+        estimatedNodeMinutes: toNumber(item.estimated_node_minutes ?? item.estimatedNodeMinutes ?? item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
         isStartingPoint,
         isPrerequisite: explicitPrerequisite === undefined ? inferredPrerequisite : Boolean(explicitPrerequisite),
         isFocus: explicitFocus === undefined ? !isStartingPoint && !inferredPrerequisite : Boolean(explicitFocus),
@@ -441,19 +504,32 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     }),
     taskPreviews: taskPreviews.map((item) => ({
       stage: readCode(item.stage) as LearningPlanPreview['taskPreviews'][number]['stage'],
-      stageGoal: String(item.goal ?? item.stage_goal ?? item.stageGoal ?? ''),
+      title: String(item.title ?? ''),
+      learningGoal: String(item.learning_goal ?? item.learningGoal ?? item.goal ?? item.stage_goal ?? item.stageGoal ?? ''),
       learnerAction: String(item.learner_action ?? item.learnerAction ?? ''),
       aiSupport: String(item.ai_support ?? item.aiSupport ?? ''),
-      estimatedMinutes: toNumber(item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
+      estimatedTaskMinutes: toNumber(item.estimated_task_minutes ?? item.estimatedTaskMinutes ?? item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
     })),
     adjustments,
-    goalText: String(data.goal_text ?? data.goalText ?? request.goalText),
-    courseName: String(data.course_name ?? data.courseName ?? data.course_id ?? data.courseId ?? request.courseName),
-    chapterName: String(data.chapter_name ?? data.chapterName ?? data.chapter_id ?? data.chapterId ?? request.chapterName),
-    diagnosisSummary: String(data.diagnosis_summary ?? data.diagnosisSummary ?? ''),
+    context: {
+      sessionId: toNumber(context.session_id ?? context.sessionId ?? request.sessionId),
+      diagnosisId: String(context.diagnosis_id ?? context.diagnosisId ?? data.diagnosis_id ?? data.diagnosisId ?? request.diagnosisId),
+      goalText: String(context.goal_text ?? context.goalText ?? data.goal_text ?? data.goalText ?? request.goalText),
+      courseName: String(context.course_name ?? context.courseName ?? data.course_name ?? data.courseName ?? data.course_id ?? data.courseId ?? request.courseName),
+      chapterName: String(context.chapter_name ?? context.chapterName ?? data.chapter_name ?? data.chapterName ?? data.chapter_id ?? data.chapterId ?? request.chapterName),
+      diagnosisSummary: String(context.diagnosis_summary ?? context.diagnosisSummary ?? data.diagnosis_summary ?? data.diagnosisSummary ?? ''),
+    },
     nextStepNote: String(data.next_step_note ?? data.nextStepNote ?? ''),
     planSource: data.plan_source || data.planSource ? readCodeLabel(data.plan_source ?? data.planSource) : undefined,
+    contentSource: data.content_source || data.contentSource ? readCodeLabel(data.content_source ?? data.contentSource) : undefined,
     fallbackApplied: Boolean(data.fallback_applied ?? data.fallbackApplied),
     fallbackReasons: readArray(data.fallback_reasons ?? data.fallbackReasons),
+    metadata: {
+      schemaVersion: String(metadata.schema_version ?? metadata.schemaVersion ?? ''),
+      persistedPreview: Boolean(metadata.persisted_preview ?? metadata.persistedPreview),
+      estimatedTotalMinutesScope: String(metadata.estimated_total_minutes_scope ?? metadata.estimatedTotalMinutesScope ?? ''),
+      estimatedNodeMinutesScope: String(metadata.estimated_node_minutes_scope ?? metadata.estimatedNodeMinutesScope ?? ''),
+      estimatedTaskMinutesScope: String(metadata.estimated_task_minutes_scope ?? metadata.estimatedTaskMinutesScope ?? ''),
+    },
   };
 }

@@ -23,7 +23,6 @@ export const useLearningPlanStore = defineStore('learningPlan', {
       };
       this.request = {
         sessionId: payload.sessionId,
-        goalId: payload.goalId,
         diagnosisId: payload.diagnosisId,
         goalText: payload.goalText,
         courseName: payload.courseName,
@@ -40,7 +39,7 @@ export const useLearningPlanStore = defineStore('learningPlan', {
         };
         return preview;
       } catch (error) {
-        this.error = error instanceof Error ? error.message : '生成学习规划预览失败';
+        this.error = error instanceof Error ? error.message : 'Failed to generate the learning plan preview.';
         throw error;
       } finally {
         this.loading = false;
@@ -81,23 +80,23 @@ export const useLearningPlanStore = defineStore('learningPlan', {
         };
         return preview;
       } catch (error) {
-        this.error = error instanceof Error ? error.message : '重新生成学习规划失败';
+        this.error = error instanceof Error ? error.message : 'Failed to regenerate the learning plan preview.';
         throw error;
       } finally {
         this.regenerating = false;
       }
     },
     async confirmPlan() {
-      if (!this.preview?.planId) {
-        throw new Error('缺少学习规划 ID。');
+      if (!this.preview?.previewId) {
+        throw new Error('Missing preview ID.');
       }
       this.confirming = true;
       this.error = '';
       try {
-        const result = await confirmLearningPlanApi(this.preview.planId);
+        const result = await confirmLearningPlanApi(this.preview.previewId);
         return result.sessionId;
       } catch (error) {
-        this.error = error instanceof Error ? error.message : '确认学习规划失败';
+        this.error = error instanceof Error ? error.message : 'Failed to confirm the learning plan.';
         throw error;
       } finally {
         this.confirming = false;

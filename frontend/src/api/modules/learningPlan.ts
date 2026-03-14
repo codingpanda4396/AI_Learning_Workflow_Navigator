@@ -14,7 +14,7 @@ function toBackendLearningMode(mode: PlanAdjustments['learningMode']): string {
 }
 
 function toApiPayload(payload: {
-  goalId: string;
+  sessionId?: number;
   diagnosisId: string;
   goalText: string;
   courseName: string;
@@ -22,20 +22,14 @@ function toApiPayload(payload: {
   adjustments: PlanAdjustments;
 }) {
   return {
-    goalId: payload.goalId,
     diagnosisId: payload.diagnosisId,
+    sessionId: payload.sessionId,
     goalText: payload.goalText,
     courseName: payload.courseName,
     chapterName: payload.chapterName,
     adjustments: {
-      intensity: {
-        code: payload.adjustments.intensity,
-        label: payload.adjustments.intensity,
-      },
-      learningMode: {
-        code: toBackendLearningMode(payload.adjustments.learningMode),
-        label: payload.adjustments.learningMode,
-      },
+      intensity: payload.adjustments.intensity,
+      learningMode: toBackendLearningMode(payload.adjustments.learningMode),
       prioritizeFoundation: payload.adjustments.prioritizeFoundation,
     },
   };

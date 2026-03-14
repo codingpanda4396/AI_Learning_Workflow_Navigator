@@ -5,9 +5,9 @@ import com.pandanav.learning.api.dto.CodeLabelDto;
 public record PlanTaskPreviewResponse(
     CodeLabelDto stage,
     String title,
-    String goal,
+    String learningGoal,
     String learnerAction,
     String aiSupport,
-    Integer estimatedMinutes
+    Integer estimatedTaskMinutes
 ) {
 }

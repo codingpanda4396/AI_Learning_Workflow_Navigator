@@ -4,10 +4,9 @@ import com.pandanav.learning.api.dto.CodeLabelDto;
 
 public record LearningPlanSummaryResponse(
     String headline,
-    String recommendedStartNodeId,
-    String recommendedStartNodeName,
+    PlanNodeReferenceResponse recommendedStartNode,
     CodeLabelDto recommendedPace,
-    Integer estimatedMinutes,
+    Integer estimatedTotalMinutes,
     Integer estimatedNodeCount,
     Integer estimatedStageCount
 ) {

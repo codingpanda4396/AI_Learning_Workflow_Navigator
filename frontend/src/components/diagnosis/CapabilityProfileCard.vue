@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { resolveCapabilityProfileCopy } from '@/types/diagnosis';
-import type { CapabilityProfile } from '@/types/diagnosis';
+import type { CapabilityProfile, DiagnosisInsights } from '@/types/diagnosis';
 
 const props = defineProps<{
   profile: CapabilityProfile;
+  insights?: DiagnosisInsights | null;
 }>();
 
-const profileCopy = computed(() => resolveCapabilityProfileCopy(props.profile));
+const profileCopy = computed(() => resolveCapabilityProfileCopy(props.insights ?? undefined));
 </script>
 
 <template>
