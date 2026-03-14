@@ -62,6 +62,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -114,6 +116,7 @@ public class LearningPlanService {
     }
 
     public LearningPlanPreviewResponse preview(PreviewLearningPlanCommand command) {
+        Instant previewStart = Instant.now();
         log.info(
             "LearningPlan preview requested. traceId={} userId={} diagnosisId={} sessionId={}",
             TraceContext.traceId(),
@@ -152,7 +155,7 @@ public class LearningPlanService {
             orchestrated.fallbackReasons()
         );
         log.info(
-            "LearningPlan preview built. traceId={} planId={} diagnosisId={} sessionId={} recommendedConcept={} strategyCode={} explanationGenerated={} nextActions={}",
+            "LearningPlan preview built. traceId={} planId={} diagnosisId={} sessionId={} recommendedConcept={} strategyCode={} explanationGenerated={} nextActions={} previewLatencyMs={}",
             TraceContext.traceId(),
             response.planId(),
             command.diagnosisId(),
@@ -160,7 +163,8 @@ public class LearningPlanService {
             response.recommendedEntry() == null ? null : response.recommendedEntry().title(),
             response.recommendedStrategy() == null ? null : response.recommendedStrategy().code(),
             response.explanationGenerated(),
-            response.nextActions() == null ? 0 : response.nextActions().size()
+            response.nextActions() == null ? 0 : response.nextActions().size(),
+            Duration.between(previewStart, Instant.now()).toMillis()
         );
         return response;
     }
@@ -358,6 +362,19 @@ public class LearningPlanService {
         LearningPlanSummary summary = preview.summary();
         PreviewTemplateExplanationAssembler.PreviewExplanations explanations =
             previewTemplateExplanationAssembler.build(preview, context);
+        log.info(
+            "LearningPlan preview explanation. traceId={} diagnosisId={} sessionId={} planId={} llmLatencyMs={} promptTokens={} completionTokens={} totalTokens={} templateFallback={} explanationGenerated={}",
+            TraceContext.traceId(),
+            context == null ? null : context.diagnosisId(),
+            context == null ? null : context.sourceSessionId(),
+            plan.getId(),
+            explanations.llmLatencyMs(),
+            explanations.promptTokens(),
+            explanations.completionTokens(),
+            explanations.totalTokens(),
+            explanations.templateFallback(),
+            explanations.explanationGenerated()
+        );
         List<String> nextActions = buildNextActions(preview);
         return new LearningPlanPreviewResponse(
             String.valueOf(plan.getId()),
@@ -390,7 +407,7 @@ public class LearningPlanService {
             committed
                 ? "已进入正式学习流程，系统会直接把你带到第一步任务。"
                 : "确认后系统会创建正式计划，并带你进入第一步任务。",
-            false,
+            explanations.explanationGenerated(),
             plan.getCreatedAt() == null ? OffsetDateTime.now() : plan.getCreatedAt(),
             TraceContext.traceId()
         );
