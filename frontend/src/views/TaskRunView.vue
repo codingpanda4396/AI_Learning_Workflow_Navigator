@@ -8,6 +8,7 @@ import LoadingState from '@/components/common/LoadingState.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import SectionCard from '@/components/ui/SectionCard.vue';
 import { formatStage } from '@/utils/format';
+import { getPreviewMetricsSnapshot, trackFirstTaskCompleted } from '@/utils/previewMetrics';
 import { useTaskStore } from '@/stores/task';
 import { normalizeLearningContent } from '@/utils/taskContent';
 
@@ -35,6 +36,8 @@ async function backToSession() {
 }
 
 async function goPrimary() {
+  trackFirstTaskCompleted(taskId.value);
+  console.info('[metrics] first task progress', getPreviewMetricsSnapshot());
   if (isTraining.value && sessionId.value) {
     await router.push(`/sessions/${sessionId.value}/quiz`);
     return;

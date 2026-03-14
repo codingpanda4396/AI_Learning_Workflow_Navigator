@@ -24,7 +24,11 @@ public class PlanCandidatePlanner {
         List<EntryCandidate> entries = buildEntryCandidates(context, learnerState);
         List<StrategyCandidate> strategies = buildStrategyCandidates(learnerState, context.requestedStrategy());
         List<IntensityCandidate> intensities = buildIntensityCandidates(context);
-        List<ActionTemplate> actions = buildActionTemplates(entries.isEmpty() ? "当前关键概念" : entries.get(0).conceptName());
+        List<ActionTemplate> actions = buildActionTemplates(
+            context,
+            learnerState,
+            entries.isEmpty() ? "当前关键概念" : entries.get(0).conceptName()
+        );
         return new PlanCandidateSet(entries, strategies, intensities, actions);
     }
 
@@ -134,13 +138,86 @@ public class PlanCandidatePlanner {
         return result;
     }
 
-    private List<ActionTemplate> buildActionTemplates(String conceptName) {
-        return List.of(
-            new ActionTemplate("STRUCTURE", "建立结构图", "明确 " + conceptName + " 在章节中的依赖位置", "先画出概念关系图并口述主线", "AI 将对关系图做缺口提示", 6),
-            new ActionTemplate("UNDERSTANDING", "补齐关键理解", "搞清最容易混淆的连接点", "用一正一反两个例子解释概念边界", "AI 会基于错误标签切换解释角度", 8),
-            new ActionTemplate("TRAINING", "做定向训练", "验证当前回补是否生效", "完成 3-5 个贴近当前卡点的短练习", "AI 会给出错因归因和下一题建议", 12),
-            new ActionTemplate("REFLECTION", "收口与决策", "判断是否可进入下一节点", "复盘本轮错误模式并给出下一步选择", "AI 将输出推进或回补建议", 5)
-        );
+    private List<ActionTemplate> buildActionTemplates(
+        LearningPlanPlanningContext context,
+        LearnerState learnerState,
+        String conceptName
+    ) {
+        GapProfile profile = resolveGapProfile(context, learnerState);
+        return switch (profile) {
+            case FOUNDATION_WEAK -> List.of(
+                new ActionTemplate("STRUCTURE", "补前置框架", "补齐 " + conceptName + " 的前置依赖", "画出依赖图并标出断点，至少标注 2 个前置关系", "AI 会检查依赖关系并提示遗漏节点", 7),
+                new ActionTemplate("UNDERSTANDING", "校准概念边界", "避免基础概念混淆", "使用 1 个正例 + 1 个反例解释核心定义", "AI 会对定义偏差做逐句纠偏", 9),
+                new ActionTemplate("TRAINING", "低阶稳态训练", "验证基础补齐是否生效", "完成 3 题基础练习，正确率达到 2/3", "AI 会给出错因和最小修正动作", 10),
+                new ActionTemplate("REFLECTION", "确认可推进性", "判断是否进入下一节点", "总结仍不清楚的 1 个点并决定继续补齐或推进", "AI 会给出继续补齐或推进建议", 5)
+            );
+            case RELATION_WEAK -> List.of(
+                new ActionTemplate("STRUCTURE", "串联关系链", "明确 " + conceptName + " 与上下游节点关系", "写出从前置到当前节点的三步关系链", "AI 会标记关系链中的逻辑跳步", 6),
+                new ActionTemplate("UNDERSTANDING", "修复连接点", "补齐最容易断链的连接环节", "用自己的话解释两个关键连接点并给例子", "AI 会检查连接是否闭环", 8),
+                new ActionTemplate("TRAINING", "迁移验证训练", "验证关系链能否迁移到题目场景", "完成 4 题连接型练习，至少 3 题能说明推理路径", "AI 会检查推理路径是否连贯", 12),
+                new ActionTemplate("REFLECTION", "关系回放", "避免再次出现断链错误", "复盘 1 次错误链路并写出替代思路", "AI 会给出下一轮重点关系节点", 5)
+            );
+            case CODE_MAPPING_WEAK -> List.of(
+                new ActionTemplate("STRUCTURE", "代码映射拆解", "把概念映射到代码骨架", "列出 3 个概念到代码位置的映射", "AI 会检查映射是否对应真实执行路径", 6),
+                new ActionTemplate("UNDERSTANDING", "语义到实现转换", "建立概念与实现动作的一一对应", "解释每段关键代码在概念层的作用", "AI 会指出语义和实现不一致的位置", 8),
+                new ActionTemplate("TRAINING", "定向改错", "降低“会概念不会写代码”问题", "完成 3 个小改错任务并说明修改理由", "AI 会逐条评估改错理由是否充分", 13),
+                new ActionTemplate("REFLECTION", "可复用模板沉淀", "沉淀下一轮可复用编码步骤", "输出 1 份最小实现模板并标注易错点", "AI 会给模板补充检查清单", 5)
+            );
+            case STABILITY_WEAK -> List.of(
+                new ActionTemplate("STRUCTURE", "最小可执行起步", "先确保本轮有稳定产出", "定义 10 分钟内可完成的最小动作", "AI 会收敛到低负担起步动作", 5),
+                new ActionTemplate("UNDERSTANDING", "高频错因收敛", "先压制反复出现的错因", "针对高频错误标签写 2 条规避规则", "AI 会校验规避规则是否可执行", 7),
+                new ActionTemplate("TRAINING", "短回路训练", "快速拿到新反馈并稳定节奏", "完成 2-3 题短练，单题复盘不超过 2 分钟", "AI 会基于表现动态调节难度", 9),
+                new ActionTemplate("REFLECTION", "节奏复盘", "决定下一轮是提速还是继续稳态", "记录本轮压力点并选择下一轮节奏", "AI 会给出提速/稳态建议", 4)
+            );
+        };
+    }
+
+    private GapProfile resolveGapProfile(LearningPlanPlanningContext context, LearnerState learnerState) {
+        int relationTagCount = countContains(context.recentErrorTags(), "LINK", "DEPENDENCY", "RELATION", "CONFUSION");
+        int codeTagCount = countContains(context.recentErrorTags(), "CODE", "IMPLEMENT", "TRANSFER", "PRACTICE");
+        int avgScore = context.recentScores() == null || context.recentScores().isEmpty()
+            ? 100
+            : (int) Math.round(context.recentScores().stream().mapToInt(Integer::intValue).average().orElse(100D));
+        if (learnerState.currentBlockType() == CurrentBlockType.FOUNDATION_GAP) {
+            return GapProfile.FOUNDATION_WEAK;
+        }
+        if (relationTagCount >= 2 || learnerState.currentBlockType() == CurrentBlockType.CONCEPT_LINK_GAP) {
+            return GapProfile.RELATION_WEAK;
+        }
+        if (codeTagCount >= 2 || learnerState.currentBlockType() == CurrentBlockType.APPLICATION_GAP) {
+            return GapProfile.CODE_MAPPING_WEAK;
+        }
+        if (avgScore < 60 || learnerState.currentBlockType() == CurrentBlockType.MIXED || learnerState.currentBlockType() == CurrentBlockType.EVIDENCE_LOW) {
+            return GapProfile.STABILITY_WEAK;
+        }
+        return GapProfile.RELATION_WEAK;
+    }
+
+    private int countContains(List<String> values, String... targets) {
+        if (values == null || values.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (String value : values) {
+            if (value == null) {
+                continue;
+            }
+            String upper = value.toUpperCase(Locale.ROOT);
+            for (String token : targets) {
+                if (upper.contains(token)) {
+                    count++;
+                    break;
+                }
+            }
+        }
+        return count;
+    }
+
+    private enum GapProfile {
+        FOUNDATION_WEAK,
+        RELATION_WEAK,
+        CODE_MAPPING_WEAK,
+        STABILITY_WEAK
     }
 
     private record EntryRank(LearningPlanContextNode node, int score) {

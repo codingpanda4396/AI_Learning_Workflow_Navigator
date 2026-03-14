@@ -25,9 +25,11 @@ import type {
   PlanAdjustments,
   PlanAlternative,
   PlanBenefit,
+  PreviewNextAction,
   PlanStrategyComparison,
   PlanStrategyOption,
   PlanStageStatus,
+  PlanTaskPreview,
   PlanUnlock,
 } from '@/types/learningPlan';
 import type { CurrentSessionInfo, SessionOverview } from '@/types/session';
@@ -390,6 +392,61 @@ function normalizeKickoffSteps(value: unknown): string[] {
     .slice(0, 4);
 }
 
+function normalizeTaskPreview(value: unknown): PlanTaskPreview[] {
+  const items = Array.isArray(value) ? value : [];
+  return items
+    .map((item, index) => {
+      const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+      const stageCode = readCode(row.stage).toUpperCase();
+      const stage = (stageCode || String(row.stage_code ?? row.stageCode ?? '')).toUpperCase();
+      const normalizedStage: PlanTaskPreview['stage'] =
+        stage === 'STRUCTURE' || stage === 'UNDERSTANDING' || stage === 'TRAINING' || stage === 'REFLECTION'
+          ? stage
+          : 'STRUCTURE';
+      return {
+        stage: normalizedStage,
+        title: String(row.title ?? row.task_title ?? row.taskTitle ?? row.goal ?? `学习任务 ${index + 1}`),
+        learningGoal: String(row.learning_goal ?? row.learningGoal ?? row.goal ?? '').trim(),
+        learnerAction: String(row.learner_action ?? row.learnerAction ?? row.action ?? '').trim(),
+        aiSupport: String(row.ai_support ?? row.aiSupport ?? '').trim(),
+        estimatedTaskMinutes: toNumber(row.estimated_task_minutes ?? row.estimatedTaskMinutes ?? row.estimated_minutes ?? row.estimatedMinutes) ?? 15,
+        expectedArtifact: String(row.expected_artifact ?? row.expectedArtifact ?? '').trim() || undefined,
+        completionCriteria: String(row.completion_criteria ?? row.completionCriteria ?? '').trim() || undefined,
+        checkMethod: String(row.check_method ?? row.checkMethod ?? '').trim() || undefined,
+      };
+    })
+    .filter((item) => item.title);
+}
+
+function normalizeNextActionDetails(value: unknown): PreviewNextAction[] {
+  const items = Array.isArray(value) ? value : [];
+  const normalized: Array<PreviewNextAction | null> = items.map((item) => {
+      if (typeof item === 'string') {
+        const title = item.trim();
+        return title ? { title } : null;
+      }
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+      const row = item as Record<string, unknown>;
+      const title = String(row.title ?? row.step ?? row.action ?? row.learner_action ?? row.learnerAction ?? '').trim();
+      if (!title) {
+        return null;
+      }
+      return {
+        title,
+        learnerAction: String(row.learner_action ?? row.learnerAction ?? '').trim() || undefined,
+        expectedArtifact: String(row.expected_artifact ?? row.expectedArtifact ?? '').trim() || undefined,
+        completionCriteria: String(row.completion_criteria ?? row.completionCriteria ?? '').trim() || undefined,
+        estimatedMinutes: toNumber(row.estimated_minutes ?? row.estimatedMinutes),
+        aiSupport: String(row.ai_support ?? row.aiSupport ?? '').trim() || undefined,
+        checkMethod: String(row.check_method ?? row.checkMethod ?? '').trim() || undefined,
+      };
+    })
+    ;
+  return normalized.filter((item): item is PreviewNextAction => item !== null).slice(0, 4);
+}
+
 function normalizePersonalization(value: unknown): LearningPlanPersonalization | undefined {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -695,7 +752,13 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
   const learnerSnapshotRaw = (data.learner_snapshot ?? data.learnerSnapshot) as Record<string, unknown> | undefined;
   const recommendedStrategyRaw = (data.recommended_strategy ?? data.recommendedStrategy) as Record<string, unknown> | undefined;
   const alternativesRaw = (Array.isArray(data.alternatives_v2) ? data.alternatives_v2 : (Array.isArray(data.alternatives) ? data.alternatives : [])) as Record<string, unknown>[];
-  const nextActionsRaw = readArray(data.next_actions ?? data.nextActions ?? data.next_actions_v2 ?? data.nextActionsV2);
+  const nextActionsSource = data.next_actions_v2 ?? data.nextActionsV2 ?? data.next_actions ?? data.nextActions;
+  const nextActionDetails = normalizeNextActionDetails(nextActionsSource);
+  const nextActionsRaw = nextActionDetails.length
+    ? nextActionDetails.map((item) => item.title)
+    : readArray(nextActionsSource);
+  const taskPreviewRaw = data.task_previews ?? data.taskPreviews ?? data.task_preview ?? data.taskPreview;
+  const taskPreviews = normalizeTaskPreview(taskPreviewRaw);
   const recommendedTitle = String(recommendedEntryRaw?.title ?? '');
   const estimatedMinutes = toNumber(recommendedEntryRaw?.estimated_minutes ?? recommendedEntryRaw?.estimatedMinutes) ?? 15;
 
@@ -726,6 +789,12 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
       notRecommendedReason: String(item.not_recommended_reason ?? item.notRecommendedReason ?? '这次优先级略低。'),
     })),
     nextActionsV2: nextActionsRaw.slice(0, 3),
+    nextActionsDetail: nextActionDetails.length ? nextActionDetails : undefined,
+    whyThisStep: String(data.why_this_step ?? data.whyThisStep ?? recommendedEntryRaw?.reason ?? '').trim() || undefined,
+    keyEvidence: readArray(data.key_evidence ?? data.keyEvidence).slice(0, 3),
+    skipRisk: String(data.skip_risk ?? data.skipRisk ?? '').trim() || undefined,
+    expectedGain: String(data.expected_gain ?? data.expectedGain ?? '').trim() || undefined,
+    confidenceHint: String(data.confidence_hint ?? data.confidenceHint ?? '').trim() || undefined,
     startGuide: String(data.start_guide ?? data.startGuide ?? '确认后系统会直接带你进入第一步任务。'),
     explanationGenerated: Boolean(data.explanation_generated ?? data.explanationGenerated),
     focuses: [],
@@ -753,7 +822,7 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
       reason: String(recommendedEntryRaw?.reason ?? ''),
     }],
     pathNodes: [],
-    taskPreviews: [],
+    taskPreviews,
     adjustments,
     context: {
       sessionId: request.sessionId,

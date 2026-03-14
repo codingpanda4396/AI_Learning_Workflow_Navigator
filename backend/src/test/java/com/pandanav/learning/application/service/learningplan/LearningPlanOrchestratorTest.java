@@ -119,6 +119,8 @@ class LearningPlanOrchestratorTest {
             null,
             null,
             null,
+            null,
+            null,
             null
         );
     }

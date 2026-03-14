@@ -128,6 +128,11 @@ class LearningPlanControllerTest {
                 new LearningPlanPreviewResponse.AlternativeStrategyResponse("PRACTICE_FIRST", "先练后学", "这次不优先，因为概念连接还不够稳。")
             ),
             List.of("建立整体框架", "补齐关键理解", "做针对性训练"),
+            "系统优先推荐这一步，因为它最能减少后续卡点。",
+            List.of("基础薄弱点集中在树结构", "最近练习在依赖关系上反复出错"),
+            "跳过会导致后续节点理解和训练同时卡住。",
+            "完成后会更容易进入下一轮训练。",
+            "当前推荐基于近期学习证据，可信度中等偏高。",
             new LearningPlanAdjustmentsDto("STANDARD", "LEARN_THEN_PRACTICE", true),
             "确认后系统会创建正式计划，并带你进入第一步任务。",
             false,

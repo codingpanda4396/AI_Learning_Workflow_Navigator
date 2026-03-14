@@ -57,6 +57,8 @@ class PlanCandidatePlannerTest {
             null,
             null,
             null,
+            null,
+            null,
             null
         );
         LearnerState learnerState = new LearnerState(

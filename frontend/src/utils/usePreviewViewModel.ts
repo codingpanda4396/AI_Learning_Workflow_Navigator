@@ -1,26 +1,29 @@
 import type { LearningPlanPreview } from '@/types/learningPlan';
 import { formatPlanMinutes } from '@/utils/normalizePlanPreview';
 
-interface PreviewAlternativeVm {
-  label: string;
-  reason: string;
-}
-
 export interface PreviewDecisionViewModel {
   hero: {
     title: string;
-    reason: string;
-    estimate: string;
+    subtitle: string;
     ctaLabel: string;
+    task: {
+      learnerAction: string;
+      expectedArtifact: string;
+      completionCriteria: string;
+      estimate: string;
+      aiSupport: string;
+      checkMethod: string;
+    };
+    secondaryActions: string[];
   };
-  aiObserved: {
-    currentState: string;
+  explanation: {
+    whyThisStep: string;
     evidence: string[];
+    confidenceHint: string;
   };
-  strategy: {
-    recommendedLabel: string;
-    explanation: string;
-    alternatives: PreviewAlternativeVm[];
+  outcomes: {
+    expectedGain: string;
+    skipRisk: string;
   };
   kickoff: {
     actions: string[];
@@ -58,36 +61,63 @@ function normalizeConceptTitle(value: string): string {
 
 export function buildPreviewViewModel(preview: LearningPlanPreview): PreviewDecisionViewModel {
   const recommendedTitle = normalizeConceptTitle(preview.recommendedEntry?.title || '');
+  const primaryTask = preview.nextActionsDetail?.[0];
+  const fallbackTask = preview.taskPreviews?.[0];
+  const secondaryActions = (preview.nextActionsDetail ?? [])
+    .slice(1, 4)
+    .map((item) => item.title)
+    .filter(Boolean);
   const evidence = (preview.learnerSnapshotV2?.evidence ?? [])
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 3);
 
-  const alternatives = (preview.alternativesV2 ?? [])
-    .slice(0, 2)
-    .map((item) => ({
-      label: text(item.label, '备选方案'),
-      reason: text(item.notRecommendedReason, '这次不优先，因为当前阶段更适合先补关键薄弱点。'),
-    }));
-
   return {
     hero: {
-      title: `下一步先学「${recommendedTitle}」`,
-      reason: text(preview.recommendedEntry?.reason, '先补稳这一块，后面的学习会更顺。'),
-      estimate: formatPlanMinutes(preview.recommendedEntry?.estimatedMinutes),
+      title: `现在先做「${recommendedTitle}」`,
+      subtitle: text(preview.whyThisStep || preview.recommendedEntry?.reason, '先补稳这一块，后面的学习会更顺。'),
       ctaLabel: '确认并进入',
+      task: {
+        learnerAction: text(
+          primaryTask?.learnerAction ?? fallbackTask?.learnerAction ?? primaryTask?.title,
+          '按系统给出的步骤完成这一步学习。',
+        ),
+        expectedArtifact: text(
+          primaryTask?.expectedArtifact,
+          '形成一份你可复述的要点清单或简短笔记。',
+        ),
+        completionCriteria: text(
+          primaryTask?.completionCriteria,
+          '你能用自己的话解释关键概念，并完成一个对应小练习。',
+        ),
+        estimate: formatPlanMinutes(primaryTask?.estimatedMinutes ?? fallbackTask?.estimatedTaskMinutes ?? preview.recommendedEntry?.estimatedMinutes),
+        aiSupport: text(
+          primaryTask?.aiSupport ?? fallbackTask?.aiSupport,
+          'AI 会按当前步骤提供提示、示例和纠错反馈。',
+        ),
+        checkMethod: text(
+          primaryTask?.checkMethod,
+          '用 1 道自测题或一段口头讲解来确认自己已掌握。',
+        ),
+      },
+      secondaryActions: secondaryActions.length ? secondaryActions : (preview.nextActionsV2 ?? []).slice(1, 3),
     },
-    aiObserved: {
-      currentState: text(preview.learnerSnapshotV2?.currentState, '你当前需要先补稳关键基础。'),
-      evidence: evidence.length ? evidence : ['当前起点与后续路径紧密相关。', '先补关键步骤能降低后续卡住概率。', '系统会根据你的表现动态调整下一步。'],
-    },
-    strategy: {
-      recommendedLabel: text(preview.recommendedStrategy?.label, '稳步推进'),
-      explanation: text(
-        preview.explanationGenerated ? preview.recommendedStrategy?.explanation : '这次先走更稳妥的路径，优先降低后续反复卡住的风险。',
-        '这次先走更稳妥的路径，优先降低后续反复卡住的风险。',
+    explanation: {
+      whyThisStep: text(
+        preview.whyThisStep || preview.recommendedEntry?.reason,
+        '系统优先推荐这一步，因为它最能减少后续学习卡点。',
       ),
-      alternatives,
+      evidence: (preview.keyEvidence ?? evidence).length
+        ? (preview.keyEvidence ?? evidence).slice(0, 3)
+        : ['当前起点与后续路径紧密相关。', '先补关键步骤能降低后续卡住概率。', '系统会根据你的表现动态调整下一步。'],
+      confidenceHint: text(
+        preview.confidenceHint,
+        preview.explanationGenerated ? '当前推荐基于近期学习证据，可信度中等偏高。' : '当前证据有限，系统会在你完成第一步后继续校准。',
+      ),
+    },
+    outcomes: {
+      expectedGain: text(preview.expectedGain, '完成后你会更容易进入后续训练，并且错因定位会更聚焦。'),
+      skipRisk: text(preview.skipRisk, '如果跳过这一步，后续节点更容易反复卡住。'),
     },
     kickoff: {
       actions: (preview.nextActionsV2 ?? []).slice(0, 3),

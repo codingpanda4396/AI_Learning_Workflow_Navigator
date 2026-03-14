@@ -127,6 +127,19 @@ export interface PlanTaskPreview {
   learnerAction: string;
   aiSupport: string;
   estimatedTaskMinutes: number;
+  expectedArtifact?: string;
+  completionCriteria?: string;
+  checkMethod?: string;
+}
+
+export interface PreviewNextAction {
+  title: string;
+  learnerAction?: string;
+  expectedArtifact?: string;
+  completionCriteria?: string;
+  estimatedMinutes?: number;
+  aiSupport?: string;
+  checkMethod?: string;
 }
 
 export interface LearningPlanContext {
@@ -181,6 +194,12 @@ export interface LearningPlanPreview {
   recommendedStrategy: PreviewRecommendedStrategy;
   alternativesV2: PreviewAlternativeStrategy[];
   nextActionsV2: string[];
+  nextActionsDetail?: PreviewNextAction[];
+  whyThisStep?: string;
+  keyEvidence?: string[];
+  skipRisk?: string;
+  expectedGain?: string;
+  confidenceHint?: string;
   startGuide: string;
   explanationGenerated: boolean;
   focuses: string[];

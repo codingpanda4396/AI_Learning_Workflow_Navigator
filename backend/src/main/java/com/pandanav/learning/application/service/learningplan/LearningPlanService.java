@@ -36,6 +36,8 @@ import com.pandanav.learning.domain.model.LearningPlanContextNode;
 import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
 import com.pandanav.learning.domain.model.LearningPlanPreview;
 import com.pandanav.learning.domain.model.LearningPlanSummary;
+import com.pandanav.learning.domain.model.LearnerEvidenceSummary;
+import com.pandanav.learning.domain.model.LearnerSignalSnapshot;
 import com.pandanav.learning.domain.model.LearnerStateSnapshot;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.PlanAdjustments;
@@ -57,6 +59,7 @@ import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
+import com.pandanav.learning.infrastructure.observability.LearningPlanMetricsLogger;
 import com.pandanav.learning.infrastructure.observability.TraceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +93,9 @@ public class LearningPlanService {
     private final TaskObjectiveTemplateStrategy taskObjectiveTemplateStrategy;
     private final ObjectMapper objectMapper;
     private final LearnerStateInterpreter learnerStateInterpreter;
+    private final LearnerSignalInterpreter learnerSignalInterpreter;
+    private final LearnerEvidenceAggregator learnerEvidenceAggregator;
+    private final LearningPlanMetricsLogger learningPlanMetricsLogger;
 
     public LearningPlanService(
         PlanningContextAssembler planningContextAssembler,
@@ -101,7 +107,10 @@ public class LearningPlanService {
         ConceptNodeRepository conceptNodeRepository,
         TaskObjectiveTemplateStrategy taskObjectiveTemplateStrategy,
         ObjectMapper objectMapper,
-        LearnerStateInterpreter learnerStateInterpreter
+        LearnerStateInterpreter learnerStateInterpreter,
+        LearnerSignalInterpreter learnerSignalInterpreter,
+        LearnerEvidenceAggregator learnerEvidenceAggregator,
+        LearningPlanMetricsLogger learningPlanMetricsLogger
     ) {
         this.planningContextAssembler = planningContextAssembler;
         this.learningPlanOrchestrator = learningPlanOrchestrator;
@@ -113,6 +122,9 @@ public class LearningPlanService {
         this.taskObjectiveTemplateStrategy = taskObjectiveTemplateStrategy;
         this.objectMapper = objectMapper;
         this.learnerStateInterpreter = learnerStateInterpreter;
+        this.learnerSignalInterpreter = learnerSignalInterpreter;
+        this.learnerEvidenceAggregator = learnerEvidenceAggregator;
+        this.learningPlanMetricsLogger = learningPlanMetricsLogger;
     }
 
     public LearningPlanPreviewResponse preview(PreviewLearningPlanCommand command) {
@@ -153,6 +165,11 @@ public class LearningPlanService {
             orchestrated.planSource(),
             orchestrated.fallbackApplied(),
             orchestrated.fallbackReasons()
+        );
+        learningPlanMetricsLogger.logPreviewBuilt(
+            Boolean.TRUE.equals(orchestrated.fallbackApplied()),
+            response.keyEvidence() == null ? 0 : response.keyEvidence().size(),
+            response.alternatives() == null ? 0 : response.alternatives().size()
         );
         log.info(
             "LearningPlan preview built. traceId={} planId={} diagnosisId={} sessionId={} recommendedConcept={} strategyCode={} explanationGenerated={} nextActions={} previewLatencyMs={}",
@@ -293,6 +310,7 @@ public class LearningPlanService {
         learningPlanRepository.update(previewDraft);
 
         Long firstTaskId = savedTasks.stream().findFirst().map(Task::getId).orElse(null);
+        learningPlanMetricsLogger.logPreviewAccepted(firstTaskId != null);
         return new ConfirmLearningPlanResponse(
             String.valueOf(previewDraft.getId()),
             savedSession.getId(),
@@ -305,6 +323,7 @@ public class LearningPlanService {
     private ConfirmLearningPlanResponse buildConfirmResponse(LearningPlan plan) {
         List<Task> tasks = taskRepository.findBySessionIdWithStatus(plan.getSessionId());
         Long firstTaskId = tasks.isEmpty() ? null : tasks.get(0).getId();
+        learningPlanMetricsLogger.logPreviewAccepted(firstTaskId != null);
         Long currentNodeId = sessionRepository.findByIdAndUserPk(plan.getSessionId(), plan.getUserId())
             .map(LearningSession::getCurrentNodeId)
             .orElse(null);
@@ -362,6 +381,7 @@ public class LearningPlanService {
         LearningPlanSummary summary = preview.summary();
         PreviewTemplateExplanationAssembler.PreviewExplanations explanations =
             previewTemplateExplanationAssembler.build(preview, context);
+        LearnerEvidenceSummary evidenceSummary = context == null ? null : context.learnerEvidenceSummary();
         log.info(
             "LearningPlan preview explanation. traceId={} diagnosisId={} sessionId={} planId={} llmLatencyMs={} promptTokens={} completionTokens={} totalTokens={} templateFallback={} explanationGenerated={}",
             TraceContext.traceId(),
@@ -399,6 +419,11 @@ public class LearningPlanService {
             ),
             explanations.alternatives(),
             nextActions,
+            evidenceSummary == null ? explanations.recommendedEntryReason() : evidenceSummary.whyThisStep(),
+            evidenceSummary == null ? explanations.learnerEvidence() : evidenceSummary.topEvidence(),
+            evidenceSummary == null ? resolveRiskIfSkipped(preview.reasons(), summary) : evidenceSummary.skipRisk(),
+            evidenceSummary == null ? "完成这一步后，你会更容易进入后续训练并减少回退。" : evidenceSummary.expectedGain(),
+            evidenceSummary == null ? resolveConfidenceExplanation(context, null) : evidenceSummary.confidenceHint(),
             new LearningPlanAdjustmentsDto(
                 preview.adjustments().intensity(),
                 preview.adjustments().learningMode(),
@@ -473,8 +498,11 @@ public class LearningPlanService {
             basedOnPreviewId,
             null,
             null,
+            null,
+            null,
             null
         );
+        LearnerSignalSnapshot learnerSignalSnapshot = learnerSignalInterpreter.interpret(adjusted);
         return new LearningPlanPlanningContext(
             adjusted.userId(),
             adjusted.goalId(),
@@ -495,6 +523,8 @@ public class LearningPlanService {
             adjusted.userFeedback(),
             adjusted.basedOnPreviewId(),
             learnerStateInterpreter.interpret(adjusted),
+            learnerSignalSnapshot,
+            learnerEvidenceAggregator.aggregate(adjusted, learnerSignalSnapshot, null),
             null,
             null
         );
@@ -507,6 +537,13 @@ public class LearningPlanService {
         LearnerStateSnapshot learnerState = orchestrated.learnerStateSnapshot() != null
             ? orchestrated.learnerStateSnapshot()
             : (context.learnerStateSnapshot() != null ? context.learnerStateSnapshot() : learnerStateInterpreter.interpret(context));
+        LearnerSignalSnapshot learnerSignal = context.learnerSignalSnapshot() != null
+            ? context.learnerSignalSnapshot()
+            : learnerSignalInterpreter.interpret(context);
+        String recommendedNodeName = orchestrated.preview() == null || orchestrated.preview().summary() == null
+            ? null
+            : orchestrated.preview().summary().recommendedStartNodeName();
+        LearnerEvidenceSummary learnerEvidence = learnerEvidenceAggregator.aggregate(context, learnerSignal, recommendedNodeName);
         return new LearningPlanPlanningContext(
             context.userId(),
             context.goalId(),
@@ -527,6 +564,8 @@ public class LearningPlanService {
             context.userFeedback(),
             context.basedOnPreviewId(),
             learnerState,
+            learnerSignal,
+            learnerEvidence,
             orchestrated.personalizedNarrative(),
             orchestrated.previewEnhancement()
         );

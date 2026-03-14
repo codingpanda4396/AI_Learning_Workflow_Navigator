@@ -39,6 +39,7 @@ import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.LearningPlanRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
+import com.pandanav.learning.infrastructure.observability.LearningPlanMetricsLogger;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -133,7 +134,10 @@ class LearningPlanServiceTest {
             mock(ConceptNodeRepository.class),
             objectiveStrategy(),
             objectMapper,
-            new DefaultLearnerStateInterpreter()
+            new DefaultLearnerStateInterpreter(),
+            new DefaultLearnerSignalInterpreter(),
+            new LearnerEvidenceAggregator(),
+            mock(LearningPlanMetricsLogger.class)
         );
 
         AdjustLearningPlanResponse response = service.adjust(new AdjustLearningPlanCommand(
@@ -205,7 +209,10 @@ class LearningPlanServiceTest {
             conceptNodeRepository,
             objectiveStrategy(),
             objectMapper,
-            new DefaultLearnerStateInterpreter()
+            new DefaultLearnerStateInterpreter(),
+            new DefaultLearnerSignalInterpreter(),
+            new LearnerEvidenceAggregator(),
+            mock(LearningPlanMetricsLogger.class)
         );
 
         ConfirmLearningPlanResponse response = service.confirm(new ConfirmLearningPlanCommand(99L, 1L));
@@ -230,7 +237,10 @@ class LearningPlanServiceTest {
             mock(ConceptNodeRepository.class),
             objectiveStrategy(),
             new ObjectMapper(),
-            new DefaultLearnerStateInterpreter()
+            new DefaultLearnerStateInterpreter(),
+            new DefaultLearnerSignalInterpreter(),
+            new LearnerEvidenceAggregator(),
+            mock(LearningPlanMetricsLogger.class)
         );
     }
 
@@ -256,6 +266,8 @@ class LearningPlanServiceTest {
             List.of("tree basics"),
             "Current weak point is tree basics",
             PlanAdjustments.defaults(),
+            null,
+            null,
             null,
             null,
             null,

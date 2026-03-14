@@ -44,6 +44,8 @@ class LearnerStateAssemblerTest {
             null,
             null,
             null,
+            null,
+            null,
             null
         );
 

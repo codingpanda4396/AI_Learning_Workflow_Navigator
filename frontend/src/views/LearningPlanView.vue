@@ -8,6 +8,7 @@ import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { useLearningPlanStore } from '@/stores/learningPlan';
+import { getPreviewMetricsSnapshot, trackPreviewAccepted, trackPreviewShown } from '@/utils/previewMetrics';
 import { buildPreviewViewModel } from '@/utils/usePreviewViewModel';
 
 const route = useRoute();
@@ -55,6 +56,10 @@ async function loadPlan() {
 async function startLearning() {
   try {
     const result = await learningPlanStore.confirmPlan();
+    if (preview.value?.id) {
+      trackPreviewAccepted(preview.value.id, result.firstTaskId);
+      console.info('[metrics] preview accepted', getPreviewMetricsSnapshot());
+    }
     if (result.firstTaskId) {
       await router.push(`/tasks/${result.firstTaskId}/run`);
       return;
@@ -77,6 +82,17 @@ watch(
     await loadPlan();
   },
   { immediate: true },
+);
+
+watch(
+  () => preview.value?.id,
+  (previewId) => {
+    if (!previewId) {
+      return;
+    }
+    trackPreviewShown(previewId);
+    console.info('[metrics] preview shown', getPreviewMetricsSnapshot());
+  },
 );
 
 onBeforeUnmount(() => {
@@ -111,39 +127,57 @@ onBeforeUnmount(() => {
       <template v-else-if="preview && previewVm">
         <section class="space-y-5">
           <section class="app-hero rounded-[24px] p-6">
-            <p class="text-sm font-medium text-indigo-600">下一步学什么</p>
+            <p class="text-sm font-medium text-indigo-600">现在先做什么</p>
             <h2 class="mt-2 text-3xl font-semibold text-slate-900">{{ previewVm.hero.title }}</h2>
-            <p class="mt-3 text-base leading-7 text-slate-700">{{ previewVm.hero.reason }}</p>
-            <p class="mt-3 text-sm text-slate-500">预计耗时：{{ previewVm.hero.estimate }}</p>
+            <p class="mt-3 text-base leading-7 text-slate-700">{{ previewVm.hero.subtitle }}</p>
+            <div class="mt-5 grid gap-3 md:grid-cols-2">
+              <div class="rounded-xl bg-white/75 p-4">
+                <p class="text-xs font-medium text-slate-500">你的动作</p>
+                <p class="mt-1 text-sm leading-6 text-slate-800">{{ previewVm.hero.task.learnerAction }}</p>
+              </div>
+              <div class="rounded-xl bg-white/75 p-4">
+                <p class="text-xs font-medium text-slate-500">预期产出</p>
+                <p class="mt-1 text-sm leading-6 text-slate-800">{{ previewVm.hero.task.expectedArtifact }}</p>
+              </div>
+              <div class="rounded-xl bg-white/75 p-4">
+                <p class="text-xs font-medium text-slate-500">完成标准</p>
+                <p class="mt-1 text-sm leading-6 text-slate-800">{{ previewVm.hero.task.completionCriteria }}</p>
+              </div>
+              <div class="rounded-xl bg-white/75 p-4">
+                <p class="text-xs font-medium text-slate-500">AI 支持 / 检查方式</p>
+                <p class="mt-1 text-sm leading-6 text-slate-800">{{ previewVm.hero.task.aiSupport }}</p>
+                <p class="mt-1 text-xs leading-5 text-slate-600">{{ previewVm.hero.task.checkMethod }}</p>
+              </div>
+            </div>
+            <p class="mt-4 text-sm text-slate-500">预计耗时：{{ previewVm.hero.task.estimate }}</p>
+            <div v-if="previewVm.hero.secondaryActions.length" class="mt-3 rounded-xl bg-indigo-50 p-4">
+              <p class="text-xs font-medium text-indigo-600">次级任务入口</p>
+              <ul class="mt-2 space-y-1 text-sm leading-6 text-slate-700">
+                <li v-for="(action, index) in previewVm.hero.secondaryActions" :key="`secondary-${index}`">{{ index + 1 }}. {{ action }}</li>
+              </ul>
+            </div>
             <div class="mt-5">
               <AppButton :loading="learningPlanStore.confirming" @click="startLearning">{{ previewVm.hero.ctaLabel }}</AppButton>
             </div>
           </section>
 
           <section class="app-card app-card-padding rounded-[24px]">
-            <h3 class="text-lg font-semibold text-slate-900">AI 看到了什么</h3>
-            <p class="mt-2 text-sm leading-7 text-slate-700">{{ previewVm.aiObserved.currentState }}</p>
+            <h3 class="text-lg font-semibold text-slate-900">系统为什么这么判断</h3>
+            <p class="mt-2 text-sm leading-7 text-slate-700">{{ previewVm.explanation.whyThisStep }}</p>
             <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-600">
-              <li v-for="(item, index) in previewVm.aiObserved.evidence" :key="`evidence-${index}`">- {{ item }}</li>
+              <li v-for="(item, index) in previewVm.explanation.evidence" :key="`evidence-${index}`">- {{ item }}</li>
             </ul>
+            <p class="mt-4 text-sm text-slate-500">{{ previewVm.explanation.confidenceHint }}</p>
           </section>
 
           <section class="app-card app-card-padding rounded-[24px]">
-            <h3 class="text-lg font-semibold text-slate-900">为什么推荐这条路</h3>
-            <p class="mt-2 text-sm text-slate-700">
-              当前推荐：<span class="font-medium text-slate-900">{{ previewVm.strategy.recommendedLabel }}</span>
-            </p>
-            <p class="mt-2 text-sm leading-7 text-slate-600">{{ previewVm.strategy.explanation }}</p>
-            <div v-if="previewVm.strategy.alternatives.length" class="mt-4 space-y-3">
-              <div
-                v-for="(item, index) in previewVm.strategy.alternatives"
-                :key="`alt-${index}`"
-                class="rounded-xl border border-slate-200 bg-slate-50 p-3"
-              >
-                <p class="text-sm font-medium text-slate-900">{{ item.label }}</p>
-                <p class="mt-1 text-sm text-slate-600">{{ item.reason }}</p>
-              </div>
-            </div>
+            <h3 class="text-lg font-semibold text-slate-900">做完会得到什么</h3>
+            <p class="mt-2 text-sm leading-7 text-slate-700">{{ previewVm.outcomes.expectedGain }}</p>
+          </section>
+
+          <section class="app-card app-card-padding rounded-[24px]">
+            <h3 class="text-lg font-semibold text-slate-900">跳过会怎样</h3>
+            <p class="mt-2 text-sm leading-7 text-slate-700">{{ previewVm.outcomes.skipRisk }}</p>
           </section>
 
           <section class="app-card app-card-padding rounded-[24px]">

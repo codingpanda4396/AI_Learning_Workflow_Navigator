@@ -9,6 +9,7 @@ import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.NodeMastery;
 import com.pandanav.learning.domain.model.PlanAdjustments;
+import com.pandanav.learning.domain.model.LearnerSignalSnapshot;
 import com.pandanav.learning.domain.model.TrainingAttemptSummary;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.NodeMasteryRepository;
@@ -33,6 +34,8 @@ public class PlanningContextAssembler {
     private final TaskRepository taskRepository;
     private final WeakPointDiagnosisService weakPointDiagnosisService;
     private final LearnerStateInterpreter learnerStateInterpreter;
+    private final LearnerSignalInterpreter learnerSignalInterpreter;
+    private final LearnerEvidenceAggregator learnerEvidenceAggregator;
 
     public PlanningContextAssembler(
         SessionRepository sessionRepository,
@@ -40,7 +43,9 @@ public class PlanningContextAssembler {
         NodeMasteryRepository nodeMasteryRepository,
         TaskRepository taskRepository,
         WeakPointDiagnosisService weakPointDiagnosisService,
-        LearnerStateInterpreter learnerStateInterpreter
+        LearnerStateInterpreter learnerStateInterpreter,
+        LearnerSignalInterpreter learnerSignalInterpreter,
+        LearnerEvidenceAggregator learnerEvidenceAggregator
     ) {
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
@@ -48,6 +53,8 @@ public class PlanningContextAssembler {
         this.taskRepository = taskRepository;
         this.weakPointDiagnosisService = weakPointDiagnosisService;
         this.learnerStateInterpreter = learnerStateInterpreter;
+        this.learnerSignalInterpreter = learnerSignalInterpreter;
+        this.learnerEvidenceAggregator = learnerEvidenceAggregator;
     }
 
     public LearningPlanPlanningContext assemble(PreviewLearningPlanCommand command) {
@@ -130,8 +137,11 @@ public class PlanningContextAssembler {
             null,
             null,
             null,
+            null,
+            null,
             null
         );
+        LearnerSignalSnapshot learnerSignalSnapshot = learnerSignalInterpreter.interpret(baseContext);
         return new LearningPlanPlanningContext(
             baseContext.userId(),
             baseContext.goalId(),
@@ -152,6 +162,8 @@ public class PlanningContextAssembler {
             baseContext.userFeedback(),
             baseContext.basedOnPreviewId(),
             learnerStateInterpreter.interpret(baseContext),
+            learnerSignalSnapshot,
+            learnerEvidenceAggregator.aggregate(baseContext, learnerSignalSnapshot, null),
             null,
             null
         );
