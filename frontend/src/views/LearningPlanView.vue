@@ -3,12 +3,11 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import AdaptationHintCard from '@/components/plan/AdaptationHintCard.vue';
-import AlternativeStrategiesPanel from '@/components/plan/AlternativeStrategiesPanel.vue';
-import CurrentStepCard from '@/components/plan/CurrentStepCard.vue';
-import PersonalizedInsightCard from '@/components/plan/PersonalizedInsightCard.vue';
+import PreviewHeroDecisionCard from '@/components/learning-plan/PreviewHeroDecisionCard.vue';
+import PreviewKickoffPanel from '@/components/learning-plan/PreviewKickoffPanel.vue';
+import PreviewSignalsPanel from '@/components/learning-plan/PreviewSignalsPanel.vue';
+import PreviewStrategyComparison from '@/components/learning-plan/PreviewStrategyComparison.vue';
 import StrategyAdjustPanel from '@/components/plan/StrategyAdjustPanel.vue';
-import WhyThisPlanCard from '@/components/plan/WhyThisPlanCard.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
 import InfoHint from '@/components/ui/InfoHint.vue';
@@ -16,7 +15,7 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { useLearningPlanStore } from '@/stores/learningPlan';
 import type { PlanAdjustments, StrategyAdjustAction } from '@/types/learningPlan';
-import { buildLearningPlanViewModel } from '@/utils/buildLearningPlanViewModel';
+import { buildPreviewViewModel } from '@/utils/usePreviewViewModel';
 
 const route = useRoute();
 const router = useRouter();
@@ -25,16 +24,14 @@ const learningPlanStore = useLearningPlanStore();
 const preview = computed(() => learningPlanStore.preview);
 const error = computed(() => learningPlanStore.error);
 const strategyNote = computed(() => learningPlanStore.strategyNote);
-const planVm = computed(() => (preview.value ? buildLearningPlanViewModel(preview.value) : null));
+const previewVm = computed(() => (preview.value ? buildPreviewViewModel(preview.value) : null));
 
 const adjustPanelOpen = ref(false);
 const adjustPanelMode = ref<'strategy' | 'disagree'>('strategy');
-const alternativesOpen = ref(false);
 
 const explainPrompts = [
-  { key: 'why-first', label: '为什么我要先学这个？' },
-  { key: 'goal-link', label: '这一步和目标有什么关系？' },
-  { key: 'fast', label: '给我一个5分钟极速版' },
+  { key: 'why-first', label: '为什么现在先学这个？' },
+  { key: 'fast', label: '给我一个10分钟压缩版' },
 ];
 
 const context = computed(() => {
@@ -169,19 +166,21 @@ onBeforeUnmount(() => {
 
 <template>
   <AppShell>
-    <div class="mx-auto max-w-[1180px] space-y-10 pb-10">
+    <div class="mx-auto max-w-[1120px] space-y-8 pb-12">
       <div v-if="viewState === 'loading'" class="space-y-6">
-        <section class="min-h-[calc(100vh-128px)] rounded-[36px] border border-slate-200 bg-slate-50 px-6 py-8 sm:px-8">
-          <div class="grid h-full gap-8 lg:grid-cols-[minmax(0,1.4fr)_320px] lg:items-end">
-            <div class="space-y-4 self-center">
-              <SkeletonBlock width="90px" :height="18" rounded="999px" />
-              <SkeletonBlock width="68%" :height="64" rounded="16px" />
-              <SkeletonBlock width="52%" :height="18" rounded="10px" />
-              <SkeletonBlock width="78%" :height="18" rounded="10px" />
+        <section class="app-hero min-h-[320px]">
+          <div class="grid h-full gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div class="space-y-4">
+              <SkeletonBlock width="96px" :height="16" rounded="999px" />
+              <SkeletonBlock width="72%" :height="56" rounded="14px" />
+              <SkeletonBlock width="88%" :height="20" rounded="10px" />
+              <SkeletonBlock width="70%" :height="20" rounded="10px" />
             </div>
-            <SkeletonBlock :height="320" rounded="28px" />
+            <SkeletonBlock :height="220" rounded="20px" />
           </div>
         </section>
+        <SkeletonBlock :height="180" rounded="24px" />
+        <SkeletonBlock :height="220" rounded="24px" />
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
@@ -189,44 +188,31 @@ onBeforeUnmount(() => {
         <AppButton @click="loadPlan">重新生成学习规划</AppButton>
       </div>
 
-      <template v-else-if="preview && planVm">
+      <template v-else-if="preview && previewVm">
         <section class="space-y-5">
-          <PersonalizedInsightCard
-            :title="planVm.learnerInsightTitle"
-            :learner-state="planVm.learnerState"
-          />
-
-          <WhyThisPlanCard
-            :title="planVm.whySectionTitle"
-            :what-i-saw="planVm.whatISaw"
-            :why-this-plan-fits-you="planVm.whyThisPlanFitsYou"
-          />
-
-          <CurrentStepCard
-            :title="planVm.stepSectionTitle"
-            :task-title="planVm.taskTitle"
-            :estimated-minutes-text="planVm.estimatedMinutesText"
-            :this-round-boundary="planVm.thisRoundBoundary"
-            :next-step-label="planVm.nextStepLabel"
-            :cta-hint="planVm.ctaHint"
-            :has-alternatives="planVm.alternatives.length > 0"
+          <PreviewHeroDecisionCard
+            :title="previewVm.hero.title"
+            :strongest-reason="previewVm.hero.strongestReason"
+            :risk-if-skip="previewVm.hero.riskIfSkip"
+            :estimate="previewVm.hero.estimate"
+            :cta-label="previewVm.hero.ctaLabel"
             :loading="learningPlanStore.confirming"
             @start="startLearning"
-            @show-alternatives="alternativesOpen = true"
           />
 
-          <AdaptationHintCard
-            :title="planVm.riskTitle"
-            :main-risk-if-skip="planVm.mainRiskIfSkip"
-            :adaptation-hint="planVm.adaptationHint"
+          <PreviewSignalsPanel
+            :items="previewVm.signals"
           />
 
-          <AlternativeStrategiesPanel
-            :alternatives="planVm.alternatives"
-            :open-by-default="alternativesOpen"
+          <PreviewStrategyComparison
+            :recommended-reason="previewVm.strategy.recommendedReason"
+            :recommended="previewVm.strategy.recommended"
+            :others="previewVm.strategy.others"
           />
 
-          <section class="rounded-[24px] border border-slate-200 bg-white px-5 py-5">
+          <PreviewKickoffPanel :kickoff="previewVm.kickoff" />
+
+          <section class="app-card app-card-padding rounded-[24px]">
             <p class="text-sm font-semibold text-slate-900">需要微调推荐时</p>
             <div class="mt-3 flex flex-wrap gap-3">
               <AppButton variant="secondary" @click="openAdjustPanel('strategy')">调整学习节奏</AppButton>

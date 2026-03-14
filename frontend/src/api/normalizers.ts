@@ -25,6 +25,8 @@ import type {
   PlanAdjustments,
   PlanAlternative,
   PlanBenefit,
+  PlanStrategyComparison,
+  PlanStrategyOption,
   PlanStageStatus,
   PlanUnlock,
 } from '@/types/learningPlan';
@@ -335,6 +337,57 @@ function normalizePlanStageStatuses(value: unknown): PlanStageStatus[] {
       description: String(row.description ?? row.reason ?? ''),
     };
   }).filter((item) => item.stage);
+}
+
+function normalizePlanStrategyOptions(value: unknown): PlanStrategyOption[] {
+  const items = Array.isArray(value) ? value : [];
+  return items
+    .map((item, index) => {
+      const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+      return {
+        key: String(row.key ?? row.id ?? row.code ?? `strategy-${index + 1}`),
+        title: String(row.title ?? row.name ?? row.strategy ?? '策略方案'),
+        fitFor: String(row.fit_for ?? row.fitFor ?? row.suitable_for ?? row.suitableFor ?? row.when_to_use ?? row.whenToUse ?? ''),
+        tradeoff: String(row.trade_off ?? row.tradeOff ?? row.cost ?? row.cons ?? row.reason ?? ''),
+        timeShortPlan: String(row.time_short_plan ?? row.timeShortPlan ?? row.if_no_time ?? row.ifNoTime ?? '').trim() || undefined,
+      };
+    })
+    .filter((item) => item.title || item.fitFor || item.tradeoff);
+}
+
+function normalizePlanStrategyComparison(value: unknown): PlanStrategyComparison | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const row = value as Record<string, unknown>;
+  const options = normalizePlanStrategyOptions(row.options ?? row.items ?? row.strategies ?? row.alternatives);
+  if (!options.length && !row.recommended_reason && !row.recommendedReason && !row.recommendation) {
+    return undefined;
+  }
+  return {
+    recommendedKey: String(row.recommended_key ?? row.recommendedKey ?? row.selected_key ?? row.selectedKey ?? '').trim() || undefined,
+    recommendedReason: String(row.recommended_reason ?? row.recommendedReason ?? row.recommendation ?? '').trim() || undefined,
+    options,
+  };
+}
+
+function normalizeKickoffSteps(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => {
+      if (typeof item === 'string') {
+        return item.trim();
+      }
+      if (item && typeof item === 'object') {
+        const row = item as Record<string, unknown>;
+        return String(row.step ?? row.title ?? row.description ?? row.action ?? '').trim();
+      }
+      return String(item ?? '').trim();
+    })
+    .filter(Boolean)
+    .slice(0, 4);
 }
 
 function normalizePersonalization(value: unknown): LearningPlanPersonalization | undefined {
@@ -659,6 +712,9 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
   const nextUnlocks = normalizePlanUnlocks(data.next_unlocks ?? data.nextUnlocks);
   const stageStatuses = normalizePlanStageStatuses(data.stage_statuses ?? data.stageStatuses);
   const personalization = normalizePersonalization(data.personalization);
+  const strategyComparison = normalizePlanStrategyComparison(data.strategy_comparison ?? data.strategyComparison);
+  const optionComparison = normalizePlanStrategyComparison(data.option_comparison ?? data.optionComparison);
+  const kickoffSteps = normalizeKickoffSteps(data.kickoff_steps ?? data.kickoffSteps);
 
   return {
     id: String(data.id ?? data.preview_id ?? data.previewId ?? data.plan_id ?? data.planId ?? ''),
@@ -844,5 +900,17 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     stageStatuses,
     nextStepLabel: String(data.next_step_label ?? data.nextStepLabel ?? ''),
     personalization,
+    narrative: String(data.narrative ?? '').trim() || undefined,
+    planNarrative: String(data.plan_narrative ?? data.planNarrative ?? '').trim() || undefined,
+    guidance: String(data.guidance ?? '').trim() || undefined,
+    confidenceExplanation: String(data.confidence_explanation ?? data.confidenceExplanation ?? '').trim() || undefined,
+    strategyComparison,
+    optionComparison,
+    kickoffSteps,
+    firstAction: String(data.first_action ?? data.firstAction ?? '').trim() || undefined,
+    firstCheckpoint: String(data.first_checkpoint ?? data.firstCheckpoint ?? '').trim() || undefined,
+    ifPerformWell: String(data.if_perform_well ?? data.ifPerformWell ?? '').trim() || undefined,
+    ifStillStruggle: String(data.if_still_struggle ?? data.ifStillStruggle ?? '').trim() || undefined,
+    ifNoTime: String(data.if_no_time ?? data.ifNoTime ?? '').trim() || undefined,
   };
 }

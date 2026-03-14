@@ -78,6 +78,20 @@ export interface PlanAlternative {
   description: string;
 }
 
+export interface PlanStrategyOption {
+  key: string;
+  title: string;
+  fitFor: string;
+  tradeoff: string;
+  timeShortPlan?: string;
+}
+
+export interface PlanStrategyComparison {
+  recommendedKey?: string;
+  recommendedReason?: string;
+  options: PlanStrategyOption[];
+}
+
 export interface PlanBenefit {
   key: string;
   title: string;
@@ -167,6 +181,18 @@ export interface LearningPlanPreview {
   stageStatuses?: PlanStageStatus[];
   nextStepLabel?: string;
   personalization?: LearningPlanPersonalization;
+  narrative?: string;
+  planNarrative?: string;
+  guidance?: string;
+  confidenceExplanation?: string;
+  strategyComparison?: PlanStrategyComparison;
+  optionComparison?: PlanStrategyComparison;
+  kickoffSteps?: string[];
+  firstAction?: string;
+  firstCheckpoint?: string;
+  ifPerformWell?: string;
+  ifStillStruggle?: string;
+  ifNoTime?: string;
 }
 
 export interface PlanConfirmResult {
