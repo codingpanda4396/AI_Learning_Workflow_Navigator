@@ -1,28 +1,28 @@
 :root {
   color-scheme: light;
-  --app-bg: #f4f6f3;
+  --app-bg: #f5f7fa;
   --app-surface: rgba(255, 255, 255, 0.9);
   --app-surface-strong: #ffffff;
-  --app-surface-muted: #f7f8f6;
-  --app-border: rgba(15, 23, 42, 0.09);
-  --app-border-strong: rgba(15, 23, 42, 0.15);
-  --app-text: #142033;
-  --app-text-soft: #52607a;
-  --app-text-muted: #7f8a9d;
-  --app-primary: #1f365c;
-  --app-primary-hover: #274572;
-  --app-primary-active: #182b47;
-  --app-primary-soft: rgba(31, 54, 92, 0.08);
-  --app-accent: #2d7c6f;
+  --app-surface-muted: #f8fafc;
+  --app-border: rgba(15, 23, 42, 0.08);
+  --app-border-strong: rgba(15, 23, 42, 0.14);
+  --app-text: #0f172a;
+  --app-text-soft: #475569;
+  --app-text-muted: #7c8798;
+  --app-primary: #0f172a;
+  --app-primary-hover: #111c33;
+  --app-primary-active: #020617;
+  --app-primary-soft: rgba(15, 23, 42, 0.06);
+  --app-accent: #2563eb;
   --app-danger: #b65b65;
   --app-danger-soft: #fbf1f1;
   --app-warning: #8b6a2c;
-  --app-shadow-sm: 0 8px 24px rgba(17, 24, 39, 0.05);
-  --app-shadow-md: 0 18px 48px rgba(17, 24, 39, 0.08);
-  --app-shadow-lg: 0 28px 80px rgba(17, 24, 39, 0.12);
-  --app-radius-lg: 24px;
-  --app-radius-md: 18px;
-  --app-radius-sm: 14px;
+  --app-shadow-sm: 0 10px 30px rgba(15, 23, 42, 0.04);
+  --app-shadow-md: 0 22px 60px rgba(15, 23, 42, 0.06);
+  --app-shadow-lg: 0 32px 96px rgba(15, 23, 42, 0.09);
+  --app-radius-lg: 28px;
+  --app-radius-md: 22px;
+  --app-radius-sm: 16px;
 }
 
 html,
@@ -33,9 +33,9 @@ body,
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(140, 198, 184, 0.16), transparent 30%),
-    radial-gradient(circle at top right, rgba(162, 188, 223, 0.18), transparent 24%),
-    linear-gradient(180deg, #f7f8f6 0%, var(--app-bg) 100%);
+    radial-gradient(circle at top left, rgba(148, 163, 184, 0.12), transparent 30%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.84), transparent 24%),
+    linear-gradient(180deg, #fbfcfe 0%, var(--app-bg) 100%);
   color: var(--app-text);
   font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 }
@@ -54,8 +54,8 @@ textarea:focus-visible {
 
 .app-page {
   margin: 0 auto;
-  width: min(1120px, calc(100% - 32px));
-  padding: 32px 0 56px;
+  width: min(1120px, calc(100% - 40px));
+  padding: 32px 0 64px;
 }
 
 .app-page-narrow {
@@ -176,7 +176,7 @@ textarea:focus-visible {
 
 .app-text-lead {
   font-size: 16px;
-  line-height: 1.8;
+  line-height: 1.75;
   color: var(--app-text-soft);
 }
 
@@ -212,7 +212,7 @@ textarea:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid transparent;
   font-weight: 600;
   transition:
@@ -227,7 +227,7 @@ textarea:focus-visible {
 }
 
 .app-btn:focus-visible {
-  box-shadow: 0 0 0 4px rgba(85, 117, 171, 0.18);
+  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.08);
 }
 
 .app-btn:active:not(:disabled) {
@@ -240,14 +240,22 @@ textarea:focus-visible {
 }
 
 .app-btn-primary {
-  background: linear-gradient(180deg, #274572 0%, var(--app-primary) 100%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, #1e293b 0%, var(--app-primary) 100%);
   color: #fff;
-  box-shadow: 0 12px 26px rgba(31, 54, 92, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 16px 36px rgba(15, 23, 42, 0.18);
 }
 
 .app-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #315287 0%, var(--app-primary-hover) 100%);
-  box-shadow: 0 16px 34px rgba(31, 54, 92, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, #263246 0%, var(--app-primary-hover) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 40px rgba(15, 23, 42, 0.2);
 }
 
 .app-btn-primary:active:not(:disabled) {
@@ -289,8 +297,8 @@ textarea:focus-visible {
 }
 
 .app-btn-lg {
-  min-height: 52px;
-  padding: 0 24px;
+  min-height: 54px;
+  padding: 0 26px;
   font-size: 15px;
 }
 
@@ -322,8 +330,8 @@ textarea:focus-visible {
 .app-textarea {
   width: 100%;
   border: 1px solid rgba(15, 23, 42, 0.09);
-  border-radius: 18px;
-  background: rgba(247, 248, 246, 0.84);
+  border-radius: 20px;
+  background: rgba(248, 250, 252, 0.9);
   color: var(--app-text);
   transition:
     border-color 160ms ease,
