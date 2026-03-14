@@ -26,10 +26,10 @@ public class CapabilityProfileBuilder {
         List<String> strengths = new ArrayList<>();
         List<String> weaknesses = new ArrayList<>();
 
-        if (experience.contains("做过项目或作品")) {
+        if (experience.contains("PROJECTS")) {
             strengths.add("有一定动手实践经验，适合结合案例继续推进。");
         }
-        if (experience.contains("准备过考试或面试")) {
+        if (experience.contains("EXAM_PREP")) {
             strengths.add("目标感比较明确，适合按阶段设置训练重点。");
         }
         if (currentLevel == CapabilityLevel.ADVANCED) {
@@ -42,54 +42,53 @@ public class CapabilityProfileBuilder {
         if (currentLevel == CapabilityLevel.BEGINNER) {
             weaknesses.add("当前基础还不够稳定，需要先补齐关键概念。");
         }
-        if (experience.contains("几乎没有相关经验")) {
-            weaknesses.add("相关经验较少，开始阶段更需要例子和分步练习。");
+        if (experience.contains("NO_EXPERIENCE")) {
+            weaknesses.add("相关经验较少，起步阶段更需要例子和分步练习。");
         }
-        if ("每周 1-3 小时".equals(timeBudget)) {
+        if ("LIGHT".equals(timeBudget)) {
             weaknesses.add("可投入时间有限，学习内容需要更聚焦。");
         }
         if (weaknesses.isEmpty()) {
             weaknesses.add("还需要通过后续训练进一步确认薄弱点。");
         }
 
-        String summary = "系统已根据你的回答整理出当前能力画像，后续学习会尽量贴合你的当前基础和节奏。";
-        return new CapabilityProfileDraft(currentLevel, strengths, weaknesses, learningPreference, timeBudget, goalOrientation, summary);
+        return new CapabilityProfileDraft(currentLevel, strengths, weaknesses, learningPreference, timeBudget, goalOrientation, "系统已根据你的回答整理出当前能力画像。");
     }
 
     private CapabilityLevel mapCurrentLevel(String foundation, List<String> experience) {
-        if ("已经能独立应用".equals(foundation) || experience.contains("做过项目或作品")) {
+        if ("ADVANCED".equals(foundation) || experience.contains("PROJECTS")) {
             return CapabilityLevel.ADVANCED;
         }
-        if ("学过但还不太稳".equals(foundation)
-            || "基础比较稳".equals(foundation)
-            || experience.contains("上过相关课程")
-            || experience.contains("做过作业或实验")) {
+        if ("BASIC".equals(foundation)
+            || "PROFICIENT".equals(foundation)
+            || experience.contains("COURSEWORK")
+            || experience.contains("ASSIGNMENTS")) {
             return CapabilityLevel.INTERMEDIATE;
         }
         return CapabilityLevel.BEGINNER;
     }
 
     private String mapGoalOrientation(String goalStyle) {
-        if ("准备考试或测验".equals(goalStyle)) {
+        if ("EXAM".equals(goalStyle)) {
             return "EXAM";
         }
-        if ("准备实习或求职面试".equals(goalStyle)) {
+        if ("INTERVIEW".equals(goalStyle)) {
             return "INTERVIEW";
         }
-        if ("完成项目或作品".equals(goalStyle)) {
+        if ("PROJECT".equals(goalStyle)) {
             return "PROJECT";
         }
         return "COURSE";
     }
 
     private String mapLearningPreference(String preference) {
-        if ("先看例子，再总结方法".equals(preference)) {
+        if ("EXAMPLE_FIRST".equals(preference)) {
             return "EXAMPLE_FIRST";
         }
-        if ("先做题，在反馈中查漏补缺".equals(preference)) {
+        if ("PRACTICE_FIRST".equals(preference)) {
             return "PRACTICE_FIRST";
         }
-        if ("边学边做项目，穿插补基础".equals(preference)) {
+        if ("PROJECT_DRIVEN".equals(preference)) {
             return "PROJECT_DRIVEN";
         }
         return "CONCEPT_FIRST";

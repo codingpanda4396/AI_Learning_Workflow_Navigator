@@ -3,10 +3,10 @@ package com.pandanav.learning.application.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.pandanav.learning.api.dto.diagnosis.GenerateDiagnosisResponse;
-import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisAnswerRequest;
-import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisRequest;
-import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisResponse;
+import com.pandanav.learning.api.dto.diagnosis.CreateDiagnosisSessionResponse;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisAnswerSubmissionDto;
+import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionRequest;
+import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionResponse;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.enums.DiagnosisStatus;
 import com.pandanav.learning.domain.llm.LlmGateway;
@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -61,11 +60,10 @@ class DiagnosisServiceTest {
     private LlmGateway llmGateway;
 
     private DiagnosisService diagnosisService;
-    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper();
         LlmJsonParser llmJsonParser = new LlmJsonParser(objectMapper);
         diagnosisService = new DiagnosisService(
             sessionRepository,
@@ -82,7 +80,7 @@ class DiagnosisServiceTest {
     }
 
     @Test
-    void generateDiagnosisShouldReturnCodeLabelOptionsWhenLlmSucceeds() {
+    void createDiagnosisSessionShouldReturnStructuredOptionsWhenLlmSucceeds() {
         LearningSession session = learningSession(101L, 10L);
         DiagnosisSession savedDiagnosis = new DiagnosisSession();
         savedDiagnosis.setId(501L);
@@ -93,14 +91,74 @@ class DiagnosisServiceTest {
               "questions": [
                 {
                   "questionId": "q_foundation",
-                  "copy": {
-                    "sectionLabel": "FOUNDATION",
-                    "title": "How solid is your foundation?",
-                    "description": "Choose the closest option.",
-                    "placeholder": "",
-                    "submitHint": "This helps set the starting point."
-                  },
-                  "options": ["刚开始接触", "学过但还不太熟", "基础比较熟", "已经能独立应用"]
+                  "title": "How solid is your foundation?",
+                  "description": "Choose the closest option.",
+                  "placeholder": "",
+                  "submitHint": "This helps set the starting point.",
+                  "sectionLabel": "FOUNDATION",
+                  "options": [
+                    {"code":"BEGINNER","label":"Starter"},
+                    {"code":"BASIC","label":"Basic"},
+                    {"code":"PROFICIENT","label":"Proficient"},
+                    {"code":"ADVANCED","label":"Advanced"}
+                  ]
+                },
+                {
+                  "questionId": "q_experience",
+                  "title": "Experience",
+                  "description": "Past experience",
+                  "placeholder": "",
+                  "submitHint": "This helps sequence the plan.",
+                  "sectionLabel": "EXPERIENCE",
+                  "options": [
+                    {"code":"COURSEWORK","label":"Coursework"},
+                    {"code":"ASSIGNMENTS","label":"Assignments"},
+                    {"code":"PROJECTS","label":"Projects"},
+                    {"code":"EXAM_PREP","label":"Exam prep"},
+                    {"code":"NO_EXPERIENCE","label":"No experience"}
+                  ]
+                },
+                {
+                  "questionId": "q_goal_style",
+                  "title": "Goal",
+                  "description": "Main goal",
+                  "placeholder": "",
+                  "submitHint": "This sets the plan focus.",
+                  "sectionLabel": "GOAL",
+                  "options": [
+                    {"code":"COURSE","label":"Course"},
+                    {"code":"EXAM","label":"Exam"},
+                    {"code":"INTERVIEW","label":"Interview"},
+                    {"code":"PROJECT","label":"Project"}
+                  ]
+                },
+                {
+                  "questionId": "q_time_budget",
+                  "title": "Time",
+                  "description": "Weekly time",
+                  "placeholder": "",
+                  "submitHint": "This affects the pace.",
+                  "sectionLabel": "TIME",
+                  "options": [
+                    {"code":"LIGHT","label":"1-3h"},
+                    {"code":"STANDARD","label":"4-6h"},
+                    {"code":"INTENSIVE","label":"7-10h"},
+                    {"code":"IMMERSIVE","label":"10h+"}
+                  ]
+                },
+                {
+                  "questionId": "q_learning_preference",
+                  "title": "Preference",
+                  "description": "Best learning style",
+                  "placeholder": "",
+                  "submitHint": "This affects content delivery.",
+                  "sectionLabel": "PREFERENCE",
+                  "options": [
+                    {"code":"CONCEPT_FIRST","label":"Concept first"},
+                    {"code":"EXAMPLE_FIRST","label":"Example first"},
+                    {"code":"PRACTICE_FIRST","label":"Practice first"},
+                    {"code":"PROJECT_DRIVEN","label":"Project driven"}
+                  ]
                 }
               ]
             }
@@ -111,16 +169,17 @@ class DiagnosisServiceTest {
             return diagnosis;
         });
 
-        GenerateDiagnosisResponse response = diagnosisService.generateDiagnosis(101L, 10L);
+        CreateDiagnosisSessionResponse response = diagnosisService.createDiagnosisSession(101L, 10L);
 
         assertEquals(501L, response.diagnosisId());
-        assertTrue(response.contentSource() != null && !response.contentSource().isBlank());
+        assertEquals("GENERATED", response.status());
         assertEquals("BEGINNER", response.questions().get(0).options().get(0).code());
         assertEquals(4, response.questions().get(0).options().size());
+        assertEquals("/plan", response.nextAction().target().route());
     }
 
     @Test
-    void generateDiagnosisShouldFallbackWhenLlmFails() {
+    void createDiagnosisSessionShouldFallbackWhenLlmFails() {
         LearningSession session = learningSession(101L, 10L);
         DiagnosisSession savedDiagnosis = new DiagnosisSession();
         savedDiagnosis.setId(501L);
@@ -133,16 +192,16 @@ class DiagnosisServiceTest {
             return diagnosis;
         });
 
-        GenerateDiagnosisResponse response = diagnosisService.generateDiagnosis(101L, 10L);
+        CreateDiagnosisSessionResponse response = diagnosisService.createDiagnosisSession(101L, 10L);
 
         assertEquals(5, response.questions().size());
         assertEquals(4, response.questions().get(0).options().size());
-        assertEquals(Boolean.TRUE, response.fallbackApplied());
-        assertEquals("RULE_FALLBACK", response.contentSource());
+        assertTrue(response.fallback().applied());
+        assertEquals("RULE_FALLBACK", response.fallback().contentSource());
     }
 
     @Test
-    void submitDiagnosisShouldReturnCodeLabelProfileWhenLlmSucceeds() {
+    void submitDiagnosisSessionShouldReturnStructuredProfileWhenLlmSucceeds() {
         LearningSession session = learningSession(101L, 10L);
         DiagnosisSession diagnosisSession = new DiagnosisSession();
         diagnosisSession.setId(501L);
@@ -166,21 +225,23 @@ class DiagnosisServiceTest {
             return profile;
         });
 
-        SubmitDiagnosisResponse response = diagnosisService.submitDiagnosis(buildSubmitRequest(), 10L);
+        SubmitDiagnosisSessionResponse response = diagnosisService.submitDiagnosisSession(501L, buildSubmitRequest(), 10L);
+        assertEquals("PROFILED", response.status());
         assertEquals("INTERMEDIATE", response.capabilityProfile().currentLevel().code());
         assertEquals("INTERVIEW", response.capabilityProfile().goalOrientation().code());
         assertEquals("PRACTICE_FIRST", response.capabilityProfile().learningPreference().code());
         assertEquals("STANDARD", response.capabilityProfile().timeBudget().code());
-        assertEquals("LLM", response.contentSource());
+        assertEquals("LLM", response.fallback().contentSource());
+        assertTrue(response.insights().planExplanation().contains("training"));
 
         ArgumentCaptor<List<DiagnosisAnswer>> answersCaptor = ArgumentCaptor.forClass(List.class);
         verify(diagnosisAnswerRepository).saveAll(answersCaptor.capture());
         assertEquals(5, answersCaptor.getValue().size());
-        assertTrue(response.capabilityProfile().planExplanation().contains("training"));
+        assertEquals("BASIC", answersCaptor.getValue().get(0).getAnswerValueJson().replace("\"", ""));
     }
 
     @Test
-    void submitDiagnosisShouldFallbackWhenLlmFails() {
+    void submitDiagnosisSessionShouldFallbackWhenLlmFails() {
         LearningSession session = learningSession(101L, 10L);
         DiagnosisSession diagnosisSession = new DiagnosisSession();
         diagnosisSession.setId(501L);
@@ -199,14 +260,14 @@ class DiagnosisServiceTest {
             return profile;
         });
 
-        SubmitDiagnosisResponse response = diagnosisService.submitDiagnosis(buildSubmitRequest(), 10L);
-        assertEquals(Boolean.TRUE, response.fallbackApplied());
-        assertEquals("RULE_FALLBACK", response.contentSource());
-        assertTrue(response.capabilityProfile().summary().length() > 0);
+        SubmitDiagnosisSessionResponse response = diagnosisService.submitDiagnosisSession(501L, buildSubmitRequest(), 10L);
+        assertTrue(response.fallback().applied());
+        assertEquals("RULE_FALLBACK", response.fallback().contentSource());
+        assertTrue(response.insights().summary().length() > 0);
     }
 
     @Test
-    void submitDiagnosisShouldRejectUnknownQuestion() {
+    void submitDiagnosisSessionShouldRejectUnknownQuestion() {
         LearningSession session = learningSession(101L, 10L);
         DiagnosisSession diagnosisSession = new DiagnosisSession();
         diagnosisSession.setId(501L);
@@ -217,23 +278,23 @@ class DiagnosisServiceTest {
         when(diagnosisSessionRepository.findByIdAndUserPk(501L, 10L)).thenReturn(Optional.of(diagnosisSession));
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
 
-        SubmitDiagnosisRequest request = new SubmitDiagnosisRequest(
+        SubmitDiagnosisSessionRequest request = new SubmitDiagnosisSessionRequest(
             501L,
-            List.of(new SubmitDiagnosisAnswerRequest("q_missing", List.of("X"), null, null))
+            List.of(new DiagnosisAnswerSubmissionDto("q_missing", "X", null, null, null))
         );
 
-        assertThrows(BadRequestException.class, () -> diagnosisService.submitDiagnosis(request, 10L));
+        assertThrows(BadRequestException.class, () -> diagnosisService.submitDiagnosisSession(501L, request, 10L));
     }
 
-    private SubmitDiagnosisRequest buildSubmitRequest() {
-        return new SubmitDiagnosisRequest(
+    private SubmitDiagnosisSessionRequest buildSubmitRequest() {
+        return new SubmitDiagnosisSessionRequest(
             501L,
             List.of(
-                new SubmitDiagnosisAnswerRequest("q_foundation", List.of("BASIC"), null, null),
-                new SubmitDiagnosisAnswerRequest("q_experience", List.of("COURSEWORK", "EXAM_PREP"), null, null),
-                new SubmitDiagnosisAnswerRequest("q_goal_style", List.of("INTERVIEW"), null, null),
-                new SubmitDiagnosisAnswerRequest("q_time_budget", List.of("STANDARD"), null, null),
-                new SubmitDiagnosisAnswerRequest("q_learning_preference", List.of("PRACTICE_FIRST"), null, null)
+                new DiagnosisAnswerSubmissionDto("q_foundation", "BASIC", null, null, null),
+                new DiagnosisAnswerSubmissionDto("q_experience", null, List.of("COURSEWORK", "EXAM_PREP"), null, null),
+                new DiagnosisAnswerSubmissionDto("q_goal_style", "INTERVIEW", null, null, null),
+                new DiagnosisAnswerSubmissionDto("q_time_budget", "STANDARD", null, null, null),
+                new DiagnosisAnswerSubmissionDto("q_learning_preference", "PRACTICE_FIRST", null, null, null)
             )
         );
     }
@@ -245,72 +306,87 @@ class DiagnosisServiceTest {
                 "questionId": "q_foundation",
                 "dimension": "FOUNDATION",
                 "type": "single_choice",
+                "required": true,
                 "title": "Foundation",
                 "description": "How solid is your base?",
+                "placeholder": "",
+                "submitHint": "",
+                "sectionLabel": "FOUNDATION",
                 "options": [
-                  {"code":"BEGINNER","label":"刚开始接触"},
-                  {"code":"BASIC","label":"学过但还不太熟"},
-                  {"code":"PROFICIENT","label":"基础比较熟"},
-                  {"code":"ADVANCED","label":"已经能独立应用"}
-                ],
-                "required": true
+                  {"code":"BEGINNER","label":"Beginner","order":1},
+                  {"code":"BASIC","label":"Basic","order":2},
+                  {"code":"PROFICIENT","label":"Proficient","order":3},
+                  {"code":"ADVANCED","label":"Advanced","order":4}
+                ]
               },
               {
                 "questionId": "q_experience",
                 "dimension": "EXPERIENCE",
                 "type": "multiple_choice",
+                "required": true,
                 "title": "Experience",
                 "description": "Past experience",
+                "placeholder": "",
+                "submitHint": "",
+                "sectionLabel": "EXPERIENCE",
                 "options": [
-                  {"code":"COURSEWORK","label":"上过相关课程"},
-                  {"code":"ASSIGNMENTS","label":"做过作业或实验"},
-                  {"code":"PROJECTS","label":"做过项目或作品"},
-                  {"code":"EXAM_PREP","label":"准备过考试或面试"},
-                  {"code":"NO_EXPERIENCE","label":"几乎没有相关经验"}
-                ],
-                "required": true
+                  {"code":"COURSEWORK","label":"Coursework","order":1},
+                  {"code":"ASSIGNMENTS","label":"Assignments","order":2},
+                  {"code":"PROJECTS","label":"Projects","order":3},
+                  {"code":"EXAM_PREP","label":"Exam prep","order":4},
+                  {"code":"NO_EXPERIENCE","label":"No experience","order":5}
+                ]
               },
               {
                 "questionId": "q_goal_style",
                 "dimension": "GOAL_STYLE",
                 "type": "single_choice",
+                "required": true,
                 "title": "Goal",
                 "description": "Main goal",
+                "placeholder": "",
+                "submitHint": "",
+                "sectionLabel": "GOAL",
                 "options": [
-                  {"code":"COURSE","label":"应对课程学习与作业"},
-                  {"code":"EXAM","label":"准备考试或测验"},
-                  {"code":"INTERVIEW","label":"准备实习或求职面试"},
-                  {"code":"PROJECT","label":"完成项目或作品"}
-                ],
-                "required": true
+                  {"code":"COURSE","label":"Course","order":1},
+                  {"code":"EXAM","label":"Exam","order":2},
+                  {"code":"INTERVIEW","label":"Interview","order":3},
+                  {"code":"PROJECT","label":"Project","order":4}
+                ]
               },
               {
                 "questionId": "q_time_budget",
                 "dimension": "TIME_BUDGET",
                 "type": "single_choice",
+                "required": true,
                 "title": "Time",
                 "description": "Weekly time",
+                "placeholder": "",
+                "submitHint": "",
+                "sectionLabel": "TIME",
                 "options": [
-                  {"code":"LIGHT","label":"每周 1-3 小时"},
-                  {"code":"STANDARD","label":"每周 4-6 小时"},
-                  {"code":"INTENSIVE","label":"每周 7-10 小时"},
-                  {"code":"IMMERSIVE","label":"每周 10 小时以上"}
-                ],
-                "required": true
+                  {"code":"LIGHT","label":"1-3h","order":1},
+                  {"code":"STANDARD","label":"4-6h","order":2},
+                  {"code":"INTENSIVE","label":"7-10h","order":3},
+                  {"code":"IMMERSIVE","label":"10h+","order":4}
+                ]
               },
               {
                 "questionId": "q_learning_preference",
                 "dimension": "LEARNING_PREFERENCE",
                 "type": "single_choice",
+                "required": true,
                 "title": "Preference",
                 "description": "Best learning style",
+                "placeholder": "",
+                "submitHint": "",
+                "sectionLabel": "PREFERENCE",
                 "options": [
-                  {"code":"CONCEPT_FIRST","label":"先讲清概念，再做练习"},
-                  {"code":"EXAMPLE_FIRST","label":"先看例子，再总结方法"},
-                  {"code":"PRACTICE_FIRST","label":"先做题，在反馈中查漏补缺"},
-                  {"code":"PROJECT_DRIVEN","label":"边学边做项目，穿插补基础"}
-                ],
-                "required": true
+                  {"code":"CONCEPT_FIRST","label":"Concept first","order":1},
+                  {"code":"EXAMPLE_FIRST","label":"Example first","order":2},
+                  {"code":"PRACTICE_FIRST","label":"Practice first","order":3},
+                  {"code":"PROJECT_DRIVEN","label":"Project driven","order":4}
+                ]
               }
             ]
             """;

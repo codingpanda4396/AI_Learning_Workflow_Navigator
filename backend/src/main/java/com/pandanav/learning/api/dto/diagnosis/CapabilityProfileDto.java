@@ -17,10 +17,6 @@ public record CapabilityProfileDto(
     @JsonProperty("timeBudget")
     CodeLabelDto timeBudget,
     @JsonProperty("goalOrientation")
-    CodeLabelDto goalOrientation,
-    @JsonProperty("summary")
-    String summary,
-    @JsonProperty("planExplanation")
-    String planExplanation
+    CodeLabelDto goalOrientation
 ) {
 }

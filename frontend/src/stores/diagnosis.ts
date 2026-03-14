@@ -4,6 +4,7 @@ import type {
   CapabilityProfile,
   DiagnosisAnswer,
   DiagnosisAnswerValue,
+  DiagnosisInsights,
   DiagnosisQuestion,
   DiagnosisSubmitResponse,
 } from '@/types/diagnosis';
@@ -14,7 +15,9 @@ interface DiagnosisState {
   currentQuestionIndex: number;
   answers: Record<string, DiagnosisAnswerValue>;
   capabilityProfile: CapabilityProfile | null;
+  insights: DiagnosisInsights | null;
   nextAction: DiagnosisSubmitResponse['nextAction'] | null;
+  status: string;
   loading: boolean;
   submitting: boolean;
   error: string;
@@ -27,7 +30,9 @@ export const useDiagnosisStore = defineStore('diagnosis', {
     currentQuestionIndex: 0,
     answers: {},
     capabilityProfile: null,
+    insights: null,
     nextAction: null,
+    status: '',
     loading: false,
     submitting: false,
     error: '',
@@ -37,7 +42,9 @@ export const useDiagnosisStore = defineStore('diagnosis', {
       this.loading = true;
       this.error = '';
       this.capabilityProfile = null;
+      this.insights = null;
       this.nextAction = null;
+      this.status = '';
       this.currentQuestionIndex = 0;
       this.answers = {};
 
@@ -45,9 +52,11 @@ export const useDiagnosisStore = defineStore('diagnosis', {
         const response = await generateDiagnosisApi(sessionId);
         this.diagnosisId = response.diagnosisId;
         this.questions = response.questions;
+        this.nextAction = response.nextAction ?? null;
+        this.status = response.status;
         return response;
       } catch (error) {
-        this.error = error instanceof Error ? error.message : '生成诊断问题失败，请稍后重试。';
+        this.error = error instanceof Error ? error.message : '诊断问卷生成失败，请稍后重试。';
         throw error;
       } finally {
         this.loading = false;
@@ -72,24 +81,32 @@ export const useDiagnosisStore = defineStore('diagnosis', {
           .filter((question) => this.answers[question.questionId] !== undefined)
           .map((question) => {
             const value = this.answers[question.questionId];
-            if (question.type.code === 'TEXT') {
+            if (question.type === 'TEXT') {
               return {
                 questionId: question.questionId,
-                answerText: typeof value === 'string' ? value : '',
+                text: typeof value === 'string' ? value : '',
+              };
+            }
+            if (question.type === 'MULTIPLE_CHOICE') {
+              return {
+                questionId: question.questionId,
+                selectedOptionCodes: Array.isArray(value) ? value : typeof value === 'string' ? [value] : [],
               };
             }
             return {
               questionId: question.questionId,
-              answerCodes: Array.isArray(value) ? value : typeof value === 'string' ? [value] : [],
+              selectedOptionCode: typeof value === 'string' ? value : Array.isArray(value) ? value[0] : undefined,
             };
           });
 
         const response = await submitDiagnosisApi(this.diagnosisId, answers);
         this.capabilityProfile = response.capabilityProfile;
+        this.insights = response.insights ?? null;
         this.nextAction = response.nextAction ?? null;
+        this.status = response.status;
         return response;
       } catch (error) {
-        this.error = error instanceof Error ? error.message : '提交诊断回答失败，请稍后重试。';
+        this.error = error instanceof Error ? error.message : '诊断答案提交失败，请稍后重试。';
         throw error;
       } finally {
         this.submitting = false;
@@ -101,7 +118,9 @@ export const useDiagnosisStore = defineStore('diagnosis', {
       this.currentQuestionIndex = 0;
       this.answers = {};
       this.capabilityProfile = null;
+      this.insights = null;
       this.nextAction = null;
+      this.status = '';
       this.loading = false;
       this.submitting = false;
       this.error = '';

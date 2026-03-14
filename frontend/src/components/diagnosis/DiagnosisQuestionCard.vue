@@ -50,7 +50,7 @@ function updateText(value: string) {
     </div>
 
     <div class="mt-6">
-      <div v-if="question.type.code === 'SINGLE_CHOICE'" class="grid gap-3">
+      <div v-if="question.type === 'SINGLE_CHOICE'" class="grid gap-3">
         <label
           v-for="option in question.options || []"
           :key="option.code"
@@ -67,7 +67,7 @@ function updateText(value: string) {
         </label>
       </div>
 
-      <div v-else-if="question.type.code === 'MULTIPLE_CHOICE'" class="grid gap-3">
+      <div v-else-if="question.type === 'MULTIPLE_CHOICE'" class="grid gap-3">
         <label
           v-for="option in question.options || []"
           :key="option.code"

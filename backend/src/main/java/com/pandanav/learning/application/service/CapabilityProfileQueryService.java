@@ -3,6 +3,7 @@ package com.pandanav.learning.application.service;
 import com.pandanav.learning.api.contract.ContractCatalog;
 import com.pandanav.learning.api.dto.diagnosis.CapabilityProfileDto;
 import com.pandanav.learning.api.dto.diagnosis.CapabilityProfileResponse;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisInsightsDto;
 import com.pandanav.learning.domain.model.CapabilityProfile;
 import com.pandanav.learning.domain.model.CapabilityProfileContext;
 import com.pandanav.learning.domain.repository.CapabilityProfileRepository;
@@ -29,7 +30,7 @@ public class CapabilityProfileQueryService {
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
         CapabilityProfile profile = capabilityProfileRepository.findLatestBySessionId(sessionId)
             .orElseThrow(() -> new NotFoundException("Capability profile not found."));
-        return new CapabilityProfileResponse(sessionId, toDto(profile));
+        return new CapabilityProfileResponse(sessionId, toDto(profile), new DiagnosisInsightsDto(profile.getSummaryText(), profile.getPlanExplanation()));
     }
 
     public CapabilityProfileContext getContextForSession(Long sessionId, Long userId) {
@@ -55,9 +56,7 @@ public class CapabilityProfileQueryService {
             profile.getWeaknesses(),
             ContractCatalog.learningPreference(profile.getLearningPreference()),
             ContractCatalog.timeBudget(profile.getTimeBudget()),
-            ContractCatalog.goalOrientation(profile.getGoalOrientation()),
-            profile.getSummaryText(),
-            profile.getPlanExplanation()
+            ContractCatalog.goalOrientation(profile.getGoalOrientation())
         );
     }
 }

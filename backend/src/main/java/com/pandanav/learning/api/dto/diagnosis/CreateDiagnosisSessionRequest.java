@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record GenerateDiagnosisRequest(
+public record CreateDiagnosisSessionRequest(
     @NotNull
     @Positive
     @JsonProperty("sessionId")

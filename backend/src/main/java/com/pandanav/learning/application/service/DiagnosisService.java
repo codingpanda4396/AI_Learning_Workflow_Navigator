@@ -5,13 +5,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.contract.ContractCatalog;
 import com.pandanav.learning.api.dto.diagnosis.CapabilityProfileDto;
+import com.pandanav.learning.api.dto.diagnosis.CreateDiagnosisSessionResponse;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisActionTargetDto;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisAnswerSubmissionDto;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisFallbackDto;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisInsightsDto;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisMetadataDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisNextActionDto;
-import com.pandanav.learning.api.dto.diagnosis.DiagnosisQuestionCopyDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisQuestionDto;
-import com.pandanav.learning.api.dto.diagnosis.GenerateDiagnosisResponse;
-import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisAnswerRequest;
-import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisRequest;
-import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisResponse;
+import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionRequest;
+import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionResponse;
 import com.pandanav.learning.domain.enums.DiagnosisDimension;
 import com.pandanav.learning.domain.enums.DiagnosisStatus;
 import com.pandanav.learning.domain.model.CapabilityProfile;
@@ -20,6 +23,7 @@ import com.pandanav.learning.domain.model.CapabilityProfileSummaryCopy;
 import com.pandanav.learning.domain.model.DiagnosisAnswer;
 import com.pandanav.learning.domain.model.DiagnosisQuestion;
 import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
+import com.pandanav.learning.domain.model.DiagnosisQuestionOption;
 import com.pandanav.learning.domain.model.DiagnosisSession;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.repository.CapabilityProfileRepository;
@@ -43,8 +47,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class DiagnosisService {
-
-    private static final DiagnosisNextActionDto NEXT_ACTION = new DiagnosisNextActionDto("PATH_PLAN", "进入个性化学习路径");
 
     private final SessionRepository sessionRepository;
     private final DiagnosisSessionRepository diagnosisSessionRepository;
@@ -81,7 +83,7 @@ public class DiagnosisService {
         this.objectMapper = objectMapper;
     }
 
-    public GenerateDiagnosisResponse generateDiagnosis(Long sessionId, Long userId) {
+    public CreateDiagnosisSessionResponse createDiagnosisSession(Long sessionId, Long userId) {
         LearningSession session = sessionRepository.findByIdAndUserPk(sessionId, userId)
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
 
@@ -98,18 +100,24 @@ public class DiagnosisService {
         diagnosisSession.setStartedAt(OffsetDateTime.now());
 
         DiagnosisSession saved = diagnosisSessionRepository.save(diagnosisSession);
-        return new GenerateDiagnosisResponse(
+        return new CreateDiagnosisSessionResponse(
             saved.getId(),
             session.getId(),
+            DiagnosisStatus.GENERATED.name(),
             toQuestionDtos(questions),
-            copyResult.fallbackApplied(),
-            copyResult.fallbackReasons(),
-            copyResult.fallbackApplied() ? "RULE_FALLBACK" : "LLM"
+            buildNextAction(session.getId(), saved.getId()),
+            fallback(copyResult.fallbackApplied(), copyResult.fallbackReasons(), copyResult.fallbackApplied() ? "RULE_FALLBACK" : "LLM"),
+            new DiagnosisMetadataDto(questions.size(), null, null)
         );
     }
 
-    public SubmitDiagnosisResponse submitDiagnosis(SubmitDiagnosisRequest request, Long userId) {
-        DiagnosisSession diagnosisSession = diagnosisSessionRepository.findByIdAndUserPk(request.diagnosisId(), userId)
+    public SubmitDiagnosisSessionResponse submitDiagnosisSession(Long diagnosisId, SubmitDiagnosisSessionRequest request, Long userId) {
+        Long resolvedDiagnosisId = diagnosisId != null ? diagnosisId : request.diagnosisId();
+        if (resolvedDiagnosisId == null || resolvedDiagnosisId <= 0) {
+            throw new BadRequestException("Diagnosis session id is required.");
+        }
+
+        DiagnosisSession diagnosisSession = diagnosisSessionRepository.findByIdAndUserPk(resolvedDiagnosisId, userId)
             .orElseThrow(() -> new NotFoundException("Diagnosis session not found."));
         LearningSession learningSession = sessionRepository.findByIdAndUserPk(diagnosisSession.getLearningSessionId(), userId)
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
@@ -123,17 +131,17 @@ public class DiagnosisService {
         diagnosisAnswerRepository.saveAll(answers);
         diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.SUBMITTED, null);
 
-        Map<DiagnosisDimension, List<String>> answersByDimension = answers.stream()
+        Map<DiagnosisDimension, List<String>> answerCodesByDimension = answers.stream()
             .collect(Collectors.groupingBy(
                 DiagnosisAnswer::getDimension,
                 LinkedHashMap::new,
-                Collectors.flatMapping(answer -> extractAnswerTexts(answer).stream(), Collectors.toList())
+                Collectors.flatMapping(answer -> extractAnswerCodes(answer).stream(), Collectors.toList())
             ));
 
-        CapabilityProfileDraft draft = capabilityProfileBuilder.build(answersByDimension);
+        CapabilityProfileDraft draft = capabilityProfileBuilder.build(answerCodesByDimension);
         CapabilityProfileSummaryCopy fallbackSummary = capabilityProfileSummaryGenerator.buildFallback(draft);
         CapabilityProfileSummaryLlmService.CapabilityProfileSummaryResult summaryResult =
-            capabilityProfileSummaryLlmService.generate(learningSession, draft, answersByDimension);
+            capabilityProfileSummaryLlmService.generate(learningSession, draft, answerCodesByDimension);
         CapabilityProfileSummaryCopy summaryCopy = summaryResult.copy() == null ? fallbackSummary : summaryResult.copy();
 
         CapabilityProfile profile = new CapabilityProfile();
@@ -153,18 +161,36 @@ public class DiagnosisService {
         CapabilityProfile savedProfile = capabilityProfileRepository.save(profile);
         diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.PROFILED, OffsetDateTime.now());
 
-        return new SubmitDiagnosisResponse(
+        return new SubmitDiagnosisSessionResponse(
+            diagnosisSession.getId(),
+            learningSession.getId(),
+            DiagnosisStatus.PROFILED.name(),
             toProfileDto(savedProfile),
-            NEXT_ACTION,
-            summaryResult.fallbackApplied(),
-            summaryResult.fallbackReasons(),
-            summaryResult.fallbackApplied() ? "RULE_FALLBACK" : "LLM"
+            new DiagnosisInsightsDto(savedProfile.getSummaryText(), savedProfile.getPlanExplanation()),
+            buildNextAction(learningSession.getId(), diagnosisSession.getId()),
+            fallback(summaryResult.fallbackApplied(), summaryResult.fallbackReasons(), summaryResult.fallbackApplied() ? "RULE_FALLBACK" : "LLM"),
+            new DiagnosisMetadataDto(questions.size(), answers.size(), savedProfile.getVersion())
         );
     }
 
-    private void validateAnswers(Map<String, DiagnosisQuestion> questionMap, List<SubmitDiagnosisAnswerRequest> answerRequests) {
-        Map<String, SubmitDiagnosisAnswerRequest> submittedByQuestionId = new LinkedHashMap<>();
-        for (SubmitDiagnosisAnswerRequest answer : answerRequests) {
+    private DiagnosisNextActionDto buildNextAction(Long sessionId, Long diagnosisId) {
+        return new DiagnosisNextActionDto(
+            "PATH_PLAN",
+            "进入个性化学习路径",
+            new DiagnosisActionTargetDto(
+                "/plan",
+                Map.of("sessionId", sessionId, "diagnosisId", diagnosisId)
+            )
+        );
+    }
+
+    private DiagnosisFallbackDto fallback(boolean applied, List<String> reasons, String contentSource) {
+        return new DiagnosisFallbackDto(applied, reasons == null ? List.of() : reasons, contentSource);
+    }
+
+    private void validateAnswers(Map<String, DiagnosisQuestion> questionMap, List<DiagnosisAnswerSubmissionDto> answerRequests) {
+        Map<String, DiagnosisAnswerSubmissionDto> submittedByQuestionId = new LinkedHashMap<>();
+        for (DiagnosisAnswerSubmissionDto answer : answerRequests) {
             String questionId = answer.questionId() == null ? "" : answer.questionId().trim();
             DiagnosisQuestion question = questionMap.get(questionId);
             if (question == null) {
@@ -186,7 +212,8 @@ public class DiagnosisService {
         if (value == null || value.isNull()) {
             throw new BadRequestException("Diagnosis answer value is required.");
         }
-        if ("multiple_choice".equalsIgnoreCase(question.type())) {
+        String typeCode = ContractCatalog.diagnosisQuestionTypeCode(question.type());
+        if ("MULTIPLE_CHOICE".equals(typeCode)) {
             if (!value.isArray() || value.isEmpty()) {
                 throw new BadRequestException("Question %s requires multiple choices.".formatted(question.questionId()));
             }
@@ -195,21 +222,22 @@ public class DiagnosisService {
             }
             return;
         }
-        if ("text".equalsIgnoreCase(question.type())) {
+        if ("TEXT".equals(typeCode)) {
             if (value.isArray() || value.isObject() || value.asText("").isBlank()) {
                 throw new BadRequestException("Question %s requires text input.".formatted(question.questionId()));
             }
             return;
         }
         if (value.isArray() || value.isObject()) {
-            throw new BadRequestException("Question %s requires a single value.".formatted(question.questionId()));
+            throw new BadRequestException("Question %s requires a single option code.".formatted(question.questionId()));
         }
         assertAllowedOption(question, value.asText(""));
     }
 
     private void assertAllowedOption(DiagnosisQuestion question, String value) {
         String normalized = value == null ? "" : value.trim();
-        if (normalized.isBlank() || ContractCatalog.diagnosisOption(question.dimension(), normalized).isEmpty()) {
+        boolean matched = question.options().stream().anyMatch(option -> option.code().equalsIgnoreCase(normalized));
+        if (!matched && ContractCatalog.diagnosisOption(question.dimension(), normalized).isEmpty()) {
             throw new BadRequestException("Invalid answer option for question: " + question.questionId());
         }
     }
@@ -217,17 +245,17 @@ public class DiagnosisService {
     private List<DiagnosisAnswer> buildAnswers(
         Long diagnosisId,
         Map<String, DiagnosisQuestion> questionMap,
-        List<SubmitDiagnosisAnswerRequest> answerRequests
+        List<DiagnosisAnswerSubmissionDto> answerRequests
     ) {
         List<DiagnosisAnswer> answers = new ArrayList<>();
-        for (SubmitDiagnosisAnswerRequest request : answerRequests) {
+        for (DiagnosisAnswerSubmissionDto request : answerRequests) {
             DiagnosisQuestion question = questionMap.get(request.questionId().trim());
             JsonNode normalizedValue = normalizeAnswerValue(question, request);
             DiagnosisAnswer answer = new DiagnosisAnswer();
             answer.setDiagnosisSessionId(diagnosisId);
             answer.setQuestionId(question.questionId());
             answer.setDimension(question.dimension());
-            answer.setAnswerType(question.type().toUpperCase(Locale.ROOT));
+            answer.setAnswerType(ContractCatalog.diagnosisQuestionTypeCode(question.type()));
             answer.setAnswerValueJson(toJson(normalizedValue));
             answer.setRawText(toRawText(question, normalizedValue));
             answers.add(answer);
@@ -235,20 +263,38 @@ public class DiagnosisService {
         return answers;
     }
 
-    private List<String> extractAnswerTexts(DiagnosisAnswer answer) {
+    private List<String> extractAnswerCodes(DiagnosisAnswer answer) {
         try {
             JsonNode jsonNode = objectMapper.readTree(answer.getAnswerValueJson());
             if (jsonNode.isArray()) {
                 List<String> values = new ArrayList<>();
                 for (JsonNode item : jsonNode) {
-                    values.add(ContractCatalog.diagnosisOptionLabel(answer.getDimension(), item.asText("")));
+                    values.add(normalizeOptionCode(answer.getDimension(), item.asText("")));
                 }
                 return values;
             }
-            return List.of(ContractCatalog.diagnosisOptionLabel(answer.getDimension(), jsonNode.asText("")));
+            return List.of(normalizeOptionCode(answer.getDimension(), jsonNode.asText("")));
         } catch (Exception ex) {
-            return answer.getRawText() == null || answer.getRawText().isBlank() ? List.of() : List.of(answer.getRawText());
+            if (answer.getRawText() == null || answer.getRawText().isBlank()) {
+                return List.of();
+            }
+            String[] parts = answer.getRawText().split("\\|");
+            List<String> fallback = new ArrayList<>();
+            for (String part : parts) {
+                String code = normalizeOptionCode(answer.getDimension(), part.trim());
+                if (!code.isBlank()) {
+                    fallback.add(code);
+                }
+            }
+            return fallback;
         }
+    }
+
+    private String normalizeOptionCode(DiagnosisDimension dimension, String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        return ContractCatalog.diagnosisOptionCode(dimension, raw);
     }
 
     private List<DiagnosisQuestion> readQuestions(String json) {
@@ -256,20 +302,24 @@ public class DiagnosisService {
             JsonNode node = objectMapper.readTree(json);
             List<DiagnosisQuestion> questions = new ArrayList<>();
             for (JsonNode item : node) {
-                List<String> options = new ArrayList<>();
-                for (JsonNode option : item.path("options")) {
-                    options.add(option.isObject() ? option.path("label").asText("") : option.asText(""));
-                }
-                DiagnosisQuestionCopy copy = readCopy(item.path("copy"), item);
+                DiagnosisDimension dimension = DiagnosisDimension.valueOf(item.path("dimension").asText("FOUNDATION"));
+                DiagnosisQuestionCopy legacyCopy = readLegacyCopy(item.path("copy"), item);
+                String title = textOrDefault(item.path("title").asText(""), legacyCopy.title());
+                String description = textOrDefault(item.path("description").asText(""), legacyCopy.description());
+                String placeholder = textOrDefault(item.path("placeholder").asText(""), legacyCopy.placeholder());
+                String submitHint = textOrDefault(item.path("submitHint").asText(""), legacyCopy.submitHint());
+                String sectionLabel = textOrDefault(item.path("sectionLabel").asText(""), legacyCopy.sectionLabel());
                 questions.add(new DiagnosisQuestion(
                     item.path("questionId").asText(""),
-                    DiagnosisDimension.valueOf(item.path("dimension").asText("FOUNDATION")),
+                    dimension,
                     item.path("type").asText("single_choice"),
-                    textOrDefault(item.path("title").asText(""), copy.title()),
-                    textOrDefault(item.path("description").asText(""), copy.description()),
-                    options,
                     item.path("required").asBoolean(true),
-                    copy
+                    readOptions(dimension, item.path("options")),
+                    title,
+                    description,
+                    placeholder,
+                    submitHint,
+                    sectionLabel
                 ));
             }
             return questions;
@@ -278,7 +328,7 @@ public class DiagnosisService {
         }
     }
 
-    private DiagnosisQuestionCopy readCopy(JsonNode copyNode, JsonNode questionNode) {
+    private DiagnosisQuestionCopy readLegacyCopy(JsonNode copyNode, JsonNode questionNode) {
         if (copyNode != null && copyNode.isObject()) {
             return new DiagnosisQuestionCopy(
                 copyNode.path("sectionLabel").asText(""),
@@ -292,9 +342,39 @@ public class DiagnosisService {
             questionNode.path("dimension").asText(""),
             questionNode.path("title").asText(""),
             questionNode.path("description").asText(""),
-            "",
-            ""
+            questionNode.path("placeholder").asText(""),
+            questionNode.path("submitHint").asText("")
         );
+    }
+
+    private List<DiagnosisQuestionOption> readOptions(DiagnosisDimension dimension, JsonNode optionsNode) {
+        List<DiagnosisQuestionOption> defaults = ContractCatalog.diagnosisQuestionOptions(dimension);
+        if (!optionsNode.isArray() || optionsNode.isEmpty()) {
+            return defaults;
+        }
+        List<DiagnosisQuestionOption> options = new ArrayList<>();
+        for (int i = 0; i < optionsNode.size(); i++) {
+            JsonNode optionNode = optionsNode.get(i);
+            DiagnosisQuestionOption defaultOption = i < defaults.size() ? defaults.get(i) : null;
+            String fallbackCode = defaultOption == null ? "" : defaultOption.code();
+            String fallbackLabel = defaultOption == null ? "" : defaultOption.label();
+            String code = optionNode.isObject()
+                ? textOrDefault(optionNode.path("code").asText(""), fallbackCode)
+                : normalizeOptionCode(dimension, optionNode.asText(""));
+            String label = optionNode.isObject()
+                ? textOrDefault(optionNode.path("label").asText(""), fallbackLabel)
+                : textOrDefault(optionNode.asText(""), fallbackLabel);
+            Integer order = optionNode.isObject() && optionNode.has("order")
+                ? optionNode.path("order").asInt(i + 1)
+                : i + 1;
+            if (code.isBlank() && !label.isBlank()) {
+                code = normalizeOptionCode(dimension, label);
+            }
+            if (!code.isBlank() && !label.isBlank()) {
+                options.add(new DiagnosisQuestionOption(code, label, order));
+            }
+        }
+        return options.isEmpty() ? defaults : options;
     }
 
     private List<Map<String, Object>> questionsToMap(List<DiagnosisQuestion> questions) {
@@ -302,12 +382,14 @@ public class DiagnosisService {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("questionId", question.questionId());
             item.put("dimension", question.dimension().name());
-            item.put("type", question.type());
+            item.put("type", ContractCatalog.diagnosisQuestionTypeCode(question.type()));
+            item.put("required", question.required());
             item.put("title", question.title());
             item.put("description", question.description());
-            item.put("options", ContractCatalog.diagnosisOptions(question.dimension(), question.options()));
-            item.put("required", question.required());
-            item.put("copy", question.copy());
+            item.put("placeholder", question.placeholder());
+            item.put("submitHint", question.submitHint());
+            item.put("sectionLabel", question.sectionLabel());
+            item.put("options", question.options());
             return item;
         }).toList();
     }
@@ -319,9 +401,7 @@ public class DiagnosisService {
             profile.getWeaknesses(),
             ContractCatalog.learningPreference(profile.getLearningPreference()),
             ContractCatalog.timeBudget(profile.getTimeBudget()),
-            ContractCatalog.goalOrientation(profile.getGoalOrientation()),
-            profile.getSummaryText(),
-            profile.getPlanExplanation()
+            ContractCatalog.goalOrientation(profile.getGoalOrientation())
         );
     }
 
@@ -329,19 +409,15 @@ public class DiagnosisService {
         return questions.stream()
             .map(question -> new DiagnosisQuestionDto(
                 question.questionId(),
-                ContractCatalog.diagnosisDimension(question.dimension()),
-                ContractCatalog.diagnosisQuestionType(question.type()),
+                question.dimension().name(),
+                ContractCatalog.diagnosisQuestionTypeCode(question.type()),
+                question.required(),
+                ContractCatalog.diagnosisQuestionOptions(question.options()),
                 question.title(),
                 question.description(),
-                ContractCatalog.diagnosisOptions(question.dimension(), question.options()),
-                question.required(),
-                new DiagnosisQuestionCopyDto(
-                    question.copy().sectionLabel(),
-                    question.copy().title(),
-                    question.copy().description(),
-                    question.copy().placeholder(),
-                    question.copy().submitHint()
-                )
+                question.placeholder(),
+                question.submitHint(),
+                question.sectionLabel()
             ))
             .toList();
     }
@@ -360,37 +436,71 @@ public class DiagnosisService {
         }
     }
 
-    private JsonNode normalizeAnswerValue(DiagnosisQuestion question, SubmitDiagnosisAnswerRequest request) {
-        if (request.value() != null && !request.value().isNull()) {
-            return request.value();
+    private JsonNode normalizeAnswerValue(DiagnosisQuestion question, DiagnosisAnswerSubmissionDto request) {
+        if (request.legacyValue() != null && !request.legacyValue().isNull()) {
+            return normalizeLegacyValue(question, request.legacyValue());
         }
-        if ("multiple_choice".equalsIgnoreCase(question.type())) {
-            List<String> answerCodes = request.answerCodes() == null ? List.of() : request.answerCodes().stream()
-                .map(code -> ContractCatalog.diagnosisOptionCode(question.dimension(), code))
+        String typeCode = ContractCatalog.diagnosisQuestionTypeCode(question.type());
+        if ("MULTIPLE_CHOICE".equals(typeCode)) {
+            List<String> answerCodes = request.selectedOptionCodes() == null ? List.of() : request.selectedOptionCodes().stream()
+                .map(code -> normalizeOptionCode(question.dimension(), code))
+                .filter(code -> !code.isBlank())
+                .distinct()
                 .toList();
             return objectMapper.valueToTree(answerCodes);
         }
-        if ("text".equalsIgnoreCase(question.type())) {
-            return objectMapper.valueToTree(request.answerText());
+        if ("TEXT".equals(typeCode)) {
+            return objectMapper.valueToTree(request.text());
         }
-        String firstCode = request.answerCodes() == null || request.answerCodes().isEmpty() ? null : request.answerCodes().get(0);
-        return objectMapper.valueToTree(ContractCatalog.diagnosisOptionCode(question.dimension(), firstCode));
+        String singleCode = textOrDefault(request.selectedOptionCode(), "");
+        if (singleCode.isBlank() && request.selectedOptionCodes() != null && !request.selectedOptionCodes().isEmpty()) {
+            singleCode = request.selectedOptionCodes().get(0);
+        }
+        return objectMapper.valueToTree(normalizeOptionCode(question.dimension(), singleCode));
+    }
+
+    private JsonNode normalizeLegacyValue(DiagnosisQuestion question, JsonNode legacyValue) {
+        String typeCode = ContractCatalog.diagnosisQuestionTypeCode(question.type());
+        if ("MULTIPLE_CHOICE".equals(typeCode) && legacyValue.isArray()) {
+            List<String> codes = new ArrayList<>();
+            for (JsonNode item : legacyValue) {
+                String code = normalizeOptionCode(question.dimension(), item.asText(""));
+                if (!code.isBlank()) {
+                    codes.add(code);
+                }
+            }
+            return objectMapper.valueToTree(codes);
+        }
+        if ("TEXT".equals(typeCode)) {
+            return objectMapper.valueToTree(legacyValue.asText(""));
+        }
+        return objectMapper.valueToTree(normalizeOptionCode(question.dimension(), legacyValue.asText("")));
     }
 
     private String toRawText(DiagnosisQuestion question, JsonNode value) {
         if (value == null || value.isNull()) {
             return null;
         }
+        String typeCode = ContractCatalog.diagnosisQuestionTypeCode(question.type());
+        if ("TEXT".equals(typeCode)) {
+            return value.asText("");
+        }
         if (value.isArray()) {
             List<String> items = new ArrayList<>();
             for (JsonNode item : value) {
-                items.add(ContractCatalog.diagnosisOptionLabel(question.dimension(), item.asText("")));
+                items.add(resolveOptionLabel(question, item.asText("")));
             }
             return String.join(" | ", items);
         }
-        return "text".equalsIgnoreCase(question.type())
-            ? value.asText("")
-            : ContractCatalog.diagnosisOptionLabel(question.dimension(), value.asText(""));
+        return resolveOptionLabel(question, value.asText(""));
+    }
+
+    private String resolveOptionLabel(DiagnosisQuestion question, String code) {
+        return question.options().stream()
+            .filter(option -> option.code().equalsIgnoreCase(code))
+            .map(DiagnosisQuestionOption::label)
+            .findFirst()
+            .orElseGet(() -> ContractCatalog.diagnosisOptionLabel(question.dimension(), code));
     }
 
     private String textOrDefault(String candidate, String fallback) {

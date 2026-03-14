@@ -1,46 +1,71 @@
 import type { CodeLabel } from '@/types/common';
 
-export type DiagnosisQuestionType = 'single_choice' | 'multiple_choice' | 'text';
+export type DiagnosisQuestionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TEXT';
+export type DiagnosisStatus = 'GENERATED' | 'SUBMITTED' | 'PROFILED';
 
-export interface DiagnosisQuestionCopy {
-  sectionLabel?: string;
-  title?: string;
-  description?: string;
-  placeholder?: string;
-  submitHint?: string;
+export interface DiagnosisQuestionOption {
+  code: string;
+  label: string;
+  order?: number;
 }
 
 export interface DiagnosisQuestion {
   questionId: string;
-  dimension: CodeLabel;
-  type: CodeLabel;
+  dimension: string;
+  type: DiagnosisQuestionType;
+  required: boolean;
+  options?: DiagnosisQuestionOption[];
   title?: string;
   description?: string;
-  options?: CodeLabel[];
-  required: boolean;
   placeholder?: string;
-  copy?: DiagnosisQuestionCopy;
+  submitHint?: string;
+  sectionLabel?: string;
 }
 
 export interface DiagnosisGeneratePayload {
   sessionId: string;
 }
 
+export interface DiagnosisFallback {
+  applied: boolean;
+  reasons: string[];
+  contentSource?: string;
+}
+
+export interface DiagnosisMetadata {
+  questionCount?: number;
+  answerCount?: number;
+  profileVersion?: number;
+}
+
+export interface DiagnosisActionTarget {
+  route: string;
+  params?: Record<string, string | number>;
+}
+
+export interface DiagnosisNextAction {
+  code: string;
+  label: string;
+  target?: DiagnosisActionTarget;
+}
+
 export interface DiagnosisGenerateResponse {
   diagnosisId: string;
   sessionId: string;
+  status: DiagnosisStatus;
   questions: DiagnosisQuestion[];
-  fallbackApplied?: boolean;
-  fallbackReasons?: string[];
-  contentSource?: string;
+  nextAction?: DiagnosisNextAction;
+  fallback: DiagnosisFallback;
+  metadata?: DiagnosisMetadata;
 }
 
 export type DiagnosisAnswerValue = string | string[];
 
 export interface DiagnosisAnswer {
   questionId: string;
-  answerCodes?: string[];
-  answerText?: string;
+  selectedOptionCode?: string;
+  selectedOptionCodes?: string[];
+  text?: string;
 }
 
 export interface CapabilityProfile {
@@ -50,13 +75,11 @@ export interface CapabilityProfile {
   learningPreference?: CodeLabel;
   timeBudget?: CodeLabel;
   goalOrientation?: CodeLabel;
-  summary?: string;
-  planExplanation?: string;
 }
 
-export interface DiagnosisNextAction {
-  code: string;
-  label: string;
+export interface DiagnosisInsights {
+  summary?: string;
+  planExplanation?: string;
 }
 
 export interface DiagnosisSubmitPayload {
@@ -65,11 +88,14 @@ export interface DiagnosisSubmitPayload {
 }
 
 export interface DiagnosisSubmitResponse {
+  diagnosisId: string;
+  sessionId: string;
+  status: DiagnosisStatus;
   capabilityProfile: CapabilityProfile;
+  insights?: DiagnosisInsights;
   nextAction?: DiagnosisNextAction;
-  fallbackApplied?: boolean;
-  fallbackReasons?: string[];
-  contentSource?: string;
+  fallback: DiagnosisFallback;
+  metadata?: DiagnosisMetadata;
 }
 
 const DEFAULT_QUESTION_DESCRIPTION = 'Answer based on your real learning situation. This is not a test.';
@@ -78,7 +104,7 @@ const DEFAULT_SUBMIT_HINT = 'Your answers will be used to build the capability p
 const DEFAULT_PROFILE_SUMMARY = 'Your capability profile has been generated from the diagnosis answers.';
 const DEFAULT_PROFILE_PLAN_EXPLANATION = 'The next learning plan will use this profile as an input.';
 
-const diagnosisQuestionCopyByDimension: Record<string, Required<DiagnosisQuestionCopy>> = {
+const diagnosisQuestionCopyByDimension: Record<string, Required<Pick<DiagnosisQuestion, 'sectionLabel' | 'title' | 'description' | 'placeholder' | 'submitHint'>>> = {
   FOUNDATION: {
     sectionLabel: 'Foundation',
     title: 'How solid is your current foundation on this topic?',
@@ -120,10 +146,10 @@ function normalizeDimensionKey(dimension: string) {
   return dimension.trim().replace(/[\s-]+/g, '_').toUpperCase();
 }
 
-export function resolveDiagnosisQuestionCopy(question: DiagnosisQuestion): Required<DiagnosisQuestionCopy> {
-  const dimensionKey = normalizeDimensionKey(question.dimension.code);
+export function resolveDiagnosisQuestionCopy(question: DiagnosisQuestion) {
+  const dimensionKey = normalizeDimensionKey(question.dimension);
   const defaultCopy = diagnosisQuestionCopyByDimension[dimensionKey] ?? {
-    sectionLabel: dimensionKey || question.dimension.code || 'Diagnosis',
+    sectionLabel: dimensionKey || 'Diagnosis',
     title: 'Please answer based on your current situation.',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
@@ -131,17 +157,17 @@ export function resolveDiagnosisQuestionCopy(question: DiagnosisQuestion): Requi
   };
 
   return {
-    sectionLabel: question.copy?.sectionLabel || defaultCopy.sectionLabel,
-    title: question.copy?.title || question.title || defaultCopy.title,
-    description: question.copy?.description || question.description || defaultCopy.description,
-    placeholder: question.copy?.placeholder || question.placeholder || defaultCopy.placeholder,
-    submitHint: question.copy?.submitHint || defaultCopy.submitHint,
+    sectionLabel: question.sectionLabel || defaultCopy.sectionLabel,
+    title: question.title || defaultCopy.title,
+    description: question.description || defaultCopy.description,
+    placeholder: question.placeholder || defaultCopy.placeholder,
+    submitHint: question.submitHint || defaultCopy.submitHint,
   };
 }
 
-export function resolveCapabilityProfileCopy(profile: CapabilityProfile) {
+export function resolveCapabilityProfileCopy(insights?: DiagnosisInsights | null) {
   return {
-    summary: profile.summary || DEFAULT_PROFILE_SUMMARY,
-    planExplanation: profile.planExplanation || DEFAULT_PROFILE_PLAN_EXPLANATION,
+    summary: insights?.summary || DEFAULT_PROFILE_SUMMARY,
+    planExplanation: insights?.planExplanation || DEFAULT_PROFILE_PLAN_EXPLANATION,
   };
 }

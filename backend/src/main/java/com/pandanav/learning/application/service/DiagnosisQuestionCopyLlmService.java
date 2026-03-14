@@ -10,7 +10,7 @@ import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.LlmTextResult;
 import com.pandanav.learning.domain.llm.model.PromptTemplateKey;
 import com.pandanav.learning.domain.model.DiagnosisQuestion;
-import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
+import com.pandanav.learning.domain.model.DiagnosisQuestionOption;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
 import com.pandanav.learning.infrastructure.observability.LlmFailureClassifier;
@@ -54,14 +54,14 @@ public class DiagnosisQuestionCopyLlmService {
                 LlmInvocationProfile.LIGHT_JSON_TASK,
                 "你只负责润色诊断题目的中文文案，不得改变题目结构。只输出 JSON。",
                 """
-                    你正在为能力诊断题生成中文 copy。
+                    你正在为能力诊断题生成中文文案。
                     约束：
                     1. 只可输出 JSON，不得解释。
                     2. 不得新增字段，不得修改 questionId / dimension / type / required。
-                    3. options 数量必须与输入一致，可润色表达但不可增减。
-                    4. 标题不超过28字，description 不超过40字，placeholder 不超过40字。
+                    3. options 数量必须与输入一致，可润色 label 但不可增减。
+                    4. title 不超过 18 字，description 不超过 40 字，placeholder 不超过 30 字。
                     5. 语气面向普通大学生，简洁、自然、非考试感。
-                    
+
                     输入：
                     {
                       "goal": "%s",
@@ -69,20 +69,18 @@ public class DiagnosisQuestionCopyLlmService {
                       "chapter": "%s",
                       "questions": %s
                     }
-                    
+
                     输出格式：
                     {
                       "questions": [
                         {
                           "questionId": "q_foundation",
-                          "copy": {
-                            "sectionLabel": "KNOWLEDGE_FOUNDATION",
-                            "title": "",
-                            "description": "",
-                            "placeholder": "",
-                            "submitHint": ""
-                          },
-                          "options": ["", ""]
+                          "title": "",
+                          "description": "",
+                          "placeholder": "",
+                          "submitHint": "",
+                          "sectionLabel": "",
+                          "options": [{"code": "BEGINNER", "label": ""}]
                         }
                       ]
                     }
@@ -92,7 +90,7 @@ public class DiagnosisQuestionCopyLlmService {
                     safe(session.getChapterId()),
                     serializeQuestions(fallbackQuestions)
                 ),
-                "{\"questions\":[{\"questionId\":\"\",\"copy\":{\"sectionLabel\":\"\",\"title\":\"\",\"description\":\"\",\"placeholder\":\"\",\"submitHint\":\"\"},\"options\":[\"\"]}]}",
+                "{\"questions\":[{\"questionId\":\"\",\"title\":\"\",\"description\":\"\",\"placeholder\":\"\",\"submitHint\":\"\",\"sectionLabel\":\"\",\"options\":[{\"code\":\"\",\"label\":\"\"}]}]}",
                 "short_json_only",
                 null,
                 800
@@ -101,16 +99,7 @@ public class DiagnosisQuestionCopyLlmService {
             JsonNode root = llmJsonParser.parse(result.text());
             JsonNode items = root.path("questions");
             if (!items.isArray() || items.size() != fallbackQuestions.size()) {
-                llmCallLogger.logFallback(
-                    LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, result.model()),
-                    LlmFallbackReason.MISSING_REQUIRED_FIELDS,
-                    LlmObservabilityHelper.elapsedMs(start)
-                );
-                return new DiagnosisQuestionCopyResult(
-                    fallbackQuestions,
-                    true,
-                    List.of(LlmFallbackReason.MISSING_REQUIRED_FIELDS.name())
-                );
+                return fallback(fallbackQuestions, start, result.model(), LlmFallbackReason.MISSING_REQUIRED_FIELDS);
             }
 
             Map<String, DiagnosisQuestion> byId = fallbackQuestions.stream()
@@ -121,52 +110,44 @@ public class DiagnosisQuestionCopyLlmService {
                 String questionId = item.path("questionId").asText("");
                 DiagnosisQuestion original = byId.get(questionId);
                 if (original == null) {
-                    llmCallLogger.logFallback(
-                        LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, result.model()),
-                        LlmFallbackReason.MISSING_REQUIRED_FIELDS,
-                        LlmObservabilityHelper.elapsedMs(start)
-                    );
-                    return new DiagnosisQuestionCopyResult(
-                        fallbackQuestions,
-                        true,
-                        List.of(LlmFallbackReason.MISSING_REQUIRED_FIELDS.name())
-                    );
+                    return fallback(fallbackQuestions, start, result.model(), LlmFallbackReason.MISSING_REQUIRED_FIELDS);
                 }
-                List<String> options = readOptions(item.path("options"), original.options());
+                List<DiagnosisQuestionOption> options = readOptions(item.path("options"), original.options());
                 if (options.size() != original.options().size()) {
-                    llmCallLogger.logFallback(
-                        LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, result.model()),
-                        LlmFallbackReason.MISSING_REQUIRED_FIELDS,
-                        LlmObservabilityHelper.elapsedMs(start)
-                    );
-                    return new DiagnosisQuestionCopyResult(
-                        fallbackQuestions,
-                        true,
-                        List.of(LlmFallbackReason.MISSING_REQUIRED_FIELDS.name())
-                    );
+                    return fallback(fallbackQuestions, start, result.model(), LlmFallbackReason.MISSING_REQUIRED_FIELDS);
                 }
-                DiagnosisQuestionCopy copy = readCopy(item.path("copy"), original.copy());
                 refined.add(new DiagnosisQuestion(
                     original.questionId(),
                     original.dimension(),
                     original.type(),
-                    copy.title(),
-                    copy.description(),
-                    options,
                     original.required(),
-                    copy
+                    options,
+                    textOrDefault(item.path("title").asText(""), original.title()),
+                    textOrDefault(item.path("description").asText(""), original.description()),
+                    textOrDefault(item.path("placeholder").asText(""), original.placeholder()),
+                    textOrDefault(item.path("submitHint").asText(""), original.submitHint()),
+                    textOrDefault(item.path("sectionLabel").asText(""), original.sectionLabel())
                 ));
             }
             return new DiagnosisQuestionCopyResult(refined, false, List.of());
         } catch (Exception ex) {
             LlmFallbackReason reason = llmFailureClassifier.classifyFallback(ex);
-            llmCallLogger.logFallback(
-                LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, null),
-                reason,
-                LlmObservabilityHelper.elapsedMs(start)
-            );
-            return new DiagnosisQuestionCopyResult(fallbackQuestions, true, List.of(reason.name()));
+            return fallback(fallbackQuestions, start, null, reason);
         }
+    }
+
+    private DiagnosisQuestionCopyResult fallback(
+        List<DiagnosisQuestion> fallbackQuestions,
+        Instant start,
+        String model,
+        LlmFallbackReason reason
+    ) {
+        llmCallLogger.logFallback(
+            LlmObservabilityHelper.context(LlmStage.DIAGNOSIS_QUESTION_COPY, model),
+            reason,
+            LlmObservabilityHelper.elapsedMs(start)
+        );
+        return new DiagnosisQuestionCopyResult(fallbackQuestions, true, List.of(reason.name()));
     }
 
     private List<Map<String, Object>> serializeQuestions(List<DiagnosisQuestion> questions) {
@@ -176,37 +157,34 @@ public class DiagnosisQuestionCopyLlmService {
             item.put("dimension", question.dimension().name());
             item.put("type", question.type());
             item.put("required", question.required());
-            item.put("copy", question.copy());
+            item.put("title", question.title());
+            item.put("description", question.description());
+            item.put("placeholder", question.placeholder());
+            item.put("submitHint", question.submitHint());
+            item.put("sectionLabel", question.sectionLabel());
             item.put("options", question.options());
             return item;
         }).toList();
     }
 
-    private List<String> readOptions(JsonNode node, List<String> fallback) {
+    private List<DiagnosisQuestionOption> readOptions(JsonNode node, List<DiagnosisQuestionOption> fallback) {
         if (!node.isArray()) {
             return fallback;
         }
-        List<String> options = new ArrayList<>();
-        for (JsonNode item : node) {
-            String text = item.asText("").trim();
-            if (!text.isBlank()) {
-                options.add(text);
+        List<DiagnosisQuestionOption> options = new ArrayList<>();
+        for (int i = 0; i < node.size(); i++) {
+            JsonNode item = node.get(i);
+            DiagnosisQuestionOption fallbackOption = i < fallback.size() ? fallback.get(i) : null;
+            String code = item.path("code").asText(fallbackOption == null ? "" : fallbackOption.code());
+            String label = textOrDefault(item.path("label").asText(""), fallbackOption == null ? "" : fallbackOption.label());
+            if (fallbackOption != null && !fallbackOption.code().equalsIgnoreCase(code)) {
+                code = fallbackOption.code();
+            }
+            if (!code.isBlank() && !label.isBlank()) {
+                options.add(new DiagnosisQuestionOption(code, label, fallbackOption == null ? i + 1 : fallbackOption.order()));
             }
         }
         return options.size() == fallback.size() ? options : fallback;
-    }
-
-    private DiagnosisQuestionCopy readCopy(JsonNode node, DiagnosisQuestionCopy fallback) {
-        if (!node.isObject()) {
-            return fallback;
-        }
-        return new DiagnosisQuestionCopy(
-            textOrDefault(node.path("sectionLabel").asText(""), fallback.sectionLabel()),
-            textOrDefault(node.path("title").asText(""), fallback.title()),
-            textOrDefault(node.path("description").asText(""), fallback.description()),
-            textOrDefault(node.path("placeholder").asText(""), fallback.placeholder()),
-            textOrDefault(node.path("submitHint").asText(""), fallback.submitHint())
-        );
     }
 
     private String textOrDefault(String candidate, String fallback) {

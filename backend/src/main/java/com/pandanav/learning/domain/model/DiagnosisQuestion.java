@@ -8,10 +8,12 @@ public record DiagnosisQuestion(
     String questionId,
     DiagnosisDimension dimension,
     String type,
+    boolean required,
+    List<DiagnosisQuestionOption> options,
     String title,
     String description,
-    List<String> options,
-    boolean required,
-    DiagnosisQuestionCopy copy
+    String placeholder,
+    String submitHint,
+    String sectionLabel
 ) {
 }

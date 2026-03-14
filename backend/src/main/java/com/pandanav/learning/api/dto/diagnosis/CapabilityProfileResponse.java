@@ -6,6 +6,8 @@ public record CapabilityProfileResponse(
     @JsonProperty("sessionId")
     Long sessionId,
     @JsonProperty("capabilityProfile")
-    CapabilityProfileDto capabilityProfile
+    CapabilityProfileDto capabilityProfile,
+    @JsonProperty("insights")
+    DiagnosisInsightsDto insights
 ) {
 }
