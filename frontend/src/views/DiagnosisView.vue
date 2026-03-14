@@ -1,43 +1,41 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { generateDiagnosisApi, submitDiagnosisApi } from '@/api/modules/diagnosis';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import LoadingState from '@/components/common/LoadingState.vue';
-import DiagnosisGoalSummaryCard from '@/components/diagnosis/DiagnosisGoalSummaryCard.vue';
-import DiagnosisProgressCard from '@/components/diagnosis/DiagnosisProgressCard.vue';
-import DiagnosisQuestionCard from '@/components/diagnosis/DiagnosisQuestionCard.vue';
+import DiagnosisFooter from '@/components/diagnosis/DiagnosisFooter.vue';
+import ProgressIndicator from '@/components/diagnosis/ProgressIndicator.vue';
+import QuestionCard from '@/components/diagnosis/QuestionCard.vue';
 import { useDiagnosisStore } from '@/stores/diagnosis';
-import { resolveDiagnosisResultViewModel, resolveDiagnosisStatusLabel } from '@/types/diagnosis';
-import type { DiagnosisAnswerValue, DiagnosisQuestion } from '@/types/diagnosis';
-import DiagnosisResultView from '@/views/DiagnosisResultView.vue';
+import type { DiagnosisAnswer, DiagnosisAnswerValue, DiagnosisNextAction, DiagnosisQuestion } from '@/types/diagnosis';
 
 const route = useRoute();
 const router = useRouter();
 const diagnosisStore = useDiagnosisStore();
 
 const sessionId = computed(() => String(route.params.sessionId || route.query.sessionId || '').trim());
-const goalText = computed(() => String(route.query.goal || '暂未提供本次学习目标'));
-const courseId = computed(() => String(route.query.course || '暂未提供课程信息'));
-const chapterId = computed(() => String(route.query.chapter || '暂未提供章节信息'));
-const questions = computed(() => diagnosisStore.questions);
-const currentQuestion = computed<DiagnosisQuestion | null>(() => questions.value[diagnosisStore.currentQuestionIndex] || null);
+const goalText = computed(() => String(route.query.goal || '').trim());
+const courseId = computed(() => String(route.query.course || '').trim());
+const chapterId = computed(() => String(route.query.chapter || '').trim());
+
+const diagnosisId = ref('');
+const responseSessionId = ref('');
+const nextAction = ref<DiagnosisNextAction | null>(null);
+const questions = ref<DiagnosisQuestion[]>([]);
+const loading = ref(false);
+const submitting = ref(false);
+const error = ref('');
+
+const totalQuestions = computed(() => questions.value.length);
+const currentQuestion = computed(() => diagnosisStore.currentQuestion);
+const currentStep = computed(() => diagnosisStore.currentIndex + 1);
 const currentAnswer = computed(() => {
   const questionId = currentQuestion.value?.questionId;
   return questionId ? diagnosisStore.answers[questionId] : undefined;
 });
-
-const isGenerating = computed(() => diagnosisStore.loading && questions.value.length === 0);
-const isSubmitting = computed(() => diagnosisStore.submitting);
-const isResult = computed(() => Boolean(diagnosisStore.capabilityProfile));
-const isError = computed(() => Boolean(diagnosisStore.error) && !isGenerating.value && !isSubmitting.value && !isResult.value);
-const canRetrySubmit = computed(() => Boolean(questions.value.length) && !isResult.value);
-const currentStep = computed(() => (questions.value.length ? diagnosisStore.currentQuestionIndex + 1 : 0));
-const statusText = computed(() => resolveDiagnosisStatusLabel(diagnosisStore.status));
-const diagnosisResult = computed(() =>
-  resolveDiagnosisResultViewModel(diagnosisStore.capabilityProfile, diagnosisStore.insights, diagnosisStore.nextAction),
-);
-
+const isLastQuestion = computed(() => diagnosisStore.currentIndex >= totalQuestions.value - 1);
 const isCurrentAnswered = computed(() => {
   const question = currentQuestion.value;
   if (!question || !question.required) {
@@ -50,6 +48,12 @@ const isCurrentAnswered = computed(() => {
   }
   return typeof answer === 'string' ? answer.trim().length > 0 : false;
 });
+const buttonDisabled = computed(() => !isCurrentAnswered.value || loading.value || submitting.value);
+
+function syncCurrentQuestion() {
+  const next = questions.value[diagnosisStore.currentIndex] || null;
+  diagnosisStore.setCurrentQuestion(next);
+}
 
 function updateAnswer(value: DiagnosisAnswerValue) {
   if (!currentQuestion.value) {
@@ -58,51 +62,10 @@ function updateAnswer(value: DiagnosisAnswerValue) {
   diagnosisStore.updateAnswer(currentQuestion.value.questionId, value);
 }
 
-function previousQuestion() {
-  diagnosisStore.setCurrentQuestionIndex(diagnosisStore.currentQuestionIndex - 1);
-}
-
-function nextQuestion() {
-  if (!isCurrentAnswered.value) {
-    return;
-  }
-  diagnosisStore.setCurrentQuestionIndex(diagnosisStore.currentQuestionIndex + 1);
-}
-
-async function submitDiagnosis() {
-  if (!isCurrentAnswered.value) {
-    return;
-  }
-  try {
-    await diagnosisStore.submitDiagnosis();
-  } catch {
-    return;
-  }
-}
-
-async function retryGenerate() {
-  if (!sessionId.value) {
-    return;
-  }
-  try {
-    await diagnosisStore.generateDiagnosis(sessionId.value);
-  } catch {
-    return;
-  }
-}
-
-async function retryCurrentAction() {
-  if (canRetrySubmit.value) {
-    await submitDiagnosis();
-    return;
-  }
-  await retryGenerate();
-}
-
-async function enterPlanFlow() {
-  const target = diagnosisStore.nextAction?.target;
-  const targetSessionId = String(target?.params?.sessionId ?? diagnosisStore.sessionId ?? sessionId.value);
-  const targetDiagnosisId = String(target?.params?.diagnosisId ?? diagnosisStore.diagnosisId);
+async function enterPlanFlow(targetAction?: DiagnosisNextAction | null) {
+  const target = targetAction?.target;
+  const targetSessionId = String(target?.params?.sessionId ?? responseSessionId.value ?? sessionId.value);
+  const targetDiagnosisId = String(target?.params?.diagnosisId ?? diagnosisId.value);
   const numericSessionId = Number(targetSessionId);
 
   if (!Number.isFinite(numericSessionId) || numericSessionId <= 0) {
@@ -122,16 +85,89 @@ async function enterPlanFlow() {
   });
 }
 
-async function loadDiagnosis() {
-  diagnosisStore.reset();
-  if (!sessionId.value) {
-    diagnosisStore.error = '缺少生成能力诊断所需的会话记录。';
+function buildSubmitAnswers(): DiagnosisAnswer[] {
+  return questions.value
+    .filter((question) => diagnosisStore.answers[question.questionId] !== undefined)
+    .map((question) => {
+      const value = diagnosisStore.answers[question.questionId];
+      if (question.type === 'TEXT') {
+        return {
+          questionId: question.questionId,
+          text: typeof value === 'string' ? value : '',
+        };
+      }
+      if (question.type === 'MULTIPLE_CHOICE') {
+        return {
+          questionId: question.questionId,
+          selectedOptionCodes: Array.isArray(value) ? value : typeof value === 'string' ? [value] : [],
+        };
+      }
+      return {
+        questionId: question.questionId,
+        selectedOptionCode: typeof value === 'string' ? value : Array.isArray(value) ? value[0] : undefined,
+      };
+    });
+}
+
+async function submitCurrentAnswers() {
+  if (!diagnosisId.value) {
+    error.value = '诊断会话缺失，请刷新后重试。';
     return;
   }
+
+  submitting.value = true;
+  error.value = '';
   try {
-    await diagnosisStore.generateDiagnosis(sessionId.value);
-  } catch {
+    const response = await submitDiagnosisApi(diagnosisId.value, buildSubmitAnswers());
+    await enterPlanFlow(response.nextAction ?? nextAction.value);
+  } catch (submitError) {
+    error.value = submitError instanceof Error ? submitError.message : '提交失败，请稍后重试。';
+  } finally {
+    submitting.value = false;
+  }
+}
+
+async function handleContinue() {
+  if (!currentQuestion.value || !isCurrentAnswered.value) {
     return;
+  }
+  if (!isLastQuestion.value) {
+    diagnosisStore.setCurrentIndex(diagnosisStore.currentIndex + 1);
+    syncCurrentQuestion();
+    return;
+  }
+  await submitCurrentAnswers();
+}
+
+async function loadDiagnosis() {
+  diagnosisStore.reset();
+  questions.value = [];
+  diagnosisId.value = '';
+  responseSessionId.value = '';
+  nextAction.value = null;
+  error.value = '';
+
+  if (!sessionId.value) {
+    error.value = '缺少生成能力诊断所需的会话记录。';
+    return;
+  }
+
+  loading.value = true;
+  try {
+    const response = await generateDiagnosisApi(sessionId.value);
+    diagnosisId.value = response.diagnosisId;
+    responseSessionId.value = response.sessionId;
+    nextAction.value = response.nextAction ?? null;
+    questions.value = response.questions;
+    diagnosisStore.setCurrentIndex(0);
+    syncCurrentQuestion();
+    if (!questions.value.length) {
+      error.value = '暂无可用诊断题目，请稍后重试。';
+    }
+  } catch (loadError) {
+    error.value = loadError instanceof Error ? loadError.message : '题目加载失败，请稍后重试。';
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -142,90 +178,37 @@ onMounted(async () => {
 
 <template>
   <AppShell>
-    <div class="space-y-6 pb-10">
-      <DiagnosisGoalSummaryCard v-if="!isResult" :session-id="sessionId" :goal="goalText" :course="courseId" :chapter="chapterId" />
+    <div class="mx-auto max-w-2xl pb-10">
+      <header class="mb-10 text-center">
+        <h1 class="text-3xl font-semibold tracking-tight text-slate-950">AI能力诊断</h1>
+        <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">
+          回答几个简单问题，<br />
+          AI会判断你的学习起点并生成学习计划。
+        </p>
+      </header>
 
-      <LoadingState v-if="isGenerating" />
+      <LoadingState v-if="loading" />
 
-      <ErrorState v-else-if="isError" :message="diagnosisStore.error" />
+      <template v-else-if="!error && currentQuestion">
+        <main class="space-y-6">
+          <ProgressIndicator :current="currentStep" :total="totalQuestions" />
+          <QuestionCard :question="currentQuestion" :model-value="currentAnswer" @update:model-value="updateAnswer" />
+        </main>
 
-      <DiagnosisResultView
-        v-else-if="isResult && diagnosisStore.capabilityProfile"
-        :result="diagnosisResult"
-        :reasoning-steps="diagnosisStore.reasoningSteps"
-        :strength-sources="diagnosisStore.strengthSources"
-        :weakness-sources="diagnosisStore.weaknessSources"
-        @action="enterPlanFlow"
-      />
-
-      <template v-else-if="currentQuestion">
-        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <DiagnosisQuestionCard :question="currentQuestion" :model-value="currentAnswer" @update:model-value="updateAnswer" />
-          <div class="space-y-4">
-            <DiagnosisProgressCard :current="currentStep" :total="questions.length" />
-            <div class="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-5 text-sm leading-6 text-slate-600">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">诊断进度</p>
-              <div class="mt-3 space-y-3">
-                <div>
-                  <p class="text-xs text-slate-400">当前状态</p>
-                  <p class="mt-1 font-medium text-slate-700">{{ statusText }}</p>
-                </div>
-                <div>
-                  <p class="text-xs text-slate-400">说明</p>
-                  <p class="mt-1 font-medium text-slate-700">请根据你的真实情况作答，AI 会据此判断你当前的能力水平。</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3 rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
-          <p class="text-sm leading-6 text-slate-600">
-            按你的实际情况回答即可。系统会用这些信息生成能力诊断，并据此安排后续学习路径。
-          </p>
-          <div class="flex flex-wrap gap-3">
-            <button
-              type="button"
-              class="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              :disabled="diagnosisStore.currentQuestionIndex === 0"
-              @click="previousQuestion"
-            >
-              上一题
-            </button>
-            <button
-              v-if="diagnosisStore.currentQuestionIndex < questions.length - 1"
-              type="button"
-              class="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-              :disabled="!isCurrentAnswered"
-              @click="nextQuestion"
-            >
-              下一题
-            </button>
-            <button
-              v-else
-              type="button"
-              class="rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-              :disabled="!isCurrentAnswered || isSubmitting"
-              @click="submitDiagnosis"
-            >
-              {{ isSubmitting ? '正在生成能力诊断...' : '完成诊断并生成结果' }}
-            </button>
-          </div>
-        </div>
+        <DiagnosisFooter :disabled="buttonDisabled" :loading="submitting" @continue="handleContinue" />
       </template>
 
-      <div v-if="isSubmitting" class="rounded-[1.8rem] border border-sky-100 bg-sky-50 p-6 text-sm leading-7 text-sky-700">
-        系统正在根据你的回答生成能力诊断，并准备下一步个性化学习路径。
-      </div>
-
-      <div v-if="isError" class="flex justify-start">
-        <button
-          type="button"
-          class="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          @click="retryCurrentAction"
-        >
-          {{ canRetrySubmit ? '重新提交诊断' : '重新生成诊断' }}
-        </button>
+      <div v-else class="space-y-4">
+        <ErrorState :message="error || '页面加载失败，请稍后重试。'" />
+        <div class="flex justify-center">
+          <button
+            type="button"
+            class="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            @click="loadDiagnosis"
+          >
+            重新加载
+          </button>
+        </div>
       </div>
     </div>
   </AppShell>
