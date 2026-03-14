@@ -39,7 +39,7 @@ const isResult = computed(() => Boolean(diagnosisStore.capabilityProfile));
 const isError = computed(() => Boolean(diagnosisStore.error) && !isGenerating.value && !isSubmitting.value && !isResult.value);
 const canRetrySubmit = computed(() => Boolean(questions.value.length) && !isResult.value);
 const currentStep = computed(() => (questions.value.length ? diagnosisStore.currentQuestionIndex + 1 : 0));
-const submitButtonText = computed(() => diagnosisStore.nextAction?.label || '进入个性化学习路径');
+const submitButtonText = computed(() => '去看为你生成的学习路径');
 const statusText = computed(() => resolveDiagnosisStatusLabel(diagnosisStore.status));
 const sourceText = computed(() => resolveDiagnosisSourceLabel(diagnosisStore.fallback?.contentSource));
 const fallbackText = computed(() => resolveDiagnosisFallbackText(diagnosisStore.fallback));
@@ -165,26 +165,26 @@ onMounted(async () => {
 
         <PrimaryActionCard
           eyebrow="建议下一步"
-          title="进入个性化学习路径"
+          title="去看为你生成的学习路径"
           description="系统已经完成当前能力快照，接下来会结合你的目标、节奏和当前水平，生成更适合你的学习路径。"
-          :helper="diagnosisStore.nextAction?.label || '确认后进入下一步学习规划。'"
+          helper="继续下一步后，你会看到系统基于这份诊断生成的学习规划。"
           :button-label="submitButtonText"
           @action="enterPlanFlow"
         />
 
-        <section class="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-5 text-sm text-slate-500">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">辅助信息</p>
+        <section class="rounded-[1.6rem] border border-slate-200 bg-slate-50/70 p-5 text-sm text-slate-500">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">次级信息</p>
           <div class="mt-4 grid gap-3 md:grid-cols-3">
-            <div class="rounded-2xl border border-slate-200 bg-white/80 p-4">
+            <div class="rounded-2xl border border-slate-200 bg-white/85 p-4">
               <p class="text-xs text-slate-400">生成方式</p>
               <p class="mt-2 font-medium leading-6 text-slate-700">{{ sourceText }}</p>
             </div>
-            <div class="rounded-2xl border border-slate-200 bg-white/80 p-4">
+            <div class="rounded-2xl border border-slate-200 bg-white/85 p-4">
               <p class="text-xs text-slate-400">生成说明</p>
               <p class="mt-2 font-medium leading-6 text-slate-700">{{ fallbackText }}</p>
             </div>
-            <div class="rounded-2xl border border-slate-200 bg-white/80 p-4">
-              <p class="text-xs text-slate-400">诊断辅助信息</p>
+            <div class="rounded-2xl border border-slate-200 bg-white/85 p-4">
+              <p class="text-xs text-slate-400">系统字段</p>
               <p class="mt-2 font-medium leading-6 text-slate-700">{{ helperMetaText }}</p>
             </div>
           </div>
@@ -196,8 +196,8 @@ onMounted(async () => {
           <DiagnosisQuestionCard :question="currentQuestion" :model-value="currentAnswer" @update:model-value="updateAnswer" />
           <div class="space-y-4">
             <DiagnosisProgressCard :current="currentStep" :total="questions.length" />
-            <div class="rounded-[1.6rem] border border-slate-200 bg-slate-50/90 p-5 text-sm leading-6 text-slate-600">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">辅助说明</p>
+            <div class="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-5 text-sm leading-6 text-slate-600">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">次级信息</p>
               <div class="mt-3 space-y-3">
                 <div>
                   <p class="text-xs text-slate-400">诊断状态</p>
@@ -212,7 +212,7 @@ onMounted(async () => {
                   <p class="mt-1 font-medium text-slate-700">{{ fallbackText }}</p>
                 </div>
                 <div>
-                  <p class="text-xs text-slate-400">诊断辅助信息</p>
+                  <p class="text-xs text-slate-400">系统字段</p>
                   <p class="mt-1 font-medium text-slate-700">{{ helperMetaText }}</p>
                 </div>
               </div>

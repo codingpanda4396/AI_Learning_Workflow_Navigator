@@ -23,8 +23,8 @@ defineEmits<{
         <p v-if="helper" class="mt-4 text-sm text-slate-400">{{ helper }}</p>
       </div>
       <div class="rounded-[1.6rem] border border-white/10 bg-white/6 p-4 lg:w-[22rem]">
-        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">下一步</p>
-        <p class="mt-2 text-sm leading-6 text-slate-200">看完这份能力快照后，现在就进入规划页，把诊断结论变成可执行的学习路径。</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">建议下一步</p>
+        <p class="mt-2 text-sm leading-6 text-slate-200">继续进入学习规划页，系统会把这份诊断结果转换成一条可直接开始的学习路径。</p>
         <button
           class="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-amber-400 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="disabled"

@@ -84,7 +84,7 @@ const stageOutcomes: Record<string, string> = {
           :disabled="props.busy"
           @click="$emit('focusConfirm')"
         >
-          去底部确认开始
+          去确认按路径开始学习
         </button>
       </div>
     </div>

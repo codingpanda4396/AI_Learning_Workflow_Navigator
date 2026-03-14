@@ -17,10 +17,10 @@ defineEmits<{
   <section class="rounded-[2.4rem] border border-slate-950 bg-[linear-gradient(135deg,#0f172a_0%,#111827_52%,#1e293b_100%)] p-6 text-white shadow-[0_32px_100px_rgba(15,23,42,0.28)]">
     <div class="flex flex-col gap-6">
       <div class="max-w-3xl">
-        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">确认开始</p>
-        <h3 class="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">确认后会正式创建学习会话，并直接进入第一步任务。</h3>
+        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">建议下一步</p>
+        <h3 class="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">按这条路径开始学习，系统会直接带你进入第一步任务。</h3>
         <p class="mt-3 text-sm leading-7 text-slate-300">
-          主按钮会按当前规划启动学习流程；如果你还想微调节奏或重看诊断，可以使用下面这些次级操作。
+          主按钮会按当前规划启动学习流程；如果你还想微调节奏、回看诊断或重新确认目标，可以使用下面这些次级操作。
         </p>
       </div>
 
@@ -51,7 +51,7 @@ defineEmits<{
             :disabled="disabled || regenerating || confirming"
             @click="$emit('diagnosis')"
           >
-            返回诊断
+            回看诊断
           </button>
           <button
             type="button"
@@ -59,7 +59,7 @@ defineEmits<{
             :disabled="disabled || regenerating || confirming"
             @click="$emit('back')"
           >
-            返回目标
+            重新确认目标
           </button>
           <button
             type="button"
@@ -77,7 +77,7 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('confirm')"
         >
-          {{ confirming ? '正在创建学习会话...' : '确认并开始学习' }}
+          {{ confirming ? '正在创建学习会话...' : '按这条路径开始学习' }}
         </button>
       </div>
     </div>
