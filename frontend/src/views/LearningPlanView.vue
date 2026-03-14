@@ -1,20 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import PreviewHeroDecisionCard from '@/components/learning-plan/PreviewHeroDecisionCard.vue';
-import PreviewKickoffPanel from '@/components/learning-plan/PreviewKickoffPanel.vue';
-import PreviewSignalsPanel from '@/components/learning-plan/PreviewSignalsPanel.vue';
-import PreviewStrategyComparison from '@/components/learning-plan/PreviewStrategyComparison.vue';
-import StrategyAdjustPanel from '@/components/plan/StrategyAdjustPanel.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
-import InfoHint from '@/components/ui/InfoHint.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { useLearningPlanStore } from '@/stores/learningPlan';
-import type { PlanAdjustments, StrategyAdjustAction } from '@/types/learningPlan';
 import { buildPreviewViewModel } from '@/utils/usePreviewViewModel';
 
 const route = useRoute();
@@ -23,16 +16,7 @@ const learningPlanStore = useLearningPlanStore();
 
 const preview = computed(() => learningPlanStore.preview);
 const error = computed(() => learningPlanStore.error);
-const strategyNote = computed(() => learningPlanStore.strategyNote);
 const previewVm = computed(() => (preview.value ? buildPreviewViewModel(preview.value) : null));
-
-const adjustPanelOpen = ref(false);
-const adjustPanelMode = ref<'strategy' | 'disagree'>('strategy');
-
-const explainPrompts = [
-  { key: 'why-first', label: '为什么现在先学这个？' },
-  { key: 'fast', label: '给我一个10分钟压缩版' },
-];
 
 const context = computed(() => {
   const sessionId = Number(route.query.sessionId ?? 0);
@@ -87,70 +71,6 @@ async function startLearning() {
   }
 }
 
-function openAdjustPanel(mode: 'strategy' | 'disagree') {
-  adjustPanelMode.value = mode;
-  adjustPanelOpen.value = true;
-}
-
-function resolveAdjustments(action: StrategyAdjustAction): PlanAdjustments | null {
-  const current = preview.value?.adjustments ?? learningPlanStore.adjustments;
-  switch (action) {
-    case 'faster':
-      return { ...current, intensity: 'LIGHT', prioritizeFoundation: false };
-    case 'steadier':
-      return { ...current, intensity: 'STANDARD', prioritizeFoundation: true };
-    case 'practice-first':
-      return { ...current, learningMode: 'LEARN_BY_DOING' };
-    case 'ten-minute':
-      return { ...current, intensity: 'LIGHT' };
-    case 'already-know':
-      return { ...current, prioritizeFoundation: false, learningMode: 'LEARN_BY_DOING' };
-    case 'not-enough-time':
-      return { ...current, intensity: 'LIGHT' };
-    case 'not-clear':
-    default:
-      return null;
-  }
-}
-
-async function regenerateWithAdjustments(nextAdjustments: PlanAdjustments | null) {
-  if (!nextAdjustments || !learningPlanStore.request) {
-    return;
-  }
-  learningPlanStore.setAdjustments(nextAdjustments);
-  try {
-    await learningPlanStore.regeneratePreview();
-  } catch {
-    return;
-  }
-}
-
-async function onSelectStrategy(action: StrategyAdjustAction) {
-  await learningPlanStore.submitStrategyFeedback({
-    action,
-    intent: adjustPanelMode.value,
-  });
-  await regenerateWithAdjustments(resolveAdjustments(action));
-  adjustPanelOpen.value = false;
-}
-
-async function onMastered() {
-  adjustPanelMode.value = 'disagree';
-  await learningPlanStore.submitStrategyFeedback({
-    action: 'already-know',
-    intent: 'disagree',
-  });
-  await regenerateWithAdjustments(resolveAdjustments('already-know'));
-}
-
-async function onAskAi(prompt: string) {
-  await learningPlanStore.submitStrategyFeedback({
-    action: 'ask-ai',
-    intent: 'ai-explain',
-    prompt,
-  });
-}
-
 watch(
   () => [route.query.sessionId, route.query.diagnosisId, route.query.goal, route.query.course, route.query.chapter],
   async () => {
@@ -190,66 +110,50 @@ onBeforeUnmount(() => {
 
       <template v-else-if="preview && previewVm">
         <section class="space-y-5">
-          <PreviewHeroDecisionCard
-            :title="previewVm.hero.title"
-            :strongest-reason="previewVm.hero.strongestReason"
-            :risk-if-skip="previewVm.hero.riskIfSkip"
-            :estimate="previewVm.hero.estimate"
-            :cta-label="previewVm.hero.ctaLabel"
-            :loading="learningPlanStore.confirming"
-            @start="startLearning"
-          />
-
-          <PreviewSignalsPanel
-            :items="previewVm.signals"
-          />
-
-          <PreviewStrategyComparison
-            :recommended-reason="previewVm.strategy.recommendedReason"
-            :recommended="previewVm.strategy.recommended"
-            :others="previewVm.strategy.others"
-          />
-
-          <PreviewKickoffPanel :kickoff="previewVm.kickoff" />
-
-          <section class="app-card app-card-padding rounded-[24px]">
-            <p class="text-sm font-semibold text-slate-900">需要微调推荐时</p>
-            <div class="mt-3 flex flex-wrap gap-3">
-              <AppButton variant="secondary" @click="openAdjustPanel('strategy')">调整学习节奏</AppButton>
-              <AppButton variant="ghost" @click="openAdjustPanel('disagree')">我不认同这个建议</AppButton>
-              <button
-                type="button"
-                class="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-100"
-                @click="onMastered"
-              >
-                我已经会了
-              </button>
+          <section class="app-hero rounded-[24px] p-6">
+            <p class="text-sm font-medium text-indigo-600">下一步学什么</p>
+            <h2 class="mt-2 text-3xl font-semibold text-slate-900">{{ previewVm.hero.title }}</h2>
+            <p class="mt-3 text-base leading-7 text-slate-700">{{ previewVm.hero.reason }}</p>
+            <p class="mt-3 text-sm text-slate-500">预计耗时：{{ previewVm.hero.estimate }}</p>
+            <div class="mt-5">
+              <AppButton :loading="learningPlanStore.confirming" @click="startLearning">{{ previewVm.hero.ctaLabel }}</AppButton>
             </div>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <button
-                v-for="item in explainPrompts"
-                :key="item.key"
-                type="button"
-                class="rounded-full border border-slate-200 px-3 py-2 text-xs text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-                @click="onAskAi(item.label)"
-              >
-                {{ item.label }}
-              </button>
-            </div>
-            <p v-if="strategyNote" class="mt-3 text-sm leading-7 text-slate-600">{{ strategyNote }}</p>
           </section>
 
-          <InfoHint v-if="error" tone="danger">{{ error }}</InfoHint>
-        </section>
+          <section class="app-card app-card-padding rounded-[24px]">
+            <h3 class="text-lg font-semibold text-slate-900">AI 看到了什么</h3>
+            <p class="mt-2 text-sm leading-7 text-slate-700">{{ previewVm.aiObserved.currentState }}</p>
+            <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-600">
+              <li v-for="(item, index) in previewVm.aiObserved.evidence" :key="`evidence-${index}`">- {{ item }}</li>
+            </ul>
+          </section>
 
-        <StrategyAdjustPanel
-          :open="adjustPanelOpen"
-          :mode="adjustPanelMode"
-          :loading="learningPlanStore.strategySubmitting || learningPlanStore.regenerating"
-          :pending-note="strategyNote"
-          @close="adjustPanelOpen = false"
-          @select="onSelectStrategy"
-        />
+          <section class="app-card app-card-padding rounded-[24px]">
+            <h3 class="text-lg font-semibold text-slate-900">为什么推荐这条路</h3>
+            <p class="mt-2 text-sm text-slate-700">
+              当前推荐：<span class="font-medium text-slate-900">{{ previewVm.strategy.recommendedLabel }}</span>
+            </p>
+            <p class="mt-2 text-sm leading-7 text-slate-600">{{ previewVm.strategy.explanation }}</p>
+            <div v-if="previewVm.strategy.alternatives.length" class="mt-4 space-y-3">
+              <div
+                v-for="(item, index) in previewVm.strategy.alternatives"
+                :key="`alt-${index}`"
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3"
+              >
+                <p class="text-sm font-medium text-slate-900">{{ item.label }}</p>
+                <p class="mt-1 text-sm text-slate-600">{{ item.reason }}</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="app-card app-card-padding rounded-[24px]">
+            <h3 class="text-lg font-semibold text-slate-900">确认后怎么开始</h3>
+            <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-700">
+              <li v-for="(action, index) in previewVm.kickoff.actions" :key="`next-${index}`">{{ index + 1 }}. {{ action }}</li>
+            </ul>
+            <p class="mt-4 text-sm leading-7 text-slate-600">{{ previewVm.kickoff.systemGuide }}</p>
+          </section>
+        </section>
       </template>
 
       <EmptyStatePanel

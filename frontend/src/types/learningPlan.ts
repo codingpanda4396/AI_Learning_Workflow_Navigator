@@ -146,11 +146,43 @@ export interface LearningPlanMetadata {
   estimatedTaskMinutesScope: string;
 }
 
+export interface PreviewRecommendedEntry {
+  conceptId: string;
+  title: string;
+  estimatedMinutes: number;
+  reason: string;
+}
+
+export interface PreviewLearnerSnapshot {
+  currentState: string;
+  evidence: string[];
+}
+
+export interface PreviewRecommendedStrategy {
+  code: string;
+  label: string;
+  explanation: string;
+}
+
+export interface PreviewAlternativeStrategy {
+  code: string;
+  label: string;
+  notRecommendedReason: string;
+}
+
 export interface LearningPlanPreview {
   id: string;
   status: CodeLabel;
   previewOnly: boolean;
   committed: boolean;
+  goal: string;
+  recommendedEntry: PreviewRecommendedEntry;
+  learnerSnapshotV2: PreviewLearnerSnapshot;
+  recommendedStrategy: PreviewRecommendedStrategy;
+  alternativesV2: PreviewAlternativeStrategy[];
+  nextActionsV2: string[];
+  startGuide: string;
+  explanationGenerated: boolean;
   focuses: string[];
   summary: PlanSummary;
   reasons: PlanReason[];

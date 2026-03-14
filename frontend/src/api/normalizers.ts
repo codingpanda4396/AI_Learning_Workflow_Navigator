@@ -690,227 +690,83 @@ export function normalizeGrowthDashboard(data: Record<string, unknown>): GrowthD
 }
 
 export function normalizeLearningPlanPreview(data: Record<string, unknown>, request: LearningPlanRequest): LearningPlanPreview {
-  const summary = (data.summary as Record<string, unknown> | undefined) ?? {};
-  const context = (data.context as Record<string, unknown> | undefined) ?? {};
-  const metadata = (data.metadata as Record<string, unknown> | undefined) ?? {};
   const adjustments = normalizePlanAdjustments(data.adjustments, request.adjustments);
-  const reasons = (Array.isArray(data.reasons) ? data.reasons : []) as Record<string, unknown>[];
-  const pathNodes = (Array.isArray(data.path_preview ?? data.pathPreview ?? data.path_nodes ?? data.pathNodes)
-    ? (data.path_preview ?? data.pathPreview ?? data.path_nodes ?? data.pathNodes)
-    : []) as Record<string, unknown>[];
-  const taskPreviews = (Array.isArray(data.task_preview ?? data.taskPreview ?? data.task_previews ?? data.taskPreviews)
-    ? (data.task_preview ?? data.taskPreview ?? data.task_previews ?? data.taskPreviews)
-    : []) as Record<string, unknown>[];
-  const priorityNodes = (Array.isArray(data.priority_nodes ?? data.priorityNodes)
-    ? (data.priority_nodes ?? data.priorityNodes)
-    : []) as Record<string, unknown>[];
-  const keyWeaknesses = readArray(data.key_weaknesses ?? data.keyWeaknesses);
-  const whyStartHere = String(data.why_start_here ?? data.whyStartHere ?? '');
-  const confidenceValue = data.confidence_label ?? data.confidenceLabel ?? data.confidence ?? data.decision_confidence ?? data.decisionConfidence;
-  const alternatives = normalizePlanAlternatives(data.alternatives ?? data.rejected_alternatives ?? data.rejectedAlternatives);
-  const benefits = normalizePlanBenefits(data.benefits ?? data.outcomes ?? data.immediate_gains ?? data.immediateGains);
-  const nextUnlocks = normalizePlanUnlocks(data.next_unlocks ?? data.nextUnlocks);
-  const stageStatuses = normalizePlanStageStatuses(data.stage_statuses ?? data.stageStatuses);
-  const personalization = normalizePersonalization(data.personalization);
-  const strategyComparison = normalizePlanStrategyComparison(data.strategy_comparison ?? data.strategyComparison);
-  const optionComparison = normalizePlanStrategyComparison(data.option_comparison ?? data.optionComparison);
-  const kickoffSteps = normalizeKickoffSteps(data.kickoff_steps ?? data.kickoffSteps);
+  const recommendedEntryRaw = (data.recommended_entry ?? data.recommendedEntry) as Record<string, unknown> | undefined;
+  const learnerSnapshotRaw = (data.learner_snapshot ?? data.learnerSnapshot) as Record<string, unknown> | undefined;
+  const recommendedStrategyRaw = (data.recommended_strategy ?? data.recommendedStrategy) as Record<string, unknown> | undefined;
+  const alternativesRaw = (Array.isArray(data.alternatives_v2) ? data.alternatives_v2 : (Array.isArray(data.alternatives) ? data.alternatives : [])) as Record<string, unknown>[];
+  const nextActionsRaw = readArray(data.next_actions ?? data.nextActions ?? data.next_actions_v2 ?? data.nextActionsV2);
+  const recommendedTitle = String(recommendedEntryRaw?.title ?? '');
+  const estimatedMinutes = toNumber(recommendedEntryRaw?.estimated_minutes ?? recommendedEntryRaw?.estimatedMinutes) ?? 15;
 
   return {
-    id: String(data.id ?? data.preview_id ?? data.previewId ?? data.plan_id ?? data.planId ?? ''),
+    id: String(data.plan_id ?? data.planId ?? data.preview_id ?? data.previewId ?? data.id ?? ''),
     status: readCodeLabel(data.status ?? 'PREVIEW_READY', 'PREVIEW_READY'),
     previewOnly: Boolean(data.preview_only ?? data.previewOnly ?? true),
     committed: Boolean(data.committed ?? false),
-    focuses: readArray(data.focuses),
+    goal: String(data.goal ?? request.goalText),
+    recommendedEntry: {
+      conceptId: String(recommendedEntryRaw?.concept_id ?? recommendedEntryRaw?.conceptId ?? ''),
+      title: recommendedTitle || '当前关键知识点',
+      estimatedMinutes,
+      reason: String(recommendedEntryRaw?.reason ?? '先补这一步，后续更容易推进。'),
+    },
+    learnerSnapshotV2: {
+      currentState: String(learnerSnapshotRaw?.current_state ?? learnerSnapshotRaw?.currentState ?? '你当前需要先补稳关键基础。'),
+      evidence: readArray(learnerSnapshotRaw?.evidence).slice(0, 3),
+    },
+    recommendedStrategy: {
+      code: String(recommendedStrategyRaw?.code ?? ''),
+      label: String(recommendedStrategyRaw?.label ?? '稳步推进'),
+      explanation: String(recommendedStrategyRaw?.explanation ?? '当前先补关键薄弱点更稳妥。'),
+    },
+    alternativesV2: alternativesRaw.map((item) => ({
+      code: String(item.code ?? ''),
+      label: String(item.label ?? '备选方案'),
+      notRecommendedReason: String(item.not_recommended_reason ?? item.notRecommendedReason ?? '这次优先级略低。'),
+    })),
+    nextActionsV2: nextActionsRaw.slice(0, 3),
+    startGuide: String(data.start_guide ?? data.startGuide ?? '确认后系统会直接带你进入第一步任务。'),
+    explanationGenerated: Boolean(data.explanation_generated ?? data.explanationGenerated),
+    focuses: [],
     summary: {
       recommendedStartNode: {
-        id: String(
-          (summary.recommended_start_node as Record<string, unknown> | undefined)?.id
-            ?? (summary.recommendedStartNode as Record<string, unknown> | undefined)?.id
-            ?? summary.recommended_start_node_id
-            ?? summary.recommendedStartNodeId
-            ?? ''
-        ),
-        nodeKey: String(
-          (summary.recommended_start_node as Record<string, unknown> | undefined)?.node_key
-            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.nodeKey
-            ?? (summary.recommendedStartNode as Record<string, unknown> | undefined)?.nodeKey
-            ?? summary.recommended_start_node_id
-            ?? summary.recommendedStartNodeId
-            ?? ''
-        ),
-        nodeName: String(
-          (summary.recommended_start_node as Record<string, unknown> | undefined)?.node_name
-            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.nodeName
-            ?? (summary.recommendedStartNode as Record<string, unknown> | undefined)?.nodeName
-            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.display_name
-            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.displayName
-            ?? summary.recommended_start_node_name
-            ?? summary.recommendedStartNodeName
-            ?? summary.recommended_start
-            ?? summary.recommendedStart
-            ?? ''
-        ),
-        displayName: String(
-          (summary.recommended_start_node as Record<string, unknown> | undefined)?.display_name
-            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.displayName
-            ?? (summary.recommendedStartNode as Record<string, unknown> | undefined)?.displayName
-            ?? ''
-        ) || undefined,
+        id: String(recommendedEntryRaw?.concept_id ?? recommendedEntryRaw?.conceptId ?? ''),
+        nodeKey: String(recommendedEntryRaw?.concept_id ?? recommendedEntryRaw?.conceptId ?? ''),
+        nodeName: recommendedTitle || '当前关键知识点',
+        displayName: recommendedTitle || undefined,
       },
-      recommendedRhythm: (readCode(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm) || request.adjustments.intensity) as LearningPlanPreview['summary']['recommendedRhythm'],
-      recommendedRhythmLabel: readLabel(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm),
-      estimatedTotalMinutes: toNumber(summary.estimated_total_minutes ?? summary.estimatedTotalMinutes ?? summary.estimated_minutes ?? summary.estimatedMinutes) ?? 0,
-      estimatedKnowledgeCount: toNumber(summary.estimated_node_count ?? summary.estimatedNodeCount ?? summary.estimated_knowledge_count ?? summary.estimatedKnowledgeCount) ?? 0,
-      stageCount: toNumber(summary.estimated_stage_count ?? summary.estimatedStageCount ?? summary.stage_count ?? summary.stageCount) ?? 4,
-      personalizedHeadline: String(summary.headline ?? summary.personalized_headline ?? summary.personalizedHeadline ?? ''),
-      personalizedSummary: String(context.diagnosis_summary ?? context.diagnosisSummary ?? data.learner_profile_summary ?? data.learnerProfileSummary ?? data.diagnosis_summary ?? data.diagnosisSummary ?? ''),
+      recommendedRhythm: request.adjustments.intensity,
+      recommendedRhythmLabel: request.adjustments.intensity,
+      estimatedTotalMinutes: estimatedMinutes,
+      estimatedKnowledgeCount: 1,
+      stageCount: 4,
+      personalizedHeadline: '',
+      personalizedSummary: '',
     },
-    reasons: reasons.map((item, index) => ({
-      key: String(item.key ?? item.type ?? `reason-${index + 1}`),
-      title: String(item.title ?? ''),
-      label: String(item.label ?? item.type ?? ''),
-      description: String(item.description ?? ''),
-    })),
-    whyStartHere: whyStartHere || '系统将从当前最稳妥的起点开始，逐步补齐关键薄弱点。',
-    keyWeaknesses: keyWeaknesses.length ? keyWeaknesses : ['关键薄弱点待进一步识别'],
-    priorityNodes: (priorityNodes.length
-      ? priorityNodes.map((item) => ({
-          nodeId: String(item.node_id ?? item.nodeId ?? ''),
-          title: String(item.title ?? item.node_name ?? item.nodeName ?? '当前推荐节点'),
-          reason: String(item.reason ?? '这是当前最能稳定推进学习路径的节点。'),
-        }))
-      : [
-          {
-            nodeId: String(summary.recommended_start_node_id ?? summary.recommendedStartNodeId ?? ''),
-            title: String(summary.recommended_start_node_name ?? summary.recommendedStartNodeName ?? '当前推荐节点'),
-            reason: '这是当前最能稳定推进学习路径的节点。',
-          },
-        ]),
-    pathNodes: pathNodes.map((item, index) => {
-      const reasonTags = readArray(item.reason_tags ?? item.reasonTags).length
-        ? readArray(item.reason_tags ?? item.reasonTags)
-        : item.reasonTag
-          ? [String(item.reasonTag)]
-          : [];
-      const isStartingPoint = Boolean(item.is_recommended_start ?? item.isRecommendedStart ?? item.is_starting_point ?? item.isStartingPoint);
-      const explicitPrerequisite = item.is_prerequisite ?? item.isPrerequisite;
-      const explicitFocus = item.is_focus ?? item.isFocus;
-      const inferredPrerequisite = reasonTags.some((tag) => /prerequisite|前置|基础/i.test(tag));
-
-      return {
-        node: {
-          id: String(
-            (item.node as Record<string, unknown> | undefined)?.id
-              ?? item.node_id
-              ?? item.nodeId
-              ?? item.id
-              ?? `path-${index + 1}`
-          ),
-          nodeKey: String(
-            (item.node as Record<string, unknown> | undefined)?.node_key
-              ?? (item.node as Record<string, unknown> | undefined)?.nodeKey
-              ?? item.node_id
-              ?? item.nodeId
-              ?? item.id
-              ?? `path-${index + 1}`
-          ),
-          nodeName: String(
-            (item.node as Record<string, unknown> | undefined)?.node_name
-              ?? (item.node as Record<string, unknown> | undefined)?.nodeName
-              ?? (item.node as Record<string, unknown> | undefined)?.display_name
-              ?? (item.node as Record<string, unknown> | undefined)?.displayName
-              ?? item.node_name
-              ?? item.nodeName
-              ?? item.display_name
-              ?? item.displayName
-              ?? item.name
-              ?? ''
-          ),
-          displayName: String(
-            (item.node as Record<string, unknown> | undefined)?.display_name
-              ?? (item.node as Record<string, unknown> | undefined)?.displayName
-              ?? item.display_name
-              ?? item.displayName
-              ?? ''
-          ) || undefined,
-        },
-        masteryStatus: normalizePathMasteryStatus(readCode(item.status ?? item.mastery_status ?? item.masteryStatus), item.mastery),
-        difficulty: normalizePathDifficulty(readCode(item.difficulty) || item.difficulty),
-        reasonTags,
-        estimatedNodeMinutes: toNumber(item.estimated_node_minutes ?? item.estimatedNodeMinutes ?? item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
-        isStartingPoint,
-        isPrerequisite: explicitPrerequisite === undefined ? inferredPrerequisite : Boolean(explicitPrerequisite),
-        isFocus: explicitFocus === undefined ? !isStartingPoint && !inferredPrerequisite : Boolean(explicitFocus),
-      };
-    }),
-    taskPreviews: taskPreviews.map((item) => ({
-      stage: readCode(item.stage) as LearningPlanPreview['taskPreviews'][number]['stage'],
-      title: String(item.title ?? ''),
-      learningGoal: String(item.learning_goal ?? item.learningGoal ?? item.goal ?? item.stage_goal ?? item.stageGoal ?? ''),
-      learnerAction: String(item.learner_action ?? item.learnerAction ?? ''),
-      aiSupport: String(item.ai_support ?? item.aiSupport ?? ''),
-      estimatedTaskMinutes: toNumber(item.estimated_task_minutes ?? item.estimatedTaskMinutes ?? item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
-    })),
+    reasons: [],
+    whyStartHere: String(recommendedEntryRaw?.reason ?? ''),
+    keyWeaknesses: readArray(learnerSnapshotRaw?.evidence),
+    priorityNodes: [{
+      nodeId: String(recommendedEntryRaw?.concept_id ?? recommendedEntryRaw?.conceptId ?? ''),
+      title: recommendedTitle || '当前关键知识点',
+      reason: String(recommendedEntryRaw?.reason ?? ''),
+    }],
+    pathNodes: [],
+    taskPreviews: [],
     adjustments,
     context: {
-      sessionId: toNumber(context.session_id ?? context.sessionId ?? request.sessionId),
-      diagnosisId: String(context.diagnosis_id ?? context.diagnosisId ?? data.diagnosis_id ?? data.diagnosisId ?? request.diagnosisId),
-      goalText: String(context.goal_text ?? context.goalText ?? data.goal_text ?? data.goalText ?? request.goalText),
-      courseName: String(context.course_name ?? context.courseName ?? data.course_name ?? data.courseName ?? data.course_id ?? data.courseId ?? request.courseName),
-      chapterName: String(context.chapter_name ?? context.chapterName ?? data.chapter_name ?? data.chapterName ?? data.chapter_id ?? data.chapterId ?? request.chapterName),
-      diagnosisSummary: String(context.diagnosis_summary ?? context.diagnosisSummary ?? data.diagnosis_summary ?? data.diagnosisSummary ?? ''),
+      sessionId: request.sessionId,
+      diagnosisId: request.diagnosisId,
+      goalText: request.goalText,
+      courseName: request.courseName,
+      chapterName: request.chapterName,
+      diagnosisSummary: '',
     },
-    nextStepNote: String(data.next_step_note ?? data.nextStepNote ?? ''),
-    planSource: data.plan_source || data.planSource ? readCodeLabel(data.plan_source ?? data.planSource) : undefined,
-    contentSource: data.content_source || data.contentSource ? readCodeLabel(data.content_source ?? data.contentSource) : undefined,
-    fallbackApplied: Boolean(data.fallback_applied ?? data.fallbackApplied),
-    fallbackReasons: readArray(data.fallback_reasons ?? data.fallbackReasons),
-    metadata: {
-      schemaVersion: String(metadata.schema_version ?? metadata.schemaVersion ?? ''),
-      persistedPreview: Boolean(metadata.persisted_preview ?? metadata.persistedPreview),
-      estimatedTotalMinutesScope: String(metadata.estimated_total_minutes_scope ?? metadata.estimatedTotalMinutesScope ?? ''),
-      estimatedNodeMinutesScope: String(metadata.estimated_node_minutes_scope ?? metadata.estimatedNodeMinutesScope ?? ''),
-      estimatedTaskMinutesScope: String(metadata.estimated_task_minutes_scope ?? metadata.estimatedTaskMinutesScope ?? ''),
-    },
-    confidence: typeof confidenceValue === 'number' || typeof confidenceValue === 'string' ? confidenceValue : undefined,
-    recommendationHeadline: String(
-      data.recommendation_headline
-      ?? data.recommendationHeadline
-      ?? summary.recommendation_headline
-      ?? summary.recommendationHeadline
-      ?? summary.headline
-      ?? ''
-    ),
-    recommendationSubtitle: String(
-      data.recommendation_subtitle
-      ?? data.recommendationSubtitle
-      ?? summary.recommendation_subtitle
-      ?? summary.recommendationSubtitle
-      ?? ''
-    ),
-    learnerGoal: String(data.learner_goal ?? data.learnerGoal ?? context.goal_text ?? context.goalText ?? request.goalText),
-    masteryScore: toNumber(data.mastery_score ?? data.masteryScore ?? data.current_mastery_score ?? data.currentMasteryScore),
-    riskIfSkipped: String(data.risk_if_skipped ?? data.riskIfSkipped ?? ''),
-    alternatives,
-    benefits,
-    nextUnlocks,
-    currentFocus: String(data.current_focus ?? data.currentFocus ?? ''),
-    nextStep: String(data.next_step ?? data.nextStep ?? ''),
-    stageStatuses,
-    nextStepLabel: String(data.next_step_label ?? data.nextStepLabel ?? ''),
-    personalization,
-    narrative: String(data.narrative ?? '').trim() || undefined,
-    planNarrative: String(data.plan_narrative ?? data.planNarrative ?? '').trim() || undefined,
-    guidance: String(data.guidance ?? '').trim() || undefined,
-    confidenceExplanation: String(data.confidence_explanation ?? data.confidenceExplanation ?? '').trim() || undefined,
-    strategyComparison,
-    optionComparison,
-    kickoffSteps,
-    firstAction: String(data.first_action ?? data.firstAction ?? '').trim() || undefined,
-    firstCheckpoint: String(data.first_checkpoint ?? data.firstCheckpoint ?? '').trim() || undefined,
-    ifPerformWell: String(data.if_perform_well ?? data.ifPerformWell ?? '').trim() || undefined,
-    ifStillStruggle: String(data.if_still_struggle ?? data.ifStillStruggle ?? '').trim() || undefined,
-    ifNoTime: String(data.if_no_time ?? data.ifNoTime ?? '').trim() || undefined,
+    nextStepNote: String(data.start_guide ?? data.startGuide ?? ''),
+    alternatives: [],
+    benefits: [],
+    nextUnlocks: [],
+    stageStatuses: [],
   };
 }
