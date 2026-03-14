@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class LearningPlanPromptBuilder {
 
+    private static final int LEARNING_PLAN_MAX_OUTPUT_TOKENS = 2600;
+
     public LlmPrompt build(LearningPlanPlanningContext context, LearningPlanPreview rulePreview) {
         String system = """
             You are generating an explainable AI co-decision learning preview.
@@ -158,7 +160,7 @@ public class LearningPlanPromptBuilder {
             "{\"headline\":\"\",\"subtitle\":\"\",\"why_now\":\"\",\"confidence\":\"MEDIUM\",\"current_focus_label\":\"\",\"current_task\":{\"task_title\":\"\",\"estimated_minutes\":8,\"priority\":\"MEDIUM\"},\"decision_reasons\":[{\"type\":\"WEAKNESS_MATCH\",\"title\":\"\",\"description\":\"\"}],\"alternatives\":[{\"strategy\":\"FAST_TRACK\",\"label\":\"\",\"description\":\"\",\"tradeoff\":\"\"}],\"strategy_comparison\":{\"current_recommended_strategy\":\"FOUNDATION_FIRST\",\"options\":[{\"strategy\":\"FOUNDATION_FIRST\",\"label\":\"\",\"suitable_for\":\"\",\"not_ideal_when\":\"\",\"switching_cost_risk\":\"\"}]},\"plan_guidance\":{\"why_chosen\":\"\",\"why_not_alternatives\":\"\",\"learner_mirror\":\"\",\"first_action\":\"\",\"first_checkpoint\":\"\",\"plan_tradeoff\":\"\",\"if_perform_well\":\"\",\"if_still_struggle\":\"\",\"if_no_time\":\"\",\"start_prompt\":\"\",\"kickoff_steps\":[\"\"],\"warmup_goal\":\"\",\"validation_focus\":\"\",\"evidence_mode\":\"\",\"adaptation_policy\":\"\",\"confidence_explanation\":\"\"},\"focuses\":[\"\"],\"benefits\":[\"\"],\"next_unlocks\":[\"\"],\"next_step_label\":\"\",\"task_preview\":[{\"stage\":\"STRUCTURE\",\"title\":\"\",\"goal\":\"\",\"learner_action\":\"\",\"ai_support\":\"\",\"estimated_minutes\":8}]}",
             "json_only",
             null,
-            1800
+            LEARNING_PLAN_MAX_OUTPUT_TOKENS
         );
     }
 
