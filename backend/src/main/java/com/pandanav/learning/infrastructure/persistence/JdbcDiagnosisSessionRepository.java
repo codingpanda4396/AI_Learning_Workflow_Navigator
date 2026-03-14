@@ -88,7 +88,7 @@ public class JdbcDiagnosisSessionRepository implements DiagnosisSessionRepositor
                     item.setId(rs.getLong("id"));
                     item.setLearningSessionId(rs.getLong("learning_session_id"));
                     item.setUserPk(rs.getObject("user_id", Long.class));
-                    item.setStatus(DiagnosisStatus.valueOf(rs.getString("status")));
+                    item.setStatus(DiagnosisStatus.fromDb(rs.getString("status")));
                     item.setGeneratedQuestionsJson(rs.getString("generated_questions_json"));
                     item.setStartedAt(rs.getObject("started_at", OffsetDateTime.class));
                     item.setCompletedAt(rs.getObject("completed_at", OffsetDateTime.class));

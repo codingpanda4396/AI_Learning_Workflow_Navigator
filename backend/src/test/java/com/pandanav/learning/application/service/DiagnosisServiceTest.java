@@ -71,7 +71,11 @@ class DiagnosisServiceTest {
             diagnosisAnswerRepository,
             capabilityProfileRepository,
             new DiagnosisTemplateFactory(new DiagnosisQuestionCopyFactory()),
+            new DiagnosisQuestionAssembler(new DiagnosisQuestionCopyFactory()),
             new DiagnosisQuestionCopyLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class)),
+            new DefaultDiagnosisQuestionPersonalizer(),
+            new DiagnosisQuestionCopyNormalizer(),
+            new DiagnosisExplanationBuilder(),
             new CapabilityProfileBuilder(),
             new DiagnosisExplanationAssembler(objectMapper),
             new CapabilityProfileSummaryLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class)),
@@ -147,17 +151,17 @@ class DiagnosisServiceTest {
                   ]
                 },
                 {
-                  "questionId": "q_learning_preference",
-                  "title": "Preference",
-                  "description": "Best learning style",
+                  "questionId": "q_difficulty_pain_point",
+                  "title": "Pain point",
+                  "description": "Main bottleneck",
                   "placeholder": "",
                   "submitHint": "This affects content delivery.",
-                  "sectionLabel": "PREFERENCE",
+                  "sectionLabel": "PAIN_POINT",
                   "options": [
-                    {"code":"CONCEPT_FIRST","label":"Concept first"},
-                    {"code":"EXAMPLE_FIRST","label":"Example first"},
-                    {"code":"PRACTICE_FIRST","label":"Practice first"},
-                    {"code":"PROJECT_DRIVEN","label":"Project driven"}
+                    {"code":"CONCEPT_UNDERSTANDING","label":"Concept understanding"},
+                    {"code":"TRANSFER_APPLICATION","label":"Transfer application"},
+                    {"code":"IMPLEMENTATION","label":"Implementation"},
+                    {"code":"LONG_TERM_MEMORY","label":"Long-term memory"}
                   ]
                 }
               ]
@@ -172,25 +176,34 @@ class DiagnosisServiceTest {
         CreateDiagnosisSessionResponse response = diagnosisService.createDiagnosisSession(101L, 10L);
 
         assertEquals(501L, response.diagnosisId());
-        assertEquals("GENERATED", response.status());
+        assertEquals("READY", response.status());
+        assertEquals("LLM", response.generationMode());
+        assertTrue(response.diagnosisExplanation().whyTheseQuestions().contains("系统需要了解"));
+        assertEquals(3, response.decisionHints().planningFactors().size());
         assertEquals("BEGINNER", response.questions().get(0).options().get(0).code());
         assertEquals(4, response.questions().get(0).options().size());
         assertEquals("/plan", response.nextAction().target().route());
     }
 
     @Test
-    void createDiagnosisSessionShouldFailWhenLlmFails() {
+    void createDiagnosisSessionShouldFallbackWhenLlmFails() {
         LearningSession session = learningSession(101L, 10L);
         DiagnosisSession savedDiagnosis = new DiagnosisSession();
         savedDiagnosis.setId(501L);
 
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
         when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class))).thenThrow(new RuntimeException("llm down"));
-        AiGenerationException ex = assertThrows(
-            AiGenerationException.class,
-            () -> diagnosisService.createDiagnosisSession(101L, 10L)
-        );
-        assertEquals("DIAGNOSIS_QUESTION_COPY", ex.getStage());
+        when(diagnosisSessionRepository.save(any(DiagnosisSession.class))).thenAnswer(invocation -> {
+            DiagnosisSession diagnosis = invocation.getArgument(0);
+            diagnosis.setId(savedDiagnosis.getId());
+            return diagnosis;
+        });
+
+        CreateDiagnosisSessionResponse response = diagnosisService.createDiagnosisSession(101L, 10L);
+        assertEquals("READY", response.status());
+        assertEquals("RULE_FALLBACK", response.generationMode());
+        assertTrue(response.fallback().applied());
+        assertEquals("RULE_FALLBACK", response.fallback().contentSource());
     }
 
     @Test
@@ -200,7 +213,7 @@ class DiagnosisServiceTest {
         diagnosisSession.setId(501L);
         diagnosisSession.setLearningSessionId(101L);
         diagnosisSession.setUserPk(10L);
-        diagnosisSession.setStatus(DiagnosisStatus.GENERATED);
+        diagnosisSession.setStatus(DiagnosisStatus.READY);
         diagnosisSession.setGeneratedQuestionsJson(generatedQuestionsJson());
 
         when(diagnosisSessionRepository.findByIdAndUserPk(501L, 10L)).thenReturn(Optional.of(diagnosisSession));
@@ -219,7 +232,7 @@ class DiagnosisServiceTest {
         });
 
         SubmitDiagnosisSessionResponse response = diagnosisService.submitDiagnosisSession(501L, buildSubmitRequest(), 10L);
-        assertEquals("PROFILED", response.status());
+        assertEquals("EVALUATED", response.status());
         assertEquals("INTERMEDIATE", response.capabilityProfile().currentLevel().code());
         assertEquals("INTERVIEW", response.capabilityProfile().goalOrientation().code());
         assertEquals("PRACTICE_FIRST", response.capabilityProfile().learningPreference().code());
@@ -243,7 +256,7 @@ class DiagnosisServiceTest {
         diagnosisSession.setId(501L);
         diagnosisSession.setLearningSessionId(101L);
         diagnosisSession.setUserPk(10L);
-        diagnosisSession.setStatus(DiagnosisStatus.GENERATED);
+        diagnosisSession.setStatus(DiagnosisStatus.READY);
         diagnosisSession.setGeneratedQuestionsJson(generatedQuestionsJson());
 
         when(diagnosisSessionRepository.findByIdAndUserPk(501L, 10L)).thenReturn(Optional.of(diagnosisSession));

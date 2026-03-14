@@ -218,6 +218,7 @@ public class DiagnosisExplanationAssembler {
                 yield "你的时间投入可以支持稳定推进当前学习计划。";
             }
             case LEARNING_PREFERENCE -> "你的学习偏好会影响每个阶段的解释方式与练习比重。";
+            case DIFFICULTY_PAIN_POINT -> "你的主要卡点会影响任务难度分布与讲解方式。";
             default -> FALLBACK_CONCLUSION;
         };
     }

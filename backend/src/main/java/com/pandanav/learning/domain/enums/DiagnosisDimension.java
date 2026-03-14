@@ -5,5 +5,6 @@ public enum DiagnosisDimension {
     EXPERIENCE,
     GOAL_STYLE,
     TIME_BUDGET,
-    LEARNING_PREFERENCE
+    LEARNING_PREFERENCE,
+    DIFFICULTY_PAIN_POINT
 }

@@ -46,6 +46,12 @@ public final class ContractCatalog {
             option("EXAMPLE_FIRST", "先看例子，再总结方法"),
             option("PRACTICE_FIRST", "先做题，在反馈中查漏补缺"),
             option("PROJECT_DRIVEN", "边学边做项目，穿插补基础")
+        ),
+        DiagnosisDimension.DIFFICULTY_PAIN_POINT, List.of(
+            option("CONCEPT_UNDERSTANDING", "理解概念"),
+            option("TRANSFER_APPLICATION", "做题迁移"),
+            option("IMPLEMENTATION", "实现代码"),
+            option("LONG_TERM_MEMORY", "长期记忆")
         )
     );
 
@@ -106,7 +112,8 @@ public final class ContractCatalog {
     private static final Map<String, String> CONTENT_SOURCE_LABELS = Map.of(
         "LLM", "AI 生成文案",
         "RULE_TEMPLATE", "规则模板文案",
-        "RULE_FALLBACK", "规则兜底文案"
+        "RULE_FALLBACK", "规则兜底文案",
+        "HYBRID", "混合生成文案"
     );
 
     private static final Map<String, String> PREVIEW_STATUS_LABELS = Map.of(
@@ -138,6 +145,7 @@ public final class ContractCatalog {
             case GOAL_STYLE -> "目标导向";
             case TIME_BUDGET -> "时间预算";
             case LEARNING_PREFERENCE -> "学习偏好";
+            case DIFFICULTY_PAIN_POINT -> "学习卡点";
         });
     }
 

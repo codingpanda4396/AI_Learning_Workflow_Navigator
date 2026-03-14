@@ -45,6 +45,13 @@ public class DiagnosisQuestionCopyFactory {
                 "你可以简单描述自己更容易进入状态的方式。",
                 "这会影响系统讲解和练习的组织方式。"
             );
+            case DIFFICULTY_PAIN_POINT -> new DiagnosisQuestionCopy(
+                "DIFFICULTY_PAIN_POINT",
+                "你目前最容易卡住的是哪一类问题？",
+                "请选择最符合的一项。",
+                "",
+                "这会帮助系统识别你最需要突破的难点。"
+            );
         };
     }
 }

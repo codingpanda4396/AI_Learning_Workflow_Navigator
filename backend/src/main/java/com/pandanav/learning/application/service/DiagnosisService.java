@@ -8,6 +8,8 @@ import com.pandanav.learning.api.dto.diagnosis.CapabilityProfileDto;
 import com.pandanav.learning.api.dto.diagnosis.CreateDiagnosisSessionResponse;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisActionTargetDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisAnswerSubmissionDto;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisDecisionHintsDto;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisExplanationDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisFallbackDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisInsightsDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisMetadataDto;
@@ -16,6 +18,7 @@ import com.pandanav.learning.api.dto.diagnosis.DiagnosisQuestionDto;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionRequest;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionResponse;
 import com.pandanav.learning.domain.enums.DiagnosisDimension;
+import com.pandanav.learning.domain.enums.DiagnosisGenerationMode;
 import com.pandanav.learning.domain.enums.DiagnosisStatus;
 import com.pandanav.learning.domain.model.CapabilityProfile;
 import com.pandanav.learning.domain.model.CapabilityProfileDraft;
@@ -26,6 +29,7 @@ import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
 import com.pandanav.learning.domain.model.DiagnosisQuestionOption;
 import com.pandanav.learning.domain.model.DiagnosisSession;
 import com.pandanav.learning.domain.model.LearningSession;
+import com.pandanav.learning.domain.model.PlanningContext;
 import com.pandanav.learning.domain.repository.CapabilityProfileRepository;
 import com.pandanav.learning.domain.repository.DiagnosisAnswerRepository;
 import com.pandanav.learning.domain.repository.DiagnosisSessionRepository;
@@ -35,6 +39,7 @@ import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
+import com.pandanav.learning.infrastructure.observability.TraceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -56,7 +61,11 @@ public class DiagnosisService {
     private final DiagnosisAnswerRepository diagnosisAnswerRepository;
     private final CapabilityProfileRepository capabilityProfileRepository;
     private final DiagnosisTemplateFactory diagnosisTemplateFactory;
+    private final DiagnosisQuestionAssembler diagnosisQuestionAssembler;
     private final DiagnosisQuestionCopyLlmService diagnosisQuestionCopyLlmService;
+    private final DiagnosisQuestionPersonalizer diagnosisQuestionPersonalizer;
+    private final DiagnosisQuestionCopyNormalizer diagnosisQuestionCopyNormalizer;
+    private final DiagnosisExplanationBuilder diagnosisExplanationBuilder;
     private final CapabilityProfileBuilder capabilityProfileBuilder;
     private final DiagnosisExplanationAssembler diagnosisExplanationAssembler;
     private final CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService;
@@ -68,7 +77,11 @@ public class DiagnosisService {
         DiagnosisAnswerRepository diagnosisAnswerRepository,
         CapabilityProfileRepository capabilityProfileRepository,
         DiagnosisTemplateFactory diagnosisTemplateFactory,
+        DiagnosisQuestionAssembler diagnosisQuestionAssembler,
         DiagnosisQuestionCopyLlmService diagnosisQuestionCopyLlmService,
+        DiagnosisQuestionPersonalizer diagnosisQuestionPersonalizer,
+        DiagnosisQuestionCopyNormalizer diagnosisQuestionCopyNormalizer,
+        DiagnosisExplanationBuilder diagnosisExplanationBuilder,
         CapabilityProfileBuilder capabilityProfileBuilder,
         DiagnosisExplanationAssembler diagnosisExplanationAssembler,
         CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService,
@@ -79,7 +92,11 @@ public class DiagnosisService {
         this.diagnosisAnswerRepository = diagnosisAnswerRepository;
         this.capabilityProfileRepository = capabilityProfileRepository;
         this.diagnosisTemplateFactory = diagnosisTemplateFactory;
+        this.diagnosisQuestionAssembler = diagnosisQuestionAssembler;
         this.diagnosisQuestionCopyLlmService = diagnosisQuestionCopyLlmService;
+        this.diagnosisQuestionPersonalizer = diagnosisQuestionPersonalizer;
+        this.diagnosisQuestionCopyNormalizer = diagnosisQuestionCopyNormalizer;
+        this.diagnosisExplanationBuilder = diagnosisExplanationBuilder;
         this.capabilityProfileBuilder = capabilityProfileBuilder;
         this.diagnosisExplanationAssembler = diagnosisExplanationAssembler;
         this.capabilityProfileSummaryLlmService = capabilityProfileSummaryLlmService;
@@ -89,25 +106,62 @@ public class DiagnosisService {
     public CreateDiagnosisSessionResponse createDiagnosisSession(Long sessionId, Long userId) {
         LearningSession session = sessionRepository.findByIdAndUserPk(sessionId, userId)
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
+        PlanningContext planningContext = buildPlanningContext(session);
+        String topic = resolveTopic(planningContext);
+        log.info(
+            "DIAGNOSIS_GENERATION_START traceId={} sessionId={} generationMode={} questionCount={} topic={}",
+            TraceContext.traceId(),
+            session.getId(),
+            "PENDING",
+            0,
+            topic
+        );
 
-        List<DiagnosisQuestion> sourceQuestions = diagnosisTemplateFactory.buildQuestions(session);
-        List<DiagnosisQuestion> questions = diagnosisQuestionCopyLlmService.enhanceQuestions(session, sourceQuestions);
+        List<DiagnosisQuestion> baseQuestions = diagnosisTemplateFactory.buildQuestions(session);
+        List<DiagnosisQuestion> assembledQuestions = diagnosisQuestionAssembler.assemble(session, baseQuestions);
+        DiagnosisGenerationMode generationMode = DiagnosisGenerationMode.LLM;
+        boolean fallbackApplied = false;
+        List<String> fallbackReasons = List.of();
+        List<DiagnosisQuestion> questions;
+        try {
+            questions = diagnosisQuestionCopyLlmService.enhanceQuestions(session, assembledQuestions);
+        } catch (Exception ex) {
+            generationMode = DiagnosisGenerationMode.RULE_FALLBACK;
+            fallbackApplied = true;
+            fallbackReasons = List.of("LLM_DIAGNOSIS_COPY_UNAVAILABLE");
+            questions = assembledQuestions;
+        }
+        questions = diagnosisQuestionPersonalizer.personalize(questions, planningContext);
+        questions = diagnosisQuestionCopyNormalizer.normalize(questions);
 
         DiagnosisSession diagnosisSession = new DiagnosisSession();
         diagnosisSession.setLearningSessionId(session.getId());
         diagnosisSession.setUserPk(userId);
-        diagnosisSession.setStatus(DiagnosisStatus.GENERATED);
+        diagnosisSession.setStatus(DiagnosisStatus.READY);
         diagnosisSession.setGeneratedQuestionsJson(toJson(questionsToMap(questions)));
         diagnosisSession.setStartedAt(OffsetDateTime.now());
 
         DiagnosisSession saved = diagnosisSessionRepository.save(diagnosisSession);
+        DiagnosisExplanationDto diagnosisExplanation = diagnosisExplanationBuilder.build(planningContext);
+        DiagnosisDecisionHintsDto decisionHints = buildDecisionHints();
+        log.info(
+            "DIAGNOSIS_GENERATION_RESULT traceId={} sessionId={} generationMode={} questionCount={} topic={}",
+            TraceContext.traceId(),
+            session.getId(),
+            generationMode.name(),
+            questions.size(),
+            topic
+        );
         return new CreateDiagnosisSessionResponse(
             saved.getId(),
             session.getId(),
-            DiagnosisStatus.GENERATED.name(),
+            DiagnosisStatus.READY.name(),
+            generationMode.name(),
             toQuestionDtos(questions),
+            diagnosisExplanation,
             buildNextAction(session.getId(), saved.getId()),
-            sourceMeta(false, List.of(), "LLM"),
+            decisionHints,
+            sourceMeta(fallbackApplied, fallbackReasons, generationMode.name()),
             new DiagnosisMetadataDto(questions.size(), null, null)
         );
     }
@@ -158,7 +212,7 @@ public class DiagnosisService {
         profile.setVersion(nextVersion(learningSession.getId()));
 
         CapabilityProfile savedProfile = capabilityProfileRepository.save(profile);
-        diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.PROFILED, OffsetDateTime.now());
+        diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.EVALUATED, OffsetDateTime.now());
         DiagnosisExplanationAssembler.DiagnosisExplanation explanation = diagnosisExplanationAssembler.assemble(
             questions,
             answers,
@@ -178,7 +232,7 @@ public class DiagnosisService {
         return new SubmitDiagnosisSessionResponse(
             diagnosisSession.getId(),
             learningSession.getId(),
-            DiagnosisStatus.PROFILED.name(),
+            DiagnosisStatus.EVALUATED.name(),
             toProfileDto(savedProfile),
             new DiagnosisInsightsDto(savedProfile.getSummaryText(), savedProfile.getPlanExplanation()),
             buildNextAction(learningSession.getId(), diagnosisSession.getId()),
@@ -203,6 +257,31 @@ public class DiagnosisService {
 
     private DiagnosisFallbackDto sourceMeta(boolean applied, List<String> reasons, String contentSource) {
         return new DiagnosisFallbackDto(applied, reasons == null ? List.of() : reasons, contentSource);
+    }
+
+    private DiagnosisDecisionHintsDto buildDecisionHints() {
+        return new DiagnosisDecisionHintsDto(List.of("FOUNDATION_LEVEL", "TIME_BUDGET", "GOAL_STYLE"));
+    }
+
+    private PlanningContext buildPlanningContext(LearningSession session) {
+        return new PlanningContext(
+            safeText(session == null ? null : session.getGoalText()),
+            safeText(session == null ? null : session.getCourseId()),
+            safeText(session == null ? null : session.getChapterId())
+        );
+    }
+
+    private String resolveTopic(PlanningContext context) {
+        if (context == null) {
+            return "";
+        }
+        if (!context.topicName().isBlank()) {
+            return context.topicName();
+        }
+        if (!context.chapterName().isBlank()) {
+            return context.chapterName();
+        }
+        return context.learningGoal();
     }
 
     private void validateAnswers(Map<String, DiagnosisQuestion> questionMap, List<DiagnosisAnswerSubmissionDto> answerRequests) {
@@ -522,5 +601,9 @@ public class DiagnosisService {
 
     private String textOrDefault(String candidate, String fallback) {
         return candidate == null || candidate.isBlank() ? fallback : candidate.trim();
+    }
+
+    private String safeText(String value) {
+        return value == null ? "" : value.trim();
     }
 }

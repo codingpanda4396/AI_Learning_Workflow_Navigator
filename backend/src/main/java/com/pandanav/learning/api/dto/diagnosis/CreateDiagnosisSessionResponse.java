@@ -11,10 +11,16 @@ public record CreateDiagnosisSessionResponse(
     Long sessionId,
     @JsonProperty("status")
     String status,
+    @JsonProperty("generationMode")
+    String generationMode,
     @JsonProperty("questions")
     List<DiagnosisQuestionDto> questions,
+    @JsonProperty("diagnosisExplanation")
+    DiagnosisExplanationDto diagnosisExplanation,
     @JsonProperty("nextAction")
     DiagnosisNextActionDto nextAction,
+    @JsonProperty("decisionHints")
+    DiagnosisDecisionHintsDto decisionHints,
     @JsonProperty("fallback")
     DiagnosisFallbackDto fallback,
     @JsonProperty("metadata")
