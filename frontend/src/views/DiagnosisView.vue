@@ -161,9 +161,6 @@ onMounted(async () => {
           :profile="diagnosisStore.capabilityProfile"
           :insights="diagnosisStore.insights"
           :status="statusText"
-          :fallback-text="fallbackText"
-          :source-text="sourceText"
-          :metadata="diagnosisStore.metadata"
         />
 
         <PrimaryActionCard
@@ -174,6 +171,24 @@ onMounted(async () => {
           :button-label="submitButtonText"
           @action="enterPlanFlow"
         />
+
+        <section class="rounded-[1.6rem] border border-slate-200 bg-slate-50/80 p-5 text-sm text-slate-500">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">辅助信息</p>
+          <div class="mt-4 grid gap-3 md:grid-cols-3">
+            <div class="rounded-2xl border border-slate-200 bg-white/80 p-4">
+              <p class="text-xs text-slate-400">生成方式</p>
+              <p class="mt-2 font-medium leading-6 text-slate-700">{{ sourceText }}</p>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-white/80 p-4">
+              <p class="text-xs text-slate-400">生成说明</p>
+              <p class="mt-2 font-medium leading-6 text-slate-700">{{ fallbackText }}</p>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-white/80 p-4">
+              <p class="text-xs text-slate-400">诊断辅助信息</p>
+              <p class="mt-2 font-medium leading-6 text-slate-700">{{ helperMetaText }}</p>
+            </div>
+          </div>
+        </section>
       </template>
 
       <template v-else-if="currentQuestion">
