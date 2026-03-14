@@ -88,7 +88,7 @@ public class LearningPlanPromptBuilder {
             "{\"headline\":\"\",\"reasons\":[{\"type\":\"\",\"title\":\"\",\"description\":\"\"}],\"focuses\":[\"\"],\"task_preview\":[{\"stage\":\"STRUCTURE\",\"title\":\"\",\"goal\":\"\",\"learner_action\":\"\",\"ai_support\":\"\",\"estimated_minutes\":8}]}",
             "json_only",
             null,
-            320
+            640
         );
     }
 
