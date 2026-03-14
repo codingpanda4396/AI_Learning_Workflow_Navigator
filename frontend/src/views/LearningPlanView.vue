@@ -201,13 +201,13 @@ onBeforeUnmount(() => {
           :busy="learningPlanStore.confirming || learningPlanStore.regenerating"
           @focus-confirm="focusConfirmSection"
         />
-        <PlanReasonPanel :reasons="preview.reasons" :diagnosis-summary="preview.context.diagnosisSummary" />
         <PlanAdjustPanel
           v-model="adjustments"
           :disabled="learningPlanStore.confirming"
           :regenerating="learningPlanStore.regenerating"
           @regenerate="regeneratePlan"
         />
+        <PlanReasonPanel :reasons="preview.reasons" :diagnosis-summary="preview.context.diagnosisSummary" />
         <div id="plan-confirm-anchor" class="pt-2" />
         <PlanActionBar
           :confirming="learningPlanStore.confirming"

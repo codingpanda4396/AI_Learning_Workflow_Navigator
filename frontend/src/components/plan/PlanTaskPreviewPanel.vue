@@ -31,15 +31,15 @@ const stageOutcomes: Record<string, string> = {
 <template>
   <PageSection
     eyebrow="学习阶段"
-    title="这轮学习会经历哪些阶段"
-    description="每个阶段都说明你要达成什么、AI 会怎么辅助，以及完成后你会获得什么。"
+    title="你会经历这四个学习阶段"
+    description="每张卡片都对应一个阶段，先看清这一轮会怎么学，再决定开始。"
   >
     <div class="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 md:p-5">
       <div class="grid gap-4 xl:grid-cols-4">
         <article
           v-for="task in props.tasks"
           :key="task.stage"
-          class="relative rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]"
+          class="relative flex h-full flex-col rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]"
         >
           <div class="flex items-center justify-between gap-3">
             <div>
@@ -50,21 +50,21 @@ const stageOutcomes: Record<string, string> = {
               {{ task.estimatedTaskMinutes }} 分钟
             </span>
           </div>
-          <p class="mt-4 text-sm font-medium leading-6 text-slate-900">{{ task.title || STAGE_LABELS[task.stage] }}</p>
-          <dl class="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-            <div>
-              <dt class="font-semibold text-slate-900">学习目标</dt>
+          <p class="mt-4 min-h-[3rem] text-sm font-medium leading-6 text-slate-900">{{ task.title || STAGE_LABELS[task.stage] }}</p>
+          <dl class="mt-4 flex-1 space-y-3 text-sm leading-6 text-slate-600">
+            <div class="rounded-[1.2rem] bg-slate-50 p-3">
+              <dt class="font-semibold text-slate-900">学习动作</dt>
+              <dd class="mt-1">{{ task.learnerAction || '按系统给出的任务提示逐步推进。' }}</dd>
+            </div>
+            <div class="rounded-[1.2rem] bg-slate-50 p-3">
+              <dt class="font-semibold text-slate-900">AI 支持</dt>
+              <dd class="mt-1">{{ task.aiSupport || 'AI 会根据当前阶段提供讲解、引导和反馈。' }}</dd>
+            </div>
+            <div class="rounded-[1.2rem] bg-slate-50 p-3">
+              <dt class="font-semibold text-slate-900">阶段目标</dt>
               <dd class="mt-1">{{ task.learningGoal || '围绕当前阶段完成对应学习目标。' }}</dd>
             </div>
-            <div>
-              <dt class="font-semibold text-slate-900">你会怎么学</dt>
-              <dd class="mt-1">{{ task.learnerAction || '按照系统给出的任务提示逐步推进。' }}</dd>
-            </div>
-            <div>
-              <dt class="font-semibold text-slate-900">AI 会怎么辅助</dt>
-              <dd class="mt-1">{{ task.aiSupport || 'AI 会根据当前阶段提供解释、引导和反馈。' }}</dd>
-            </div>
-            <div>
+            <div class="rounded-[1.2rem] border border-dashed border-slate-200 p-3">
               <dt class="font-semibold text-slate-900">完成后你会获得什么</dt>
               <dd class="mt-1">{{ stageOutcomes[task.stage] }}</dd>
             </div>
@@ -73,18 +73,18 @@ const stageOutcomes: Record<string, string> = {
       </div>
     </div>
 
-    <div class="mt-5 rounded-[2rem] bg-slate-950 px-5 py-5 text-white shadow-[0_26px_70px_rgba(15,23,42,0.22)] md:px-6">
-      <p class="text-sm font-semibold text-white">确认后就会按这个节奏开始</p>
-      <p class="mt-2 text-sm leading-7 text-slate-300">{{ props.nextStepNote || '确认后会创建正式学习会话，并从第一步学习任务开始。' }}</p>
+    <div class="mt-5 rounded-[1.8rem] border border-slate-200 bg-slate-50 px-5 py-5 md:px-6">
+      <p class="text-sm font-semibold text-slate-950">确认后会从第一阶段正式开始</p>
+      <p class="mt-2 text-sm leading-7 text-slate-600">{{ props.nextStepNote || '确认后会创建正式学习会话，并从第一步学习任务开始。' }}</p>
       <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p class="text-xs leading-6 text-slate-400">你不需要重新选择步骤，系统会按规划直接进入第一阶段任务。</p>
+        <p class="text-xs leading-6 text-slate-500">不需要再手动选择步骤，系统会按这套阶段顺序推进。</p>
         <button
           type="button"
-          class="rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+          class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="props.busy"
           @click="$emit('focusConfirm')"
         >
-          查看开始入口
+          去底部确认开始
         </button>
       </div>
     </div>
