@@ -8,24 +8,24 @@ const props = defineProps<{
 }>();
 
 const defaultTitles = [
-  '优先处理什么',
-  '为何以此为最佳起点',
-  '此顺序避免了什么风险',
-  '本轮重点优化什么',
+  '根据你的诊断结果，当前最需要先解决什么',
+  '为什么当前更适合从这里开始',
+  '这样安排能先解决哪些学习问题',
+  '为什么不建议一开始直接跳到更难部分',
 ];
 </script>
 
 <template>
   <PageSection
-    eyebrow="推理"
-    title="预览为何如此编排"
-    description="本节保留后端推理的可读性，无需在路由中硬编码说明文案。"
+    eyebrow="安排依据"
+    title="为什么这样安排"
+    description="这不是系统术语说明，而是这轮学习路径为什么适合你现在开始的依据。"
   >
     <div class="grid gap-4 xl:grid-cols-[1.1fr_repeat(2,minmax(0,1fr))]">
       <div class="rounded-[1.9rem] bg-[linear-gradient(180deg,#f7fbff_0%,#edf6ff_100%)] p-6 shadow-[0_20px_50px_rgba(56,189,248,0.08)] ring-1 ring-sky-100">
-        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-sky-600">诊断摘要</p>
-        <h3 class="mt-4 text-2xl font-semibold tracking-tight text-slate-950">计划从诊断结果出发，而非前端硬编码规则。</h3>
-        <p class="mt-4 text-sm leading-7 text-slate-600">{{ diagnosisSummary || '后端未返回本预览的诊断摘要。' }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-sky-600">诊断结果</p>
+        <h3 class="mt-4 text-2xl font-semibold tracking-tight text-slate-950">这条路径是从你的当前状态出发，而不是默认模板。</h3>
+        <p class="mt-4 text-sm leading-7 text-slate-600">{{ diagnosisSummary || '暂未返回更详细的诊断摘要，系统会先从更稳妥的起点为你安排。' }}</p>
       </div>
 
       <article
@@ -33,9 +33,9 @@ const defaultTitles = [
         :key="reason.key"
         class="rounded-[1.85rem] border border-slate-200/90 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_65px_rgba(15,23,42,0.08)]"
       >
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{{ reason.label || `原因 ${index + 1}` }}</p>
-        <h3 class="mt-3 text-xl font-semibold tracking-tight text-slate-950">{{ reason.title || defaultTitles[index] || `原因 ${index + 1}` }}</h3>
-        <p class="mt-3 text-sm leading-7 text-slate-600">{{ reason.description }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{{ reason.label || `依据 ${index + 1}` }}</p>
+        <h3 class="mt-3 text-xl font-semibold tracking-tight text-slate-950">{{ reason.title || defaultTitles[index] || `依据 ${index + 1}` }}</h3>
+        <p class="mt-3 text-sm leading-7 text-slate-600">{{ reason.description || '系统会优先按你的诊断结果安排更合适的起点和顺序。' }}</p>
       </article>
     </div>
   </PageSection>

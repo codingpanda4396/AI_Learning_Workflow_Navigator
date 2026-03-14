@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import PageSection from '@/components/common/PageSection.vue';
 import { PATH_DIFFICULTY_LABELS, PATH_STATUS_LABELS } from '@/constants/learningPlan';
 import type { PlanPathNode } from '@/types/learningPlan';
@@ -8,12 +9,19 @@ const props = defineProps<{
   focuses?: string[];
 }>();
 
+const currentNode = computed(() => props.nodes.find((node) => node.isStartingPoint || node.isFocus) || props.nodes[0]);
+const nextNode = computed(() => {
+  if (!props.nodes.length) return undefined;
+  const index = props.nodes.findIndex((node) => node.node.id === currentNode.value?.node.id);
+  return index >= 0 ? props.nodes[index + 1] : props.nodes[1];
+});
+
 function getNodeRole(node: PlanPathNode, index: number) {
-  if (node.isStartingPoint) return '推荐起点';
-  if (node.isPrerequisite) return '前置知识';
+  if (node.isStartingPoint) return '本轮起点';
+  if (node.isPrerequisite) return '前置补齐';
   if (node.isFocus) return '当前重点';
-  if (index === props.nodes.length - 1) return '后续扩展';
-  return '衔接节点';
+  if (index === props.nodes.length - 1) return '后续进阶';
+  return '路径衔接';
 }
 
 function getNodeName(node: PlanPathNode) {
@@ -23,14 +31,34 @@ function getNodeName(node: PlanPathNode) {
 
 <template>
   <PageSection
-    eyebrow="路径"
-    title="预览学习路径的编排顺序"
-    description="节点名称优先使用 displayName，其次 nodeName。难度与掌握度由 code-label 映射驱动。"
+    eyebrow="学习路径"
+    title="本轮学习路线"
+    description="你会从当前更适合的起点开始，按顺序进入后续知识内容和学习阶段。"
   >
     <div v-if="props.focuses?.length" class="mb-4 flex flex-wrap gap-2">
       <span v-for="focus in props.focuses" :key="focus" class="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
         {{ focus }}
       </span>
+    </div>
+
+    <div v-if="currentNode" class="mb-5 grid gap-3 md:grid-cols-3">
+      <div class="rounded-[1.5rem] bg-slate-50 p-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">从哪里开始</p>
+        <p class="mt-3 text-base font-semibold text-slate-950">{{ getNodeName(currentNode) }}</p>
+        <p class="mt-2 text-sm leading-6 text-slate-600">这是系统判断当前最适合先进入的起点节点。</p>
+      </div>
+      <div class="rounded-[1.5rem] bg-slate-50 p-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">当前要解决什么</p>
+        <p class="mt-3 text-base font-semibold text-slate-950">{{ currentNode.reasonTags[0] || '先补齐本轮最关键的薄弱点' }}</p>
+        <p class="mt-2 text-sm leading-6 text-slate-600">确认后会围绕这个节点展开第一步学习任务。</p>
+      </div>
+      <div class="rounded-[1.5rem] bg-slate-50 p-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">接下来会进入</p>
+        <p class="mt-3 text-base font-semibold text-slate-950">{{ nextNode ? getNodeName(nextNode) : '当前节点后的下一阶段' }}</p>
+        <p class="mt-2 text-sm leading-6 text-slate-600">
+          {{ nextNode ? '学完起点内容后，系统会继续带你进入后续阶段。' : '即使当前只返回一个节点，也会以它作为本轮正式起点展开学习。' }}
+        </p>
+      </div>
     </div>
 
     <div class="overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_18px_60px_rgba(15,23,42,0.05)] md:p-6">
@@ -53,7 +81,7 @@ function getNodeName(node: PlanPathNode) {
 
           <h3 class="mt-5 text-lg font-semibold tracking-tight text-slate-950">{{ getNodeName(node) }}</h3>
           <p class="mt-3 text-sm leading-6 text-slate-600">
-            {{ node.reasonTags[0] || '根据后端路径预览推理定位。' }}
+            {{ node.reasonTags[0] || (index === 0 ? '这是本轮学习路线的起点节点。' : '这是路径中的后续学习内容。') }}
           </p>
 
           <div class="mt-5 flex flex-wrap gap-2">

@@ -24,14 +24,14 @@ export const INTENSITY_LABELS: Record<LearningIntensity, string> = {
 
 export const LEARNING_MODE_LABELS: Record<LearningMode, string> = {
   EXPLAIN_THEN_PRACTICE: '先讲解后练习',
-  LEARN_BY_DOING: '在做中学',
+  LEARN_BY_DOING: '边做边学',
 };
 
 export const PATH_STATUS_LABELS: Record<PathMasteryStatus, string> = {
-  WEAK: '需要强化',
-  PARTIAL: '部分掌握',
-  STABLE: '已稳定',
-  NEW: '本轮新增',
+  WEAK: '需要优先补强',
+  PARTIAL: '已有部分基础',
+  STABLE: '已经相对稳定',
+  NEW: '本轮新接触',
 };
 
 export const PATH_DIFFICULTY_LABELS: Record<PathDifficulty, string> = {

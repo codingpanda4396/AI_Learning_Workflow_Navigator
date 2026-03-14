@@ -7,33 +7,69 @@ const props = defineProps<{
   preview: LearningPlanPreview;
 }>();
 
+function formatMinutes(minutes?: number) {
+  if (!minutes || minutes <= 0) return '时间待确认';
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
+  }
+  return `${minutes} 分钟`;
+}
+
+const heroTitle = computed(() => {
+  const headline = props.preview.summary.personalizedHeadline?.trim();
+  if (headline) return headline;
+  return `${props.preview.context.chapterName || '当前章节'}学习规划`;
+});
+
+const heroSubtitle = computed(() => {
+  const summary = props.preview.summary.personalizedSummary?.trim();
+  if (summary) return summary;
+  return '这条学习路径基于你的诊断结果生成，帮助你从更合适的起点开始。';
+});
+
 const metrics = computed(() => [
   {
-    label: '起始节点',
-    value: props.preview.summary.recommendedStartNode.displayName || props.preview.summary.recommendedStartNode.nodeName,
-    hint: '基于诊断和计划推理的最佳入口。',
+    label: '当前起点',
+    value: props.preview.summary.recommendedStartNode.displayName || props.preview.summary.recommendedStartNode.nodeName || '待系统确定',
+    hint: '这会是你确认后首先进入的学习内容。',
   },
   {
-    label: '节奏',
-    value: props.preview.summary.recommendedRhythmLabel || INTENSITY_LABELS[props.preview.summary.recommendedRhythm],
-    hint: '来自推荐的节奏 code-label 合约。',
+    label: '当前章节',
+    value: props.preview.context.chapterName || '未提供章节信息',
+    hint: props.preview.context.courseName || '本轮规划会围绕当前章节推进。',
   },
   {
-    label: '预计时长',
-    value: `${props.preview.summary.estimatedTotalMinutes} 分钟`,
-    hint: props.preview.metadata?.estimatedTotalMinutesScope || '总分钟数遵循最新后端范围。',
+    label: '预计学习时间',
+    value: formatMinutes(props.preview.summary.estimatedTotalMinutes),
+    hint: `建议节奏：${props.preview.summary.recommendedRhythmLabel || INTENSITY_LABELS[props.preview.summary.recommendedRhythm]}`,
   },
   {
-    label: '知识点',
-    value: `${props.preview.summary.estimatedKnowledgeCount}`,
-    hint: '本预览预计覆盖的知识点数量。',
+    label: '知识点数',
+    value: `${props.preview.summary.estimatedKnowledgeCount || 0} 个`,
+    hint: '本轮会优先覆盖当前最值得先学的知识点。',
   },
   {
-    label: '预览状态',
-    value: props.preview.previewOnly ? '仅预览' : '已确认',
-    hint: props.preview.status.label,
+    label: '学习阶段',
+    value: `${props.preview.summary.stageCount || 0} 个阶段`,
+    hint: '你会按阶段逐步推进，而不是一次性接收全部内容。',
   },
 ]);
+
+const secondaryTags = computed(() => {
+  const tags = [
+    props.preview.context.goalText,
+    props.preview.context.courseName ? `${props.preview.context.courseName} / ${props.preview.context.chapterName}` : '',
+    props.preview.previewOnly ? '当前为规划确认阶段' : '已生成正式学习规划',
+  ].filter(Boolean);
+
+  if (props.preview.fallbackApplied) {
+    tags.push('部分内容使用兜底结果');
+  }
+
+  return tags;
+});
 </script>
 
 <template>
@@ -42,12 +78,11 @@ const metrics = computed(() => [
     <div class="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-cyan-300/14 blur-3xl" />
     <div class="absolute bottom-0 left-0 h-36 w-36 rounded-full bg-amber-300/10 blur-3xl" />
     <div class="relative">
-      <p class="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200/78">计划预览</p>
-      <h1 class="mt-4 max-w-4xl text-3xl font-semibold tracking-tight md:text-5xl">
-        {{ preview.summary.personalizedHeadline || '你的学习计划预览已就绪' }}
-      </h1>
-      <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-200/92 md:text-base">
-        {{ preview.summary.personalizedSummary || '本预览基于最新诊断画像与规划响应生成。' }}
+      <p class="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200/78">学习规划</p>
+      <h1 class="mt-4 max-w-4xl text-3xl font-semibold tracking-tight md:text-5xl">{{ heroTitle }}</h1>
+      <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-200/92 md:text-base">{{ heroSubtitle }}</p>
+      <p class="mt-3 max-w-3xl text-sm leading-7 text-cyan-100/86">
+        基于你的诊断结果生成，确认后会按这条路径从第一步学习任务开始。
       </p>
 
       <div class="mt-8 grid gap-3 md:grid-cols-5">
@@ -63,11 +98,9 @@ const metrics = computed(() => [
       </div>
 
       <div class="mt-6 flex flex-wrap items-center gap-2 text-[11px] text-slate-300/72">
-        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.status.label }}</span>
-        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.context.goalText }}</span>
-        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.context.courseName }} / {{ preview.context.chapterName }}</span>
-        <span v-if="preview.planSource" class="rounded-full border border-white/10 bg-white/6 px-3 py-1">计划来源：{{ preview.planSource.label }}</span>
-        <span v-if="preview.contentSource" class="rounded-full border border-white/10 bg-white/6 px-3 py-1">内容来源：{{ preview.contentSource.label }}</span>
+        <span v-for="tag in secondaryTags" :key="tag" class="rounded-full border border-white/10 bg-white/6 px-3 py-1">
+          {{ tag }}
+        </span>
       </div>
     </div>
   </section>

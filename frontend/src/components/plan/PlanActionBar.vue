@@ -17,10 +17,10 @@ defineEmits<{
   <section class="rounded-[2.2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f5f7fb_100%)] p-6 shadow-[0_28px_80px_rgba(15,23,42,0.1)]">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div class="max-w-2xl">
-        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">确认</p>
-        <h3 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">基于此预览创建正式学习会话</h3>
+        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">确认开始</p>
+        <h3 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">确认后会创建正式学习会话，并从第一步任务开始。</h3>
         <p class="mt-3 text-sm leading-7 text-slate-600">
-          重新生成会保持在预览模式。确认后将转为正式计划并开启学习会话。
+          现在确认，系统会按这条规划创建正式学习流程；如果你还想微调节奏，也可以先重新生成。
         </p>
       </div>
 
@@ -47,7 +47,7 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('regenerate')"
         >
-          {{ regenerating ? '重新生成中...' : '重新生成预览' }}
+          {{ regenerating ? '重新生成中...' : '重新生成规划' }}
         </button>
         <button
           type="button"
@@ -55,7 +55,7 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('confirm')"
         >
-          {{ confirming ? '创建会话中...' : '确认并开始' }}
+          {{ confirming ? '正在创建学习会话...' : '开始学习这条路径' }}
         </button>
       </div>
     </div>

@@ -37,39 +37,17 @@ const context = computed(() => {
   };
 });
 
-const previewStateLabel = computed(() => {
-  if (!preview.value) {
-    return '';
-  }
-  return preview.value.previewOnly ? '仅预览' : '已确认';
-});
-
-const statusSummary = computed(() => {
-  if (!preview.value) {
-    return '';
-  }
-  return `${preview.value.status.label} / ${previewStateLabel.value}`;
-});
-
 const viewState = computed(() => {
-  if (learningPlanStore.loading && !preview.value) {
-    return 'loading';
-  }
-  if (error.value && !preview.value) {
-    return 'error';
-  }
-  if (learningPlanStore.confirming) {
-    return 'confirming';
-  }
-  if (learningPlanStore.regenerating) {
-    return 'regenerating';
-  }
+  if (learningPlanStore.loading && !preview.value) return 'loading';
+  if (error.value && !preview.value) return 'error';
+  if (learningPlanStore.confirming) return 'confirming';
+  if (learningPlanStore.regenerating) return 'regenerating';
   return 'ready';
 });
 
 async function loadPlan() {
   if (!context.value.diagnosisId || !context.value.goalText) {
-    learningPlanStore.error = '缺少学习计划预览所需的 diagnosisId 或 goalText。';
+    learningPlanStore.error = '缺少生成学习规划所需的诊断信息，请先完成诊断后再试。';
     return;
   }
   try {
@@ -167,8 +145,8 @@ onBeforeUnmount(() => {
 
         <PageSection
           eyebrow="生成中"
-          title="正在将诊断结果转化为预览"
-          description="前端等待统一的预览合约，并明确渲染仅预览状态。"
+          title="正在把诊断结果整理成学习规划"
+          description="我们会基于你的诊断结果生成一条可确认、可开始执行的学习路径。"
         >
           <div class="grid gap-4 md:grid-cols-3">
             <div v-for="item in 3" :key="item" class="animate-pulse rounded-[1.7rem] border border-slate-200 bg-white p-5">
@@ -182,38 +160,19 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
-        <ErrorState :message="error || '生成学习计划预览失败。'" />
+        <ErrorState :message="error || '生成学习规划失败。'" />
         <div class="flex justify-start">
           <button
             type="button"
             class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
             @click="loadPlan"
           >
-            重试预览
+            重试生成
           </button>
         </div>
       </div>
 
       <template v-else-if="preview">
-        <div class="grid gap-3 md:grid-cols-4">
-          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">状态</p>
-            <p class="mt-2 font-medium text-slate-900">{{ statusSummary }}</p>
-          </div>
-          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">预览 ID</p>
-            <p class="mt-2 font-medium text-slate-900">{{ preview.id }}</p>
-          </div>
-          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">兜底</p>
-            <p class="mt-2 font-medium text-slate-900">{{ preview.fallbackApplied ? '已应用' : '未应用' }}</p>
-          </div>
-          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">时间范围</p>
-            <p class="mt-2 font-medium text-slate-900">{{ preview.metadata?.estimatedTotalMinutesScope || '未提供' }}</p>
-          </div>
-        </div>
-
         <div v-if="preview.fallbackReasons?.length" class="rounded-[1.6rem] border border-amber-100 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-800">
           {{ preview.fallbackReasons.join(' / ') }}
         </div>
@@ -230,12 +189,11 @@ onBeforeUnmount(() => {
         >
           {{
             viewState === 'confirming'
-              ? '正在将预览转化为已确认的学习会话。'
-              : '正在根据最新调整重新生成预览。'
+              ? '正在创建正式学习会话，即将从第一步任务开始。'
+              : '正在根据最新设置重新生成学习规划。'
           }}
         </div>
 
-        <PlanReasonPanel :reasons="preview.reasons" :diagnosis-summary="preview.context.diagnosisSummary" />
         <PlanPathPreviewPanel :nodes="preview.pathNodes" :focuses="preview.focuses" />
         <PlanTaskPreviewPanel
           :tasks="preview.taskPreviews"
@@ -243,6 +201,7 @@ onBeforeUnmount(() => {
           :busy="learningPlanStore.confirming || learningPlanStore.regenerating"
           @focus-confirm="focusConfirmSection"
         />
+        <PlanReasonPanel :reasons="preview.reasons" :diagnosis-summary="preview.context.diagnosisSummary" />
         <PlanAdjustPanel
           v-model="adjustments"
           :disabled="learningPlanStore.confirming"
