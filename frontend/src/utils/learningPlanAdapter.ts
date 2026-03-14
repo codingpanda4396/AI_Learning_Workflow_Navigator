@@ -47,7 +47,12 @@ function formatMinutes(minutes?: number) {
 function clampText(value: string | undefined, fallback: string) {
   const text = String(value ?? '').trim();
   if (!text) return fallback;
-  return text.replace(/\s+/g, ' ');
+  return text
+    .replace(/^foundation of\s*/i, '')
+    .replace(/^basics? of\s*/i, '')
+    .replace(/^intro(?:duction)? to\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function toSource(preview: LearningPlanPreview): { label: string; type: PlanSourceType } {
