@@ -1,6 +1,6 @@
 # Docs Index
 
-`docs/` 按“当前可用文档优先、历史文档归档”来组织，先看入口，再按主题深入。
+`docs/` 按"当前可用文档优先、历史文档归档"来组织，先看入口，再按主题深入。
 
 ## 建议阅读顺序
 
@@ -12,17 +12,14 @@
 
 ## 按目录查找
 
-- `architecture/`：稳定架构、系统设计、阶段状态总结
-- `backend/`：后端实现说明、链路分析、测试与交付记录
+- `architecture/`：稳定架构、系统设计、状态机定义、阶段状态总结
+- `backend/`：后端实现说明、链路分析、LLM 排查指南、测试与交付记录
 - `frontend/`：前端实现说明、页面与交互相关总结
 - `devops/`：本地开发、部署、CI/CD
 - `product-planning/`：需求分析、MVP 范围、接口与重构方案
 - `implementation-plans/`：具体任务的设计稿与执行计划
 - `prompts/`：Prompt 资产、清单与使用说明
-- `issues/`：临时问题记录与待处理事项
-- `BV1003/`：专项审查与系统分析材料
-- `archive/`：历史交付、旧需求、一次性过程文档
-- `todo/`：预留目录，当前无有效文档
+- `archive/`：历史交付、旧需求、一次性过程文档、专项审查材料
 
 ## 当前高频文档
 
@@ -31,11 +28,18 @@
 - CI/CD：[`devops/cicd-guide.md`](./devops/cicd-guide.md)
 - 后端全链路测试：[`backend/backend-full-chain-test-guide.md`](./backend/backend-full-chain-test-guide.md)
 - Prompt 清单：[`prompts/prompt-inventory.md`](./prompts/prompt-inventory.md)
-- Quiz API/MVP 方案：[`product-planning/session-quiz-api-contract-mvp.md`](./product-planning/session-quiz-api-contract-mvp.md)
+- 状态机定义：[`architecture/state-machine-unification.md`](./architecture/state-machine-unification.md)
+- LLM Fallback 排查：[`backend/llm-fallback-troubleshooting.md`](./backend/llm-fallback-troubleshooting.md)
+
+## archive 子目录说明
+
+- `archive/2026-03-08-before-3.8/`：3 月 8 日前的历史交付与需求
+- `archive/2026-03-12-refactor/`：3 月 12 日重构专项的修复记录（API 统一、Mock 清理、聚合修复等）
+- `archive/2026-03-12-bv1003-audit/`：BV1003 版本专项代码审查与系统分析材料
 
 ## 维护约定
 
 - 新文档优先放入对应主题目录，不要堆在 `docs/` 根目录
 - 阶段性方案、问题记录优先使用 `YYYY-MM-DD-` 前缀
 - 已失效但需要保留的文档移动到 `archive/`
-- 根目录 `docs/` 下仅保留跨主题入口文档或通用说明
+- 根目录 `docs/` 下仅保留跨主题入口文档或通用说明（如 `contract.md`）
