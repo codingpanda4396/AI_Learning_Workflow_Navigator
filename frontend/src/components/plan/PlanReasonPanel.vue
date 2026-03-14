@@ -25,7 +25,7 @@ const defaultTitles = [
       <div class="rounded-[1.9rem] border border-sky-100 bg-[linear-gradient(180deg,#f8fbff_0%,#f2f7ff_100%)] p-6 shadow-[0_14px_40px_rgba(56,189,248,0.06)]">
         <p class="text-xs font-semibold uppercase tracking-[0.24em] text-sky-600">诊断结果</p>
         <h3 class="mt-4 text-2xl font-semibold tracking-tight text-slate-950">这条路径是从你当前状态出发，而不是固定模板。</h3>
-        <p class="mt-4 text-sm leading-7 text-slate-600">{{ diagnosisSummary || '暂未返回更详细的诊断摘要，系统会先从更稳妥的起点为你安排。' }}</p>
+        <p class="mt-4 break-words text-sm leading-7 text-slate-600">{{ diagnosisSummary || '暂未返回更详细的诊断摘要，系统会先从更稳妥的起点为你安排。' }}</p>
       </div>
 
       <article
@@ -35,7 +35,15 @@ const defaultTitles = [
       >
         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{{ reason.label || `依据 ${index + 1}` }}</p>
         <h3 class="mt-3 text-xl font-semibold tracking-tight text-slate-950">{{ reason.title || defaultTitles[index] || `依据 ${index + 1}` }}</h3>
-        <p class="mt-3 text-sm leading-7 text-slate-600">{{ reason.description || '系统会优先按你的诊断结果安排更合适的起点和顺序。' }}</p>
+        <p class="mt-3 break-words text-sm leading-7 text-slate-600">{{ reason.description || '系统会优先按你的诊断结果安排更合适的起点和顺序。' }}</p>
+      </article>
+      <article
+        v-if="!props.reasons.length"
+        class="rounded-[1.85rem] border border-slate-200/90 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)]"
+      >
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">补充说明</p>
+        <h3 class="mt-3 text-xl font-semibold tracking-tight text-slate-950">系统已基于诊断结果完成本轮排序</h3>
+        <p class="mt-3 break-words text-sm leading-7 text-slate-600">即使当前没有返回更多解释项，这条路径仍会优先照顾你的当前起点、学习节奏和目标导向。</p>
       </article>
     </div>
   </PageSection>

@@ -75,14 +75,17 @@ function getTagClass(node: PlanPathNode) {
         </p>
       </div>
     </div>
+    <div v-else class="mb-5 rounded-[1.6rem] border border-slate-200 bg-slate-50 px-5 py-5 text-sm leading-7 text-slate-600">
+      路径节点还在整理中，确认开始后系统会按你的诊断结果补全起点与推进顺序。
+    </div>
 
     <div class="mb-5 rounded-[1.6rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600 md:px-5">
       <p class="font-semibold text-slate-900">路径总览</p>
-      <p class="mt-1">{{ pathSummary }}</p>
+      <p class="mt-1 break-words">{{ pathSummary || '系统会根据你的当前起点，依次安排本轮学习路径。' }}</p>
     </div>
 
     <div class="overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_18px_60px_rgba(15,23,42,0.05)] md:p-6">
-      <div class="flex flex-col gap-4 xl:flex-row xl:items-stretch">
+      <div v-if="props.nodes.length" class="flex flex-col gap-4 xl:flex-row xl:items-stretch">
         <article
           v-for="(node, index) in props.nodes"
           :key="node.node.id"
@@ -120,6 +123,9 @@ function getTagClass(node: PlanPathNode) {
             </span>
           </div>
         </article>
+      </div>
+      <div v-else class="rounded-[1.6rem] border border-dashed border-slate-200 bg-white/90 px-5 py-6 text-sm leading-7 text-slate-600">
+        暂未返回完整路径卡片，本轮仍会从推荐起点开始，后续内容会在学习过程中逐步明确。
       </div>
     </div>
   </PageSection>

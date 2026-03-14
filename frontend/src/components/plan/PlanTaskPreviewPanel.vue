@@ -35,7 +35,7 @@ const stageOutcomes: Record<string, string> = {
     description="每张卡片都对应一个阶段，先看清这一轮会怎么学，再决定开始。"
   >
     <div class="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 md:p-5">
-      <div class="grid gap-4 xl:grid-cols-4">
+      <div v-if="props.tasks.length" class="grid gap-4 xl:grid-cols-4">
         <article
           v-for="task in props.tasks"
           :key="task.stage"
@@ -71,11 +71,14 @@ const stageOutcomes: Record<string, string> = {
           </dl>
         </article>
       </div>
+      <div v-else class="rounded-[1.6rem] border border-dashed border-slate-200 bg-white/90 px-5 py-6 text-sm leading-7 text-slate-600">
+        学习阶段正在整理中。确认后系统仍会从“理解当前起点”开始，逐步带你进入训练与复盘。
+      </div>
     </div>
 
     <div class="mt-5 rounded-[1.8rem] border border-slate-200 bg-slate-50 px-5 py-5 md:px-6">
       <p class="text-sm font-semibold text-slate-950">确认后会从第一阶段正式开始</p>
-      <p class="mt-2 text-sm leading-7 text-slate-600">{{ props.nextStepNote || '确认后会创建正式学习会话，并从第一步学习任务开始。' }}</p>
+      <p class="mt-2 break-words text-sm leading-7 text-slate-600">{{ props.nextStepNote || '确认后会创建正式学习会话，并从第一步学习任务开始。' }}</p>
       <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p class="text-xs leading-6 text-slate-500">不需要再手动选择步骤，系统会按这套阶段顺序推进。</p>
         <button

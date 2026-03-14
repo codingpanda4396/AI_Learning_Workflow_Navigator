@@ -27,9 +27,9 @@ const hintClass = computed(() => (props.tone === 'strong' ? 'text-slate-300/90' 
 <template>
   <div class="rounded-[1.6rem] border p-4 md:p-5" :class="toneClass">
     <p class="text-[11px] font-semibold uppercase tracking-[0.18em]" :class="labelClass">{{ label }}</p>
-    <div class="mt-3">
+    <div class="mt-3 min-h-[2.75rem] break-words">
       <slot />
     </div>
-    <p v-if="hint" class="mt-3 text-xs leading-5" :class="hintClass">{{ hint }}</p>
+    <p v-if="hint" class="mt-3 text-xs leading-5 break-words" :class="hintClass">{{ hint }}</p>
   </div>
 </template>

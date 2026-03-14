@@ -21,8 +21,8 @@ const contextItems = computed(() => [
     step-label="诊断"
     title="先确认你的当前起点"
     description="这一步不是考试，而是把你现在的基础、节奏和目标偏好整理成一份能力快照，作为下一步学习规划的起点。"
-    meta-label="诊断记录"
-    :meta-value="sessionId"
+    meta-label="流程位置"
+    meta-value="第 1 步，共 2 步"
     :context-items="contextItems"
   />
 </template>

@@ -45,6 +45,13 @@ const viewState = computed(() => {
   return 'ready';
 });
 
+const fallbackBannerText = computed(() => {
+  if (!preview.value?.fallbackApplied) {
+    return '';
+  }
+  return '本次规划中的部分说明已自动切换为稳定展示版本，但不会影响学习路径与开始学习流程。';
+});
+
 async function loadPlan() {
   if (!context.value.diagnosisId || !context.value.goalText) {
     learningPlanStore.error = '缺少生成学习规划所需的诊断信息，请先完成诊断后再试。';
@@ -173,8 +180,8 @@ onBeforeUnmount(() => {
       </div>
 
       <template v-else-if="preview">
-        <div v-if="preview.fallbackReasons?.length" class="rounded-[1.6rem] border border-amber-100 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-800">
-          {{ preview.fallbackReasons.join(' / ') }}
+        <div v-if="fallbackBannerText" class="rounded-[1.6rem] border border-amber-100 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-800">
+          {{ fallbackBannerText }}
         </div>
 
         <div v-if="error" class="rounded-[1.6rem] border border-rose-100 bg-rose-50 px-5 py-4 text-sm leading-7 text-rose-700">

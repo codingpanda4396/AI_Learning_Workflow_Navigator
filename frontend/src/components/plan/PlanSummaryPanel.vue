@@ -76,7 +76,7 @@ const statusTags = computed(() => {
 const focusSummary = computed(() => {
   const items = props.preview.focuses?.filter(Boolean) ?? [];
   if (!items.length) {
-    return ['起点确认', '阶段推进', 'AI 陪练支持'];
+    return ['起点确认', '阶段推进', '开始学习'];
   }
   return items.slice(0, 4);
 });
@@ -88,8 +88,8 @@ const focusSummary = computed(() => {
       step-label="规划"
       :title="heroTitle"
       :description="heroSubtitle"
-      meta-label="规划预览"
-      :meta-value="preview.id"
+      meta-label="流程位置"
+      meta-value="第 2 步，共 2 步"
       :context-items="contextItems"
     />
 
