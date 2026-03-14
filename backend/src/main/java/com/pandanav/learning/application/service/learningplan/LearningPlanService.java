@@ -60,6 +60,7 @@ public class LearningPlanService {
     private final PlanningContextAssembler planningContextAssembler;
     private final LearningPlanOrchestrator learningPlanOrchestrator;
     private final LearningPlanRepository learningPlanRepository;
+    private final LearningPlanExplanationAssembler learningPlanExplanationAssembler;
     private final SessionRepository sessionRepository;
     private final TaskRepository taskRepository;
     private final ConceptNodeRepository conceptNodeRepository;
@@ -70,6 +71,7 @@ public class LearningPlanService {
         PlanningContextAssembler planningContextAssembler,
         LearningPlanOrchestrator learningPlanOrchestrator,
         LearningPlanRepository learningPlanRepository,
+        LearningPlanExplanationAssembler learningPlanExplanationAssembler,
         SessionRepository sessionRepository,
         TaskRepository taskRepository,
         ConceptNodeRepository conceptNodeRepository,
@@ -79,6 +81,7 @@ public class LearningPlanService {
         this.planningContextAssembler = planningContextAssembler;
         this.learningPlanOrchestrator = learningPlanOrchestrator;
         this.learningPlanRepository = learningPlanRepository;
+        this.learningPlanExplanationAssembler = learningPlanExplanationAssembler;
         this.sessionRepository = sessionRepository;
         this.taskRepository = taskRepository;
         this.conceptNodeRepository = conceptNodeRepository;
@@ -109,7 +112,24 @@ public class LearningPlanService {
         writeSnapshot(previewDraft, orchestrated.preview(), context);
 
         LearningPlan saved = learningPlanRepository.save(previewDraft);
-        return toResponse(saved, orchestrated.preview(), context, orchestrated.planSource(), orchestrated.fallbackApplied(), orchestrated.fallbackReasons());
+        LearningPlanPreviewResponse response = toResponse(
+            saved,
+            orchestrated.preview(),
+            context,
+            orchestrated.planSource(),
+            orchestrated.fallbackApplied(),
+            orchestrated.fallbackReasons()
+        );
+        log.info(
+            "LearningPlanService: preview response built. previewId={}, sessionId={}, hasWhyStartHere={}, keyWeaknessCount={}, priorityNodeCount={}, fallbackApplied={}",
+            response.previewId(),
+            response.context() == null ? null : response.context().sessionId(),
+            response.whyStartHere() != null && !response.whyStartHere().isBlank(),
+            response.keyWeaknesses() == null ? 0 : response.keyWeaknesses().size(),
+            response.priorityNodes() == null ? 0 : response.priorityNodes().size(),
+            Boolean.TRUE.equals(response.fallbackApplied())
+        );
+        return response;
     }
 
     public LearningPlanPreviewResponse get(Long previewId, Long userId) {
@@ -234,6 +254,7 @@ public class LearningPlanService {
         String contentSourceCode = planContentSource == null
             ? (committed ? "RULE_TEMPLATE" : "RULE_TEMPLATE")
             : planContentSource == PlanSource.LLM ? "LLM" : "RULE_FALLBACK";
+        LearningPlanExplanationAssembler.PlanExplanation planExplanation = learningPlanExplanationAssembler.assemble(preview, context);
 
         return new LearningPlanPreviewResponse(
             String.valueOf(plan.getId()),
@@ -260,6 +281,9 @@ public class LearningPlanService {
                 .map(item -> new PlanReasonResponse(item.type(), item.title(), item.description()))
                 .toList(),
             preview.focuses(),
+            planExplanation.whyStartHere(),
+            planExplanation.keyWeaknesses(),
+            planExplanation.priorityNodes(),
             preview.pathPreview().stream()
                 .map(item -> new PlanPathNodeResponse(
                     new PlanNodeReferenceResponse(item.nodeId(), item.nodeId(), item.nodeName()),

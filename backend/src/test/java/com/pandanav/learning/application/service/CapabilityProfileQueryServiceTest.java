@@ -56,6 +56,6 @@ class CapabilityProfileQueryServiceTest {
         assertEquals("INTERVIEW", response.capabilityProfile().goalOrientation());
         assertEquals("每周 4-6 小时", context.timeBudget());
         assertEquals("PRACTICE_FIRST", context.learningPreference());
-        assertEquals("系统会先补基础，再逐步增加训练。", response.capabilityProfile().planExplanation());
+        assertEquals("系统会先补基础，再逐步增加训练。", response.insights().planExplanation());
     }
 }

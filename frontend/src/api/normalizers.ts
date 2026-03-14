@@ -154,6 +154,15 @@ export function normalizeDiagnosisGenerateResponse(data: Record<string, unknown>
 
 export function normalizeDiagnosisSubmitResponse(data: Record<string, unknown>): DiagnosisSubmitResponse {
   const insights = data.insights && typeof data.insights === 'object' ? (data.insights as Record<string, unknown>) : undefined;
+  const reasoningSteps = (Array.isArray(data.reasoning_steps ?? data.reasoningSteps)
+    ? (data.reasoning_steps ?? data.reasoningSteps)
+    : []) as Record<string, unknown>[];
+  const strengthSources = (Array.isArray(data.strength_sources ?? data.strengthSources)
+    ? (data.strength_sources ?? data.strengthSources)
+    : []) as Record<string, unknown>[];
+  const weaknessSources = (Array.isArray(data.weakness_sources ?? data.weaknessSources)
+    ? (data.weakness_sources ?? data.weaknessSources)
+    : []) as Record<string, unknown>[];
   return {
     diagnosisId: String(data.diagnosis_id ?? data.diagnosisId ?? ''),
     sessionId: String(data.session_id ?? data.sessionId ?? ''),
@@ -168,6 +177,23 @@ export function normalizeDiagnosisSubmitResponse(data: Record<string, unknown>):
     nextAction: normalizeDiagnosisNextAction(data.next_action ?? data.nextAction),
     fallback: normalizeDiagnosisFallback(data.fallback),
     metadata: normalizeDiagnosisMetadata(data.metadata),
+    reasoningSteps: reasoningSteps.map((item) => ({
+      dimension: String(item.dimension ?? 'FOUNDATION'),
+      questionId: String(item.question_id ?? item.questionId ?? 'unknown-question'),
+      questionTitle: String(item.question_title ?? item.questionTitle ?? '诊断问题'),
+      selectedAnswerLabel: String(item.selected_answer_label ?? item.selectedAnswerLabel ?? '基于你的作答信息'),
+      inferredConclusion: String(item.inferred_conclusion ?? item.inferredConclusion ?? '系统基于已收集的回答，形成当前能力判断。'),
+    })),
+    strengthSources: strengthSources.map((item) => ({
+      label: String(item.label ?? '当前表现具备可持续推进条件'),
+      dimension: String(item.dimension ?? 'FOUNDATION'),
+      sourceQuestionId: String(item.source_question_id ?? item.sourceQuestionId ?? 'unknown-question'),
+    })),
+    weaknessSources: weaknessSources.map((item) => ({
+      label: String(item.label ?? '当前仍存在需要补强的环节'),
+      dimension: String(item.dimension ?? 'FOUNDATION'),
+      sourceQuestionId: String(item.source_question_id ?? item.sourceQuestionId ?? 'unknown-question'),
+    })),
   };
 }
 
@@ -532,6 +558,11 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
   const taskPreviews = (Array.isArray(data.task_preview ?? data.taskPreview ?? data.task_previews ?? data.taskPreviews)
     ? (data.task_preview ?? data.taskPreview ?? data.task_previews ?? data.taskPreviews)
     : []) as Record<string, unknown>[];
+  const priorityNodes = (Array.isArray(data.priority_nodes ?? data.priorityNodes)
+    ? (data.priority_nodes ?? data.priorityNodes)
+    : []) as Record<string, unknown>[];
+  const keyWeaknesses = readArray(data.key_weaknesses ?? data.keyWeaknesses);
+  const whyStartHere = String(data.why_start_here ?? data.whyStartHere ?? '');
 
   return {
     id: String(data.id ?? data.preview_id ?? data.previewId ?? data.plan_id ?? data.planId ?? ''),
@@ -589,6 +620,21 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
       label: String(item.label ?? item.type ?? ''),
       description: String(item.description ?? ''),
     })),
+    whyStartHere: whyStartHere || '系统将从当前最稳妥的起点开始，逐步补齐关键薄弱点。',
+    keyWeaknesses: keyWeaknesses.length ? keyWeaknesses : ['关键薄弱点待进一步识别'],
+    priorityNodes: (priorityNodes.length
+      ? priorityNodes.map((item) => ({
+          nodeId: String(item.node_id ?? item.nodeId ?? ''),
+          title: String(item.title ?? item.node_name ?? item.nodeName ?? '当前推荐节点'),
+          reason: String(item.reason ?? '这是当前最能稳定推进学习路径的节点。'),
+        }))
+      : [
+          {
+            nodeId: String(summary.recommended_start_node_id ?? summary.recommendedStartNodeId ?? ''),
+            title: String(summary.recommended_start_node_name ?? summary.recommendedStartNodeName ?? '当前推荐节点'),
+            reason: '这是当前最能稳定推进学习路径的节点。',
+          },
+        ]),
     pathNodes: pathNodes.map((item, index) => {
       const reasonTags = readArray(item.reason_tags ?? item.reasonTags).length
         ? readArray(item.reason_tags ?? item.reasonTags)

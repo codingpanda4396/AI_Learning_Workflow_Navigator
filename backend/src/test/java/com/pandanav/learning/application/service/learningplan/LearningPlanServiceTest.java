@@ -2,7 +2,7 @@ package com.pandanav.learning.application.service.learningplan;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.dto.plan.ConfirmLearningPlanResponse;
-import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsRequest;
+import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsDto;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
 import com.pandanav.learning.application.command.ConfirmLearningPlanCommand;
 import com.pandanav.learning.application.command.PreviewLearningPlanCommand;
@@ -54,17 +54,20 @@ class LearningPlanServiceTest {
         LearningPlanService service = service(assembler, orchestrator, repository);
         LearningPlanPreviewResponse response = service.preview(new PreviewLearningPlanCommand(
             1L,
-            "goal-1",
             "diag-1",
             null,
             null,
             null,
-            new LearningPlanAdjustmentsRequest("STANDARD", "LEARN_THEN_PRACTICE", true)
+            "goal-1",
+            new LearningPlanAdjustmentsDto("STANDARD", "LEARN_THEN_PRACTICE", true)
         ));
 
-        assertEquals("88", response.planId());
-        assertEquals("LLM", response.planSource());
-        assertEquals("tree basics", response.summary().recommendedStartNodeName());
+        assertEquals("88", response.previewId());
+        assertEquals("LLM", response.contentSource().code());
+        assertEquals("tree basics", response.summary().recommendedStartNode().nodeName());
+        assertNotNull(response.whyStartHere());
+        assertEquals(2, response.priorityNodes().size());
+        assertNotNull(response.keyWeaknesses());
     }
 
     @Test
@@ -115,6 +118,7 @@ class LearningPlanServiceTest {
             assembler,
             orchestrator,
             repository,
+            new LearningPlanExplanationAssembler(),
             sessionRepository,
             taskRepository,
             conceptNodeRepository,
@@ -138,6 +142,7 @@ class LearningPlanServiceTest {
             assembler,
             orchestrator,
             repository,
+            new LearningPlanExplanationAssembler(),
             mock(SessionRepository.class),
             mock(TaskRepository.class),
             mock(ConceptNodeRepository.class),

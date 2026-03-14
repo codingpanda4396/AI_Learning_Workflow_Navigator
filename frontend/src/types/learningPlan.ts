@@ -58,6 +58,12 @@ export interface PlanPathNode {
   isFocus: boolean;
 }
 
+export interface PlanPriorityNode {
+  nodeId: string;
+  title: string;
+  reason: string;
+}
+
 export interface PlanTaskPreview {
   stage: LearningStage;
   title: string;
@@ -92,6 +98,9 @@ export interface LearningPlanPreview {
   focuses: string[];
   summary: PlanSummary;
   reasons: PlanReason[];
+  whyStartHere: string;
+  keyWeaknesses: string[];
+  priorityNodes: PlanPriorityNode[];
   pathNodes: PlanPathNode[];
   taskPreviews: PlanTaskPreview[];
   adjustments: PlanAdjustments;

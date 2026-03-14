@@ -87,6 +87,20 @@ export interface DiagnosisSubmitPayload {
   answers: DiagnosisAnswer[];
 }
 
+export interface DiagnosisReasoningStep {
+  dimension: string;
+  questionId: string;
+  questionTitle: string;
+  selectedAnswerLabel: string;
+  inferredConclusion: string;
+}
+
+export interface DiagnosisEvidenceSource {
+  label: string;
+  dimension: string;
+  sourceQuestionId: string;
+}
+
 export interface DiagnosisSubmitResponse {
   diagnosisId: string;
   sessionId: string;
@@ -96,6 +110,9 @@ export interface DiagnosisSubmitResponse {
   nextAction?: DiagnosisNextAction;
   fallback: DiagnosisFallback;
   metadata?: DiagnosisMetadata;
+  reasoningSteps: DiagnosisReasoningStep[];
+  strengthSources: DiagnosisEvidenceSource[];
+  weaknessSources: DiagnosisEvidenceSource[];
 }
 
 export interface DiagnosisResultViewModel {

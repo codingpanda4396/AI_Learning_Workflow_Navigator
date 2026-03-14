@@ -70,6 +70,29 @@ export const diagnosisSubmitMock = {
     answerCount: 1,
     profileVersion: 2,
   },
+  reasoningSteps: [
+    {
+      dimension: 'FOUNDATION',
+      questionId: 'foundation',
+      questionTitle: '你在这个主题上的基础如何？',
+      selectedAnswerLabel: '基础',
+      inferredConclusion: '你已有一定基础，但仍需通过阶段训练巩固稳定性。',
+    },
+  ],
+  strengthSources: [
+    {
+      label: '能保持稳定的学习节奏',
+      dimension: 'TIME_BUDGET',
+      sourceQuestionId: 'time_budget',
+    },
+  ],
+  weaknessSources: [
+    {
+      label: '练习前需要概念框架支撑',
+      dimension: 'FOUNDATION',
+      sourceQuestionId: 'foundation',
+    },
+  ],
 } as const;
 
 export const planPreviewRequestMock: LearningPlanRequest = {
@@ -114,6 +137,15 @@ export const planPreviewMock = {
       label: '基础',
       title: '先补齐缺失的前置知识',
       description: '诊断显示用户因缺少概念框架而受阻。',
+    },
+  ],
+  whyStartHere: '系统建议从前置概念簇开始，因为当前薄弱点会影响后续推进。',
+  keyWeaknesses: ['前置概念薄弱', '边界条件处理'],
+  priorityNodes: [
+    {
+      nodeId: 'node-1',
+      title: '前置概念簇',
+      reason: '这是当前最影响后续学习推进的起点。',
     },
   ],
   pathPreview: [

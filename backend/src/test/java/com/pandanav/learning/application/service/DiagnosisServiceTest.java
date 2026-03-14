@@ -73,6 +73,7 @@ class DiagnosisServiceTest {
             new DiagnosisTemplateFactory(new DiagnosisQuestionCopyFactory()),
             new DiagnosisQuestionCopyLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class), new LlmFailureClassifier()),
             new CapabilityProfileBuilder(),
+            new DiagnosisExplanationAssembler(objectMapper),
             new CapabilityProfileSummaryGenerator(),
             new CapabilityProfileSummaryLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class), new LlmFailureClassifier()),
             objectMapper
@@ -233,6 +234,9 @@ class DiagnosisServiceTest {
         assertEquals("STANDARD", response.capabilityProfile().timeBudget().code());
         assertEquals("LLM", response.fallback().contentSource());
         assertTrue(response.insights().planExplanation().contains("training"));
+        assertEquals(5, response.reasoningSteps().size());
+        assertTrue(response.strengthSources().size() >= 1);
+        assertTrue(response.weaknessSources().size() >= 1);
 
         ArgumentCaptor<List<DiagnosisAnswer>> answersCaptor = ArgumentCaptor.forClass(List.class);
         verify(diagnosisAnswerRepository).saveAll(answersCaptor.capture());
@@ -264,6 +268,9 @@ class DiagnosisServiceTest {
         assertTrue(response.fallback().applied());
         assertEquals("RULE_FALLBACK", response.fallback().contentSource());
         assertTrue(response.insights().summary().length() > 0);
+        assertTrue(response.reasoningSteps().size() >= 1);
+        assertTrue(response.strengthSources().size() >= 1);
+        assertTrue(response.weaknessSources().size() >= 1);
     }
 
     @Test

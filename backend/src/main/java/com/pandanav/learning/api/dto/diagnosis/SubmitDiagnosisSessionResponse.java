@@ -18,6 +18,12 @@ public record SubmitDiagnosisSessionResponse(
     @JsonProperty("fallback")
     DiagnosisFallbackDto fallback,
     @JsonProperty("metadata")
-    DiagnosisMetadataDto metadata
+    DiagnosisMetadataDto metadata,
+    @JsonProperty("reasoningSteps")
+    java.util.List<DiagnosisReasoningStepDto> reasoningSteps,
+    @JsonProperty("strengthSources")
+    java.util.List<DiagnosisEvidenceSourceDto> strengthSources,
+    @JsonProperty("weaknessSources")
+    java.util.List<DiagnosisEvidenceSourceDto> weaknessSources
 ) {
 }

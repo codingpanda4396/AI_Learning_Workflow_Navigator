@@ -35,18 +35,21 @@ import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 public class DiagnosisService {
+
+    private static final Logger log = LoggerFactory.getLogger(DiagnosisService.class);
 
     private final SessionRepository sessionRepository;
     private final DiagnosisSessionRepository diagnosisSessionRepository;
@@ -55,6 +58,7 @@ public class DiagnosisService {
     private final DiagnosisTemplateFactory diagnosisTemplateFactory;
     private final DiagnosisQuestionCopyLlmService diagnosisQuestionCopyLlmService;
     private final CapabilityProfileBuilder capabilityProfileBuilder;
+    private final DiagnosisExplanationAssembler diagnosisExplanationAssembler;
     private final CapabilityProfileSummaryGenerator capabilityProfileSummaryGenerator;
     private final CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService;
     private final ObjectMapper objectMapper;
@@ -67,6 +71,7 @@ public class DiagnosisService {
         DiagnosisTemplateFactory diagnosisTemplateFactory,
         DiagnosisQuestionCopyLlmService diagnosisQuestionCopyLlmService,
         CapabilityProfileBuilder capabilityProfileBuilder,
+        DiagnosisExplanationAssembler diagnosisExplanationAssembler,
         CapabilityProfileSummaryGenerator capabilityProfileSummaryGenerator,
         CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService,
         ObjectMapper objectMapper
@@ -78,6 +83,7 @@ public class DiagnosisService {
         this.diagnosisTemplateFactory = diagnosisTemplateFactory;
         this.diagnosisQuestionCopyLlmService = diagnosisQuestionCopyLlmService;
         this.capabilityProfileBuilder = capabilityProfileBuilder;
+        this.diagnosisExplanationAssembler = diagnosisExplanationAssembler;
         this.capabilityProfileSummaryGenerator = capabilityProfileSummaryGenerator;
         this.capabilityProfileSummaryLlmService = capabilityProfileSummaryLlmService;
         this.objectMapper = objectMapper;
@@ -160,6 +166,21 @@ public class DiagnosisService {
 
         CapabilityProfile savedProfile = capabilityProfileRepository.save(profile);
         diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.PROFILED, OffsetDateTime.now());
+        DiagnosisExplanationAssembler.DiagnosisExplanation explanation = diagnosisExplanationAssembler.assemble(
+            questions,
+            answers,
+            draft,
+            answerCodesByDimension
+        );
+
+        log.info(
+            "DiagnosisService: submit completed. diagnosisId={}, sessionId={}, reasoningStepCount={}, strengthSourceCount={}, weaknessSourceCount={}",
+            diagnosisSession.getId(),
+            learningSession.getId(),
+            explanation.reasoningSteps().size(),
+            explanation.strengthSources().size(),
+            explanation.weaknessSources().size()
+        );
 
         return new SubmitDiagnosisSessionResponse(
             diagnosisSession.getId(),
@@ -169,7 +190,10 @@ public class DiagnosisService {
             new DiagnosisInsightsDto(savedProfile.getSummaryText(), savedProfile.getPlanExplanation()),
             buildNextAction(learningSession.getId(), diagnosisSession.getId()),
             fallback(summaryResult.fallbackApplied(), summaryResult.fallbackReasons(), summaryResult.fallbackApplied() ? "RULE_FALLBACK" : "LLM"),
-            new DiagnosisMetadataDto(questions.size(), answers.size(), savedProfile.getVersion())
+            new DiagnosisMetadataDto(questions.size(), answers.size(), savedProfile.getVersion()),
+            explanation.reasoningSteps(),
+            explanation.strengthSources(),
+            explanation.weaknessSources()
         );
     }
 
