@@ -16,9 +16,9 @@ const router = useRouter();
 const diagnosisStore = useDiagnosisStore();
 
 const sessionId = computed(() => String(route.params.sessionId || route.query.sessionId || '').trim());
-const goalText = computed(() => String(route.query.goal || 'No goal was provided for this diagnosis flow.'));
-const courseId = computed(() => String(route.query.course || 'Course not provided'));
-const chapterId = computed(() => String(route.query.chapter || 'Chapter not provided'));
+const goalText = computed(() => String(route.query.goal || '未提供本次诊断的学习目标'));
+const courseId = computed(() => String(route.query.course || '未提供课程'));
+const chapterId = computed(() => String(route.query.chapter || '未提供章节'));
 const questions = computed(() => diagnosisStore.questions);
 const currentQuestion = computed<DiagnosisQuestion | null>(() => questions.value[diagnosisStore.currentQuestionIndex] || null);
 const currentAnswer = computed(() => {
@@ -32,14 +32,14 @@ const isResult = computed(() => Boolean(diagnosisStore.capabilityProfile));
 const isError = computed(() => Boolean(diagnosisStore.error) && !isGenerating.value && !isSubmitting.value && !isResult.value);
 const canRetrySubmit = computed(() => Boolean(questions.value.length) && !isResult.value);
 const currentStep = computed(() => (questions.value.length ? diagnosisStore.currentQuestionIndex + 1 : 0));
-const submitButtonText = computed(() => diagnosisStore.nextAction?.label || 'Open plan preview');
-const statusText = computed(() => diagnosisStore.status || 'GENERATED');
-const sourceText = computed(() => diagnosisStore.fallback?.contentSource?.label || 'Contract response');
+const submitButtonText = computed(() => diagnosisStore.nextAction?.label || '打开学习计划预览');
+const statusText = computed(() => diagnosisStore.status || '已生成');
+const sourceText = computed(() => diagnosisStore.fallback?.contentSource?.label || '合约响应');
 const fallbackText = computed(() => {
   if (!diagnosisStore.fallback?.applied) {
-    return 'No fallback applied';
+    return '未应用兜底';
   }
-  return diagnosisStore.fallback.reasons.join(' / ') || 'Rule fallback applied';
+  return diagnosisStore.fallback.reasons.join(' / ') || '已应用规则兜底';
 });
 
 const isCurrentAnswered = computed(() => {
@@ -129,7 +129,7 @@ async function enterPlanFlow() {
 async function loadDiagnosis() {
   diagnosisStore.reset();
   if (!sessionId.value) {
-    diagnosisStore.error = 'Missing sessionId for diagnosis.';
+    diagnosisStore.error = '缺少诊断所需的会话 ID。';
     return;
   }
   try {
@@ -178,15 +178,15 @@ onMounted(async () => {
       <template v-else-if="currentQuestion">
         <div class="grid gap-3 md:grid-cols-3">
           <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Status</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">状态</p>
             <p class="mt-2 font-medium text-slate-900">{{ statusText }}</p>
           </div>
           <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Source</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">来源</p>
             <p class="mt-2 font-medium text-slate-900">{{ sourceText }}</p>
           </div>
           <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Fallback</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">兜底</p>
             <p class="mt-2 font-medium text-slate-900">{{ fallbackText }}</p>
           </div>
         </div>
@@ -198,7 +198,7 @@ onMounted(async () => {
 
         <div class="flex flex-col gap-3 rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
           <p class="text-sm leading-6 text-slate-600">
-            Answers are submitted with stable option codes. The profile and plan preview now read the flattened contract fields directly.
+            回答将以稳定的选项编码提交。能力画像与计划预览会直接读取合约中的扁平化字段。
           </p>
           <div class="flex flex-wrap gap-3">
             <button
@@ -207,7 +207,7 @@ onMounted(async () => {
               :disabled="diagnosisStore.currentQuestionIndex === 0"
               @click="previousQuestion"
             >
-              Previous
+              上一题
             </button>
             <button
               v-if="diagnosisStore.currentQuestionIndex < questions.length - 1"
@@ -216,7 +216,7 @@ onMounted(async () => {
               :disabled="!isCurrentAnswered"
               @click="nextQuestion"
             >
-              Next
+              下一题
             </button>
             <button
               v-else
@@ -225,14 +225,14 @@ onMounted(async () => {
               :disabled="!isCurrentAnswered || isSubmitting"
               @click="submitDiagnosis"
             >
-              {{ isSubmitting ? 'Submitting diagnosis...' : 'Submit diagnosis' }}
+              {{ isSubmitting ? '提交中...' : '提交诊断' }}
             </button>
           </div>
         </div>
       </template>
 
       <div v-if="isSubmitting" class="rounded-[1.8rem] border border-sky-100 bg-sky-50 p-6 text-sm leading-7 text-sky-700">
-        We are generating the capability profile and next action from the submitted diagnosis.
+        正在根据已提交的诊断生成能力画像和下一步动作。
       </div>
 
       <div v-if="isError" class="flex justify-start">
@@ -241,7 +241,7 @@ onMounted(async () => {
           class="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           @click="retryCurrentAction"
         >
-          {{ canRetrySubmit ? 'Retry submit' : 'Regenerate diagnosis' }}
+          {{ canRetrySubmit ? '重新提交' : '重新生成诊断' }}
         </button>
       </div>
     </div>

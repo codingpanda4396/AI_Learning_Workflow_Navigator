@@ -79,7 +79,7 @@ onMounted(loadCurrentSession);
         <div class="relative space-y-8">
           <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div class="max-w-3xl">
-              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-600">Panda Navigator</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-600">熊猫导航</p>
               <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-950 md:text-5xl">从真实会话入口开始你的学习闭环</h1>
               <p class="mt-4 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
                 首页只保留当前活跃会话和真实开始学习入口，去掉了占位导航与虚假摘要。

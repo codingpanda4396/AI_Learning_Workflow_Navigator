@@ -17,7 +17,7 @@ defineEmits<{
 
 <template>
   <div class="rounded-[2rem] bg-slate-950 p-7 text-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
-    <p class="text-sm font-medium text-slate-300">Recommended next step</p>
+    <p class="text-sm font-medium text-slate-300">推荐下一步</p>
     <h3 class="mt-3 text-2xl font-semibold">{{ title }}</h3>
     <p v-if="reason" class="mt-4 text-sm leading-7 text-slate-300">{{ reason }}</p>
     <div class="mt-8 flex flex-col gap-3">

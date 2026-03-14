@@ -20,14 +20,14 @@ const learningModeOptions: LearningMode[] = ['EXPLAIN_THEN_PRACTICE', 'LEARN_BY_
 
 <template>
   <PageSection
-    eyebrow="Adjustments"
-    title="Tune the preview without editing the plan manually"
-    description="These controls only change the planning intent sent to the backend. They do not hardcode any path on the frontend."
+    eyebrow="调整"
+    title="不手动编辑计划即可微调预览"
+    description="这些控件仅改变发送给后端的规划意图，不会在前端硬编码任何路径。"
     compact
   >
     <div class="grid gap-5 lg:grid-cols-3">
       <div class="rounded-[1.5rem] bg-slate-50 p-4">
-        <p class="text-sm font-semibold text-slate-900">Intensity</p>
+        <p class="text-sm font-semibold text-slate-900">强度</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <button
             v-for="item in intensityOptions"
@@ -44,7 +44,7 @@ const learningModeOptions: LearningMode[] = ['EXPLAIN_THEN_PRACTICE', 'LEARN_BY_
       </div>
 
       <div class="rounded-[1.5rem] bg-slate-50 p-4">
-        <p class="text-sm font-semibold text-slate-900">Learning mode</p>
+        <p class="text-sm font-semibold text-slate-900">学习模式</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <button
             v-for="item in learningModeOptions"
@@ -61,7 +61,7 @@ const learningModeOptions: LearningMode[] = ['EXPLAIN_THEN_PRACTICE', 'LEARN_BY_
       </div>
 
       <div class="rounded-[1.5rem] bg-slate-50 p-4">
-        <p class="text-sm font-semibold text-slate-900">Starting strategy</p>
+        <p class="text-sm font-semibold text-slate-900">起始策略</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
@@ -70,7 +70,7 @@ const learningModeOptions: LearningMode[] = ['EXPLAIN_THEN_PRACTICE', 'LEARN_BY_
             :disabled="disabled"
             @click="model = { ...model, prioritizeFoundation: true }"
           >
-            Prioritize foundation
+            优先打基础
           </button>
           <button
             type="button"
@@ -79,7 +79,7 @@ const learningModeOptions: LearningMode[] = ['EXPLAIN_THEN_PRACTICE', 'LEARN_BY_
             :disabled="disabled"
             @click="model = { ...model, prioritizeFoundation: false }"
           >
-            Move to focus directly
+            直接进入重点
           </button>
         </div>
       </div>
@@ -87,7 +87,7 @@ const learningModeOptions: LearningMode[] = ['EXPLAIN_THEN_PRACTICE', 'LEARN_BY_
 
     <div class="mt-5 flex flex-col gap-3 rounded-[1.6rem] border border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
       <p class="text-sm leading-6 text-slate-600">
-        {{ regenerating ? 'The preview is being regenerated with the latest adjustments.' : 'Use regeneration to verify the preview state and backend reasoning before committing.' }}
+        {{ regenerating ? '正在根据最新调整重新生成预览。' : '确认前可通过重新生成验证预览状态与后端推理。' }}
       </p>
       <button
         type="button"
@@ -95,7 +95,7 @@ const learningModeOptions: LearningMode[] = ['EXPLAIN_THEN_PRACTICE', 'LEARN_BY_
         :disabled="disabled"
         @click="$emit('regenerate')"
       >
-        {{ regenerating ? 'Regenerating...' : 'Regenerate preview' }}
+        {{ regenerating ? '重新生成中...' : '重新生成预览' }}
       </button>
     </div>
   </PageSection>

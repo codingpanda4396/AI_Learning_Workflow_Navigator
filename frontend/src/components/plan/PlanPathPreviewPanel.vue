@@ -9,11 +9,11 @@ const props = defineProps<{
 }>();
 
 function getNodeRole(node: PlanPathNode, index: number) {
-  if (node.isStartingPoint) return 'Recommended start';
-  if (node.isPrerequisite) return 'Prerequisite';
-  if (node.isFocus) return 'Current focus';
-  if (index === props.nodes.length - 1) return 'Later extension';
-  return 'Bridge node';
+  if (node.isStartingPoint) return '推荐起点';
+  if (node.isPrerequisite) return '前置知识';
+  if (node.isFocus) return '当前重点';
+  if (index === props.nodes.length - 1) return '后续扩展';
+  return '衔接节点';
 }
 
 function getNodeName(node: PlanPathNode) {
@@ -23,9 +23,9 @@ function getNodeName(node: PlanPathNode) {
 
 <template>
   <PageSection
-    eyebrow="Path"
-    title="How the previewed learning path is sequenced"
-    description="Node names come from displayName first, then nodeName. Difficulty and mastery chips are driven by the new code-label mapping."
+    eyebrow="路径"
+    title="预览学习路径的编排顺序"
+    description="节点名称优先使用 displayName，其次 nodeName。难度与掌握度由 code-label 映射驱动。"
   >
     <div v-if="props.focuses?.length" class="mb-4 flex flex-wrap gap-2">
       <span v-for="focus in props.focuses" :key="focus" class="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
@@ -48,12 +48,12 @@ function getNodeName(node: PlanPathNode) {
             <span class="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold text-white">
               {{ getNodeRole(node, index) }}
             </span>
-            <span class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Step {{ index + 1 }}</span>
+            <span class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">步骤 {{ index + 1 }}</span>
           </div>
 
           <h3 class="mt-5 text-lg font-semibold tracking-tight text-slate-950">{{ getNodeName(node) }}</h3>
           <p class="mt-3 text-sm leading-6 text-slate-600">
-            {{ node.reasonTags[0] || 'Positioned from the backend path preview reasoning.' }}
+            {{ node.reasonTags[0] || '根据后端路径预览推理定位。' }}
           </p>
 
           <div class="mt-5 flex flex-wrap gap-2">
@@ -64,7 +64,7 @@ function getNodeName(node: PlanPathNode) {
               {{ PATH_DIFFICULTY_LABELS[node.difficulty] }}
             </span>
             <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-              {{ node.estimatedNodeMinutes }} min
+              {{ node.estimatedNodeMinutes }} 分钟
             </span>
           </div>
         </article>

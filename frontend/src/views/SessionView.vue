@@ -20,7 +20,7 @@ const sessionId = computed(() => Number(route.params.sessionId));
 const overview = computed(() => sessionStore.overview);
 const summary = computed(() => overview.value?.summary);
 const simpleTimeline = computed(() =>
-  (overview.value?.timeline ?? []).slice(0, 5).map((item) => `${formatStage(item.stage)} / ${item.status || 'PENDING'}`),
+  (overview.value?.timeline ?? []).slice(0, 5).map((item) => `${formatStage(item.stage)} / ${item.status || '待处理'}`),
 );
 
 async function loadOverview() {

@@ -31,9 +31,9 @@ const context = computed(() => {
   return {
     sessionId: Number.isFinite(sessionId) && sessionId > 0 ? sessionId : undefined,
     diagnosisId,
-    goalText: String(route.query.goal ?? '').trim() || 'Master the current chapter focus',
-    courseName: String(route.query.course ?? '').trim() || 'General Course',
-    chapterName: String(route.query.chapter ?? '').trim() || 'Current Chapter',
+    goalText: String(route.query.goal ?? '').trim() || '掌握当前章节重点',
+    courseName: String(route.query.course ?? '').trim() || '通用课程',
+    chapterName: String(route.query.chapter ?? '').trim() || '当前章节',
   };
 });
 
@@ -41,7 +41,7 @@ const previewStateLabel = computed(() => {
   if (!preview.value) {
     return '';
   }
-  return preview.value.previewOnly ? 'Preview only' : 'Committed';
+  return preview.value.previewOnly ? '仅预览' : '已确认';
 });
 
 const statusSummary = computed(() => {
@@ -69,7 +69,7 @@ const viewState = computed(() => {
 
 async function loadPlan() {
   if (!context.value.diagnosisId || !context.value.goalText) {
-    learningPlanStore.error = 'Missing diagnosisId or goalText for plan preview.';
+    learningPlanStore.error = '缺少学习计划预览所需的 diagnosisId 或 goalText。';
     return;
   }
   try {
@@ -166,9 +166,9 @@ onBeforeUnmount(() => {
         </section>
 
         <PageSection
-          eyebrow="Generating"
-          title="Turning diagnosis into a preview"
-          description="The frontend waits for the unified preview contract and renders preview-only state explicitly."
+          eyebrow="生成中"
+          title="正在将诊断结果转化为预览"
+          description="前端等待统一的预览合约，并明确渲染仅预览状态。"
         >
           <div class="grid gap-4 md:grid-cols-3">
             <div v-for="item in 3" :key="item" class="animate-pulse rounded-[1.7rem] border border-slate-200 bg-white p-5">
@@ -182,14 +182,14 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
-        <ErrorState :message="error || 'Failed to generate the learning plan preview.'" />
+        <ErrorState :message="error || '生成学习计划预览失败。'" />
         <div class="flex justify-start">
           <button
             type="button"
             class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
             @click="loadPlan"
           >
-            Retry preview
+            重试预览
           </button>
         </div>
       </div>
@@ -197,20 +197,20 @@ onBeforeUnmount(() => {
       <template v-else-if="preview">
         <div class="grid gap-3 md:grid-cols-4">
           <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Status</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">状态</p>
             <p class="mt-2 font-medium text-slate-900">{{ statusSummary }}</p>
           </div>
           <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preview id</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">预览 ID</p>
             <p class="mt-2 font-medium text-slate-900">{{ preview.id }}</p>
           </div>
           <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Fallback</p>
-            <p class="mt-2 font-medium text-slate-900">{{ preview.fallbackApplied ? 'Applied' : 'Not applied' }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">兜底</p>
+            <p class="mt-2 font-medium text-slate-900">{{ preview.fallbackApplied ? '已应用' : '未应用' }}</p>
           </div>
           <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Time scope</p>
-            <p class="mt-2 font-medium text-slate-900">{{ preview.metadata?.estimatedTotalMinutesScope || 'Not provided' }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">时间范围</p>
+            <p class="mt-2 font-medium text-slate-900">{{ preview.metadata?.estimatedTotalMinutesScope || '未提供' }}</p>
           </div>
         </div>
 
@@ -230,8 +230,8 @@ onBeforeUnmount(() => {
         >
           {{
             viewState === 'confirming'
-              ? 'Converting the preview into a committed learning session.'
-              : 'Regenerating the preview with updated adjustments.'
+              ? '正在将预览转化为已确认的学习会话。'
+              : '正在根据最新调整重新生成预览。'
           }}
         </div>
 

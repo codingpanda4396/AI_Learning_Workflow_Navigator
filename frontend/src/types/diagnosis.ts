@@ -98,44 +98,44 @@ export interface DiagnosisSubmitResponse {
   metadata?: DiagnosisMetadata;
 }
 
-const DEFAULT_QUESTION_DESCRIPTION = 'Answer based on your real learning situation. This is not a test.';
-const DEFAULT_TEXT_PLACEHOLDER = 'You can briefly describe your current habit, pace, or challenge.';
-const DEFAULT_SUBMIT_HINT = 'Your answers will be used to build the capability profile.';
-const DEFAULT_PROFILE_SUMMARY = 'Your capability profile has been generated from the diagnosis answers.';
-const DEFAULT_PROFILE_PLAN_EXPLANATION = 'The next learning plan will use this profile as an input.';
+const DEFAULT_QUESTION_DESCRIPTION = '请根据你的真实学习情况回答。这不是考试。';
+const DEFAULT_TEXT_PLACEHOLDER = '可简要描述你当前的习惯、节奏或遇到的挑战。';
+const DEFAULT_SUBMIT_HINT = '你的回答将用于生成能力画像。';
+const DEFAULT_PROFILE_SUMMARY = '已根据诊断回答生成你的能力画像。';
+const DEFAULT_PROFILE_PLAN_EXPLANATION = '下一份学习计划将以此画像为输入。';
 
 const diagnosisQuestionCopyByDimension: Record<string, Required<Pick<DiagnosisQuestion, 'sectionLabel' | 'title' | 'description' | 'placeholder' | 'submitHint'>>> = {
   FOUNDATION: {
-    sectionLabel: 'Foundation',
-    title: 'How solid is your current foundation on this topic?',
+    sectionLabel: '基础',
+    title: '你在这个主题上的基础如何？',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,
   },
   EXPERIENCE: {
-    sectionLabel: 'Experience',
-    title: 'What related experience have you had before?',
+    sectionLabel: '经验',
+    title: '你之前有过哪些相关经验？',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,
   },
   GOAL_STYLE: {
-    sectionLabel: 'Goal',
-    title: 'What is your main learning goal this round?',
+    sectionLabel: '目标',
+    title: '本轮你主要的学习目标是什么？',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,
   },
   TIME_BUDGET: {
-    sectionLabel: 'Time',
-    title: 'How much time can you invest each week?',
+    sectionLabel: '时间',
+    title: '你每周能投入多少时间？',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,
   },
   LEARNING_PREFERENCE: {
-    sectionLabel: 'Preference',
-    title: 'Which learning style suits you best?',
+    sectionLabel: '偏好',
+    title: '哪种学习方式更适合你？',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,
@@ -149,8 +149,8 @@ function normalizeDimensionKey(dimension: string) {
 export function resolveDiagnosisQuestionCopy(question: DiagnosisQuestion) {
   const dimensionKey = normalizeDimensionKey(question.dimension);
   const defaultCopy = diagnosisQuestionCopyByDimension[dimensionKey] ?? {
-    sectionLabel: dimensionKey || 'Diagnosis',
-    title: 'Please answer based on your current situation.',
+    sectionLabel: dimensionKey || '诊断',
+    title: '请根据你当前的情况回答。',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,

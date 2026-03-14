@@ -16,7 +16,7 @@ function logout() {
   <header class="fixed inset-x-0 top-0 z-40 border-b border-slate-200/80 bg-white/88 backdrop-blur">
     <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 md:px-6">
       <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Panda Navigator</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">熊猫导航</p>
         <h1 class="text-lg font-semibold text-slate-950">{{ APP_TITLE }}</h1>
       </div>
       <div class="flex items-center gap-4">
