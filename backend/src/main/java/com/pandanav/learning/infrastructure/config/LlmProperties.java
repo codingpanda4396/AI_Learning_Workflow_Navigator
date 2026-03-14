@@ -259,6 +259,7 @@ public class LlmProperties {
             case "PRACTICE_GENERATION" -> practiceGenerationMaxOutputTokens;
             case "CONCEPT_DECOMPOSE" -> conceptDecomposeMaxOutputTokens;
             case "PATH_PLAN" -> pathPlanMaxOutputTokens;
+            case "LEARNING_PLAN_DECISION" -> Math.max(pathPlanMaxOutputTokens, 420);
             case "TUTOR" -> tutorMaxOutputTokens;
             default -> fallbackMaxTokens;
         };
