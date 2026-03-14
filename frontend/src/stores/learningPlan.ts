@@ -87,13 +87,13 @@ export const useLearningPlanStore = defineStore('learningPlan', {
       }
     },
     async confirmPlan() {
-      if (!this.preview?.previewId) {
+      if (!this.preview?.id) {
         throw new Error('Missing preview ID.');
       }
       this.confirming = true;
       this.error = '';
       try {
-        const result = await confirmLearningPlanApi(this.preview.previewId);
+        const result = await confirmLearningPlanApi(this.preview.id);
         return result.sessionId;
       } catch (error) {
         this.error = error instanceof Error ? error.message : 'Failed to confirm the learning plan.';

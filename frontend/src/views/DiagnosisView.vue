@@ -16,9 +16,9 @@ const router = useRouter();
 const diagnosisStore = useDiagnosisStore();
 
 const sessionId = computed(() => String(route.params.sessionId || route.query.sessionId || '').trim());
-const goalText = computed(() => String(route.query.goal || '暂未提供学习目标，请先从首页创建学习任务后再进入诊断。'));
-const courseId = computed(() => String(route.query.course || '未填写课程'));
-const chapterId = computed(() => String(route.query.chapter || '未填写章节'));
+const goalText = computed(() => String(route.query.goal || 'No goal was provided for this diagnosis flow.'));
+const courseId = computed(() => String(route.query.course || 'Course not provided'));
+const chapterId = computed(() => String(route.query.chapter || 'Chapter not provided'));
 const questions = computed(() => diagnosisStore.questions);
 const currentQuestion = computed<DiagnosisQuestion | null>(() => questions.value[diagnosisStore.currentQuestionIndex] || null);
 const currentAnswer = computed(() => {
@@ -32,7 +32,15 @@ const isResult = computed(() => Boolean(diagnosisStore.capabilityProfile));
 const isError = computed(() => Boolean(diagnosisStore.error) && !isGenerating.value && !isSubmitting.value && !isResult.value);
 const canRetrySubmit = computed(() => Boolean(questions.value.length) && !isResult.value);
 const currentStep = computed(() => (questions.value.length ? diagnosisStore.currentQuestionIndex + 1 : 0));
-const submitButtonText = computed(() => diagnosisStore.nextAction?.label || '进入个性化学习路径');
+const submitButtonText = computed(() => diagnosisStore.nextAction?.label || 'Open plan preview');
+const statusText = computed(() => diagnosisStore.status || 'GENERATED');
+const sourceText = computed(() => diagnosisStore.fallback?.contentSource?.label || 'Contract response');
+const fallbackText = computed(() => {
+  if (!diagnosisStore.fallback?.applied) {
+    return 'No fallback applied';
+  }
+  return diagnosisStore.fallback.reasons.join(' / ') || 'Rule fallback applied';
+});
 
 const isCurrentAnswered = computed(() => {
   const question = currentQuestion.value;
@@ -97,18 +105,19 @@ async function retryCurrentAction() {
 
 async function enterPlanFlow() {
   const target = diagnosisStore.nextAction?.target;
-  const targetSessionId = String(target?.params?.sessionId ?? sessionId.value);
+  const targetSessionId = String(target?.params?.sessionId ?? diagnosisStore.sessionId ?? sessionId.value);
   const targetDiagnosisId = String(target?.params?.diagnosisId ?? diagnosisStore.diagnosisId);
   const numericSessionId = Number(targetSessionId);
+
   if (!Number.isFinite(numericSessionId) || numericSessionId <= 0) {
     await router.push('/');
     return;
   }
+
   await router.push({
     path: target?.route || '/plan',
     query: {
       sessionId: numericSessionId,
-      goalId: String(numericSessionId),
       diagnosisId: targetDiagnosisId,
       goal: goalText.value,
       course: courseId.value,
@@ -120,7 +129,7 @@ async function enterPlanFlow() {
 async function loadDiagnosis() {
   diagnosisStore.reset();
   if (!sessionId.value) {
-    diagnosisStore.error = '缺少学习会话信息，请先从首页创建学习目标。';
+    diagnosisStore.error = 'Missing sessionId for diagnosis.';
     return;
   }
   try {
@@ -145,7 +154,15 @@ onMounted(async () => {
       <ErrorState v-else-if="isError" :message="diagnosisStore.error" />
 
       <template v-else-if="isResult && diagnosisStore.capabilityProfile">
-        <CapabilityProfileCard :profile="diagnosisStore.capabilityProfile" :insights="diagnosisStore.insights" />
+        <CapabilityProfileCard
+          :profile="diagnosisStore.capabilityProfile"
+          :insights="diagnosisStore.insights"
+          :next-action="diagnosisStore.nextAction"
+          :status="statusText"
+          :fallback-text="fallbackText"
+          :source-text="sourceText"
+          :metadata="diagnosisStore.metadata"
+        />
 
         <div class="flex justify-end">
           <button
@@ -159,6 +176,21 @@ onMounted(async () => {
       </template>
 
       <template v-else-if="currentQuestion">
+        <div class="grid gap-3 md:grid-cols-3">
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Status</p>
+            <p class="mt-2 font-medium text-slate-900">{{ statusText }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Source</p>
+            <p class="mt-2 font-medium text-slate-900">{{ sourceText }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Fallback</p>
+            <p class="mt-2 font-medium text-slate-900">{{ fallbackText }}</p>
+          </div>
+        </div>
+
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <DiagnosisQuestionCard :question="currentQuestion" :model-value="currentAnswer" @update:model-value="updateAnswer" />
           <DiagnosisProgressCard :current="currentStep" :total="questions.length" />
@@ -166,7 +198,7 @@ onMounted(async () => {
 
         <div class="flex flex-col gap-3 rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
           <p class="text-sm leading-6 text-slate-600">
-            回答完成后，系统会基于真实接口返回的诊断结果生成能力画像，并作为后续学习规划和训练难度的依据。
+            Answers are submitted with stable option codes. The profile and plan preview now read the flattened contract fields directly.
           </p>
           <div class="flex flex-wrap gap-3">
             <button
@@ -175,7 +207,7 @@ onMounted(async () => {
               :disabled="diagnosisStore.currentQuestionIndex === 0"
               @click="previousQuestion"
             >
-              上一题
+              Previous
             </button>
             <button
               v-if="diagnosisStore.currentQuestionIndex < questions.length - 1"
@@ -184,7 +216,7 @@ onMounted(async () => {
               :disabled="!isCurrentAnswered"
               @click="nextQuestion"
             >
-              下一题
+              Next
             </button>
             <button
               v-else
@@ -193,14 +225,14 @@ onMounted(async () => {
               :disabled="!isCurrentAnswered || isSubmitting"
               @click="submitDiagnosis"
             >
-              {{ isSubmitting ? '系统正在分析你的回答...' : '提交诊断' }}
+              {{ isSubmitting ? 'Submitting diagnosis...' : 'Submit diagnosis' }}
             </button>
           </div>
         </div>
       </template>
 
       <div v-if="isSubmitting" class="rounded-[1.8rem] border border-sky-100 bg-sky-50 p-6 text-sm leading-7 text-sky-700">
-        系统正在分析你的回答并生成能力画像，请稍候。
+        We are generating the capability profile and next action from the submitted diagnosis.
       </div>
 
       <div v-if="isError" class="flex justify-start">
@@ -209,7 +241,7 @@ onMounted(async () => {
           class="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           @click="retryCurrentAction"
         >
-          {{ canRetrySubmit ? '重新提交诊断' : '重新生成诊断问卷' }}
+          {{ canRetrySubmit ? 'Retry submit' : 'Regenerate diagnosis' }}
         </button>
       </div>
     </div>

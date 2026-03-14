@@ -17,10 +17,10 @@ defineEmits<{
   <section class="rounded-[2.2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f5f7fb_100%)] p-6 shadow-[0_28px_80px_rgba(15,23,42,0.1)]">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div class="max-w-2xl">
-        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">最终确认</p>
-        <h3 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">确认这次 AI 学习决策</h3>
+        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Confirm</p>
+        <h3 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Create the formal session from this preview</h3>
         <p class="mt-3 text-sm leading-7 text-slate-600">
-          确认后会立即创建本轮学习 session，并按这份安排进入执行链路。你会从推荐起点开始，顺着四阶段流程继续推进。
+          Regeneration keeps you in preview mode. Confirmation switches the flow into a committed plan and opens the session.
         </p>
       </div>
 
@@ -31,7 +31,7 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('diagnosis')"
         >
-          回看诊断依据
+          Back to diagnosis
         </button>
         <button
           type="button"
@@ -39,7 +39,7 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('back')"
         >
-          返回调整目标
+          Back to goal
         </button>
         <button
           type="button"
@@ -47,7 +47,7 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('regenerate')"
         >
-          {{ regenerating ? '重排方案中...' : '重新生成方案' }}
+          {{ regenerating ? 'Regenerating...' : 'Regenerate preview' }}
         </button>
         <button
           type="button"
@@ -55,7 +55,7 @@ defineEmits<{
           :disabled="disabled || regenerating || confirming"
           @click="$emit('confirm')"
         >
-          {{ confirming ? '正在创建学习 session...' : '确认方案，开始学习' }}
+          {{ confirming ? 'Creating session...' : 'Confirm and start' }}
         </button>
       </div>
     </div>

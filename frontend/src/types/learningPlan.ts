@@ -5,7 +5,7 @@ export type LearningIntensity = 'LIGHT' | 'STANDARD' | 'INTENSIVE';
 export type LearningMode = 'EXPLAIN_THEN_PRACTICE' | 'LEARN_BY_DOING';
 export type PathMasteryStatus = 'WEAK' | 'PARTIAL' | 'STABLE' | 'NEW';
 export type PathDifficulty = 'FOUNDATION' | 'CORE' | 'CHALLENGE';
-export type PlanPreviewStatus = 'PREVIEW_READY' | 'COMMITTED';
+export type PlanPreviewStatus = 'PREVIEW_READY' | 'COMMITTED' | 'READY';
 
 export interface PlanAdjustments {
   intensity: LearningIntensity;
@@ -26,6 +26,7 @@ export interface PlanNodeRef {
   id: string;
   nodeKey: string;
   nodeName: string;
+  displayName?: string;
 }
 
 export interface PlanSummary {
@@ -84,10 +85,11 @@ export interface LearningPlanMetadata {
 }
 
 export interface LearningPlanPreview {
-  previewId: number;
-  status: PlanPreviewStatus;
+  id: string;
+  status: CodeLabel;
   previewOnly: boolean;
   committed: boolean;
+  focuses: string[];
   summary: PlanSummary;
   reasons: PlanReason[];
   pathNodes: PlanPathNode[];
@@ -103,7 +105,7 @@ export interface LearningPlanPreview {
 }
 
 export interface PlanConfirmResult {
-  planId?: number;
+  planId?: string;
   sessionId: number;
   currentNodeId?: number;
   firstTaskId?: number;

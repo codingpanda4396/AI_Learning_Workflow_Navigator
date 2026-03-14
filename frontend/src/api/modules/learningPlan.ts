@@ -51,11 +51,11 @@ export async function regenerateLearningPlanApi(payload: LearningPlanRequest): P
   return fetchLearningPlanPreviewApi(payload);
 }
 
-export async function confirmLearningPlanApi(planId: number): Promise<PlanConfirmResult> {
+export async function confirmLearningPlanApi(planId: string): Promise<PlanConfirmResult> {
   const response = await apiClient.post<ApiEnvelope<Record<string, unknown>>>(`/api/learning-plans/${planId}/confirm`);
   const data = unwrapEnvelope<Record<string, unknown>>(response.data);
   return {
-    planId: Number(data.plan_id ?? data.planId ?? 0) || undefined,
+    planId: String(data.plan_id ?? data.planId ?? '') || undefined,
     sessionId: Number(data.session_id ?? data.sessionId ?? 0),
     currentNodeId: Number(data.current_node_id ?? data.currentNodeId ?? 0) || undefined,
     firstTaskId: Number(data.first_task_id ?? data.firstTaskId ?? 0) || undefined,

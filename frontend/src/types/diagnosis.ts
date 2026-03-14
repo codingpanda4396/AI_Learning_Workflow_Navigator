@@ -29,7 +29,7 @@ export interface DiagnosisGeneratePayload {
 export interface DiagnosisFallback {
   applied: boolean;
   reasons: string[];
-  contentSource?: string;
+  contentSource?: CodeLabel;
 }
 
 export interface DiagnosisMetadata {

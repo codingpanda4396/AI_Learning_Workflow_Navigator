@@ -5,23 +5,34 @@ import type { PlanPathNode } from '@/types/learningPlan';
 
 const props = defineProps<{
   nodes: PlanPathNode[];
+  focuses?: string[];
 }>();
 
 function getNodeRole(node: PlanPathNode, index: number) {
-  if (node.isStartingPoint) return '推荐起点';
-  if (node.isPrerequisite) return '关键前置';
-  if (node.isFocus) return '本轮主攻';
-  if (index === props.nodes.length - 1) return '后续延展';
-  return '衔接节点';
+  if (node.isStartingPoint) return 'Recommended start';
+  if (node.isPrerequisite) return 'Prerequisite';
+  if (node.isFocus) return 'Current focus';
+  if (index === props.nodes.length - 1) return 'Later extension';
+  return 'Bridge node';
+}
+
+function getNodeName(node: PlanPathNode) {
+  return node.node.displayName || node.node.nodeName;
 }
 </script>
 
 <template>
   <PageSection
-    eyebrow="推进路径"
-    title="这轮会按什么顺序推进"
-    description="重点不是把所有内容一次展开，而是明确先补哪里、主攻哪里、后面顺着哪里延展。"
+    eyebrow="Path"
+    title="How the previewed learning path is sequenced"
+    description="Node names come from displayName first, then nodeName. Difficulty and mastery chips are driven by the new code-label mapping."
   >
+    <div v-if="props.focuses?.length" class="mb-4 flex flex-wrap gap-2">
+      <span v-for="focus in props.focuses" :key="focus" class="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+        {{ focus }}
+      </span>
+    </div>
+
     <div class="overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_18px_60px_rgba(15,23,42,0.05)] md:p-6">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-stretch">
         <article
@@ -40,10 +51,9 @@ function getNodeRole(node: PlanPathNode, index: number) {
             <span class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Step {{ index + 1 }}</span>
           </div>
 
-          <h3 class="mt-5 text-lg font-semibold tracking-tight text-slate-950">{{ node.node.nodeName }}</h3>
+          <h3 class="mt-5 text-lg font-semibold tracking-tight text-slate-950">{{ getNodeName(node) }}</h3>
           <p class="mt-3 text-sm leading-6 text-slate-600">
-            {{ node.reasonTags[0] || '按当前诊断结果安排的推进节点' }}
-            <span v-if="node.reasonTags[1]"> · {{ node.reasonTags[1] }}</span>
+            {{ node.reasonTags[0] || 'Positioned from the backend path preview reasoning.' }}
           </p>
 
           <div class="mt-5 flex flex-wrap gap-2">
@@ -54,7 +64,7 @@ function getNodeRole(node: PlanPathNode, index: number) {
               {{ PATH_DIFFICULTY_LABELS[node.difficulty] }}
             </span>
             <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-              {{ node.estimatedNodeMinutes }} 分钟
+              {{ node.estimatedNodeMinutes }} min
             </span>
           </div>
         </article>

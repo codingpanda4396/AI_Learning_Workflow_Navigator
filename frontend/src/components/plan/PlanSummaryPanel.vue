@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { INTENSITY_LABELS } from '@/constants/learningPlan';
 import type { LearningPlanPreview } from '@/types/learningPlan';
 
@@ -6,33 +7,33 @@ const props = defineProps<{
   preview: LearningPlanPreview;
 }>();
 
-const metrics = [
+const metrics = computed(() => [
   {
-    label: '本轮起点',
-    value: () => props.preview.summary.recommendedStartNode.nodeName,
-    hint: '从当前最值得优先补齐的位置切入',
+    label: 'Start node',
+    value: props.preview.summary.recommendedStartNode.displayName || props.preview.summary.recommendedStartNode.nodeName,
+    hint: 'This is the best entry point based on the diagnosis and plan reasoning.',
   },
   {
-    label: '推荐节奏',
-    value: () => props.preview.summary.recommendedRhythmLabel || INTENSITY_LABELS[props.preview.summary.recommendedRhythm],
-    hint: '结合当前基础与任务密度给出的建议',
+    label: 'Rhythm',
+    value: props.preview.summary.recommendedRhythmLabel || INTENSITY_LABELS[props.preview.summary.recommendedRhythm],
+    hint: 'Rendered from the new recommended pace code-label contract.',
   },
   {
-    label: '预估总耗时',
-    value: () => `${props.preview.summary.estimatedTotalMinutes} 分钟`,
-    hint: '口径为本次 pathPreview 的总投入时间',
+    label: 'Estimated time',
+    value: `${props.preview.summary.estimatedTotalMinutes} min`,
+    hint: props.preview.metadata?.estimatedTotalMinutesScope || 'Total minutes follow the latest backend scope.',
   },
   {
-    label: '涉及节点',
-    value: () => `${props.preview.summary.estimatedKnowledgeCount} 个`,
-    hint: '本轮真正会推进的知识节点数量',
+    label: 'Knowledge nodes',
+    value: `${props.preview.summary.estimatedKnowledgeCount}`,
+    hint: 'Count of nodes that this preview is expected to cover.',
   },
   {
-    label: '前置补齐数',
-    value: () => `${Math.max(0, props.preview.pathNodes.filter((node) => node.isPrerequisite).length)} 个`,
-    hint: '优先稳住再进入主线推进',
+    label: 'Preview state',
+    value: props.preview.previewOnly ? 'Preview only' : 'Committed',
+    hint: props.preview.status.label,
   },
-];
+]);
 </script>
 
 <template>
@@ -41,13 +42,12 @@ const metrics = [
     <div class="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-cyan-300/14 blur-3xl" />
     <div class="absolute bottom-0 left-0 h-36 w-36 rounded-full bg-amber-300/10 blur-3xl" />
     <div class="relative">
-      <p class="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200/78">AI Learning Decision</p>
+      <p class="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200/78">Plan Preview</p>
       <h1 class="mt-4 max-w-4xl text-3xl font-semibold tracking-tight md:text-5xl">
-        {{ preview.summary.personalizedHeadline }}
+        {{ preview.summary.personalizedHeadline || 'Your learning plan preview is ready' }}
       </h1>
       <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-200/92 md:text-base">
-        基于学习目标、诊断结果和近期薄弱点，这份预览先帮你确定最合理的切入点与推进顺序。
-        {{ preview.summary.personalizedSummary }}
+        {{ preview.summary.personalizedSummary || 'The preview is built from the latest diagnosis profile and planning response.' }}
       </p>
 
       <div class="mt-8 grid gap-3 md:grid-cols-5">
@@ -57,16 +57,17 @@ const metrics = [
           class="rounded-[1.55rem] border border-white/12 bg-white/8 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md"
         >
           <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300/92">{{ item.label }}</p>
-          <p class="mt-3 text-sm font-semibold leading-6 text-white">{{ item.value() }}</p>
+          <p class="mt-3 text-sm font-semibold leading-6 text-white">{{ item.value }}</p>
           <p class="mt-3 text-xs leading-5 text-slate-300/80">{{ item.hint }}</p>
         </div>
       </div>
 
       <div class="mt-6 flex flex-wrap items-center gap-2 text-[11px] text-slate-300/72">
-        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">规划依据</span>
+        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.status.label }}</span>
         <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.context.goalText }}</span>
         <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.context.courseName }} / {{ preview.context.chapterName }}</span>
-        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.status }}</span>
+        <span v-if="preview.planSource" class="rounded-full border border-white/10 bg-white/6 px-3 py-1">Plan source: {{ preview.planSource.label }}</span>
+        <span v-if="preview.contentSource" class="rounded-full border border-white/10 bg-white/6 px-3 py-1">Content source: {{ preview.contentSource.label }}</span>
       </div>
     </div>
   </section>

@@ -9,6 +9,14 @@ import type {
 } from '@/types/feedback';
 import type { QuizQuestion, QuizSnapshot } from '@/types/quiz';
 import type {
+  CapabilityProfile,
+  DiagnosisGenerateResponse,
+  DiagnosisMetadata,
+  DiagnosisNextAction,
+  DiagnosisQuestion,
+  DiagnosisSubmitResponse,
+} from '@/types/diagnosis';
+import type {
   LearningPlanPreview,
   LearningPlanRequest,
   PathDifficulty,
@@ -44,6 +52,122 @@ function readCodeLabel(value: unknown, fallback = ''): CodeLabel {
   return {
     code: readCode(value) || fallback,
     label: readLabel(value, fallback),
+  };
+}
+
+function normalizeDiagnosisFallback(value: unknown) {
+  const row = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const source = row.content_source ?? row.contentSource;
+  return {
+    applied: Boolean(row.applied),
+    reasons: readArray(row.reasons),
+    contentSource: source ? readCodeLabel(source) : undefined,
+  };
+}
+
+function normalizeDiagnosisMetadata(value: unknown): DiagnosisMetadata | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const row = value as Record<string, unknown>;
+  return {
+    questionCount: toNumber(row.question_count ?? row.questionCount),
+    answerCount: toNumber(row.answer_count ?? row.answerCount),
+    profileVersion: toNumber(row.profile_version ?? row.profileVersion),
+  };
+}
+
+function normalizeDiagnosisTarget(value: unknown): DiagnosisNextAction['target'] | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const row = value as Record<string, unknown>;
+  const params = row.params && typeof row.params === 'object' ? (row.params as Record<string, unknown>) : undefined;
+  return {
+    route: String(row.route ?? ''),
+    params: params
+      ? Object.fromEntries(Object.entries(params).map(([key, item]) => [key, typeof item === 'number' ? item : String(item ?? '')]))
+      : undefined,
+  };
+}
+
+function normalizeDiagnosisNextAction(value: unknown): DiagnosisNextAction | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const row = value as Record<string, unknown>;
+  return {
+    code: readCode(row.code),
+    label: readLabel(row.label ?? row.code),
+    target: normalizeDiagnosisTarget(row.target),
+  };
+}
+
+function normalizeDiagnosisQuestion(value: unknown): DiagnosisQuestion {
+  const row = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const rawOptions = Array.isArray(row.options) ? row.options : [];
+  return {
+    questionId: String(row.question_id ?? row.questionId ?? ''),
+    dimension: String(row.dimension ?? ''),
+    type: readCode(row.type) as DiagnosisQuestion['type'],
+    required: Boolean(row.required),
+    options: rawOptions.map((item, index) => {
+      const option = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+      return {
+        code: String(option.code ?? option.value ?? `option-${index + 1}`),
+        label: String(option.label ?? option.code ?? option.value ?? ''),
+        order: toNumber(option.order),
+      };
+    }),
+    title: String(row.title ?? ''),
+    description: String(row.description ?? ''),
+    placeholder: String(row.placeholder ?? ''),
+    submitHint: String(row.submit_hint ?? row.submitHint ?? ''),
+    sectionLabel: String(row.section_label ?? row.sectionLabel ?? ''),
+  };
+}
+
+function normalizeCapabilityProfile(value: unknown): CapabilityProfile {
+  const row = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  return {
+    currentLevel: readCodeLabel(row.current_level ?? row.currentLevel),
+    strengths: readArray(row.strengths),
+    weaknesses: readArray(row.weaknesses),
+    learningPreference: row.learning_preference || row.learningPreference ? readCodeLabel(row.learning_preference ?? row.learningPreference) : undefined,
+    timeBudget: row.time_budget || row.timeBudget ? readCodeLabel(row.time_budget ?? row.timeBudget) : undefined,
+    goalOrientation: row.goal_orientation || row.goalOrientation ? readCodeLabel(row.goal_orientation ?? row.goalOrientation) : undefined,
+  };
+}
+
+export function normalizeDiagnosisGenerateResponse(data: Record<string, unknown>): DiagnosisGenerateResponse {
+  const questions = (Array.isArray(data.questions) ? data.questions : []).map((item) => normalizeDiagnosisQuestion(item));
+  return {
+    diagnosisId: String(data.diagnosis_id ?? data.diagnosisId ?? ''),
+    sessionId: String(data.session_id ?? data.sessionId ?? ''),
+    status: String(data.status ?? 'GENERATED') as DiagnosisGenerateResponse['status'],
+    questions,
+    nextAction: normalizeDiagnosisNextAction(data.next_action ?? data.nextAction),
+    fallback: normalizeDiagnosisFallback(data.fallback),
+    metadata: normalizeDiagnosisMetadata(data.metadata),
+  };
+}
+
+export function normalizeDiagnosisSubmitResponse(data: Record<string, unknown>): DiagnosisSubmitResponse {
+  const insights = data.insights && typeof data.insights === 'object' ? (data.insights as Record<string, unknown>) : undefined;
+  return {
+    diagnosisId: String(data.diagnosis_id ?? data.diagnosisId ?? ''),
+    sessionId: String(data.session_id ?? data.sessionId ?? ''),
+    status: String(data.status ?? 'SUBMITTED') as DiagnosisSubmitResponse['status'],
+    capabilityProfile: normalizeCapabilityProfile(data.capability_profile ?? data.capabilityProfile),
+    insights: insights
+      ? {
+          summary: String(insights.summary ?? ''),
+          planExplanation: String(insights.plan_explanation ?? insights.planExplanation ?? ''),
+        }
+      : undefined,
+    nextAction: normalizeDiagnosisNextAction(data.next_action ?? data.nextAction),
+    fallback: normalizeDiagnosisFallback(data.fallback),
+    metadata: normalizeDiagnosisMetadata(data.metadata),
   };
 }
 
@@ -410,10 +534,11 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     : []) as Record<string, unknown>[];
 
   return {
-    previewId: toNumber(data.preview_id ?? data.previewId ?? data.plan_id ?? data.planId) ?? 0,
-    status: String(data.status ?? 'PREVIEW_READY') as LearningPlanPreview['status'],
+    id: String(data.id ?? data.preview_id ?? data.previewId ?? data.plan_id ?? data.planId ?? ''),
+    status: readCodeLabel(data.status ?? 'PREVIEW_READY', 'PREVIEW_READY'),
     previewOnly: Boolean(data.preview_only ?? data.previewOnly ?? true),
     committed: Boolean(data.committed ?? false),
+    focuses: readArray(data.focuses),
     summary: {
       recommendedStartNode: {
         id: String(
@@ -435,12 +560,20 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
           (summary.recommended_start_node as Record<string, unknown> | undefined)?.node_name
             ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.nodeName
             ?? (summary.recommendedStartNode as Record<string, unknown> | undefined)?.nodeName
+            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.display_name
+            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.displayName
             ?? summary.recommended_start_node_name
             ?? summary.recommendedStartNodeName
             ?? summary.recommended_start
             ?? summary.recommendedStart
             ?? ''
         ),
+        displayName: String(
+          (summary.recommended_start_node as Record<string, unknown> | undefined)?.display_name
+            ?? (summary.recommended_start_node as Record<string, unknown> | undefined)?.displayName
+            ?? (summary.recommendedStartNode as Record<string, unknown> | undefined)?.displayName
+            ?? ''
+        ) || undefined,
       },
       recommendedRhythm: (readCode(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm) || request.adjustments.intensity) as LearningPlanPreview['summary']['recommendedRhythm'],
       recommendedRhythmLabel: readLabel(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm),
@@ -487,11 +620,22 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
           nodeName: String(
             (item.node as Record<string, unknown> | undefined)?.node_name
               ?? (item.node as Record<string, unknown> | undefined)?.nodeName
+              ?? (item.node as Record<string, unknown> | undefined)?.display_name
+              ?? (item.node as Record<string, unknown> | undefined)?.displayName
               ?? item.node_name
               ?? item.nodeName
+              ?? item.display_name
+              ?? item.displayName
               ?? item.name
               ?? ''
           ),
+          displayName: String(
+            (item.node as Record<string, unknown> | undefined)?.display_name
+              ?? (item.node as Record<string, unknown> | undefined)?.displayName
+              ?? item.display_name
+              ?? item.displayName
+              ?? ''
+          ) || undefined,
         },
         masteryStatus: normalizePathMasteryStatus(readCode(item.status ?? item.mastery_status ?? item.masteryStatus), item.mastery),
         difficulty: normalizePathDifficulty(readCode(item.difficulty) || item.difficulty),

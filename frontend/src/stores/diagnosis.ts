@@ -4,19 +4,24 @@ import type {
   CapabilityProfile,
   DiagnosisAnswer,
   DiagnosisAnswerValue,
+  DiagnosisFallback,
   DiagnosisInsights,
+  DiagnosisMetadata,
+  DiagnosisNextAction,
   DiagnosisQuestion,
-  DiagnosisSubmitResponse,
 } from '@/types/diagnosis';
 
 interface DiagnosisState {
   diagnosisId: string;
+  sessionId: string;
   questions: DiagnosisQuestion[];
   currentQuestionIndex: number;
   answers: Record<string, DiagnosisAnswerValue>;
   capabilityProfile: CapabilityProfile | null;
   insights: DiagnosisInsights | null;
-  nextAction: DiagnosisSubmitResponse['nextAction'] | null;
+  nextAction: DiagnosisNextAction | null;
+  fallback: DiagnosisFallback | null;
+  metadata: DiagnosisMetadata | null;
   status: string;
   loading: boolean;
   submitting: boolean;
@@ -26,12 +31,15 @@ interface DiagnosisState {
 export const useDiagnosisStore = defineStore('diagnosis', {
   state: (): DiagnosisState => ({
     diagnosisId: '',
+    sessionId: '',
     questions: [],
     currentQuestionIndex: 0,
     answers: {},
     capabilityProfile: null,
     insights: null,
     nextAction: null,
+    fallback: null,
+    metadata: null,
     status: '',
     loading: false,
     submitting: false,
@@ -44,6 +52,8 @@ export const useDiagnosisStore = defineStore('diagnosis', {
       this.capabilityProfile = null;
       this.insights = null;
       this.nextAction = null;
+      this.fallback = null;
+      this.metadata = null;
       this.status = '';
       this.currentQuestionIndex = 0;
       this.answers = {};
@@ -51,8 +61,11 @@ export const useDiagnosisStore = defineStore('diagnosis', {
       try {
         const response = await generateDiagnosisApi(sessionId);
         this.diagnosisId = response.diagnosisId;
+        this.sessionId = response.sessionId;
         this.questions = response.questions;
         this.nextAction = response.nextAction ?? null;
+        this.fallback = response.fallback;
+        this.metadata = response.metadata ?? null;
         this.status = response.status;
         return response;
       } catch (error) {
@@ -103,6 +116,8 @@ export const useDiagnosisStore = defineStore('diagnosis', {
         this.capabilityProfile = response.capabilityProfile;
         this.insights = response.insights ?? null;
         this.nextAction = response.nextAction ?? null;
+        this.fallback = response.fallback;
+        this.metadata = response.metadata ?? null;
         this.status = response.status;
         return response;
       } catch (error) {
@@ -114,12 +129,15 @@ export const useDiagnosisStore = defineStore('diagnosis', {
     },
     reset() {
       this.diagnosisId = '';
+      this.sessionId = '';
       this.questions = [];
       this.currentQuestionIndex = 0;
       this.answers = {};
       this.capabilityProfile = null;
       this.insights = null;
       this.nextAction = null;
+      this.fallback = null;
+      this.metadata = null;
       this.status = '';
       this.loading = false;
       this.submitting = false;

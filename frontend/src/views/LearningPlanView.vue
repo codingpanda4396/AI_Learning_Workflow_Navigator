@@ -37,6 +37,20 @@ const context = computed(() => {
   };
 });
 
+const previewStateLabel = computed(() => {
+  if (!preview.value) {
+    return '';
+  }
+  return preview.value.previewOnly ? 'Preview only' : 'Committed';
+});
+
+const statusSummary = computed(() => {
+  if (!preview.value) {
+    return '';
+  }
+  return `${preview.value.status.label} / ${previewStateLabel.value}`;
+});
+
 const viewState = computed(() => {
   if (learningPlanStore.loading && !preview.value) {
     return 'loading';
@@ -55,7 +69,7 @@ const viewState = computed(() => {
 
 async function loadPlan() {
   if (!context.value.diagnosisId || !context.value.goalText) {
-    learningPlanStore.error = 'Missing diagnosis or goal parameters for plan preview.';
+    learningPlanStore.error = 'Missing diagnosisId or goalText for plan preview.';
     return;
   }
   try {
@@ -153,8 +167,8 @@ onBeforeUnmount(() => {
 
         <PageSection
           eyebrow="Generating"
-          title="Turning diagnosis results into an actionable learning path"
-          description="The system is combining your goal, weak points, and current foundation to decide where this round should start."
+          title="Turning diagnosis into a preview"
+          description="The frontend waits for the unified preview contract and renders preview-only state explicitly."
         >
           <div class="grid gap-4 md:grid-cols-3">
             <div v-for="item in 3" :key="item" class="animate-pulse rounded-[1.7rem] border border-slate-200 bg-white p-5">
@@ -175,12 +189,35 @@ onBeforeUnmount(() => {
             class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
             @click="loadPlan"
           >
-            Retry Preview
+            Retry preview
           </button>
         </div>
       </div>
 
       <template v-else-if="preview">
+        <div class="grid gap-3 md:grid-cols-4">
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Status</p>
+            <p class="mt-2 font-medium text-slate-900">{{ statusSummary }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preview id</p>
+            <p class="mt-2 font-medium text-slate-900">{{ preview.id }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Fallback</p>
+            <p class="mt-2 font-medium text-slate-900">{{ preview.fallbackApplied ? 'Applied' : 'Not applied' }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Time scope</p>
+            <p class="mt-2 font-medium text-slate-900">{{ preview.metadata?.estimatedTotalMinutesScope || 'Not provided' }}</p>
+          </div>
+        </div>
+
+        <div v-if="preview.fallbackReasons?.length" class="rounded-[1.6rem] border border-amber-100 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-800">
+          {{ preview.fallbackReasons.join(' / ') }}
+        </div>
+
         <div v-if="error" class="rounded-[1.6rem] border border-rose-100 bg-rose-50 px-5 py-4 text-sm leading-7 text-rose-700">
           {{ error }}
         </div>
@@ -193,13 +230,13 @@ onBeforeUnmount(() => {
         >
           {{
             viewState === 'confirming'
-              ? 'Creating a learning session from this preview.'
-              : 'Regenerating the path with your updated adjustments.'
+              ? 'Converting the preview into a committed learning session.'
+              : 'Regenerating the preview with updated adjustments.'
           }}
         </div>
 
         <PlanReasonPanel :reasons="preview.reasons" :diagnosis-summary="preview.context.diagnosisSummary" />
-        <PlanPathPreviewPanel :nodes="preview.pathNodes" />
+        <PlanPathPreviewPanel :nodes="preview.pathNodes" :focuses="preview.focuses" />
         <PlanTaskPreviewPanel
           :tasks="preview.taskPreviews"
           :next-step-note="preview.nextStepNote"
