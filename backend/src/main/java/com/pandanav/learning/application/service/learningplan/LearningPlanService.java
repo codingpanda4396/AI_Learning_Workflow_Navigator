@@ -2,6 +2,7 @@ package com.pandanav.learning.application.service.learningplan;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pandanav.learning.api.contract.ContractCatalog;
 import com.pandanav.learning.api.dto.plan.ConfirmLearningPlanResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsRequest;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
@@ -103,12 +104,12 @@ public class LearningPlanService {
         writeSnapshot(plan, orchestrated.preview(), context);
 
         LearningPlan saved = learningPlanRepository.save(plan);
-        return toResponse(saved.getId(), orchestrated.preview(), orchestrated.planSource(), orchestrated.fallbackApplied(), orchestrated.fallbackReasons());
+        return toResponse(saved.getId(), orchestrated.preview(), context, orchestrated.planSource(), orchestrated.fallbackApplied(), orchestrated.fallbackReasons());
     }
 
     public LearningPlanPreviewResponse get(Long planId, Long userId) {
         LearningPlanAggregate aggregate = load(planId, userId);
-        return toResponse(aggregate.plan().getId(), aggregate.preview(), null, null, null);
+        return toResponse(aggregate.plan().getId(), aggregate.preview(), aggregate.planningContext(), null, null, null);
     }
 
     public ConfirmLearningPlanResponse confirm(ConfirmLearningPlanCommand command) {
@@ -223,6 +224,7 @@ public class LearningPlanService {
     private LearningPlanPreviewResponse toResponse(
         Long planId,
         LearningPlanPreview preview,
+        LearningPlanPlanningContext context,
         PlanSource planSource,
         Boolean fallbackApplied,
         List<String> fallbackReasons
@@ -233,7 +235,7 @@ public class LearningPlanService {
                 preview.summary().headline(),
                 preview.summary().recommendedStartNodeId(),
                 preview.summary().recommendedStartNodeName(),
-                preview.summary().recommendedPace(),
+                ContractCatalog.planIntensity(preview.summary().recommendedPace()),
                 preview.summary().estimatedMinutes(),
                 preview.summary().estimatedNodeCount(),
                 preview.summary().estimatedStageCount()
@@ -243,15 +245,15 @@ public class LearningPlanService {
             preview.pathPreview().stream().map(item -> new PlanPathNodeResponse(
                 item.nodeId(),
                 item.nodeName(),
-                item.difficulty(),
+                ContractCatalog.pathDifficulty(item.difficulty()),
                 item.mastery(),
-                item.status(),
+                ContractCatalog.pathStatus(item.status()),
                 item.isRecommendedStart(),
                 item.estimatedMinutes(),
                 item.reasonTag()
             )).toList(),
             preview.taskPreview().stream().map(item -> new PlanTaskPreviewResponse(
-                item.stage(),
+                ContractCatalog.stage(item.stage()),
                 item.title(),
                 item.goal(),
                 item.learnerAction(),
@@ -259,10 +261,15 @@ public class LearningPlanService {
                 item.estimatedMinutes()
             )).toList(),
             new LearningPlanAdjustmentsRequest(
-                preview.adjustments().intensity(),
-                preview.adjustments().learningMode(),
+                ContractCatalog.planIntensity(preview.adjustments().intensity()),
+                ContractCatalog.planLearningMode(preview.adjustments().learningMode()),
                 preview.adjustments().preferPrerequisite()
             ),
+            context == null ? null : context.goalText(),
+            context == null ? null : context.courseId(),
+            context == null ? null : context.chapterId(),
+            context == null ? null : context.learnerProfileSummary(),
+            "确认后会创建本轮学习会话并从推荐起点开始推进。",
             planSource == null ? null : planSource.name(),
             fallbackApplied,
             fallbackReasons

@@ -33,9 +33,9 @@ const context = computed(() => {
     sessionId: Number.isFinite(sessionId) && sessionId > 0 ? sessionId : undefined,
     goalId,
     diagnosisId,
-    goalText: String(route.query.goal ?? '').trim() || '掌握当前章节的关键内容',
-    courseId: String(route.query.course ?? '').trim() || '通用课程',
-    chapterId: String(route.query.chapter ?? '').trim() || '当前章节',
+    goalText: String(route.query.goal ?? '').trim() || 'Master the current chapter focus',
+    courseName: String(route.query.course ?? '').trim() || 'General Course',
+    chapterName: String(route.query.chapter ?? '').trim() || 'Current Chapter',
   };
 });
 
@@ -57,7 +57,7 @@ const viewState = computed(() => {
 
 async function loadPlan() {
   if (!context.value.goalId || !context.value.diagnosisId) {
-    learningPlanStore.error = '缺少生成学习规划所需的诊断或目标参数';
+    learningPlanStore.error = 'Missing diagnosis or goal parameters for plan preview.';
     return;
   }
   try {
@@ -95,8 +95,8 @@ async function goBackToGoal() {
     path: '/',
     query: {
       goal: context.value.goalText,
-      course: context.value.courseId,
-      chapter: context.value.chapterId,
+      course: context.value.courseName,
+      chapter: context.value.chapterName,
       goalId: context.value.goalId,
       diagnosisId: context.value.diagnosisId,
     },
@@ -109,8 +109,8 @@ async function openDiagnosis() {
       path: `/diagnosis/${context.value.sessionId}`,
       query: {
         goal: context.value.goalText,
-        course: context.value.courseId,
-        chapter: context.value.chapterId,
+        course: context.value.courseName,
+        chapter: context.value.chapterName,
         goalId: context.value.goalId,
         diagnosisId: context.value.diagnosisId,
       },
@@ -156,9 +156,9 @@ onBeforeUnmount(() => {
         </section>
 
         <PageSection
-          eyebrow="AI 正在生成"
-          title="正在把你的诊断结果转成这一轮的行动决策"
-          description="系统会结合目标、薄弱点和当前基础，决定这一轮从哪里开始以及如何推进。"
+          eyebrow="Generating"
+          title="Turning diagnosis results into an actionable learning path"
+          description="The system is combining your goal, weak points, and current foundation to decide where this round should start."
         >
           <div class="grid gap-4 md:grid-cols-3">
             <div v-for="item in 3" :key="item" class="animate-pulse rounded-[1.7rem] border border-slate-200 bg-white p-5">
@@ -172,14 +172,14 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
-        <ErrorState :message="error || '学习规划生成失败，你可以再试一次。'" />
+        <ErrorState :message="error || 'Failed to generate the learning plan preview.'" />
         <div class="flex justify-start">
           <button
             type="button"
             class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
             @click="loadPlan"
           >
-            重新生成本轮方案
+            Retry Preview
           </button>
         </div>
       </div>
@@ -197,8 +197,8 @@ onBeforeUnmount(() => {
         >
           {{
             viewState === 'confirming'
-              ? '系统正在创建本轮学习会话，并把这份决策接入后续执行链路。'
-              : '系统正在根据你的偏好重新组织学习起点、解释依据和任务顺序。'
+              ? 'Creating a learning session from this preview.'
+              : 'Regenerating the path with your updated adjustments.'
           }}
         </div>
 

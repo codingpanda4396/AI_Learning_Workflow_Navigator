@@ -1,3 +1,5 @@
+import type { CodeLabel } from '@/types/common';
+
 export type DiagnosisQuestionType = 'single_choice' | 'multiple_choice' | 'text';
 
 export interface DiagnosisQuestionCopy {
@@ -10,11 +12,11 @@ export interface DiagnosisQuestionCopy {
 
 export interface DiagnosisQuestion {
   questionId: string;
-  dimension: string;
-  type: DiagnosisQuestionType;
+  dimension: CodeLabel;
+  type: CodeLabel;
   title?: string;
   description?: string;
-  options?: string[];
+  options?: CodeLabel[];
   required: boolean;
   placeholder?: string;
   copy?: DiagnosisQuestionCopy;
@@ -28,28 +30,32 @@ export interface DiagnosisGenerateResponse {
   diagnosisId: string;
   sessionId: string;
   questions: DiagnosisQuestion[];
+  fallbackApplied?: boolean;
+  fallbackReasons?: string[];
+  contentSource?: string;
 }
 
 export type DiagnosisAnswerValue = string | string[];
 
 export interface DiagnosisAnswer {
   questionId: string;
-  value: DiagnosisAnswerValue;
+  answerCodes?: string[];
+  answerText?: string;
 }
 
 export interface CapabilityProfile {
-  currentLevel: string;
+  currentLevel: CodeLabel;
   strengths: string[];
   weaknesses: string[];
-  learningPreference?: string;
-  timeBudget?: string;
-  goalOrientation?: string;
+  learningPreference?: CodeLabel;
+  timeBudget?: CodeLabel;
+  goalOrientation?: CodeLabel;
   summary?: string;
   planExplanation?: string;
 }
 
 export interface DiagnosisNextAction {
-  type: string;
+  code: string;
   label: string;
 }
 
@@ -61,39 +67,49 @@ export interface DiagnosisSubmitPayload {
 export interface DiagnosisSubmitResponse {
   capabilityProfile: CapabilityProfile;
   nextAction?: DiagnosisNextAction;
+  fallbackApplied?: boolean;
+  fallbackReasons?: string[];
+  contentSource?: string;
 }
 
-const DEFAULT_QUESTION_DESCRIPTION = '按你现在的真实情况作答即可，这不是考试。';
-const DEFAULT_TEXT_PLACEHOLDER = '你可以结合自己的学习习惯和时间安排简单描述。';
-const DEFAULT_SUBMIT_HINT = '你的回答将帮助系统构建能力画像。';
-const DEFAULT_PROFILE_SUMMARY = '系统已根据你的回答整理出当前能力画像。';
-const DEFAULT_PROFILE_PLAN_EXPLANATION = '后续学习内容会参考这份画像进行安排和调整。';
+const DEFAULT_QUESTION_DESCRIPTION = 'Answer based on your real learning situation. This is not a test.';
+const DEFAULT_TEXT_PLACEHOLDER = 'You can briefly describe your current habit, pace, or challenge.';
+const DEFAULT_SUBMIT_HINT = 'Your answers will be used to build the capability profile.';
+const DEFAULT_PROFILE_SUMMARY = 'Your capability profile has been generated from the diagnosis answers.';
+const DEFAULT_PROFILE_PLAN_EXPLANATION = 'The next learning plan will use this profile as an input.';
 
 const diagnosisQuestionCopyByDimension: Record<string, Required<DiagnosisQuestionCopy>> = {
   FOUNDATION: {
-    sectionLabel: '基础诊断',
-    title: '你觉得自己目前对这部分内容的掌握程度如何？',
+    sectionLabel: 'Foundation',
+    title: 'How solid is your current foundation on this topic?',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,
   },
-  KNOWLEDGE_FOUNDATION: {
-    sectionLabel: '知识基础',
-    title: '你觉得自己目前对这部分内容的掌握程度如何？',
+  EXPERIENCE: {
+    sectionLabel: 'Experience',
+    title: 'What related experience have you had before?',
+    description: DEFAULT_QUESTION_DESCRIPTION,
+    placeholder: DEFAULT_TEXT_PLACEHOLDER,
+    submitHint: DEFAULT_SUBMIT_HINT,
+  },
+  GOAL_STYLE: {
+    sectionLabel: 'Goal',
+    title: 'What is your main learning goal this round?',
+    description: DEFAULT_QUESTION_DESCRIPTION,
+    placeholder: DEFAULT_TEXT_PLACEHOLDER,
+    submitHint: DEFAULT_SUBMIT_HINT,
+  },
+  TIME_BUDGET: {
+    sectionLabel: 'Time',
+    title: 'How much time can you invest each week?',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,
   },
   LEARNING_PREFERENCE: {
-    sectionLabel: '学习偏好',
-    title: '说说你平时更适合什么样的学习方式。',
-    description: '比如喜欢先看总结再做题，还是边学边练。',
-    placeholder: DEFAULT_TEXT_PLACEHOLDER,
-    submitHint: DEFAULT_SUBMIT_HINT,
-  },
-  DIFFICULTY_FOCUS: {
-    sectionLabel: '难点聚焦',
-    title: '你现在最容易卡住的地方有哪些？',
+    sectionLabel: 'Preference',
+    title: 'Which learning style suits you best?',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,
@@ -105,10 +121,10 @@ function normalizeDimensionKey(dimension: string) {
 }
 
 export function resolveDiagnosisQuestionCopy(question: DiagnosisQuestion): Required<DiagnosisQuestionCopy> {
-  const dimensionKey = normalizeDimensionKey(question.dimension);
+  const dimensionKey = normalizeDimensionKey(question.dimension.code);
   const defaultCopy = diagnosisQuestionCopyByDimension[dimensionKey] ?? {
-    sectionLabel: dimensionKey || question.dimension || '诊断',
-    title: '请根据你当前的学习情况回答这个问题。',
+    sectionLabel: dimensionKey || question.dimension.code || 'Diagnosis',
+    title: 'Please answer based on your current situation.',
     description: DEFAULT_QUESTION_DESCRIPTION,
     placeholder: DEFAULT_TEXT_PLACEHOLDER,
     submitHint: DEFAULT_SUBMIT_HINT,

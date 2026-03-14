@@ -1,5 +1,6 @@
 package com.pandanav.learning.application.service;
 
+import com.pandanav.learning.api.contract.ContractCatalog;
 import com.pandanav.learning.api.dto.diagnosis.CapabilityProfileDto;
 import com.pandanav.learning.api.dto.diagnosis.CapabilityProfileResponse;
 import com.pandanav.learning.domain.model.CapabilityProfile;
@@ -49,12 +50,12 @@ public class CapabilityProfileQueryService {
 
     private CapabilityProfileDto toDto(CapabilityProfile profile) {
         return new CapabilityProfileDto(
-            profile.getCurrentLevel().name(),
+            ContractCatalog.capabilityLevel(profile.getCurrentLevel()),
             profile.getStrengths(),
             profile.getWeaknesses(),
-            profile.getLearningPreference(),
-            profile.getTimeBudget(),
-            profile.getGoalOrientation(),
+            ContractCatalog.learningPreference(profile.getLearningPreference()),
+            ContractCatalog.timeBudget(profile.getTimeBudget()),
+            ContractCatalog.goalOrientation(profile.getGoalOrientation()),
             profile.getSummaryText(),
             profile.getPlanExplanation()
         );

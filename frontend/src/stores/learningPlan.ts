@@ -26,8 +26,8 @@ export const useLearningPlanStore = defineStore('learningPlan', {
         goalId: payload.goalId,
         diagnosisId: payload.diagnosisId,
         goalText: payload.goalText,
-        courseId: payload.courseId,
-        chapterId: payload.chapterId,
+        courseName: payload.courseName,
+        chapterName: payload.chapterName,
         adjustments: this.adjustments,
       };
       try {

@@ -70,10 +70,19 @@ export const useDiagnosisStore = defineStore('diagnosis', {
       try {
         const answers: DiagnosisAnswer[] = this.questions
           .filter((question) => this.answers[question.questionId] !== undefined)
-          .map((question) => ({
-            questionId: question.questionId,
-            value: this.answers[question.questionId],
-          }));
+          .map((question) => {
+            const value = this.answers[question.questionId];
+            if (question.type.code === 'TEXT') {
+              return {
+                questionId: question.questionId,
+                answerText: typeof value === 'string' ? value : '',
+              };
+            }
+            return {
+              questionId: question.questionId,
+              answerCodes: Array.isArray(value) ? value : typeof value === 'string' ? [value] : [],
+            };
+          });
 
         const response = await submitDiagnosisApi(this.diagnosisId, answers);
         this.capabilityProfile = response.capabilityProfile;

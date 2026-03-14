@@ -14,7 +14,7 @@ const metrics = [
   },
   {
     label: '推荐推进方式',
-    value: () => INTENSITY_LABELS[props.preview.summary.recommendedRhythm],
+    value: () => props.preview.summary.recommendedRhythmLabel || INTENSITY_LABELS[props.preview.summary.recommendedRhythm],
     hint: '按你当前节奏安排，不硬拉时长',
   },
   {
@@ -65,7 +65,7 @@ const metrics = [
       <div class="mt-6 flex flex-wrap items-center gap-2 text-[11px] text-slate-300/72">
         <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">规划依据</span>
         <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.goalText }}</span>
-        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.courseId }} / {{ preview.chapterId }}</span>
+        <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">{{ preview.courseName }} / {{ preview.chapterName }}</span>
         <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1">诊断薄弱点 + 学习偏好</span>
       </div>
     </div>

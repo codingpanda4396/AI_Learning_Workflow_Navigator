@@ -1,5 +1,6 @@
 package com.pandanav.learning.api.controller;
 
+import com.pandanav.learning.api.dto.ApiEnvelope;
 import com.pandanav.learning.api.dto.ApiErrorResponse;
 import com.pandanav.learning.api.dto.diagnosis.GenerateDiagnosisRequest;
 import com.pandanav.learning.api.dto.diagnosis.GenerateDiagnosisResponse;
@@ -37,8 +38,9 @@ public class DiagnosisController {
             content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     @PostMapping("/generate")
-    public GenerateDiagnosisResponse generate(@Valid @RequestBody GenerateDiagnosisRequest request) {
-        return diagnosisService.generateDiagnosis(request.sessionId(), UserContextHolder.getRequiredUserId());
+    public ApiEnvelope<GenerateDiagnosisResponse> generate(@Valid @RequestBody GenerateDiagnosisRequest request) {
+        GenerateDiagnosisResponse response = diagnosisService.generateDiagnosis(request.sessionId(), UserContextHolder.getRequiredUserId());
+        return ApiEnvelope.ok(response, response.contentSource());
     }
 
     @Operation(summary = "Submit diagnosis answers")
@@ -50,7 +52,8 @@ public class DiagnosisController {
             content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     @PostMapping("/submit")
-    public SubmitDiagnosisResponse submit(@Valid @RequestBody SubmitDiagnosisRequest request) {
-        return diagnosisService.submitDiagnosis(request, UserContextHolder.getRequiredUserId());
+    public ApiEnvelope<SubmitDiagnosisResponse> submit(@Valid @RequestBody SubmitDiagnosisRequest request) {
+        SubmitDiagnosisResponse response = diagnosisService.submitDiagnosis(request, UserContextHolder.getRequiredUserId());
+        return ApiEnvelope.ok(response, response.contentSource());
     }
 }

@@ -1,4 +1,5 @@
 import type { LoginResponse } from '@/types/auth';
+import type { CodeLabel } from '@/types/common';
 import type {
   GrowthDashboard,
   LearningReport,
@@ -25,14 +26,36 @@ function readArray(value: unknown): string[] {
   return [];
 }
 
+function readCode(value: unknown): string {
+  if (value && typeof value === 'object') {
+    return String((value as Record<string, unknown>).code ?? '');
+  }
+  return String(value ?? '');
+}
+
+function readLabel(value: unknown, fallback = ''): string {
+  if (value && typeof value === 'object') {
+    return String((value as Record<string, unknown>).label ?? (value as Record<string, unknown>).code ?? fallback);
+  }
+  return String(value ?? fallback);
+}
+
+function readCodeLabel(value: unknown, fallback = ''): CodeLabel {
+  return {
+    code: readCode(value) || fallback,
+    label: readLabel(value, fallback),
+  };
+}
+
 function normalizePlanAdjustments(value: unknown, defaultAdjustments: PlanAdjustments): PlanAdjustments {
   if (!value || typeof value !== 'object') {
     return defaultAdjustments;
   }
   const row = value as Record<string, unknown>;
-  const rawLearningMode = String(row.learning_mode ?? row.learningMode ?? defaultAdjustments.learningMode);
+  const rawLearningMode = readCode(row.learning_mode ?? row.learningMode) || defaultAdjustments.learningMode;
+  const rawIntensity = readCode(row.intensity) || defaultAdjustments.intensity;
   return {
-    intensity: String(row.intensity ?? defaultAdjustments.intensity) as PlanAdjustments['intensity'],
+    intensity: rawIntensity as PlanAdjustments['intensity'],
     learningMode: normalizeLearningMode(rawLearningMode),
     prioritizeFoundation: Boolean(
       row.prioritize_foundation
@@ -379,12 +402,13 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     planId: toNumber(data.plan_id ?? data.planId) ?? 0,
     summary: {
       recommendedStart: String(summary.recommended_start_node_name ?? summary.recommendedStartNodeName ?? summary.recommended_start ?? summary.recommendedStart ?? ''),
-      recommendedRhythm: String(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm ?? request.adjustments.intensity) as LearningPlanPreview['summary']['recommendedRhythm'],
+      recommendedRhythm: (readCode(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm) || request.adjustments.intensity) as LearningPlanPreview['summary']['recommendedRhythm'],
+      recommendedRhythmLabel: readLabel(summary.recommended_pace ?? summary.recommendedPace ?? summary.recommended_rhythm ?? summary.recommendedRhythm),
       estimatedMinutes: toNumber(summary.estimated_minutes ?? summary.estimatedMinutes) ?? 0,
       estimatedKnowledgeCount: toNumber(summary.estimated_node_count ?? summary.estimatedNodeCount ?? summary.estimated_knowledge_count ?? summary.estimatedKnowledgeCount) ?? 0,
       stageCount: toNumber(summary.estimated_stage_count ?? summary.estimatedStageCount ?? summary.stage_count ?? summary.stageCount) ?? 4,
       personalizedHeadline: String(summary.headline ?? summary.personalized_headline ?? summary.personalizedHeadline ?? ''),
-      personalizedSummary: String(data.learner_profile_summary ?? data.learnerProfileSummary ?? data.diagnosis_summary ?? data.diagnosisSummary ?? ''),
+      personalizedSummary: String(data.learner_profile_summary ?? data.learnerProfileSummary ?? data.diagnosis_summary ?? data.diagnosisSummary ?? data.diagnosisSummary ?? ''),
     },
     reasons: reasons.map((item, index) => ({
       key: String(item.key ?? item.type ?? `reason-${index + 1}`),
@@ -406,8 +430,8 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
       return {
         id: String(item.node_id ?? item.nodeId ?? item.id ?? `path-${index + 1}`),
         name: String(item.node_name ?? item.nodeName ?? item.name ?? ''),
-        masteryStatus: normalizePathMasteryStatus(item.status ?? item.mastery_status ?? item.masteryStatus, item.mastery),
-        difficulty: normalizePathDifficulty(item.difficulty),
+        masteryStatus: normalizePathMasteryStatus(readCode(item.status ?? item.mastery_status ?? item.masteryStatus), item.mastery),
+        difficulty: normalizePathDifficulty(readCode(item.difficulty) || item.difficulty),
         reasonTags,
         estimatedMinutes: toNumber(item.estimated_minutes ?? item.estimatedMinutes) ?? 0,
         isStartingPoint,
@@ -416,7 +440,7 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
       };
     }),
     taskPreviews: taskPreviews.map((item) => ({
-      stage: String(item.stage ?? '') as LearningPlanPreview['taskPreviews'][number]['stage'],
+      stage: readCode(item.stage) as LearningPlanPreview['taskPreviews'][number]['stage'],
       stageGoal: String(item.goal ?? item.stage_goal ?? item.stageGoal ?? ''),
       learnerAction: String(item.learner_action ?? item.learnerAction ?? ''),
       aiSupport: String(item.ai_support ?? item.aiSupport ?? ''),
@@ -424,9 +448,12 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     })),
     adjustments,
     goalText: String(data.goal_text ?? data.goalText ?? request.goalText),
-    courseId: String(data.course_id ?? data.courseId ?? request.courseId),
-    chapterId: String(data.chapter_id ?? data.chapterId ?? request.chapterId),
+    courseName: String(data.course_name ?? data.courseName ?? data.course_id ?? data.courseId ?? request.courseName),
+    chapterName: String(data.chapter_name ?? data.chapterName ?? data.chapter_id ?? data.chapterId ?? request.chapterName),
     diagnosisSummary: String(data.diagnosis_summary ?? data.diagnosisSummary ?? ''),
     nextStepNote: String(data.next_step_note ?? data.nextStepNote ?? ''),
+    planSource: data.plan_source || data.planSource ? readCodeLabel(data.plan_source ?? data.planSource) : undefined,
+    fallbackApplied: Boolean(data.fallback_applied ?? data.fallbackApplied),
+    fallbackReasons: readArray(data.fallback_reasons ?? data.fallbackReasons),
   };
 }

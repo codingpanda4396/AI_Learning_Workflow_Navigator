@@ -1,3 +1,5 @@
+import type { CodeLabel } from '@/types/common';
+
 export type LearningStage = 'STRUCTURE' | 'UNDERSTANDING' | 'TRAINING' | 'REFLECTION';
 
 export type LearningIntensity = 'LIGHT' | 'STANDARD' | 'INTENSIVE';
@@ -19,14 +21,15 @@ export interface LearningPlanRequest {
   goalId: string;
   diagnosisId: string;
   goalText: string;
-  courseId: string;
-  chapterId: string;
+  courseName: string;
+  chapterName: string;
   adjustments: PlanAdjustments;
 }
 
 export interface PlanSummary {
   recommendedStart: string;
   recommendedRhythm: LearningIntensity;
+  recommendedRhythmLabel?: string;
   estimatedMinutes: number;
   estimatedKnowledgeCount: number;
   stageCount: number;
@@ -69,10 +72,13 @@ export interface LearningPlanPreview {
   taskPreviews: PlanTaskPreview[];
   adjustments: PlanAdjustments;
   goalText: string;
-  courseId: string;
-  chapterId: string;
+  courseName: string;
+  chapterName: string;
   diagnosisSummary: string;
   nextStepNote: string;
+  planSource?: CodeLabel;
+  fallbackApplied?: boolean;
+  fallbackReasons?: string[];
 }
 
 export interface PlanConfirmResult {

@@ -165,9 +165,9 @@ public class PlanningContextAssembler {
             return PlanAdjustments.defaults();
         }
         return new PlanAdjustments(
-            request.intensity(),
-            request.learningMode(),
-            request.preferPrerequisite() == null || request.preferPrerequisite()
+            request.intensity() == null ? null : request.intensity().code(),
+            request.learningMode() == null ? null : request.learningMode().code(),
+            request.prioritizeFoundation() == null || request.prioritizeFoundation()
         ).normalized();
     }
 

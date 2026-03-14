@@ -50,36 +50,36 @@ function updateText(value: string) {
     </div>
 
     <div class="mt-6">
-      <div v-if="question.type === 'single_choice'" class="grid gap-3">
+      <div v-if="question.type.code === 'SINGLE_CHOICE'" class="grid gap-3">
         <label
           v-for="option in question.options || []"
-          :key="option"
+          :key="option.code"
           class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 px-4 py-3 transition hover:border-sky-300 hover:bg-sky-50/50"
         >
           <input
             class="mt-1"
             type="radio"
             :name="question.questionId"
-            :checked="modelValue === option"
-            @change="updateSingleChoice(option)"
+            :checked="modelValue === option.code"
+            @change="updateSingleChoice(option.code)"
           />
-          <span class="text-sm leading-6 text-slate-700">{{ option }}</span>
+          <span class="text-sm leading-6 text-slate-700">{{ option.label }}</span>
         </label>
       </div>
 
-      <div v-else-if="question.type === 'multiple_choice'" class="grid gap-3">
+      <div v-else-if="question.type.code === 'MULTIPLE_CHOICE'" class="grid gap-3">
         <label
           v-for="option in question.options || []"
-          :key="option"
+          :key="option.code"
           class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 px-4 py-3 transition hover:border-sky-300 hover:bg-sky-50/50"
         >
           <input
             class="mt-1"
             type="checkbox"
-            :checked="selectedList.includes(option)"
-            @change="updateMultipleChoice(option, ($event.target as HTMLInputElement).checked)"
+            :checked="selectedList.includes(option.code)"
+            @change="updateMultipleChoice(option.code, ($event.target as HTMLInputElement).checked)"
           />
-          <span class="text-sm leading-6 text-slate-700">{{ option }}</span>
+          <span class="text-sm leading-6 text-slate-700">{{ option.label }}</span>
         </label>
       </div>
 

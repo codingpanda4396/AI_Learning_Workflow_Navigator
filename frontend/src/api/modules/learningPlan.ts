@@ -1,5 +1,6 @@
 import apiClient from '@/api/client';
 import { normalizeLearningPlanPreview } from '@/api/normalizers';
+import type { ApiEnvelope } from '@/types/common';
 import type { LearningPlanPreview, LearningPlanRequest, PlanAdjustments, PlanConfirmResult } from '@/types/learningPlan';
 
 function toBackendLearningMode(mode: PlanAdjustments['learningMode']): string {
@@ -16,20 +17,26 @@ function toApiPayload(payload: {
   goalId: string;
   diagnosisId: string;
   goalText: string;
-  courseId: string;
-  chapterId: string;
+  courseName: string;
+  chapterName: string;
   adjustments: PlanAdjustments;
 }) {
   return {
     goalId: payload.goalId,
     diagnosisId: payload.diagnosisId,
     goalText: payload.goalText,
-    courseId: payload.courseId,
-    chapterId: payload.chapterId,
+    courseName: payload.courseName,
+    chapterName: payload.chapterName,
     adjustments: {
-      intensity: payload.adjustments.intensity,
-      learningMode: toBackendLearningMode(payload.adjustments.learningMode),
-      preferPrerequisite: payload.adjustments.prioritizeFoundation,
+      intensity: {
+        code: payload.adjustments.intensity,
+        label: payload.adjustments.intensity,
+      },
+      learningMode: {
+        code: toBackendLearningMode(payload.adjustments.learningMode),
+        label: payload.adjustments.learningMode,
+      },
+      prioritizeFoundation: payload.adjustments.prioritizeFoundation,
     },
   };
 }
@@ -42,7 +49,7 @@ function unwrapEnvelope<T>(payload: unknown): T {
 }
 
 export async function fetchLearningPlanPreviewApi(payload: LearningPlanRequest): Promise<LearningPlanPreview> {
-  const response = await apiClient.post('/api/learning-plans/preview', toApiPayload(payload));
+  const response = await apiClient.post<ApiEnvelope<Record<string, unknown>>>('/api/learning-plans/preview', toApiPayload(payload));
   return normalizeLearningPlanPreview(unwrapEnvelope<Record<string, unknown>>(response.data), payload);
 }
 
@@ -51,7 +58,7 @@ export async function regenerateLearningPlanApi(payload: LearningPlanRequest): P
 }
 
 export async function confirmLearningPlanApi(planId: number): Promise<PlanConfirmResult> {
-  const response = await apiClient.post(`/api/learning-plans/${planId}/confirm`);
+  const response = await apiClient.post<ApiEnvelope<Record<string, unknown>>>(`/api/learning-plans/${planId}/confirm`);
   const data = unwrapEnvelope<Record<string, unknown>>(response.data);
   return {
     planId: Number(data.plan_id ?? data.planId ?? 0) || undefined,

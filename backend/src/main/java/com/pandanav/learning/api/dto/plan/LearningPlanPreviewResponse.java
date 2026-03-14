@@ -13,6 +13,11 @@ public record LearningPlanPreviewResponse(
     List<PlanPathNodeResponse> pathPreview,
     List<PlanTaskPreviewResponse> taskPreview,
     LearningPlanAdjustmentsRequest adjustments,
+    String goalText,
+    String courseName,
+    String chapterName,
+    String diagnosisSummary,
+    String nextStepNote,
     String planSource,
     Boolean fallbackApplied,
     List<String> fallbackReasons

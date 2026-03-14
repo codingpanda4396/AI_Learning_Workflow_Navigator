@@ -1,7 +1,9 @@
 package com.pandanav.learning.api.dto.plan;
 
+import com.pandanav.learning.api.dto.CodeLabelDto;
+
 public record PlanTaskPreviewResponse(
-    String stage,
+    CodeLabelDto stage,
     String title,
     String goal,
     String learnerAction,

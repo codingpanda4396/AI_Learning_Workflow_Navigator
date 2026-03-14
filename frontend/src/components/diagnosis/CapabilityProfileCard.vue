@@ -12,40 +12,40 @@ const profileCopy = computed(() => resolveCapabilityProfileCopy(props.profile));
 
 <template>
   <section class="rounded-[1.9rem] border border-slate-200 bg-white p-6 shadow-sm">
-    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">画像</p>
-    <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">你的能力画像</h2>
+    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">Profile</p>
+    <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Your Capability Snapshot</h2>
     <p class="mt-3 text-sm leading-6 text-slate-600">
       {{ profileCopy.summary }}
     </p>
 
     <div class="mt-6 grid gap-4 md:grid-cols-2">
       <div class="rounded-2xl bg-slate-50 p-4">
-        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">当前水平</p>
-        <p class="mt-2 text-lg font-semibold text-slate-950">{{ profile.currentLevel }}</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current Level</p>
+        <p class="mt-2 text-lg font-semibold text-slate-950">{{ profile.currentLevel.label }}</p>
       </div>
       <div class="rounded-2xl bg-slate-50 p-4">
-        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">学习偏好</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Learning Preference</p>
         <p class="mt-2 text-sm leading-6 text-slate-800">
-          {{ profile.learningPreference || '系统会按清晰、循序渐进的方式为你安排内容。' }}
+          {{ profile.learningPreference?.label || 'The system will organize content in a clear and gradual way.' }}
         </p>
       </div>
       <div class="rounded-2xl bg-slate-50 p-4">
-        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">时间安排</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Time Budget</p>
         <p class="mt-2 text-sm leading-6 text-slate-800">
-          {{ profile.timeBudget || '建议每天安排稳定的学习时间，哪怕不长也没关系。' }}
+          {{ profile.timeBudget?.label || 'A steady weekly rhythm is recommended.' }}
         </p>
       </div>
       <div class="rounded-2xl bg-slate-50 p-4">
-        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">学习方向</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Goal Orientation</p>
         <p class="mt-2 text-sm leading-6 text-slate-800">
-          {{ profile.goalOrientation || '系统会先帮你补齐关键基础，再逐步进入训练。' }}
+          {{ profile.goalOrientation?.label || 'The system will start from the most relevant foundational steps.' }}
         </p>
       </div>
     </div>
 
     <div class="mt-6 grid gap-4 md:grid-cols-2">
       <div>
-        <p class="text-sm font-semibold text-slate-900">你的优势</p>
+        <p class="text-sm font-semibold text-slate-900">Strengths</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <span
             v-for="item in profile.strengths"
@@ -57,7 +57,7 @@ const profileCopy = computed(() => resolveCapabilityProfileCopy(props.profile));
         </div>
       </div>
       <div>
-        <p class="text-sm font-semibold text-slate-900">当前薄弱点</p>
+        <p class="text-sm font-semibold text-slate-900">Weaknesses</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <span
             v-for="item in profile.weaknesses"

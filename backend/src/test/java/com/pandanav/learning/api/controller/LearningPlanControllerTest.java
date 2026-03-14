@@ -1,5 +1,6 @@
 package com.pandanav.learning.api.controller;
 
+import com.pandanav.learning.api.dto.CodeLabelDto;
 import com.pandanav.learning.api.dto.plan.ConfirmLearningPlanResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanAdjustmentsRequest;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
@@ -52,13 +53,20 @@ class LearningPlanControllerTest {
                     {
                       "goalId":"goal-1",
                       "diagnosisId":"diag-1",
-                      "adjustments":{"intensity":"STANDARD","learningMode":"LEARN_THEN_PRACTICE","preferPrerequisite":true}
+                      "courseName":"Data Structures",
+                      "chapterName":"Trees",
+                      "adjustments":{
+                        "intensity":{"code":"STANDARD","label":"Standard"},
+                        "learningMode":{"code":"LEARN_THEN_PRACTICE","label":"Explain then practice"},
+                        "prioritizeFoundation":true
+                      }
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("OK"))
             .andExpect(jsonPath("$.data.planId").value("101"))
             .andExpect(jsonPath("$.data.planSource").value("LLM"))
+            .andExpect(jsonPath("$.metadata.strategy").value("LLM"))
             .andExpect(jsonPath("$.data.summary.recommendedStartNodeName").value("tree basics"));
     }
 
@@ -84,12 +92,17 @@ class LearningPlanControllerTest {
     private LearningPlanPreviewResponse samplePreview() {
         return new LearningPlanPreviewResponse(
             "101",
-            new LearningPlanSummaryResponse("Strengthen basics before advancing", "101", "tree basics", "STANDARD", 36, 2, 4),
+            new LearningPlanSummaryResponse("Strengthen basics before advancing", "101", "tree basics", new CodeLabelDto("STANDARD", "Standard"), 36, 2, 4),
             List.of(new PlanReasonResponse("START_POINT", "Start with the basics", "The learner still needs a stronger prerequisite foundation before moving ahead.")),
             List.of("solidify tree basics", "connect traversal to the basics"),
-            List.of(new PlanPathNodeResponse("101", "tree basics", 1, 40, "LEARNING", true, 18, "prerequisite core")),
-            List.of(new PlanTaskPreviewResponse("STRUCTURE", "t1", "g1", "a1", "s1", 6)),
-            new LearningPlanAdjustmentsRequest("STANDARD", "LEARN_THEN_PRACTICE", true),
+            List.of(new PlanPathNodeResponse("101", "tree basics", new CodeLabelDto("FOUNDATION", "Foundation"), 40, new CodeLabelDto("PARTIAL", "Partial"), true, 18, "prerequisite core")),
+            List.of(new PlanTaskPreviewResponse(new CodeLabelDto("STRUCTURE", "Structure"), "t1", "g1", "a1", "s1", 6)),
+            new LearningPlanAdjustmentsRequest(new CodeLabelDto("STANDARD", "Standard"), new CodeLabelDto("LEARN_THEN_PRACTICE", "Explain then practice"), true),
+            "Strengthen tree traversal basics",
+            "Data Structures",
+            "Trees",
+            "Diagnosis summary",
+            "Next step note",
             "LLM",
             null,
             null

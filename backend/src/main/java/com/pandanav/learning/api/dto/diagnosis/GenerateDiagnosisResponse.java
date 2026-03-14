@@ -16,6 +16,8 @@ public record GenerateDiagnosisResponse(
     @JsonProperty("fallbackApplied")
     Boolean fallbackApplied,
     @JsonProperty("fallbackReasons")
-    List<String> fallbackReasons
+    List<String> fallbackReasons,
+    @JsonProperty("contentSource")
+    String contentSource
 ) {
 }

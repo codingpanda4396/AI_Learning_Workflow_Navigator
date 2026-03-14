@@ -1,22 +1,23 @@
 package com.pandanav.learning.api.dto.diagnosis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.pandanav.learning.api.dto.CodeLabelDto;
 
 import java.util.List;
 
 public record CapabilityProfileDto(
     @JsonProperty("currentLevel")
-    String currentLevel,
+    CodeLabelDto currentLevel,
     @JsonProperty("strengths")
     List<String> strengths,
     @JsonProperty("weaknesses")
     List<String> weaknesses,
     @JsonProperty("learningPreference")
-    String learningPreference,
+    CodeLabelDto learningPreference,
     @JsonProperty("timeBudget")
-    String timeBudget,
+    CodeLabelDto timeBudget,
     @JsonProperty("goalOrientation")
-    String goalOrientation,
+    CodeLabelDto goalOrientation,
     @JsonProperty("summary")
     String summary,
     @JsonProperty("planExplanation")

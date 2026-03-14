@@ -31,15 +31,16 @@ public class LearningPlanController {
 
     @PostMapping("/preview")
     public ApiEnvelope<LearningPlanPreviewResponse> preview(@Valid @RequestBody PreviewLearningPlanRequest request) {
-        return ApiEnvelope.ok(learningPlanService.preview(new PreviewLearningPlanCommand(
+        LearningPlanPreviewResponse response = learningPlanService.preview(new PreviewLearningPlanCommand(
             UserContextHolder.getRequiredUserId(),
             request.goalId(),
             request.diagnosisId(),
-            request.courseId(),
-            request.chapterId(),
+            request.courseName(),
+            request.chapterName(),
             request.goalText(),
             request.adjustments()
-        )));
+        ));
+        return ApiEnvelope.ok(response, response.planSource());
     }
 
     @PostMapping("/{planId}/confirm")
