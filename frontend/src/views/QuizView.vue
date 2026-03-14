@@ -2,11 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
-import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import LoadingState from '@/components/common/LoadingState.vue';
-import PageSection from '@/components/common/PageSection.vue';
 import QuizQuestionCard from '@/components/common/QuizQuestionCard.vue';
+import AppButton from '@/components/ui/AppButton.vue';
+import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
+import InfoHint from '@/components/ui/InfoHint.vue';
+import StepProgress from '@/components/ui/StepProgress.vue';
 import { useQuizStore } from '@/stores/quiz';
 
 const route = useRoute();
@@ -19,23 +21,28 @@ let timer: number | undefined;
 const statusText = computed(() => {
   switch (quizStore.status) {
     case 'generating':
-      return '正在生成本轮练习题。';
+      return '正在生成这一轮练习题。';
     case 'submitting':
       return '正在提交答案并生成反馈。';
     case 'answering':
-      return '你可以继续完成尚未作答的题目。';
+      return '先独立作答，做完再看反馈。';
     case 'reviewing':
-      return '本轮已经进入复盘阶段。';
+      return '这一轮已经进入复盘阶段。';
     case 'report-ready':
-      return '反馈报告已生成。';
+      return '反馈已经准备好了。';
     case 'next-round':
-      return '系统已进入下一轮建议状态。';
+      return '系统已经进入下一轮建议状态。';
     case 'failed':
-      return '当前练习暂不可用，请稍后重试。';
+      return '当前练习暂时不可用，请稍后重试。';
     default:
       return '';
   }
 });
+
+const questionCount = computed(() => quizStore.quiz?.questions.length ?? 0);
+const answeredCount = computed(() =>
+  Object.values(answers).filter((item) => String(item || '').trim().length > 0).length,
+);
 
 function stopPolling() {
   if (timer) {
@@ -106,20 +113,22 @@ onBeforeUnmount(() => {
 
 <template>
   <AppShell>
-    <div class="space-y-6 pb-26">
-      <PageSection
-        eyebrow="在线练习"
-        title="完成练习后，系统会生成本轮反馈"
-        description="先独立作答，再根据反馈确认自己已经掌握了什么、还需要继续巩固什么。"
-      >
-        <div v-if="statusText" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          {{ statusText }}
-        </div>
-      </PageSection>
+    <div class="space-y-6 pb-28">
+      <section class="app-hero">
+        <p class="app-eyebrow">学习检测</p>
+        <h1 class="app-title-lg mt-4">先专注答题，反馈会在提交后自动生成</h1>
+        <p class="app-text-lead mt-4 max-w-2xl">
+          不需要同时处理太多信息。先做题，系统再告诉你这轮学会了什么、下一步该怎么走。
+        </p>
+      </section>
+
+      <StepProgress v-if="questionCount" :current="answeredCount" :total="questionCount" label="已完成题数" />
+      <InfoHint v-if="statusText">{{ statusText }}</InfoHint>
 
       <LoadingState v-if="quizStore.loading && !quizStore.quiz" />
       <ErrorState v-else-if="quizStore.error && !quizStore.quiz" :message="quizStore.error" />
-      <section v-else-if="quizStore.quiz?.questions.length" class="space-y-5">
+
+      <section v-else-if="quizStore.quiz?.questions.length" class="app-stack-md">
         <QuizQuestionCard
           v-for="(question, index) in quizStore.quiz.questions"
           :key="question.questionId"
@@ -128,34 +137,35 @@ onBeforeUnmount(() => {
           :question="question"
         />
       </section>
-      <EmptyState
-        v-else
-        title="练习题还没有准备好"
-        description="点击下方按钮开始生成题目。生成完成后，页面会自动切换到答题状态。"
-      >
-        <button class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" :disabled="quizStore.loading" @click="generate">
-          开始生成题目
-        </button>
-      </EmptyState>
 
-      <div class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur">
-        <div class="mx-auto flex max-w-6xl justify-end px-5 py-4 md:px-6">
-          <button
+      <EmptyStatePanel
+        v-else
+        title="这一轮练习还没准备好"
+        description="点击下方按钮开始生成题目，题目就绪后会自动进入答题状态。"
+      >
+        <AppButton size="lg" :loading="quizStore.loading" @click="generate">开始生成题目</AppButton>
+      </EmptyStatePanel>
+
+      <div class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/88 backdrop-blur-xl">
+        <div class="mx-auto flex max-w-[1120px] justify-end px-4 py-4 md:px-0">
+          <AppButton
             v-if="quizStore.quiz?.questions.length"
-            class="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            size="lg"
             :disabled="quizStore.submitting"
+            :loading="quizStore.submitting"
             @click="submit"
           >
-            提交答案
-          </button>
-          <button
+            提交这轮答案
+          </AppButton>
+          <AppButton
             v-else
-            class="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+            size="lg"
             :disabled="quizStore.loading || quizStore.status === 'generating'"
+            :loading="quizStore.status === 'generating'"
             @click="generate"
           >
-            {{ quizStore.status === 'generating' ? '正在生成题目' : '开始生成题目' }}
-          </button>
+            开始生成题目
+          </AppButton>
         </div>
       </div>
     </div>

@@ -8,6 +8,7 @@ import LoadingState from '@/components/common/LoadingState.vue';
 import DiagnosisFooter from '@/components/diagnosis/DiagnosisFooter.vue';
 import ProgressIndicator from '@/components/diagnosis/ProgressIndicator.vue';
 import QuestionCard from '@/components/diagnosis/QuestionCard.vue';
+import InfoHint from '@/components/ui/InfoHint.vue';
 import { useDiagnosisStore } from '@/stores/diagnosis';
 import type { DiagnosisAnswer, DiagnosisAnswerValue, DiagnosisNextAction, DiagnosisQuestion } from '@/types/diagnosis';
 
@@ -111,7 +112,7 @@ function buildSubmitAnswers(): DiagnosisAnswer[] {
 
 async function submitCurrentAnswers() {
   if (!diagnosisId.value) {
-    error.value = '诊断会话缺失，请刷新后重试。';
+    error.value = '诊断会话缺失，请刷新后再试。';
     return;
   }
 
@@ -148,7 +149,7 @@ async function loadDiagnosis() {
   error.value = '';
 
   if (!sessionId.value) {
-    error.value = '缺少生成能力诊断所需的会话记录。';
+    error.value = '缺少生成能力诊断所需的会话信息。';
     return;
   }
 
@@ -162,7 +163,7 @@ async function loadDiagnosis() {
     diagnosisStore.setCurrentIndex(0);
     syncCurrentQuestion();
     if (!questions.value.length) {
-      error.value = '暂无可用诊断题目，请稍后重试。';
+      error.value = '暂时没有可用的诊断题目，请稍后重试。';
     }
   } catch (loadError) {
     error.value = loadError instanceof Error ? loadError.message : '题目加载失败，请稍后重试。';
@@ -171,44 +172,36 @@ async function loadDiagnosis() {
   }
 }
 
-onMounted(async () => {
-  await loadDiagnosis();
-});
+onMounted(loadDiagnosis);
 </script>
 
 <template>
   <AppShell>
-    <div class="mx-auto max-w-2xl pb-10">
-      <header class="mb-10 text-center">
-        <h1 class="text-3xl font-semibold tracking-tight text-slate-950">AI能力诊断</h1>
-        <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">
-          回答几个简单问题，<br />
-          AI会判断你的学习起点并生成学习计划。
+    <div class="mx-auto max-w-[860px] space-y-6 pb-10">
+      <section class="app-hero">
+        <p class="app-eyebrow">能力诊断</p>
+        <h1 class="app-title-lg mt-4">先回答几个问题，系统会帮你找准起点</h1>
+        <p class="app-text-lead mt-4 max-w-2xl">
+          这一步只为了知道你现在更适合从哪里开始，不是考试。回答越真实，后面的学习规划越顺手。
         </p>
-      </header>
+      </section>
 
       <LoadingState v-if="loading" />
 
       <template v-else-if="!error && currentQuestion">
-        <main class="space-y-6">
-          <ProgressIndicator :current="currentStep" :total="totalQuestions" />
-          <QuestionCard :question="currentQuestion" :model-value="currentAnswer" @update:model-value="updateAnswer" />
-        </main>
-
+        <ProgressIndicator :current="currentStep" :total="totalQuestions" />
+        <QuestionCard :question="currentQuestion" :model-value="currentAnswer" @update:model-value="updateAnswer" />
+        <InfoHint>
+          {{ isLastQuestion ? '答完这题就会生成学习规划。' : '先专注当前这一题，完成后再进入下一题。' }}
+        </InfoHint>
         <DiagnosisFooter :disabled="buttonDisabled" :loading="submitting" @continue="handleContinue" />
       </template>
 
       <div v-else class="space-y-4">
         <ErrorState :message="error || '页面加载失败，请稍后重试。'" />
-        <div class="flex justify-center">
-          <button
-            type="button"
-            class="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            @click="loadDiagnosis"
-          >
-            重新加载
-          </button>
-        </div>
+        <button class="app-btn app-btn-secondary app-btn-md" type="button" @click="loadDiagnosis">
+          重新加载
+        </button>
       </div>
     </div>
   </AppShell>

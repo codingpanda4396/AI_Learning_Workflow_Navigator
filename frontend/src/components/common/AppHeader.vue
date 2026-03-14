@@ -13,21 +13,23 @@ function logout() {
 </script>
 
 <template>
-  <header class="fixed inset-x-0 top-0 z-40 border-b border-slate-200/80 bg-white/88 backdrop-blur">
-    <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 md:px-6">
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">熊猫导航</p>
-        <h1 class="text-lg font-semibold text-slate-950">{{ APP_TITLE }}</h1>
-      </div>
+  <header class="fixed inset-x-0 top-0 z-40 border-b border-slate-200/70 bg-white/78 backdrop-blur-xl">
+    <div class="mx-auto flex max-w-[1120px] items-center justify-between px-4 py-4 md:px-0">
       <div class="flex items-center gap-4">
-        <div class="text-right">
-          <p class="text-sm font-medium text-slate-800">{{ authStore.username || '已登录用户' }}</p>
-          <p class="text-xs text-slate-500">顺着当前学习闭环继续前进</p>
+        <div class="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200/80 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+          <span class="text-sm font-semibold tracking-[0.12em] text-slate-700">AI</span>
         </div>
-        <button
-          class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-          @click="logout"
-        >
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Learning Navigator</p>
+          <h1 class="text-lg font-semibold tracking-[-0.02em] text-slate-950">{{ APP_TITLE }}</h1>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="hidden text-right md:block">
+          <p class="text-sm font-medium text-slate-800">{{ authStore.username || '已登录用户' }}</p>
+          <p class="text-xs text-slate-500">按当前主线继续往前走</p>
+        </div>
+        <button class="app-btn app-btn-secondary app-btn-sm" @click="logout">
           退出登录
         </button>
       </div>

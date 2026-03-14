@@ -38,16 +38,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#f7f8fa] text-slate-900">
+  <div class="min-h-screen text-slate-900">
+    <div class="pointer-events-none fixed inset-x-0 top-0 z-0 h-80 bg-[radial-gradient(circle_at_top,rgba(150,190,214,0.16),transparent_55%)]" />
     <AppHeader v-if="showHeader" />
-    <main :class="showHeader ? 'pt-20' : ''">
+    <main class="relative z-10" :class="showHeader ? 'pt-22' : ''">
       <router-view />
     </main>
     <transition name="fade">
       <div
         v-if="message"
-        class="fixed right-6 top-6 z-50 max-w-sm rounded-2xl px-4 py-3 text-sm shadow-lg"
-        :class="message.type === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'"
+        class="fixed right-6 top-6 z-50 max-w-sm rounded-[18px] border px-4 py-3 text-sm shadow-[0_18px_48px_rgba(15,23,42,0.18)] backdrop-blur"
+        :class="message.type === 'error' ? 'border-rose-200 bg-rose-50/95 text-rose-700' : 'border-slate-200 bg-white/95 text-slate-800'"
       >
         {{ message.text }}
       </div>

@@ -20,22 +20,23 @@ function update(value: string) {
 </script>
 
 <template>
-  <div class="rounded-[1.8rem] border border-slate-200 bg-white p-6 shadow-sm md:p-7">
-    <div class="flex items-start justify-between gap-4">
+  <section class="app-card app-card-padding app-card-strong">
+    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">问题 {{ index + 1 }}</p>
-        <h3 class="mt-3 text-lg font-semibold leading-8 text-slate-950">{{ question.stem }}</h3>
+        <p class="app-eyebrow">练习 {{ index + 1 }}</p>
+        <h3 class="mt-2 text-[24px] font-semibold leading-8 tracking-[-0.03em] text-slate-950">{{ question.stem }}</h3>
       </div>
-      <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-        {{ question.type || '自动题型' }}
-      </span>
+      <span class="app-badge">{{ question.type || '自动题型' }}</span>
     </div>
 
-    <div v-if="(normalizedType === 'SINGLE_CHOICE' || normalizedType === 'CHOICE' || normalizedType === 'TRUE_FALSE') && question.options.length" class="mt-5 space-y-3">
+    <div
+      v-if="(normalizedType === 'SINGLE_CHOICE' || normalizedType === 'CHOICE' || normalizedType === 'TRUE_FALSE') && question.options.length"
+      class="mt-5 grid gap-3"
+    >
       <label
         v-for="option in question.options"
         :key="option"
-        class="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 px-4 py-4 text-sm transition hover:border-slate-400 hover:bg-slate-50"
+        :class="['app-option flex cursor-pointer items-center gap-3', modelValue === option ? 'app-option-selected' : '']"
       >
         <input
           class="h-4 w-4"
@@ -44,16 +45,16 @@ function update(value: string) {
           :checked="modelValue === option"
           @change="update(option)"
         />
-        <span>{{ option }}</span>
+        <span class="text-sm leading-7 text-slate-700">{{ option }}</span>
       </label>
     </div>
 
     <textarea
       v-else
-      class="mt-5 min-h-36 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 outline-none transition focus:border-slate-400"
-      :placeholder="question.evaluationFocus || '请输入你的答案'"
+      class="app-textarea mt-5"
+      :placeholder="question.evaluationFocus || '先写下你的答案'"
       :value="modelValue"
       @input="update(($event.target as HTMLTextAreaElement).value)"
     />
-  </div>
+  </section>
 </template>

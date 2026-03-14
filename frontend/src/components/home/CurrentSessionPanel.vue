@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import AppButton from '@/components/ui/AppButton.vue';
 import type { ActiveSession } from '@/types/home';
 
 defineProps<{
@@ -17,53 +18,41 @@ function continueLearning(session: ActiveSession | null) {
 </script>
 
 <template>
-  <section class="overflow-hidden rounded-[2rem] bg-white shadow-[0_22px_60px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70">
-    <div class="bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_60%,#0f172a_100%)] px-6 py-6 text-white md:px-7">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">当前会话</p>
-          <h2 class="mt-3 text-2xl font-semibold tracking-tight">真实会话入口</h2>
-          <p class="mt-2 text-sm leading-6 text-slate-300">这里只展示当前活跃会话，不再保留占位卡片或虚假快捷入口。</p>
-        </div>
-        <div class="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-medium text-emerald-200">
-          {{ session ? '进行中' : '空闲中' }}
-        </div>
+  <section class="app-card app-card-padding app-card-strong">
+    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div class="max-w-2xl">
+        <p class="app-eyebrow">当前学习</p>
+        <h2 class="mt-2 text-[28px] font-semibold tracking-[-0.035em] text-slate-950">
+          {{ session ? '继续你刚才的学习主线' : '现在还没有进行中的会话' }}
+        </h2>
+        <p class="mt-3 text-sm leading-7 text-slate-600">
+          {{ session ? '不用重新找入口，直接回到当前该做的那一步。' : '先在上方输入目标，系统会帮你开好第一条学习路径。' }}
+        </p>
+      </div>
+      <span class="app-pill">{{ session ? '进行中' : '待开始' }}</span>
+    </div>
+
+    <div v-if="session" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div class="app-stat">
+        <p class="app-stat-label">学习目标</p>
+        <p class="mt-2 text-sm font-semibold leading-6 text-slate-900">{{ session.goal || '未填写' }}</p>
+      </div>
+      <div class="app-stat">
+        <p class="app-stat-label">课程</p>
+        <p class="mt-2 text-sm font-semibold leading-6 text-slate-900">{{ session.course || '未填写' }}</p>
+      </div>
+      <div class="app-stat">
+        <p class="app-stat-label">章节</p>
+        <p class="mt-2 text-sm font-semibold leading-6 text-slate-900">{{ session.chapter || '未填写' }}</p>
+      </div>
+      <div class="app-stat">
+        <p class="app-stat-label">当前状态</p>
+        <p class="mt-2 text-sm font-semibold leading-6 text-slate-900">{{ session.phase || '待开始' }}</p>
       </div>
     </div>
 
-    <div v-if="session" class="space-y-5 p-6 md:p-7">
-      <dl class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-[1.5rem] bg-slate-50 px-4 py-4">
-          <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">目标</dt>
-          <dd class="mt-2 text-sm font-semibold text-slate-900">{{ session.goal || '暂无' }}</dd>
-        </div>
-        <div class="rounded-[1.5rem] bg-slate-50 px-4 py-4">
-          <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">课程</dt>
-          <dd class="mt-2 text-sm font-semibold text-slate-900">{{ session.course || '暂无' }}</dd>
-        </div>
-        <div class="rounded-[1.5rem] bg-slate-50 px-4 py-4">
-          <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">章节</dt>
-          <dd class="mt-2 text-sm font-semibold text-slate-900">{{ session.chapter || '暂无' }}</dd>
-        </div>
-        <div class="rounded-[1.5rem] bg-slate-50 px-4 py-4">
-          <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">状态</dt>
-          <dd class="mt-2 text-sm font-semibold text-slate-900">{{ session.phase || '暂无' }}</dd>
-        </div>
-      </dl>
-
-      <div class="flex flex-wrap gap-3">
-        <button
-          type="button"
-          class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-          @click="continueLearning(session)"
-        >
-          打开会话
-        </button>
-      </div>
-    </div>
-
-    <div v-else class="m-6 rounded-[1.6rem] bg-slate-50 px-5 py-10 text-center text-sm text-slate-500 md:m-7">
-      当前没有活跃会话，请从上方入口开始新的学习会话。
+    <div class="mt-6">
+      <AppButton v-if="session" size="lg" @click="continueLearning(session)">继续下一步</AppButton>
     </div>
   </section>
 </template>

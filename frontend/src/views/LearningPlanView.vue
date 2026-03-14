@@ -3,6 +3,11 @@ import { computed, onBeforeUnmount, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
+import AppButton from '@/components/ui/AppButton.vue';
+import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
+import InfoHint from '@/components/ui/InfoHint.vue';
+import SectionCard from '@/components/ui/SectionCard.vue';
+import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { useLearningPlanStore } from '@/stores/learningPlan';
 
@@ -33,76 +38,40 @@ const viewState = computed(() => {
 });
 
 const nextTask = computed(() => preview.value?.taskPreviews[0]);
-
+const taskTitle = computed(() => nextTask.value?.title?.trim() || preview.value?.nextStepNote?.trim() || '从推荐起点开始');
 const actionBenefits = computed(() =>
   [nextTask.value?.learningGoal, nextTask.value?.learnerAction, nextTask.value?.aiSupport]
     .map((item) => item?.trim())
     .filter((item): item is string => Boolean(item))
     .slice(0, 3),
 );
-
-const taskTitle = computed(() => nextTask.value?.title?.trim() || preview.value?.nextStepNote?.trim() || '从推荐起点开始学习');
-
 const estimatedTime = computed(() => {
   const minutes = nextTask.value?.estimatedTaskMinutes ?? 0;
-  if (!minutes) return '15 分钟';
+  if (!minutes) return '约 15 分钟';
   if (minutes >= 60) {
     const hours = Math.floor(minutes / 60);
     const rest = minutes % 60;
-    return rest ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
+    return rest ? `约 ${hours} 小时 ${rest} 分钟` : `约 ${hours} 小时`;
   }
-  return `${minutes} 分钟`;
+  return `约 ${minutes} 分钟`;
 });
-
 const stagePath = [
-  { key: 'STRUCTURE', label: '基础框架' },
-  { key: 'UNDERSTANDING', label: '算法原理' },
-  { key: 'TRAINING', label: '算法实现' },
-  { key: 'REFLECTION', label: '进阶应用' },
+  { key: 'STRUCTURE', label: '基础结构' },
+  { key: 'UNDERSTANDING', label: '理解原理' },
+  { key: 'TRAINING', label: '练习强化' },
+  { key: 'REFLECTION', label: '复盘巩固' },
 ];
-
 const currentPathIndex = computed(() => {
   const stage = nextTask.value?.stage;
   const index = stagePath.findIndex((item) => item.key === stage);
   return index >= 0 ? index : 0;
 });
-
-const fallbackBannerText = computed(() => {
-  if (!preview.value?.fallbackApplied) {
-    return '';
-  }
-  return '部分规划说明已切换为精简展示，但不会影响当前学习任务与后续跳转。';
-});
-
-const aiAdvice = computed(() => {
-  const lines: string[] = [];
-  lines.push(`你的目标是：${preview.value?.context.goalText || '完成当前章节学习'}`);
-
-  const weaknessText = preview.value?.keyWeaknesses
-    ?.map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('、');
-  if (weaknessText) {
-    lines.push(`当前还需要先补稳：${weaknessText}。`);
-  }
-
-  const mainReason =
-    preview.value?.whyStartHere?.trim() ||
-    preview.value?.context.diagnosisSummary?.trim() ||
-    preview.value?.reasons?.[0]?.description?.trim();
-  if (mainReason) {
-    lines.push(mainReason);
-  } else {
-    lines.push('系统建议先完成当前起步任务，后续学习会更顺畅。');
-  }
-
-  return lines.slice(0, 3);
-});
+const reasons = computed(() => (preview.value?.reasons ?? []).slice(0, 2));
+const focusPoints = computed(() => (preview.value?.keyWeaknesses ?? []).slice(0, 3));
 
 async function loadPlan() {
   if (!context.value.diagnosisId || !context.value.goalText) {
-    learningPlanStore.error = '缺少生成学习计划所需的诊断信息，请先完成诊断。';
+    learningPlanStore.error = '缺少生成学习规划所需的诊断信息，请先完成诊断。';
     return;
   }
   try {
@@ -149,91 +118,94 @@ onBeforeUnmount(() => {
 
 <template>
   <AppShell>
-    <div class="mx-auto max-w-4xl space-y-5 pb-8">
-      <div v-if="viewState === 'loading'" class="space-y-4">
-        <div class="rounded-[1.8rem] border border-slate-200 bg-white px-6 py-5 shadow-[0_16px_48px_rgba(15,23,42,0.06)]">
-          <div class="space-y-3 animate-pulse">
-            <div class="h-4 w-24 rounded-full bg-slate-200" />
-            <div class="h-8 w-80 rounded-2xl bg-slate-100" />
-            <div class="h-20 rounded-[1.2rem] bg-slate-100" />
+    <div class="mx-auto max-w-[920px] space-y-6 pb-8">
+      <div v-if="viewState === 'loading'" class="app-stack-md">
+        <section class="app-card app-card-padding app-card-strong">
+          <SkeletonBlock width="92px" :height="14" rounded="999px" />
+          <div class="mt-4">
+            <SkeletonBlock width="68%" :height="42" rounded="22px" />
           </div>
-        </div>
+          <div class="mt-6 grid gap-3">
+            <SkeletonBlock :height="18" rounded="12px" />
+            <SkeletonBlock width="86%" :height="18" rounded="12px" />
+            <SkeletonBlock :height="120" rounded="22px" />
+          </div>
+        </section>
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
-        <ErrorState :message="error || '学习计划生成失败。'" />
-        <div class="flex justify-start">
-          <button
-            type="button"
-            class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-            @click="loadPlan"
-          >
-            重试生成
-          </button>
-        </div>
+        <ErrorState :message="error || '学习规划生成失败。'" />
+        <AppButton @click="loadPlan">重新生成学习规划</AppButton>
       </div>
 
       <template v-else-if="preview">
-        <div v-if="error" class="rounded-[1.4rem] border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {{ error }}
+        <section class="app-hero">
+          <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <div class="max-w-2xl">
+              <p class="app-eyebrow">学习规划</p>
+              <h1 class="app-title-lg mt-4">你现在先学这一步</h1>
+              <h2 class="mt-4 text-[30px] font-semibold leading-[1.2] tracking-[-0.04em] text-slate-950">{{ taskTitle }}</h2>
+              <p class="mt-3 text-sm text-slate-500">{{ estimatedTime }}</p>
+            </div>
+            <div class="flex flex-col gap-3">
+              <AppButton size="lg" :loading="learningPlanStore.confirming" @click="startLearning">
+                开始这一小步
+              </AppButton>
+              <span v-if="viewState === 'confirming'" class="app-badge justify-center">正在进入学习任务</span>
+            </div>
+          </div>
+        </section>
+
+        <SectionCard strong title="完成后你会得到什么" description="这里只保留当前最值得开始的收益，不让说明信息抢走注意力。">
+          <div class="grid gap-3">
+            <div v-for="item in actionBenefits" :key="item" class="app-option app-option-selected flex items-start gap-3">
+              <span class="mt-[10px] h-2 w-2 rounded-full bg-slate-900" />
+              <span class="text-sm leading-7 text-slate-700">{{ item }}</span>
+            </div>
+            <div v-if="!actionBenefits.length" class="app-option app-option-selected text-sm leading-7 text-slate-700">
+              先补上这个关键起点，后面的学习会更轻松。
+            </div>
+          </div>
+        </SectionCard>
+
+        <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <SectionCard title="为什么先学这里" description="理由只保留最短解释，帮你确认这一步是合理的。">
+            <div class="space-y-3">
+              <InfoHint>{{ preview.whyStartHere || '这是当前最稳妥的起点，先把它学会，后面会顺很多。' }}</InfoHint>
+              <div v-for="item in reasons" :key="item.key" class="app-hint">
+                <p class="text-sm font-semibold text-slate-900">{{ item.title }}</p>
+                <p class="mt-1 text-sm text-slate-600">{{ item.description }}</p>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="你现在的重点">
+            <div class="flex flex-wrap gap-2">
+              <span v-for="item in focusPoints" :key="item" class="app-pill">{{ item }}</span>
+              <span v-if="!focusPoints.length" class="app-pill">先把当前建议学会</span>
+            </div>
+            <div class="app-divider my-5" />
+            <p class="app-eyebrow">后续路径</p>
+            <div class="mt-3 grid gap-2">
+              <div
+                v-for="(item, index) in stagePath"
+                :key="item.key"
+                :class="['rounded-[16px] px-4 py-3 text-sm', index === currentPathIndex ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600']"
+              >
+                {{ index + 1 }}. {{ item.label }}
+              </div>
+            </div>
+          </SectionCard>
         </div>
 
-        <section class="mx-auto w-full max-w-[720px] rounded-[24px] border border-slate-200 bg-white p-8 shadow-[0_14px_36px_rgba(15,23,42,0.08)]">
-          <p class="text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">当前建议先学</p>
-          <h1 class="mt-4 text-2xl font-semibold leading-tight text-slate-950">{{ taskTitle }}</h1>
-          <p class="mt-3 text-sm text-slate-500">预计时间：{{ estimatedTime }}</p>
-
-          <div class="mt-7">
-            <p class="text-base font-semibold text-slate-900">完成后你会：</p>
-            <ul class="mt-3 space-y-2.5 text-sm leading-6 text-slate-700">
-              <li v-for="item in actionBenefits" :key="item" class="flex gap-3">
-                <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-900" />
-                <span>{{ item }}</span>
-              </li>
-              <li v-if="!actionBenefits.length" class="flex gap-3">
-                <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-900" />
-                <span>先补这一块，再继续后面的算法学习会更顺。</span>
-              </li>
-            </ul>
-          </div>
-
-          <div class="mt-8 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              class="min-w-[12rem] rounded-2xl bg-slate-950 px-6 py-3 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="learningPlanStore.confirming"
-              @click="startLearning"
-            >
-              开始这一小步
-            </button>
-            <span
-              v-if="viewState === 'confirming'"
-              class="rounded-full bg-sky-100 px-3 py-1.5 text-sm font-medium text-sky-700"
-            >
-              正在进入学习任务
-            </span>
-          </div>
-        </section>
-
-        <section class="mx-auto w-full max-w-[720px] rounded-2xl bg-slate-100 px-4 py-4">
-          <p class="text-sm font-semibold text-slate-900">为什么先学这个？</p>
-          <p class="mt-2 text-sm leading-6 text-slate-600">
-            {{ aiAdvice[0] || '先补这一块，后面会更容易连起来。' }}
-          </p>
-        </section>
-
-        <section class="mx-auto w-full max-w-[720px] space-y-2">
-          <p class="text-sm font-semibold text-slate-900">后续学习路径</p>
-          <p class="text-sm leading-6 text-slate-600">
-            <span class="mr-2 inline-flex rounded-full bg-slate-900 px-2.5 py-0.5 text-xs font-medium text-white">当前</span>
-            <template v-for="(item, index) in stagePath" :key="item.key">
-              <span :class="index === currentPathIndex ? 'font-semibold text-slate-900' : ''">{{ item.label }}</span>
-              <span v-if="index < stagePath.length - 1" class="px-2 text-slate-400">→</span>
-            </template>
-          </p>
-          <p class="text-xs text-slate-500">先完成当前这一步，后续会自动衔接。</p>
-        </section>
+        <InfoHint v-if="error" tone="danger">{{ error }}</InfoHint>
       </template>
+
+      <EmptyStatePanel
+        v-else
+        title="还没有拿到学习规划"
+        description="先完成诊断，系统才能给出这次最值得开始的建议。"
+      />
     </div>
   </AppShell>
 </template>

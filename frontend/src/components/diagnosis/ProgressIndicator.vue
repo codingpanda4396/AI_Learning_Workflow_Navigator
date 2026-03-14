@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import StepProgress from '@/components/ui/StepProgress.vue';
+
 defineProps<{
   current: number;
   total: number;
@@ -6,8 +8,5 @@ defineProps<{
 </script>
 
 <template>
-  <section class="text-center">
-    <p class="text-sm text-slate-500">问题进度</p>
-    <p class="mt-1 text-2xl font-semibold text-slate-950">{{ current }} / {{ total }}</p>
-  </section>
+  <StepProgress :current="current" :total="total" label="诊断进度" />
 </template>
