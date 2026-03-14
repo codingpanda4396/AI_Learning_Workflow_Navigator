@@ -6,6 +6,14 @@ export type LearningMode = 'EXPLAIN_THEN_PRACTICE' | 'LEARN_BY_DOING';
 export type PathMasteryStatus = 'WEAK' | 'PARTIAL' | 'STABLE' | 'NEW';
 export type PathDifficulty = 'FOUNDATION' | 'CORE' | 'CHALLENGE';
 export type PlanPreviewStatus = 'PREVIEW_READY' | 'COMMITTED' | 'READY';
+export type StrategyAdjustAction =
+  | 'faster'
+  | 'steadier'
+  | 'practice-first'
+  | 'ten-minute'
+  | 'already-know'
+  | 'not-enough-time'
+  | 'not-clear';
 
 export interface PlanAdjustments {
   intensity: LearningIntensity;
@@ -64,6 +72,31 @@ export interface PlanPriorityNode {
   reason: string;
 }
 
+export interface PlanAlternative {
+  key: string;
+  title: string;
+  description: string;
+}
+
+export interface PlanBenefit {
+  key: string;
+  title: string;
+  description: string;
+}
+
+export interface PlanUnlock {
+  key: string;
+  title: string;
+  description: string;
+}
+
+export interface PlanStageStatus {
+  stage: LearningStage;
+  label?: string;
+  status: 'CURRENT' | 'LOCKED' | 'PENDING' | 'COMPLETED' | 'OPTIONAL' | 'REVIEW';
+  description?: string;
+}
+
 export interface PlanTaskPreview {
   stage: LearningStage;
   title: string;
@@ -111,6 +144,18 @@ export interface LearningPlanPreview {
   fallbackApplied?: boolean;
   fallbackReasons?: string[];
   metadata?: LearningPlanMetadata;
+  confidence?: string | number;
+  recommendationHeadline?: string;
+  recommendationSubtitle?: string;
+  learnerGoal?: string;
+  masteryScore?: number;
+  riskIfSkipped?: string;
+  alternatives?: PlanAlternative[];
+  benefits?: PlanBenefit[];
+  nextUnlocks?: PlanUnlock[];
+  currentFocus?: string;
+  nextStep?: string;
+  stageStatuses?: PlanStageStatus[];
 }
 
 export interface PlanConfirmResult {

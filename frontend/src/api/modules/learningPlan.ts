@@ -3,6 +3,12 @@ import { normalizeLearningPlanPreview } from '@/api/normalizers';
 import type { ApiEnvelope } from '@/types/common';
 import type { LearningPlanPreview, LearningPlanRequest, PlanAdjustments, PlanConfirmResult } from '@/types/learningPlan';
 
+export interface LearningPlanStrategyPayload {
+  action: string;
+  intent: 'strategy' | 'disagree' | 'ai-explain';
+  prompt?: string;
+}
+
 function toBackendLearningMode(mode: PlanAdjustments['learningMode']): string {
   switch (mode) {
     case 'LEARN_BY_DOING':
@@ -61,4 +67,8 @@ export async function confirmLearningPlanApi(planId: string): Promise<PlanConfir
     firstTaskId: Number(data.first_task_id ?? data.firstTaskId ?? 0) || undefined,
     nextPage: typeof data.next_page === 'string' ? String(data.next_page) : typeof data.nextPage === 'string' ? String(data.nextPage) : undefined,
   };
+}
+
+export async function submitLearningPlanStrategyApi(planId: string, payload: LearningPlanStrategyPayload): Promise<void> {
+  await apiClient.post<ApiEnvelope<Record<string, unknown>>>(`/api/learning-plans/${planId}/strategy-adjustments`, payload);
 }

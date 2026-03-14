@@ -22,6 +22,10 @@ import type {
   PathDifficulty,
   PathMasteryStatus,
   PlanAdjustments,
+  PlanAlternative,
+  PlanBenefit,
+  PlanStageStatus,
+  PlanUnlock,
 } from '@/types/learningPlan';
 import type { CurrentSessionInfo, SessionOverview } from '@/types/session';
 import type { TaskDetail, TaskRunResult } from '@/types/task';
@@ -275,6 +279,61 @@ function normalizePathMasteryStatus(status: unknown, mastery: unknown): PathMast
     return 'STABLE';
   }
   return status === 'READY' ? 'STABLE' : 'PARTIAL';
+}
+
+function normalizePlanAlternatives(value: unknown): PlanAlternative[] {
+  const items = Array.isArray(value) ? value : [];
+  return items.map((item, index) => {
+    const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+    return {
+      key: String(row.key ?? row.id ?? `alternative-${index + 1}`),
+      title: String(row.title ?? row.name ?? row.direction ?? '备选方向'),
+      description: String(row.description ?? row.trade_off ?? row.tradeOff ?? row.reason ?? '当前阶段优先级略低，先放在下一跳。'),
+    };
+  }).filter((item) => item.title || item.description);
+}
+
+function normalizePlanBenefits(value: unknown): PlanBenefit[] {
+  const items = Array.isArray(value) ? value : [];
+  return items.map((item, index) => {
+    const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+    return {
+      key: String(row.key ?? row.id ?? `benefit-${index + 1}`),
+      title: String(row.title ?? row.headline ?? row.name ?? '完成后的直接收益'),
+      description: String(row.description ?? row.detail ?? row.value ?? '先把关键一步打通，后续学习会更顺。'),
+    };
+  }).filter((item) => item.title || item.description);
+}
+
+function normalizePlanUnlocks(value: unknown): PlanUnlock[] {
+  const items = Array.isArray(value) ? value : [];
+  return items.map((item, index) => {
+    const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+    return {
+      key: String(row.key ?? row.id ?? `unlock-${index + 1}`),
+      title: String(row.title ?? row.name ?? row.stage ?? '后续阶段'),
+      description: String(row.description ?? row.detail ?? row.reason ?? '完成这一小步后即可继续推进。'),
+    };
+  }).filter((item) => item.title || item.description);
+}
+
+function normalizePlanStageStatuses(value: unknown): PlanStageStatus[] {
+  const items = Array.isArray(value) ? value : [];
+  return items.map((item) => {
+    const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+    const stage = readCode(row.stage) as PlanStageStatus['stage'];
+    const status = readCode(row.status).toUpperCase();
+    const normalizedStatus: PlanStageStatus['status'] =
+      status === 'CURRENT' || status === 'LOCKED' || status === 'PENDING' || status === 'COMPLETED' || status === 'OPTIONAL' || status === 'REVIEW'
+        ? status
+        : 'PENDING';
+    return {
+      stage,
+      label: String(row.label ?? ''),
+      status: normalizedStatus,
+      description: String(row.description ?? row.reason ?? ''),
+    };
+  }).filter((item) => item.stage);
 }
 
 function normalizeWeakPoint(item: Record<string, unknown>): WeakPointItem {
@@ -563,6 +622,11 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     : []) as Record<string, unknown>[];
   const keyWeaknesses = readArray(data.key_weaknesses ?? data.keyWeaknesses);
   const whyStartHere = String(data.why_start_here ?? data.whyStartHere ?? '');
+  const confidenceValue = data.confidence_label ?? data.confidenceLabel ?? data.confidence ?? data.decision_confidence ?? data.decisionConfidence;
+  const alternatives = normalizePlanAlternatives(data.alternatives ?? data.rejected_alternatives ?? data.rejectedAlternatives);
+  const benefits = normalizePlanBenefits(data.benefits ?? data.outcomes ?? data.immediate_gains ?? data.immediateGains);
+  const nextUnlocks = normalizePlanUnlocks(data.next_unlocks ?? data.nextUnlocks);
+  const stageStatuses = normalizePlanStageStatuses(data.stage_statuses ?? data.stageStatuses);
 
   return {
     id: String(data.id ?? data.preview_id ?? data.previewId ?? data.plan_id ?? data.planId ?? ''),
@@ -721,5 +785,30 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
       estimatedNodeMinutesScope: String(metadata.estimated_node_minutes_scope ?? metadata.estimatedNodeMinutesScope ?? ''),
       estimatedTaskMinutesScope: String(metadata.estimated_task_minutes_scope ?? metadata.estimatedTaskMinutesScope ?? ''),
     },
+    confidence: typeof confidenceValue === 'number' || typeof confidenceValue === 'string' ? confidenceValue : undefined,
+    recommendationHeadline: String(
+      data.recommendation_headline
+      ?? data.recommendationHeadline
+      ?? summary.recommendation_headline
+      ?? summary.recommendationHeadline
+      ?? summary.headline
+      ?? ''
+    ),
+    recommendationSubtitle: String(
+      data.recommendation_subtitle
+      ?? data.recommendationSubtitle
+      ?? summary.recommendation_subtitle
+      ?? summary.recommendationSubtitle
+      ?? ''
+    ),
+    learnerGoal: String(data.learner_goal ?? data.learnerGoal ?? context.goal_text ?? context.goalText ?? request.goalText),
+    masteryScore: toNumber(data.mastery_score ?? data.masteryScore ?? data.current_mastery_score ?? data.currentMasteryScore),
+    riskIfSkipped: String(data.risk_if_skipped ?? data.riskIfSkipped ?? ''),
+    alternatives,
+    benefits,
+    nextUnlocks,
+    currentFocus: String(data.current_focus ?? data.currentFocus ?? ''),
+    nextStep: String(data.next_step ?? data.nextStep ?? ''),
+    stageStatuses,
   };
 }

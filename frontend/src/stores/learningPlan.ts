@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
-import { confirmLearningPlanApi, fetchLearningPlanPreviewApi, regenerateLearningPlanApi } from '@/api/modules/learningPlan';
+import { confirmLearningPlanApi, fetchLearningPlanPreviewApi, regenerateLearningPlanApi, submitLearningPlanStrategyApi } from '@/api/modules/learningPlan';
 import type { LearningPlanPreview, LearningPlanRequest, PlanAdjustments, PlanConfirmResult } from '@/types/learningPlan';
 
 export const useLearningPlanStore = defineStore('learningPlan', {
@@ -11,12 +11,15 @@ export const useLearningPlanStore = defineStore('learningPlan', {
     loading: false,
     regenerating: false,
     confirming: false,
+    strategySubmitting: false,
+    strategyNote: '',
     error: '',
   }),
   actions: {
     async generatePreview(payload: Omit<LearningPlanRequest, 'adjustments'> & { adjustments?: Partial<PlanAdjustments> }) {
       this.loading = true;
       this.error = '';
+      this.strategyNote = '';
       this.adjustments = {
         ...DEFAULT_PLAN_ADJUSTMENTS,
         ...(payload.adjustments ?? {}),
@@ -66,6 +69,7 @@ export const useLearningPlanStore = defineStore('learningPlan', {
       }
       this.regenerating = true;
       this.error = '';
+      this.strategyNote = '';
       const payload: LearningPlanRequest = {
         ...this.request,
         adjustments: { ...this.adjustments },
@@ -101,6 +105,25 @@ export const useLearningPlanStore = defineStore('learningPlan', {
         this.confirming = false;
       }
     },
+    async submitStrategyFeedback(payload: { action: string; intent: 'strategy' | 'disagree' | 'ai-explain'; prompt?: string }) {
+      if (!this.preview?.id) {
+        this.strategyNote = '当前规划还没准备好，暂时无法调整策略。';
+        return { accepted: false, pending: true };
+      }
+
+      this.strategySubmitting = true;
+      this.strategyNote = '';
+      try {
+        await submitLearningPlanStrategyApi(this.preview.id, payload);
+        this.strategyNote = payload.intent === 'ai-explain' ? '已把你的问题交给 AI 解释入口，后续可直接对接会话能力。' : '已收到你的调整意图，系统会按新的策略继续生成。';
+        return { accepted: true, pending: false };
+      } catch {
+        this.strategyNote = '已保留这次操作入口；如果后端还未开放，会先按前端策略重算当前规划。';
+        return { accepted: false, pending: true };
+      } finally {
+        this.strategySubmitting = false;
+      }
+    },
     reset() {
       this.preview = null;
       this.request = null;
@@ -108,6 +131,8 @@ export const useLearningPlanStore = defineStore('learningPlan', {
       this.loading = false;
       this.regenerating = false;
       this.confirming = false;
+      this.strategySubmitting = false;
+      this.strategyNote = '';
       this.error = '';
     },
   },
