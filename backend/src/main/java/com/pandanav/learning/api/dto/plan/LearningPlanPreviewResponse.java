@@ -1,47 +1,53 @@
 package com.pandanav.learning.api.dto.plan;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.pandanav.learning.api.dto.CodeLabelDto;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LearningPlanPreviewResponse(
-    String previewId,
+    String planId,
     String status,
     Boolean previewOnly,
     Boolean committed,
-    CodeLabelDto planSource,
-    CodeLabelDto contentSource,
-    String contentSourceType,
-    Boolean fallbackApplied,
-    List<String> fallbackReasons,
-    String confidence,
-    OffsetDateTime generatedAt,
-    String traceId,
-    LearningPlanSummaryResponse summary,
-    List<PlanReasonResponse> reasons,
-    List<PlanReasonResponse> decisionReasons,
-    List<PlanAlternativeResponse> alternatives,
-    LearningPlanStrategyComparisonResponse strategyComparison,
-    List<String> focuses,
-    LearningPlanRecommendationResponse recommendation,
-    LearningPlanLearnerSnapshotResponse learnerSnapshot,
-    LearningPlanPersonalizationResponse personalization,
-    LearningPlanGuidanceResponse planGuidance,
-    String confidenceExplanation,
-    String whyStartHere,
-    List<String> keyWeaknesses,
-    List<PlanPriorityNodeResponse> priorityNodes,
-    List<PlanPathNodeResponse> pathPreview,
-    List<PlanTaskPreviewResponse> taskPreview,
-    List<String> benefits,
-    List<String> nextUnlocks,
-    String nextStepLabel,
+    String goal,
+    RecommendedEntryResponse recommendedEntry,
+    LearnerSnapshotResponse learnerSnapshot,
+    RecommendedStrategyResponse recommendedStrategy,
+    List<AlternativeStrategyResponse> alternatives,
+    List<String> nextActions,
     LearningPlanAdjustmentsDto adjustments,
-    LearningPlanContextResponse context,
-    String nextStepNote,
-    LearningPlanMetadataResponse metadata
+    String startGuide,
+    Boolean explanationGenerated,
+    OffsetDateTime generatedAt,
+    String traceId
 ) {
+    public record RecommendedEntryResponse(
+        String conceptId,
+        String title,
+        Integer estimatedMinutes,
+        String reason
+    ) {
+    }
+
+    public record LearnerSnapshotResponse(
+        String currentState,
+        List<String> evidence
+    ) {
+    }
+
+    public record RecommendedStrategyResponse(
+        String code,
+        String label,
+        String explanation
+    ) {
+    }
+
+    public record AlternativeStrategyResponse(
+        String code,
+        String label,
+        String notRecommendedReason
+    ) {
+    }
 }

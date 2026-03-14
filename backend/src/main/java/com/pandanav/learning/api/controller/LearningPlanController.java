@@ -43,7 +43,7 @@ public class LearningPlanController {
             request.goalText(),
             request.adjustments()
         ));
-        return ApiEnvelope.ok(response, response.contentSourceType());
+        return ApiEnvelope.ok(response, Boolean.TRUE.equals(response.explanationGenerated()) ? "LLM_HINTS" : "TEMPLATE_ONLY");
     }
 
     @PostMapping("/adjust")
@@ -57,7 +57,7 @@ public class LearningPlanController {
             request.timeBudget(),
             request.userFeedback()
         ));
-        return ApiEnvelope.ok(response, response.result() == null ? null : response.result().contentSourceType());
+        return ApiEnvelope.ok(response, response.result() == null ? null : (Boolean.TRUE.equals(response.result().explanationGenerated()) ? "LLM_HINTS" : "TEMPLATE_ONLY"));
     }
 
     @PostMapping("/{previewId}/confirm")

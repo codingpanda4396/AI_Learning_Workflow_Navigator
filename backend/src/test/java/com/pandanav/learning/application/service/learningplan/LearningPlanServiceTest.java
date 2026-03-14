@@ -77,14 +77,12 @@ class LearningPlanServiceTest {
             new LearningPlanAdjustmentsDto("STANDARD", "LEARN_THEN_PRACTICE", true)
         ));
 
-        assertEquals("88", response.previewId());
-        assertEquals("LLM", response.contentSource().code());
-        assertEquals("tree basics", response.summary().recommendedStartNode().nodeName());
-        assertNotNull(response.recommendation());
+        assertEquals("88", response.planId());
+        assertEquals("tree basics", response.recommendedEntry().title());
+        assertNotNull(response.recommendedEntry().reason());
         assertNotNull(response.learnerSnapshot());
-        assertNotNull(response.planGuidance());
-        assertNotNull(response.strategyComparison());
-        assertEquals("HIGH", response.confidence());
+        assertNotNull(response.recommendedStrategy());
+        assertEquals("FOUNDATION_FIRST", response.recommendedStrategy().code());
     }
 
     @Test
@@ -121,7 +119,7 @@ class LearningPlanServiceTest {
             assembler,
             orchestrator,
             repository,
-            new LearningPlanExplanationAssembler(),
+            new PreviewTemplateExplanationAssembler(),
             sessionRepository,
             mock(TaskRepository.class),
             mock(ConceptNodeRepository.class),
@@ -193,7 +191,7 @@ class LearningPlanServiceTest {
             assembler,
             orchestrator,
             repository,
-            new LearningPlanExplanationAssembler(),
+            new PreviewTemplateExplanationAssembler(),
             sessionRepository,
             taskRepository,
             conceptNodeRepository,
@@ -218,7 +216,7 @@ class LearningPlanServiceTest {
             assembler,
             orchestrator,
             repository,
-            new LearningPlanExplanationAssembler(),
+            new PreviewTemplateExplanationAssembler(),
             mock(SessionRepository.class),
             mock(TaskRepository.class),
             mock(ConceptNodeRepository.class),

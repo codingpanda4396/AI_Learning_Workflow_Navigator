@@ -81,7 +81,7 @@ public class LearningPlanService {
     private final PlanningContextAssembler planningContextAssembler;
     private final LearningPlanOrchestrator learningPlanOrchestrator;
     private final LearningPlanRepository learningPlanRepository;
-    private final LearningPlanExplanationAssembler learningPlanExplanationAssembler;
+    private final PreviewTemplateExplanationAssembler previewTemplateExplanationAssembler;
     private final SessionRepository sessionRepository;
     private final TaskRepository taskRepository;
     private final ConceptNodeRepository conceptNodeRepository;
@@ -93,7 +93,7 @@ public class LearningPlanService {
         PlanningContextAssembler planningContextAssembler,
         LearningPlanOrchestrator learningPlanOrchestrator,
         LearningPlanRepository learningPlanRepository,
-        LearningPlanExplanationAssembler learningPlanExplanationAssembler,
+        PreviewTemplateExplanationAssembler previewTemplateExplanationAssembler,
         SessionRepository sessionRepository,
         TaskRepository taskRepository,
         ConceptNodeRepository conceptNodeRepository,
@@ -104,7 +104,7 @@ public class LearningPlanService {
         this.planningContextAssembler = planningContextAssembler;
         this.learningPlanOrchestrator = learningPlanOrchestrator;
         this.learningPlanRepository = learningPlanRepository;
-        this.learningPlanExplanationAssembler = learningPlanExplanationAssembler;
+        this.previewTemplateExplanationAssembler = previewTemplateExplanationAssembler;
         this.sessionRepository = sessionRepository;
         this.taskRepository = taskRepository;
         this.conceptNodeRepository = conceptNodeRepository;
@@ -152,19 +152,15 @@ public class LearningPlanService {
             orchestrated.fallbackReasons()
         );
         log.info(
-            "LearningPlan preview built. traceId={} previewId={} diagnosisId={} sessionId={} contentSourceType={} fallbackApplied={} fallbackReasons={} personalization={} guidance={} strategyComparison={} whatISawCount={} confidence={}",
+            "LearningPlan preview built. traceId={} planId={} diagnosisId={} sessionId={} recommendedConcept={} strategyCode={} explanationGenerated={} nextActions={}",
             TraceContext.traceId(),
-            response.previewId(),
+            response.planId(),
             command.diagnosisId(),
             command.sessionId(),
-            response.contentSourceType(),
-            response.fallbackApplied(),
-            response.fallbackReasons(),
-            response.personalization() != null,
-            response.planGuidance() != null,
-            response.strategyComparison() != null,
-            response.personalization() == null || response.personalization().whatISaw() == null ? 0 : response.personalization().whatISaw().size(),
-            response.confidence()
+            response.recommendedEntry() == null ? null : response.recommendedEntry().title(),
+            response.recommendedStrategy() == null ? null : response.recommendedStrategy().code(),
+            response.explanationGenerated(),
+            response.nextActions() == null ? 0 : response.nextActions().size()
         );
         return response;
     }
@@ -360,125 +356,77 @@ public class LearningPlanService {
     ) {
         boolean committed = plan.getStatus() == LearningPlanStatus.CONFIRMED || plan.getSessionId() != null;
         LearningPlanSummary summary = preview.summary();
-        String contentSourceType = summary.contentSourceType() != null
-            ? summary.contentSourceType()
-            : (planContentSource == PlanSource.LLM ? "LLM" : "FALLBACK");
-        boolean resolvedFallbackApplied = fallbackApplied != null
-            ? fallbackApplied
-            : Boolean.TRUE.equals(summary.fallbackApplied());
-        List<String> resolvedFallbackReasons = fallbackReasons != null
-            ? fallbackReasons
-            : (summary.fallbackReasons() == null ? List.of() : summary.fallbackReasons());
-        LearningPlanExplanationAssembler.PlanExplanation planExplanation = learningPlanExplanationAssembler.assemble(preview, context);
-        List<PlanReasonResponse> reasonResponses = mapReasons(preview.reasons());
-        List<PlanAlternativeResponse> alternatives = mapAlternatives(summary.alternatives());
-        LearningPlanRecommendationResponse recommendation = new LearningPlanRecommendationResponse(
-            summary.headline(),
-            summary.subtitle(),
-            summary.taskTitle(),
-            summary.taskEstimatedMinutes(),
-            summary.taskPriority(),
-            summary.whyNow()
-        );
-        LearningPlanLearnerSnapshotResponse learnerSnapshot = new LearningPlanLearnerSnapshotResponse(
-            context == null ? null : context.goalText(),
-            planExplanation.keyWeaknesses(),
-            resolveMasteryScore(context, summary.recommendedStartNodeId()),
-            resolveRiskIfSkipped(preview.reasons(), summary),
-            summary.currentFocusLabel()
-        );
-        LearningPlanPersonalizationResponse personalization = mapPersonalization(context);
-        PreviewEnhancement enhancement = context == null ? null : context.previewEnhancement();
-        LearningPlanStrategyComparisonResponse strategyComparison = mapStrategyComparison(enhancement);
-        LearningPlanGuidanceResponse planGuidance = mapPlanGuidance(enhancement);
-        String confidenceExplanation = resolveConfidenceExplanation(context, planGuidance);
-
+        PreviewTemplateExplanationAssembler.PreviewExplanations explanations =
+            previewTemplateExplanationAssembler.build(preview, context);
+        List<String> nextActions = buildNextActions(preview);
         return new LearningPlanPreviewResponse(
             String.valueOf(plan.getId()),
             committed ? COMMITTED : PREVIEW_READY,
             !committed,
             committed,
-            new CodeLabelDto("RULE_ENGINE", "Rule Engine"),
-            toContentSource(contentSourceType),
-            contentSourceType,
-            resolvedFallbackApplied,
-            resolvedFallbackReasons,
-            summary.confidence(),
-            plan.getCreatedAt() == null ? OffsetDateTime.now() : plan.getCreatedAt(),
-            TraceContext.traceId(),
-            new LearningPlanSummaryResponse(
-                summary.headline(),
-                new PlanNodeReferenceResponse(
-                    summary.recommendedStartNodeId(),
-                    summary.recommendedStartNodeId(),
-                    summary.recommendedStartNodeName()
-                ),
-                new CodeLabelDto(summary.recommendedPace(), summary.recommendedPace()),
-                summary.estimatedMinutes(),
-                summary.estimatedNodeCount(),
-                summary.estimatedStageCount()
+            context == null ? null : context.goalText(),
+            new LearningPlanPreviewResponse.RecommendedEntryResponse(
+                summary.recommendedStartNodeId(),
+                summary.recommendedStartNodeName(),
+                resolveEstimatedMinutes(summary),
+                explanations.recommendedEntryReason()
             ),
-            reasonResponses,
-            reasonResponses,
-            alternatives,
-            strategyComparison,
-            preview.focuses() == null ? List.of() : preview.focuses(),
-            recommendation,
-            learnerSnapshot,
-            personalization,
-            planGuidance,
-            confidenceExplanation,
-            planExplanation.whyStartHere(),
-            planExplanation.keyWeaknesses(),
-            planExplanation.priorityNodes(),
-            preview.pathPreview().stream()
-                .map(item -> new PlanPathNodeResponse(
-                    new PlanNodeReferenceResponse(item.nodeId(), item.nodeId(), item.nodeName()),
-                    new CodeLabelDto(resolveDifficultyCode(item.difficulty()), resolveDifficultyCode(item.difficulty())),
-                    item.mastery(),
-                    new CodeLabelDto(resolvePathStatus(item.mastery()), resolvePathStatus(item.mastery())),
-                    item.isRecommendedStart(),
-                    item.estimatedMinutes(),
-                    item.reasonTag()
-                ))
-                .toList(),
-            preview.taskPreview().stream()
-                .map(item -> new PlanTaskPreviewResponse(
-                    new CodeLabelDto(item.stage(), item.stage()),
-                    item.title(),
-                    item.goal(),
-                    item.learnerAction(),
-                    item.aiSupport(),
-                    item.estimatedMinutes()
-                ))
-                .toList(),
-            summary.benefits() == null ? List.of() : summary.benefits(),
-            summary.nextUnlocks() == null ? List.of() : summary.nextUnlocks(),
-            summary.nextStepLabel(),
+            new LearningPlanPreviewResponse.LearnerSnapshotResponse(
+                explanations.learnerCurrentState(),
+                explanations.learnerEvidence()
+            ),
+            new LearningPlanPreviewResponse.RecommendedStrategyResponse(
+                explanations.strategyCode(),
+                explanations.strategyLabel(),
+                explanations.strategyExplanation()
+            ),
+            explanations.alternatives(),
+            nextActions,
             new LearningPlanAdjustmentsDto(
                 preview.adjustments().intensity(),
                 preview.adjustments().learningMode(),
                 preview.adjustments().preferPrerequisite()
             ),
-            context == null ? null : new LearningPlanContextResponse(
-                context.sourceSessionId(),
-                context.diagnosisId(),
-                context.goalText(),
-                context.courseId(),
-                context.chapterId(),
-                context.learnerProfileSummary()
-            ),
             committed
-                ? "正式学习计划已创建，可直接进入当前推荐步骤。"
-                : "确认预览后会创建正式学习计划，并从当前推荐步骤开始推进。",
-            new LearningPlanMetadataResponse(
-                "plan-preview.v4",
-                true,
-                "path_preview_total",
-                "per_path_node",
-                "per_stage_task_template"
-            )
+                ? "已进入正式学习流程，系统会直接把你带到第一步任务。"
+                : "确认后系统会创建正式计划，并带你进入第一步任务。",
+            false,
+            plan.getCreatedAt() == null ? OffsetDateTime.now() : plan.getCreatedAt(),
+            TraceContext.traceId()
         );
+    }
+
+    private Integer resolveEstimatedMinutes(LearningPlanSummary summary) {
+        if (summary.taskEstimatedMinutes() != null && summary.taskEstimatedMinutes() > 0) {
+            return summary.taskEstimatedMinutes();
+        }
+        if (summary.estimatedMinutes() == null || summary.estimatedMinutes() <= 0) {
+            return 15;
+        }
+        return Math.max(6, summary.estimatedMinutes() / Math.max(summary.estimatedStageCount() == null ? 1 : summary.estimatedStageCount(), 1));
+    }
+
+    private List<String> buildNextActions(LearningPlanPreview preview) {
+        List<String> actions = new ArrayList<>();
+        if (preview.taskPreview() != null) {
+            for (PlanTaskPreview item : preview.taskPreview()) {
+                if (item == null || item.title() == null || item.title().isBlank()) {
+                    continue;
+                }
+                actions.add(item.title().trim());
+                if (actions.size() >= 3) {
+                    break;
+                }
+            }
+        }
+        while (actions.size() < 3) {
+            actions.add(switch (actions.size()) {
+                case 0 -> "先完成第一步的结构梳理";
+                case 1 -> "再做一次关键理解检查";
+                default -> "最后用一轮短练习确认掌握";
+            });
+        }
+        return actions;
     }
 
     private LearningPlanPlanningContext withAdjustmentIntent(
