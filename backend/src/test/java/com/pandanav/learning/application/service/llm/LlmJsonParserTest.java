@@ -43,7 +43,7 @@ class LlmJsonParserTest {
 
         try {
             LlmJsonParseException ex = assertThrows(LlmJsonParseException.class, () -> parser.parse(
-                "```json\n{\"headline\":\"oops\",\n```",
+                "```json\nnot a json payload\n```",
                 new LlmCallContext("trace-1", "req-1", LlmStage.LEARNING_PLAN, "test-model")
             ));
             assertTrue(ex.diagnosticSummary().contains("stage=LEARNING_PLAN"));

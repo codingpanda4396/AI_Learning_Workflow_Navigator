@@ -15,17 +15,20 @@ public class LlmFailureClassifier {
             return LlmFailureType.VALIDATION_ERROR;
         }
         if (error instanceof LlmJsonParseException) {
-            return LlmFailureType.JSON_PARSE_ERROR;
+            return LlmFailureType.LLM_JSON_PARSE_ERROR;
         }
         if (error instanceof LlmCallException llmCallException) {
             return llmCallException.failureType();
         }
         String message = normalize(error == null ? null : error.getMessage());
         if (message.contains("timed out") || message.contains("timeout")) {
-            return LlmFailureType.TIMEOUT;
+            return LlmFailureType.LLM_TIMEOUT;
+        }
+        if (message.contains("truncated") || message.contains("finishreason=length")) {
+            return LlmFailureType.LLM_TRUNCATED;
         }
         if (message.contains("json")) {
-            return LlmFailureType.JSON_PARSE_ERROR;
+            return LlmFailureType.LLM_JSON_PARSE_ERROR;
         }
         if (message.contains("empty response") || message.contains("no content")) {
             return LlmFailureType.EMPTY_RESPONSE;
@@ -34,7 +37,7 @@ public class LlmFailureClassifier {
             return LlmFailureType.VALIDATION_ERROR;
         }
         if (message.contains("provider returned") || message.contains("http error") || message.contains("api")) {
-            return LlmFailureType.API_ERROR;
+            return LlmFailureType.LLM_API_ERROR;
         }
         return LlmFailureType.UNKNOWN_ERROR;
     }
@@ -47,9 +50,10 @@ public class LlmFailureClassifier {
             return jsonParseException.fallbackReason();
         }
         return switch (classifyFailure(error)) {
-            case TIMEOUT -> LlmFallbackReason.LLM_TIMEOUT;
-            case API_ERROR -> LlmFallbackReason.LLM_API_ERROR;
-            case JSON_PARSE_ERROR -> LlmFallbackReason.JSON_PARSE_ERROR;
+            case LLM_TIMEOUT, TIMEOUT -> LlmFallbackReason.LLM_TIMEOUT;
+            case LLM_API_ERROR, API_ERROR -> LlmFallbackReason.LLM_API_ERROR;
+            case LLM_JSON_PARSE_ERROR, JSON_PARSE_ERROR -> LlmFallbackReason.JSON_PARSE_ERROR;
+            case LLM_TRUNCATED -> LlmFallbackReason.OUTPUT_TRUNCATED;
             case EMPTY_RESPONSE -> LlmFallbackReason.EMPTY_RESPONSE;
             case VALIDATION_ERROR -> LlmFallbackReason.JSON_SCHEMA_MISMATCH;
             case UNKNOWN_ERROR -> LlmFallbackReason.UNKNOWN_ERROR;

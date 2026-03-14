@@ -14,7 +14,7 @@ class LlmFailureClassifierTest {
     void shouldMapJsonErrorsToJsonParseReason() {
         RuntimeException error = new RuntimeException("LLM provider response is not valid JSON.");
 
-        assertEquals(LlmFailureType.JSON_PARSE_ERROR, classifier.classifyFailure(error));
+        assertEquals(LlmFailureType.LLM_JSON_PARSE_ERROR, classifier.classifyFailure(error));
         assertEquals(LlmFallbackReason.JSON_PARSE_ERROR, classifier.classifyFallback(error));
     }
 

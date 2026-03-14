@@ -59,6 +59,26 @@ public class LlmCallLogger {
         recordLatency(context, metrics.latencyMs(), "success", null);
     }
 
+    public void logOutputSize(
+        LlmCallContext context,
+        int rawLength,
+        Integer completionTokens,
+        String finishReason,
+        boolean truncated
+    ) {
+        log.info(
+            "LLM_OUTPUT_SIZE stage={} model={} traceId={} requestId={} rawLength={} completionTokens={} finishReason={} truncated={}",
+            context.stage(),
+            safe(context.model()),
+            safe(context.traceId()),
+            safe(context.requestId()),
+            rawLength,
+            completionTokens == null ? -1 : completionTokens,
+            safe(finishReason),
+            truncated
+        );
+    }
+
     public void logFallback(LlmCallContext context, LlmFallbackReason reason, int latencyMs) {
         log.warn(
             "LLM_CALL_FALLBACK stage={} model={} traceId={} requestId={} reason={} latencyMs={}",

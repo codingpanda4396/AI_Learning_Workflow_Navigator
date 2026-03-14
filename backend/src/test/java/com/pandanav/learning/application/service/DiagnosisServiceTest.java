@@ -72,7 +72,7 @@ class DiagnosisServiceTest {
             capabilityProfileRepository,
             new DiagnosisTemplateFactory(new DiagnosisQuestionCopyFactory()),
             new DiagnosisQuestionAssembler(new DiagnosisQuestionCopyFactory()),
-            new DiagnosisQuestionCopyLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class)),
+            new DiagnosisQuestionCopyLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class), new QuestionStructureAssembler()),
             new DefaultDiagnosisQuestionPersonalizer(),
             new DiagnosisQuestionCopyNormalizer(),
             new DiagnosisExplanationBuilder(),
