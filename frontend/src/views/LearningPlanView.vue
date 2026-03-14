@@ -3,8 +3,6 @@ import { computed, onBeforeUnmount, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import PageSection from '@/components/common/PageSection.vue';
-import PlanWhyStartHereCard from '@/components/learning-plan/PlanWhyStartHereCard.vue';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { useLearningPlanStore } from '@/stores/learningPlan';
 
@@ -36,7 +34,7 @@ const viewState = computed(() => {
 
 const nextTask = computed(() => preview.value?.taskPreviews[0]);
 
-const learningContent = computed(() =>
+const actionBenefits = computed(() =>
   [nextTask.value?.learningGoal, nextTask.value?.learnerAction, nextTask.value?.aiSupport]
     .map((item) => item?.trim())
     .filter((item): item is string => Boolean(item))
@@ -47,7 +45,7 @@ const taskTitle = computed(() => nextTask.value?.title?.trim() || preview.value?
 
 const estimatedTime = computed(() => {
   const minutes = nextTask.value?.estimatedTaskMinutes ?? 0;
-  if (!minutes) return '约 15 分钟';
+  if (!minutes) return '15 分钟';
   if (minutes >= 60) {
     const hours = Math.floor(minutes / 60);
     const rest = minutes % 60;
@@ -57,10 +55,10 @@ const estimatedTime = computed(() => {
 });
 
 const stagePath = [
-  { key: 'STRUCTURE', label: 'Foundation' },
-  { key: 'UNDERSTANDING', label: 'Algorithm' },
-  { key: 'TRAINING', label: 'Implementation' },
-  { key: 'REFLECTION', label: 'Advanced' },
+  { key: 'STRUCTURE', label: '基础框架' },
+  { key: 'UNDERSTANDING', label: '算法原理' },
+  { key: 'TRAINING', label: '算法实现' },
+  { key: 'REFLECTION', label: '进阶应用' },
 ];
 
 const currentPathIndex = computed(() => {
@@ -74,6 +72,32 @@ const fallbackBannerText = computed(() => {
     return '';
   }
   return '部分规划说明已切换为精简展示，但不会影响当前学习任务与后续跳转。';
+});
+
+const aiAdvice = computed(() => {
+  const lines: string[] = [];
+  lines.push(`你的目标是：${preview.value?.context.goalText || '完成当前章节学习'}`);
+
+  const weaknessText = preview.value?.keyWeaknesses
+    ?.map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('、');
+  if (weaknessText) {
+    lines.push(`当前还需要先补稳：${weaknessText}。`);
+  }
+
+  const mainReason =
+    preview.value?.whyStartHere?.trim() ||
+    preview.value?.context.diagnosisSummary?.trim() ||
+    preview.value?.reasons?.[0]?.description?.trim();
+  if (mainReason) {
+    lines.push(mainReason);
+  } else {
+    lines.push('系统建议先完成当前起步任务，后续学习会更顺畅。');
+  }
+
+  return lines.slice(0, 3);
 });
 
 async function loadPlan() {
@@ -125,18 +149,14 @@ onBeforeUnmount(() => {
 
 <template>
   <AppShell>
-    <div class="mx-auto max-w-5xl space-y-4 pb-8">
+    <div class="mx-auto max-w-4xl space-y-5 pb-8">
       <div v-if="viewState === 'loading'" class="space-y-4">
-        <PageSection eyebrow="Learning Plan" title="正在整理你的下一步学习任务" compact>
+        <div class="rounded-[1.8rem] border border-slate-200 bg-white px-6 py-5 shadow-[0_16px_48px_rgba(15,23,42,0.06)]">
           <div class="space-y-3 animate-pulse">
-            <div class="h-5 w-40 rounded-full bg-slate-200" />
-            <div class="h-24 rounded-[1.5rem] bg-slate-100" />
+            <div class="h-4 w-24 rounded-full bg-slate-200" />
+            <div class="h-8 w-80 rounded-2xl bg-slate-100" />
+            <div class="h-20 rounded-[1.2rem] bg-slate-100" />
           </div>
-        </PageSection>
-        <div class="animate-pulse rounded-[2rem] bg-slate-950 p-8 shadow-[0_28px_80px_rgba(15,23,42,0.18)]">
-          <div class="mx-auto h-5 w-28 rounded-full bg-white/20" />
-          <div class="mx-auto mt-5 h-12 max-w-xl rounded-2xl bg-white/15" />
-          <div class="mx-auto mt-4 h-28 max-w-3xl rounded-[1.5rem] bg-white/10" />
         </div>
       </div>
 
@@ -162,101 +182,91 @@ onBeforeUnmount(() => {
           {{ error }}
         </div>
 
-        <PageSection eyebrow="SECTION 1" title="学习目标" compact>
-          <div class="rounded-[1.6rem] border border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="text-lg font-semibold text-slate-950">{{ preview.context.goalText }}</p>
+        <header class="space-y-4 rounded-[1.8rem] border border-slate-200/80 bg-white px-6 py-5 shadow-[0_16px_48px_rgba(15,23,42,0.06)]">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">学习导航</p>
+            <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">先完成这一步，再继续后面的算法学习</h1>
+          </div>
+          <section class="rounded-2xl bg-slate-50 px-4 py-4">
+            <p class="text-sm font-semibold text-slate-600">学习目标</p>
+            <p class="mt-2 text-lg font-semibold text-slate-950">{{ preview.context.goalText }}</p>
             <p class="mt-2 text-sm text-slate-500">{{ preview.context.courseName }} · {{ preview.context.chapterName }}</p>
+          </section>
+        </header>
+
+        <section class="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#0f172a_0%,#13263f_56%,#1d4d63_100%)] px-6 py-7 text-white shadow-[0_28px_82px_rgba(15,23,42,0.22)] md:px-8 md:py-8">
+          <div class="max-w-3xl">
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">现在开始第一步</p>
+            <h2 class="mt-3 text-3xl font-semibold tracking-tight">{{ taskTitle }}</h2>
+            <p class="mt-3 text-sm text-slate-200">预计时间：{{ estimatedTime }}</p>
           </div>
-        </PageSection>
 
-        <section class="overflow-hidden rounded-[2.2rem] bg-[linear-gradient(135deg,#0f172a_0%,#13263f_46%,#1f6b7a_100%)] px-6 py-8 text-white shadow-[0_32px_90px_rgba(15,23,42,0.22)] md:px-10 md:py-10">
-          <div class="mx-auto max-w-3xl text-center">
-            <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-300">SECTION 2</p>
-            <h1 class="mt-4 text-3xl font-semibold tracking-tight md:text-5xl">下一步学习</h1>
-            <p class="mt-3 text-sm leading-7 text-slate-200 md:text-base">你现在该做的只有一件事：开始这一步。</p>
-          </div>
+          <div class="mt-6 rounded-[1.5rem] bg-white px-5 py-5 text-slate-950 shadow-[0_18px_56px_rgba(255,255,255,0.12)] md:px-6">
+            <p class="text-sm font-semibold text-slate-900">你将完成</p>
+            <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+              <li v-for="item in actionBenefits" :key="item" class="flex gap-3">
+                <span class="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-900" />
+                <span>{{ item }}</span>
+              </li>
+              <li v-if="!actionBenefits.length" class="flex gap-3">
+                <span class="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-900" />
+                <span>先搭好知识框架，再进入具体算法学习。</span>
+              </li>
+            </ul>
 
-          <div class="mx-auto mt-8 max-w-3xl rounded-[2rem] bg-white px-6 py-6 text-slate-950 shadow-[0_22px_70px_rgba(255,255,255,0.12)] md:px-8">
-            <p class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">任务名称</p>
-            <h2 class="mt-3 text-2xl font-semibold tracking-tight">{{ taskTitle }}</h2>
-
-            <div class="mt-6 rounded-[1.5rem] bg-slate-50 p-5">
-              <p class="text-sm font-semibold text-slate-950">学习内容</p>
-              <ul class="mt-3 space-y-3 text-sm leading-6 text-slate-700">
-                <li v-for="item in learningContent" :key="item" class="flex gap-3">
-                  <span class="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-950" />
-                  <span>{{ item }}</span>
-                </li>
-                <li v-if="!learningContent.length" class="flex gap-3">
-                  <span class="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-950" />
-                  <span>系统会围绕当前推荐起点，带你完成这一轮的首个学习任务。</span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="mt-5 flex items-center justify-center gap-3 text-sm text-slate-500">
-              <span class="rounded-full bg-slate-100 px-4 py-2 font-medium">预计时间 {{ estimatedTime }}</span>
-              <span
-                v-if="viewState === 'confirming'"
-                class="rounded-full bg-sky-100 px-4 py-2 font-medium text-sky-700"
-              >
-                正在进入任务
-              </span>
-            </div>
-
-            <div class="mt-7 flex justify-center">
+            <div class="mt-6 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                class="min-w-[14rem] rounded-2xl bg-slate-950 px-8 py-4 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                class="min-w-[12rem] rounded-2xl bg-slate-950 px-6 py-3 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="learningPlanStore.confirming"
                 @click="startLearning"
               >
                 开始学习
               </button>
+              <span
+                v-if="viewState === 'confirming'"
+                class="rounded-full bg-sky-100 px-3 py-1.5 text-sm font-medium text-sky-700"
+              >
+                正在进入学习任务
+              </span>
             </div>
           </div>
         </section>
 
-        <PageSection eyebrow="SECTION 3" title="学习路径概览" compact>
-          <div class="grid gap-3 md:grid-cols-4">
-            <article
-              v-for="(item, index) in stagePath"
-              :key="item.key"
-              class="rounded-[1.6rem] border px-4 py-4 transition"
-              :class="index === currentPathIndex ? 'border-slate-950 bg-slate-950 text-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]' : 'border-slate-200 bg-slate-50 text-slate-500'"
-            >
-              <p class="text-xs font-semibold uppercase tracking-[0.2em]" :class="index === currentPathIndex ? 'text-slate-300' : 'text-slate-400'">
-                {{ index === currentPathIndex ? 'Current' : `Step ${index + 1}` }}
-              </p>
-              <p class="mt-3 text-base font-semibold">{{ item.label }}</p>
-            </article>
+        <section class="space-y-4 rounded-[1.8rem] border border-slate-200/80 bg-white px-6 py-5 shadow-[0_16px_48px_rgba(15,23,42,0.06)]">
+          <div>
+            <h3 class="text-xl font-semibold tracking-tight text-slate-950">AI 为什么这样安排</h3>
+            <p class="mt-2 text-sm text-slate-600">先补当前关键基础，再进入算法原理和实战，能减少后续卡顿。</p>
           </div>
-        </PageSection>
 
-        <PageSection eyebrow="SECTION 4" compact>
-          <div class="space-y-3">
-            <PlanWhyStartHereCard
-              :why-start-here="preview.whyStartHere"
-              :key-weaknesses="preview.keyWeaknesses"
-              :priority-nodes="preview.priorityNodes"
-            />
-            <details class="group rounded-[1.6rem] border border-slate-200 bg-slate-50 px-5 py-4">
-              <summary class="cursor-pointer list-none text-base font-semibold text-slate-950">
-                为什么这样安排
-              </summary>
-              <div class="mt-4 space-y-3 text-sm leading-7 text-slate-600">
-                <p v-if="preview.context.diagnosisSummary">{{ preview.context.diagnosisSummary }}</p>
-                <p v-for="reason in preview.reasons" :key="reason.key">
-                  <span class="font-semibold text-slate-900">{{ reason.title || reason.label || 'AI 规划依据' }}：</span>
-                  {{ reason.description }}
-                </p>
-                <p v-if="!preview.context.diagnosisSummary && !preview.reasons.length">
-                  AI 已根据当前诊断结果选择最合适的起点，并优先给出能立即开始的任务。
-                </p>
-              </div>
-            </details>
+          <div class="rounded-2xl bg-sky-50/70 px-4 py-4">
+            <p class="text-sm font-semibold text-slate-900">AI 学习建议</p>
+            <ul class="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+              <li v-for="line in aiAdvice" :key="line" class="flex gap-3">
+                <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-600" />
+                <span>{{ line }}</span>
+              </li>
+            </ul>
           </div>
-        </PageSection>
+
+          <div>
+            <p class="text-sm font-semibold text-slate-900">后续学习路径</p>
+            <div class="mt-3 grid gap-2 md:grid-cols-4">
+              <article
+                v-for="(item, index) in stagePath"
+                :key="item.key"
+                class="rounded-xl border px-3 py-3 text-sm transition"
+                :class="index === currentPathIndex ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-500'"
+              >
+                <p class="text-xs font-medium" :class="index === currentPathIndex ? 'text-slate-300' : 'text-slate-400'">
+                  {{ index === currentPathIndex ? `① 当前：第 ${index + 1} 步` : `第 ${index + 1} 步` }}
+                </p>
+                <p class="mt-1 font-semibold">{{ item.label }}</p>
+              </article>
+            </div>
+            <p class="mt-3 text-xs text-slate-500">你只需要先完成当前这一步，系统会自动带你进入下一步。</p>
+          </div>
+        </section>
       </template>
     </div>
   </AppShell>
