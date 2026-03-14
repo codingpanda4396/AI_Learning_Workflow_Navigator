@@ -19,27 +19,22 @@ defineEmits<{
   <section class="entry-card">
     <div class="entry-card__header">
       <div>
-        <p class="app-eyebrow">{{ session ? 'CURRENT PATH' : 'START NEW PATH' }}</p>
-        <h2 class="entry-card__title">
-          {{ session ? '继续当前主线' : '开始新的学习主线' }}
-        </h2>
+        <p class="app-eyebrow">First Step</p>
+        <h2 class="entry-card__title">{{ session ? '先回到当前主线' : '从这里开始第一步' }}</h2>
         <p class="entry-card__desc">
-          {{
-            session
-              ? '直接回到上一次停下来的地方。'
-              : '告诉系统你想学什么，后面的诊断和规划会自动完成。'
-          }}
+          {{ session ? '当前已经有进行中的学习主线。' : '先输入目标，系统会从诊断开始往后推进。' }}
         </p>
       </div>
 
-      <div v-if="session" class="entry-card__actions entry-card__actions--top">
-        <AppButton size="lg" :loading="loading" class="entry-card__primary" @click="$emit('continue')">
-          继续当前主线
-        </AppButton>
-        <AppButton size="lg" variant="secondary" disabled>
-          新建学习主线
-        </AppButton>
-      </div>
+      <AppButton
+        v-if="session"
+        size="lg"
+        :loading="loading"
+        class="entry-card__primary"
+        @click="$emit('continue')"
+      >
+        继续当前主线
+      </AppButton>
     </div>
 
     <div class="entry-form" :class="{ 'entry-form--muted': Boolean(session) }">
@@ -82,10 +77,6 @@ defineEmits<{
         </AppButton>
       </div>
     </div>
-
-    <p v-if="session" class="entry-card__note">
-      同一时间只保留一条进行中的学习主线，先把当前路径走完会更顺。
-    </p>
   </section>
 </template>
 
@@ -101,34 +92,33 @@ defineEmits<{
 .entry-card__header {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
 }
 
 .entry-card__title {
-  margin-top: 12px;
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.06;
+  margin-top: 10px;
+  font-size: clamp(28px, 3.8vw, 36px);
+  line-height: 1.08;
   font-weight: 650;
   letter-spacing: -0.04em;
   color: #0f172a;
 }
 
 .entry-card__desc {
-  margin-top: 12px;
-  max-width: 520px;
-  font-size: 15px;
-  line-height: 1.75;
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.7;
   color: #64748b;
 }
 
 .entry-form {
   display: grid;
   gap: 14px;
-  margin-top: 28px;
+  margin-top: 24px;
 }
 
 .entry-form--muted {
-  opacity: 0.82;
+  opacity: 0.72;
 }
 
 .entry-field {
@@ -155,24 +145,11 @@ defineEmits<{
 
 .entry-card__actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
   margin-top: 6px;
-}
-
-.entry-card__actions--top {
-  margin-top: 0;
 }
 
 .entry-card__primary {
   min-width: 188px;
-}
-
-.entry-card__note {
-  margin-top: 18px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: #64748b;
 }
 
 @media (min-width: 1024px) {
@@ -187,12 +164,8 @@ defineEmits<{
   }
 
   .entry-form {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr) auto;
     align-items: end;
-  }
-
-  .entry-card__actions {
-    justify-content: flex-end;
   }
 }
 </style>
