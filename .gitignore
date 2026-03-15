@@ -36,3 +36,4 @@ deploy/.env.prod
 secrets.md
 
 node_modules
+/frontend/dist
