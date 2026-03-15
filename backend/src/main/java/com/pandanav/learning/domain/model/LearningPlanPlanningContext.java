@@ -21,6 +21,7 @@ public record LearningPlanPlanningContext(
     String adjustmentReason,
     String userFeedback,
     Long basedOnPreviewId,
+    LearnerProfileSnapshot learnerProfileSnapshot,
     LearnerStateSnapshot learnerStateSnapshot,
     LearnerSignalSnapshot learnerSignalSnapshot,
     LearnerEvidenceSummary learnerEvidenceSummary,

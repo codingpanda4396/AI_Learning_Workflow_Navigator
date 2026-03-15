@@ -5,6 +5,7 @@ import com.pandanav.learning.domain.enums.FoundationStatus;
 import com.pandanav.learning.domain.model.ActionTemplate;
 import com.pandanav.learning.domain.model.EntryCandidate;
 import com.pandanav.learning.domain.model.IntensityCandidate;
+import com.pandanav.learning.domain.model.LearnerProfileSnapshot;
 import com.pandanav.learning.domain.model.LearnerState;
 import com.pandanav.learning.domain.model.LearningPlanContextNode;
 import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
@@ -14,15 +15,17 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Component
 public class PlanCandidatePlanner {
 
     public PlanCandidateSet plan(LearningPlanPlanningContext context, LearnerState learnerState) {
         List<EntryCandidate> entries = buildEntryCandidates(context, learnerState);
-        List<StrategyCandidate> strategies = buildStrategyCandidates(learnerState, context.requestedStrategy());
+        List<StrategyCandidate> strategies = buildStrategyCandidates(context, learnerState, context.requestedStrategy());
         List<IntensityCandidate> intensities = buildIntensityCandidates(context);
         List<ActionTemplate> actions = buildActionTemplates(
             context,
@@ -54,6 +57,7 @@ public class PlanCandidatePlanner {
             if (node.prerequisiteNodeIds() != null && !node.prerequisiteNodeIds().isEmpty()) {
                 score += learnerState.currentBlockType() == CurrentBlockType.FOUNDATION_GAP ? 3 : 1;
             }
+            score += profileEntryBoost(context.learnerProfileSnapshot(), node, mastery);
             ranked.add(new EntryRank(node, score));
         }
 
@@ -87,21 +91,25 @@ public class PlanCandidatePlanner {
         return "该节点当前收益最高，先处理可快速稳住后续学习节奏。";
     }
 
-    private List<StrategyCandidate> buildStrategyCandidates(LearnerState learnerState, String requestedStrategy) {
-        List<StrategyCandidate> result = new ArrayList<>();
-        result.add(new StrategyCandidate(
+    private List<StrategyCandidate> buildStrategyCandidates(
+        LearningPlanPlanningContext context,
+        LearnerState learnerState,
+        String requestedStrategy
+    ) {
+        List<StrategyCandidate> baseline = new ArrayList<>();
+        baseline.add(new StrategyCandidate(
             "FOUNDATION_FIRST",
             "先补基础",
             "先把前置依赖打通，再推进后续内容，降低反复卡住风险。",
             "短期推进速度略慢，但稳定性更高。"
         ));
-        result.add(new StrategyCandidate(
+        baseline.add(new StrategyCandidate(
             "PRACTICE_FIRST",
             "先练后学",
             "先通过小练习暴露关键盲点，再按盲点回补解释。",
             "反馈更直接，但基础薄弱时挫败感会升高。"
         ));
-        result.add(new StrategyCandidate(
+        baseline.add(new StrategyCandidate(
             "FAST_TRACK",
             "快速推进",
             "压缩解释时长，优先推进到目标训练环节。",
@@ -110,7 +118,7 @@ public class PlanCandidatePlanner {
         if (requestedStrategy != null && !requestedStrategy.isBlank()) {
             String normalized = requestedStrategy.trim().toUpperCase(Locale.ROOT);
             if ("COMPRESSED_10_MIN".equals(normalized)) {
-                result.add(new StrategyCandidate(
+                baseline.add(new StrategyCandidate(
                     "COMPRESSED_10_MIN",
                     "10分钟压缩版",
                     "最小可执行动作优先，适合时间极少时保持连续性。",
@@ -118,15 +126,27 @@ public class PlanCandidatePlanner {
                 ));
             }
         }
-        if (learnerState.currentBlockType() == CurrentBlockType.EVIDENCE_LOW && result.stream().noneMatch(item -> "COMPRESSED_10_MIN".equals(item.code()))) {
-            result.add(new StrategyCandidate(
+        if (learnerState.currentBlockType() == CurrentBlockType.EVIDENCE_LOW && baseline.stream().noneMatch(item -> "COMPRESSED_10_MIN".equals(item.code()))) {
+            baseline.add(new StrategyCandidate(
                 "COMPRESSED_10_MIN",
                 "10分钟压缩版",
                 "证据不足时先做低风险起步，快速拿到第一轮反馈。",
                 "信息量偏少，需要通过下一轮数据继续校准。"
             ));
         }
-        return result.stream().limit(4).toList();
+        LearnerProfileSnapshot snapshot = context.learnerProfileSnapshot();
+        String profilePreferred = resolveProfilePreferredStrategy(snapshot);
+        List<StrategyCandidate> ordered = new ArrayList<>();
+        if (profilePreferred != null) {
+            baseline.stream()
+                .filter(item -> profilePreferred.equals(item.code()))
+                .findFirst()
+                .ifPresent(ordered::add);
+        }
+        baseline.stream()
+            .filter(item -> ordered.stream().noneMatch(existing -> existing.code().equals(item.code())))
+            .forEach(ordered::add);
+        return ordered.stream().limit(4).toList();
     }
 
     private List<IntensityCandidate> buildIntensityCandidates(LearningPlanPlanningContext context) {
@@ -135,7 +155,25 @@ public class PlanCandidatePlanner {
         result.add(new IntensityCandidate("LIGHT", "轻量节奏", budget > 0 ? Math.min(12, budget) : 10, "适合时间碎片化或需要降低压力时使用。"));
         result.add(new IntensityCandidate("STANDARD", "标准节奏", budget > 0 ? Math.min(18, budget) : 15, "兼顾理解与训练的默认节奏。"));
         result.add(new IntensityCandidate("INTENSIVE", "强化节奏", budget > 0 ? Math.min(26, Math.max(budget, 16)) : 22, "适合冲刺阶段，单位时间推进更快。"));
-        return result;
+        String profileIntensity = resolveProfilePreferredIntensity(context.learnerProfileSnapshot());
+        if (profileIntensity == null) {
+            return result;
+        }
+        Map<String, IntensityCandidate> byCode = new LinkedHashMap<>();
+        for (IntensityCandidate item : result) {
+            byCode.put(item.code(), item);
+        }
+        List<IntensityCandidate> ordered = new ArrayList<>();
+        IntensityCandidate preferred = byCode.get(profileIntensity);
+        if (preferred != null) {
+            ordered.add(preferred);
+        }
+        for (IntensityCandidate item : result) {
+            if (ordered.stream().noneMatch(existing -> existing.code().equals(item.code()))) {
+                ordered.add(item);
+            }
+        }
+        return ordered;
     }
 
     private List<ActionTemplate> buildActionTemplates(
@@ -173,6 +211,13 @@ public class PlanCandidatePlanner {
     }
 
     private GapProfile resolveGapProfile(LearningPlanPlanningContext context, LearnerState learnerState) {
+        String supportPriority = readMapValue(context.learnerProfileSnapshot(), true, "supportPriority");
+        if ("UNDERSTANDING".equals(supportPriority) || "SPACED_REVIEW".equals(supportPriority)) {
+            return GapProfile.FOUNDATION_WEAK;
+        }
+        if ("TRAINING_VARIANTS".equals(supportPriority) || "GUIDED_PRACTICE".equals(supportPriority)) {
+            return GapProfile.CODE_MAPPING_WEAK;
+        }
         int relationTagCount = countContains(context.recentErrorTags(), "LINK", "DEPENDENCY", "RELATION", "CONFUSION");
         int codeTagCount = countContains(context.recentErrorTags(), "CODE", "IMPLEMENT", "TRANSFER", "PRACTICE");
         int avgScore = context.recentScores() == null || context.recentScores().isEmpty()
@@ -211,6 +256,65 @@ public class PlanCandidatePlanner {
             }
         }
         return count;
+    }
+
+    private int profileEntryBoost(LearnerProfileSnapshot snapshot, LearningPlanContextNode node, int mastery) {
+        if (snapshot == null) {
+            return 0;
+        }
+        String supportPriority = readMapValue(snapshot, true, "supportPriority");
+        if ("UNDERSTANDING".equals(supportPriority) || "SPACED_REVIEW".equals(supportPriority)) {
+            return mastery < 60 ? 4 : 0;
+        }
+        if ("TRAINING_VARIANTS".equals(supportPriority) || "GUIDED_PRACTICE".equals(supportPriority)) {
+            return (node.attemptCount() != null && node.attemptCount() >= 2) ? 4 : 1;
+        }
+        return 0;
+    }
+
+    private String resolveProfilePreferredStrategy(LearnerProfileSnapshot snapshot) {
+        String learningPreference = readMapValue(snapshot, true, "learningPreference");
+        String supportPriority = readMapValue(snapshot, true, "supportPriority");
+        if ("PRACTICE_FIRST".equals(learningPreference) || "PROJECT_DRIVEN".equals(learningPreference)) {
+            return "PRACTICE_FIRST";
+        }
+        if ("CONCEPT_FIRST".equals(learningPreference) || "UNDERSTANDING".equals(supportPriority) || "SPACED_REVIEW".equals(supportPriority)) {
+            return "FOUNDATION_FIRST";
+        }
+        if ("TRAINING_VARIANTS".equals(supportPriority) || "GUIDED_PRACTICE".equals(supportPriority)) {
+            return "PRACTICE_FIRST";
+        }
+        return null;
+    }
+
+    private String resolveProfilePreferredIntensity(LearnerProfileSnapshot snapshot) {
+        String learningIntensity = readMapValue(snapshot, false, "learningIntensity");
+        String timeBudget = readMapValue(snapshot, false, "timeBudget");
+        if ("LIGHT".equals(learningIntensity) || "LIGHT".equals(timeBudget)) {
+            return "LIGHT";
+        }
+        if ("INTENSIVE".equals(learningIntensity) || "IMMERSIVE".equals(learningIntensity) || "IMMERSIVE".equals(timeBudget)) {
+            return "INTENSIVE";
+        }
+        if ("STANDARD".equals(learningIntensity) || "STANDARD".equals(timeBudget)) {
+            return "STANDARD";
+        }
+        return null;
+    }
+
+    private String readMapValue(LearnerProfileSnapshot snapshot, boolean strategyHints, String key) {
+        if (snapshot == null || key == null || key.isBlank()) {
+            return "";
+        }
+        Map<String, Object> source = strategyHints ? snapshot.getStrategyHints() : snapshot.getConstraints();
+        if (source == null || source.isEmpty()) {
+            return "";
+        }
+        Object value = source.get(key);
+        if (value == null) {
+            return "";
+        }
+        return String.valueOf(value).trim().toUpperCase(Locale.ROOT);
     }
 
     private enum GapProfile {

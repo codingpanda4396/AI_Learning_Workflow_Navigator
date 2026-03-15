@@ -5,8 +5,10 @@ import com.pandanav.learning.domain.model.ActionTemplate;
 import com.pandanav.learning.domain.model.AlternativeExplanation;
 import com.pandanav.learning.domain.model.EntryCandidate;
 import com.pandanav.learning.domain.model.IntensityCandidate;
+import com.pandanav.learning.domain.model.LearnerProfileSnapshot;
 import com.pandanav.learning.domain.model.LearnerState;
 import com.pandanav.learning.domain.model.LearningPlanDecisionValidationResult;
+import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
 import com.pandanav.learning.domain.model.LlmPlanDecisionResult;
 import com.pandanav.learning.domain.model.PlanCandidateSet;
 import com.pandanav.learning.domain.model.StrategyCandidate;
@@ -17,12 +19,14 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Component
 public class LearningPlanDecisionValidator {
 
     public LearningPlanDecisionValidationResult validateAndFallback(
+        LearningPlanPlanningContext context,
         LearnerState learnerState,
         PlanCandidateSet candidateSet,
         LlmPlanDecisionResult llmDecision,
@@ -49,6 +53,7 @@ public class LearningPlanDecisionValidator {
         l2Errors.addAll(validateStructure(llmDecision));
         l2Errors.addAll(validateCandidateConstraints(llmDecision, candidateSet));
         l2Errors.addAll(validateBusinessConsistency(llmDecision, candidateSet));
+        l2Errors.addAll(validateProfileConsistency(context, llmDecision));
         if (!l2Errors.isEmpty()) {
             return new LearningPlanDecisionValidationResult(
                 defaultDecision,
@@ -162,6 +167,36 @@ public class LearningPlanDecisionValidator {
             .anyMatch(action -> containsAnyHint(action, actionHints));
         if (!related) {
             errors.add("nextActions_not_related_to_selected_concept");
+        }
+        return errors;
+    }
+
+    private List<String> validateProfileConsistency(
+        LearningPlanPlanningContext context,
+        LlmPlanDecisionResult decision
+    ) {
+        if (context == null || context.learnerProfileSnapshot() == null) {
+            return List.of();
+        }
+        LearnerProfileSnapshot snapshot = context.learnerProfileSnapshot();
+        List<String> errors = new ArrayList<>();
+        String learningPreference = readHint(snapshot.getStrategyHints(), "learningPreference");
+        String learningIntensity = readHint(snapshot.getConstraints(), "learningIntensity");
+        String timeBudget = readHint(snapshot.getConstraints(), "timeBudget");
+
+        String selectedStrategy = normalize(decision.selectedStrategyCode());
+        String selectedIntensity = normalize(decision.selectedIntensityCode());
+        if (("PRACTICE_FIRST".equals(learningPreference) || "PROJECT_DRIVEN".equals(learningPreference))
+            && "FOUNDATION_FIRST".equals(selectedStrategy)) {
+            errors.add("profile_strategy_conflict_learning_preference");
+        }
+        if ("CONCEPT_FIRST".equals(learningPreference) && "FAST_TRACK".equals(selectedStrategy)) {
+            errors.add("profile_strategy_conflict_learning_preference");
+        }
+        if ("LIGHT".equals(learningIntensity) || "LIGHT".equals(timeBudget)) {
+            if ("INTENSIVE".equals(selectedIntensity)) {
+                errors.add("profile_intensity_conflict_time_budget");
+            }
         }
         return errors;
     }
@@ -390,5 +425,16 @@ public class LearningPlanDecisionValidator {
 
     private String normalizeText(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String readHint(Map<String, Object> source, String key) {
+        if (source == null || source.isEmpty()) {
+            return "";
+        }
+        Object raw = source.get(key);
+        if (raw == null) {
+            return "";
+        }
+        return String.valueOf(raw).trim().toUpperCase(Locale.ROOT);
     }
 }

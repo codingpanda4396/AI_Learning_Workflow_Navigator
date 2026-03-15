@@ -6,12 +6,14 @@ import com.pandanav.learning.application.service.WeakPointDiagnosisService;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningPlanContextNode;
 import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
+import com.pandanav.learning.domain.model.LearnerProfileSnapshot;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.NodeMastery;
 import com.pandanav.learning.domain.model.PlanAdjustments;
 import com.pandanav.learning.domain.model.LearnerSignalSnapshot;
 import com.pandanav.learning.domain.model.TrainingAttemptSummary;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
+import com.pandanav.learning.domain.repository.LearnerProfileSnapshotRepository;
 import com.pandanav.learning.domain.repository.NodeMasteryRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
@@ -36,6 +38,7 @@ public class PlanningContextAssembler {
     private final LearnerStateInterpreter learnerStateInterpreter;
     private final LearnerSignalInterpreter learnerSignalInterpreter;
     private final LearnerEvidenceAggregator learnerEvidenceAggregator;
+    private final LearnerProfileSnapshotRepository learnerProfileSnapshotRepository;
 
     public PlanningContextAssembler(
         SessionRepository sessionRepository,
@@ -45,7 +48,8 @@ public class PlanningContextAssembler {
         WeakPointDiagnosisService weakPointDiagnosisService,
         LearnerStateInterpreter learnerStateInterpreter,
         LearnerSignalInterpreter learnerSignalInterpreter,
-        LearnerEvidenceAggregator learnerEvidenceAggregator
+        LearnerEvidenceAggregator learnerEvidenceAggregator,
+        LearnerProfileSnapshotRepository learnerProfileSnapshotRepository
     ) {
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
@@ -55,6 +59,7 @@ public class PlanningContextAssembler {
         this.learnerStateInterpreter = learnerStateInterpreter;
         this.learnerSignalInterpreter = learnerSignalInterpreter;
         this.learnerEvidenceAggregator = learnerEvidenceAggregator;
+        this.learnerProfileSnapshotRepository = learnerProfileSnapshotRepository;
     }
 
     public LearningPlanPlanningContext assemble(PreviewLearningPlanCommand command) {
@@ -112,7 +117,10 @@ public class PlanningContextAssembler {
             .toList();
         List<Integer> recentScores = recentAttempts.stream().map(TrainingAttemptSummary::score).filter(score -> score != null).toList();
         List<String> weakLabels = weakNodes.stream().map(WeakPointDiagnosisService.WeakNode::nodeName).limit(4).toList();
-        String learnerProfileSummary = weakLabels.isEmpty()
+        LearnerProfileSnapshot learnerProfileSnapshot = resolveLearnerProfileSnapshot(command.diagnosisId());
+        String learnerProfileSummary = learnerProfileSnapshot != null
+            ? buildSnapshotSummary(learnerProfileSnapshot)
+            : weakLabels.isEmpty()
             ? "当前可用历史证据较少，系统会优先根据目标与知识顺序给出稳健预览。"
             : "结合最近的薄弱点表现，本轮会优先补齐 " + String.join("、", weakLabels) + " 相关的关键连接。";
 
@@ -135,6 +143,7 @@ public class PlanningContextAssembler {
             null,
             null,
             null,
+            learnerProfileSnapshot,
             null,
             null,
             null,
@@ -161,12 +170,57 @@ public class PlanningContextAssembler {
             baseContext.adjustmentReason(),
             baseContext.userFeedback(),
             baseContext.basedOnPreviewId(),
+            baseContext.learnerProfileSnapshot(),
             learnerStateInterpreter.interpret(baseContext),
             learnerSignalSnapshot,
             learnerEvidenceAggregator.aggregate(baseContext, learnerSignalSnapshot, null),
             null,
             null
         );
+    }
+
+    private LearnerProfileSnapshot resolveLearnerProfileSnapshot(String diagnosisId) {
+        if (diagnosisId == null || diagnosisId.isBlank()) {
+            return null;
+        }
+        try {
+            Long diagnosisSessionId = Long.parseLong(diagnosisId.trim());
+            return learnerProfileSnapshotRepository.findByDiagnosisSessionId(diagnosisSessionId).orElse(null);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private String buildSnapshotSummary(LearnerProfileSnapshot snapshot) {
+        String preference = readMapValue(snapshot.getStrategyHints(), "learningPreference");
+        String supportPriority = readMapValue(snapshot.getStrategyHints(), "supportPriority");
+        String timeBudget = readMapValue(snapshot.getConstraints(), "timeBudget");
+        List<String> parts = new ArrayList<>();
+        if (!supportPriority.isBlank()) {
+            parts.add("支持重点偏向 " + supportPriority);
+        }
+        if (!preference.isBlank()) {
+            parts.add("学习偏好为 " + preference);
+        }
+        if (!timeBudget.isBlank()) {
+            parts.add("时间预算约束为 " + timeBudget);
+        }
+        if (parts.isEmpty()) {
+            return "已读取诊断画像快照，本轮将按画像信号约束候选策略并动态校验一致性。";
+        }
+        return "已读取诊断画像快照：" + String.join("，", parts) + "。";
+    }
+
+    private String readMapValue(Map<String, Object> values, String key) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        Object raw = values.get(key);
+        if (raw == null) {
+            return "";
+        }
+        String text = String.valueOf(raw).trim();
+        return text.isBlank() ? "" : text;
     }
 
     private LearningPlanContextNode toContextNode(

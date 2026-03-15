@@ -60,9 +60,10 @@ public class LearningPlanOrchestrator {
             : context.learnerStateSnapshot();
         LearnerState learnerState = learnerStateAssembler.assemble(context);
         PlanCandidateSet candidateSet = planCandidatePlanner.plan(context, learnerState);
-        LlmPlanDecisionResult defaultDecision = defaultDecisionFactory.create(learnerState, candidateSet);
+        LlmPlanDecisionResult defaultDecision = defaultDecisionFactory.create(context, learnerState, candidateSet);
         Optional<LlmPlanDecisionResult> llmDecision = decisionLlmService.decide(learnerState, candidateSet);
         LearningPlanDecisionValidationResult validatedDecision = decisionValidator.validateAndFallback(
+            context,
             learnerState,
             candidateSet,
             llmDecision.orElse(null),
