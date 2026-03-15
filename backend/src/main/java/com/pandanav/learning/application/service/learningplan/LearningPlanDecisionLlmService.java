@@ -11,6 +11,8 @@ import com.pandanav.learning.domain.model.LearnerState;
 import com.pandanav.learning.domain.model.LlmPlanDecisionResult;
 import com.pandanav.learning.domain.model.PlanCandidateSet;
 import com.pandanav.learning.domain.service.LearningPlanDecisionPromptBuilder;
+import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -27,15 +29,18 @@ public class LearningPlanDecisionLlmService {
     private final LlmGateway llmGateway;
     private final LlmJsonParser llmJsonParser;
     private final LearningPlanDecisionPromptBuilder promptBuilder;
+    private final LlmProperties llmProperties;
 
     public LearningPlanDecisionLlmService(
         LlmGateway llmGateway,
         LlmJsonParser llmJsonParser,
-        LearningPlanDecisionPromptBuilder promptBuilder
+        LearningPlanDecisionPromptBuilder promptBuilder,
+        LlmProperties llmProperties
     ) {
         this.llmGateway = llmGateway;
         this.llmJsonParser = llmJsonParser;
         this.promptBuilder = promptBuilder;
+        this.llmProperties = llmProperties;
     }
 
     public Optional<LlmPlanDecisionResult> decide(LearnerState learnerState, PlanCandidateSet candidateSet) {
@@ -45,19 +50,32 @@ public class LearningPlanDecisionLlmService {
         if (candidateSet.entries() == null || candidateSet.entries().isEmpty()) {
             return Optional.empty();
         }
+        if (!llmProperties.isEnabled() || !llmProperties.isReady()) {
+            if (isDecisionStrictMode()) {
+                throw new AiGenerationException("LEARNING_PLAN_DECISION", "LLM_NOT_READY");
+            }
+            return Optional.empty();
+        }
         try {
             LlmPrompt prompt = promptBuilder.build(learnerState, candidateSet);
             LlmTextResult raw = llmGateway.generate(LlmStage.LEARNING_PLAN, prompt);
             if (isTruncated(raw)) {
-                log.warn("Learning plan decision LLM output truncated, skip llm decision.");
-                return Optional.empty();
+                return onDecisionFailure("OUTPUT_TRUNCATED", "Learning plan decision LLM output truncated, skip llm decision.");
             }
             JsonNode json = llmJsonParser.parse(raw.text());
             return Optional.of(parseDecision(json));
         } catch (Exception ex) {
-            log.warn("Learning plan decision LLM call failed: {}", ex.getMessage());
-            return Optional.empty();
+            String reason = ex instanceof IllegalArgumentException ? "MISSING_REQUIRED_FIELDS" : "API_ERROR";
+            return onDecisionFailure(reason, "Learning plan decision LLM call failed: " + ex.getMessage());
         }
+    }
+
+    private Optional<LlmPlanDecisionResult> onDecisionFailure(String reason, String logMessage) {
+        log.warn(logMessage);
+        if (isDecisionStrictMode()) {
+            throw new AiGenerationException("LEARNING_PLAN_DECISION", reason);
+        }
+        return Optional.empty();
     }
 
     private LlmPlanDecisionResult parseDecision(JsonNode root) {
@@ -123,5 +141,10 @@ public class LearningPlanDecisionLlmService {
             return false;
         }
         return result.usage().truncated() || "length".equalsIgnoreCase(result.usage().finishReason());
+    }
+
+    private boolean isDecisionStrictMode() {
+        return llmProperties.getFailurePolicy() != null
+            && llmProperties.getFailurePolicy().isLearningPlanDecisionStrict();
     }
 }

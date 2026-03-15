@@ -32,6 +32,10 @@ app:
     path-plan-max-output-tokens: 300
     tutor-max-output-tokens: 450
     fallback-to-rule: true
+    failure-policy:
+      diagnosis-copy-strict: false
+      capability-summary-strict: false
+      learning-plan-decision-strict: false
     profiles:
       light-json-task:
         model: qwen3.5-plus

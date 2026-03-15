@@ -20,3 +20,7 @@ app:
   llm:
     enabled: ${LLM_ENABLED:true}
     fallback-to-rule: true
+    failure-policy:
+      diagnosis-copy-strict: ${LLM_DIAGNOSIS_COPY_STRICT:false}
+      capability-summary-strict: ${LLM_CAPABILITY_SUMMARY_STRICT:false}
+      learning-plan-decision-strict: ${LLM_LEARNING_PLAN_DECISION_STRICT:false}

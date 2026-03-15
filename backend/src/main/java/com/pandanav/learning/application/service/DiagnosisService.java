@@ -41,6 +41,8 @@ import com.pandanav.learning.domain.repository.LearnerProfileSnapshotRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.service.CapabilityProfileBuilder;
 import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
+import com.pandanav.learning.infrastructure.config.LlmProperties;
+import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.exception.InternalServerException;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
@@ -81,6 +83,7 @@ public class DiagnosisService {
     private final LearnerProfileSnapshotBuilder learnerProfileSnapshotBuilder;
     private final LearnerFeatureSignalRepository learnerFeatureSignalRepository;
     private final LearnerProfileSnapshotRepository learnerProfileSnapshotRepository;
+    private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
 
     public DiagnosisService(
@@ -103,6 +106,7 @@ public class DiagnosisService {
         LearnerProfileSnapshotBuilder learnerProfileSnapshotBuilder,
         LearnerFeatureSignalRepository learnerFeatureSignalRepository,
         LearnerProfileSnapshotRepository learnerProfileSnapshotRepository,
+        LlmProperties llmProperties,
         ObjectMapper objectMapper
     ) {
         this.sessionRepository = sessionRepository;
@@ -124,6 +128,7 @@ public class DiagnosisService {
         this.learnerProfileSnapshotBuilder = learnerProfileSnapshotBuilder;
         this.learnerFeatureSignalRepository = learnerFeatureSignalRepository;
         this.learnerProfileSnapshotRepository = learnerProfileSnapshotRepository;
+        this.llmProperties = llmProperties;
         this.objectMapper = objectMapper;
     }
 
@@ -150,9 +155,15 @@ public class DiagnosisService {
         try {
             questions = diagnosisQuestionCopyLlmService.enhanceQuestions(session, assembledQuestions);
         } catch (Exception ex) {
+            if (isDiagnosisCopyStrictMode()) {
+                if (ex instanceof AiGenerationException aiEx) {
+                    throw aiEx;
+                }
+                throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "API_ERROR");
+            }
             generationMode = DiagnosisGenerationMode.RULE_FALLBACK;
             fallbackApplied = true;
-            fallbackReasons = List.of("LLM_DIAGNOSIS_COPY_UNAVAILABLE");
+            fallbackReasons = List.of(resolveFailureReason(ex, "LLM_DIAGNOSIS_COPY_UNAVAILABLE"));
             questions = assembledQuestions;
         }
         questions = diagnosisQuestionPersonalizer.personalize(questions, planningContext);
@@ -228,8 +239,21 @@ public class DiagnosisService {
         LearnerFeatureAggregator.AggregationResult aggregationResult = learnerFeatureAggregator.aggregate(featureSignals);
 
         CapabilityProfileDraft draft = capabilityProfileBuilder.build(answerCodesByDimension);
-        CapabilityProfileSummaryCopy summaryCopy =
-            capabilityProfileSummaryLlmService.generate(learningSession, draft, answerCodesByDimension);
+        CapabilityProfileSummaryCopy summaryCopy;
+        try {
+            summaryCopy = capabilityProfileSummaryLlmService.generate(learningSession, draft, answerCodesByDimension);
+        } catch (AiGenerationException ex) {
+            if (isCapabilitySummaryStrictMode()) {
+                throw ex;
+            }
+            log.warn(
+                "Diagnosis capability summary fallback enabled. diagnosisId={} sessionId={} reason={}",
+                diagnosisSession.getId(),
+                learningSession.getId(),
+                ex.getReason()
+            );
+            summaryCopy = buildRuleBasedSummaryCopy(draft, answerCodesByDimension);
+        }
 
         CapabilityProfile profile = new CapabilityProfile();
         profile.setLearningSessionId(learningSession.getId());
@@ -687,5 +711,47 @@ public class DiagnosisService {
 
     private String safeText(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private boolean isDiagnosisCopyStrictMode() {
+        return llmProperties.getFailurePolicy() != null
+            && llmProperties.getFailurePolicy().isDiagnosisCopyStrict();
+    }
+
+    private boolean isCapabilitySummaryStrictMode() {
+        return llmProperties.getFailurePolicy() != null
+            && llmProperties.getFailurePolicy().isCapabilitySummaryStrict();
+    }
+
+    private String resolveFailureReason(Exception ex, String fallbackReason) {
+        if (ex instanceof AiGenerationException aiEx) {
+            return aiEx.getReason();
+        }
+        return fallbackReason;
+    }
+
+    private CapabilityProfileSummaryCopy buildRuleBasedSummaryCopy(
+        CapabilityProfileDraft draft,
+        Map<DiagnosisDimension, List<String>> answersByDimension
+    ) {
+        String level = draft.currentLevel() == null ? "当前阶段" : draft.currentLevel().name();
+        String primaryStrength = firstOrDefault(draft.strengths(), "有可持续推进的基础能力");
+        String primaryWeakness = firstOrDefault(draft.weaknesses(), "仍有关键环节需要补强");
+        int answerCount = answersByDimension.values().stream().mapToInt(List::size).sum();
+        String summary = "当前能力水平为 " + level + "，主要优势是" + primaryStrength + "，主要待提升点是" + primaryWeakness + "。";
+        String planExplanation = "建议先围绕待提升点做一轮短闭环训练，再用 1 次复盘确认是否稳定，当前共采集 " + answerCount + " 条诊断信号。";
+        return new CapabilityProfileSummaryCopy(summary, planExplanation);
+    }
+
+    private String firstOrDefault(List<String> values, String fallback) {
+        if (values == null || values.isEmpty()) {
+            return fallback;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return fallback;
     }
 }

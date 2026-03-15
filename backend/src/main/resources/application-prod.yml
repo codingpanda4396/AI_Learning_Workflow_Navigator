@@ -45,3 +45,7 @@ app:
     fallback-to-rule: ${LLM_FALLBACK_TO_RULE:true}
     log-request: ${LLM_LOG_REQUEST:false}
     log-response: ${LLM_LOG_RESPONSE:false}
+    failure-policy:
+      diagnosis-copy-strict: ${LLM_DIAGNOSIS_COPY_STRICT:false}
+      capability-summary-strict: ${LLM_CAPABILITY_SUMMARY_STRICT:false}
+      learning-plan-decision-strict: ${LLM_LEARNING_PLAN_DECISION_STRICT:false}

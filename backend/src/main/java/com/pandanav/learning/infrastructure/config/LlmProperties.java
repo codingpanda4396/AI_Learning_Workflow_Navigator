@@ -33,6 +33,7 @@ public class LlmProperties {
     private boolean logResponse = false;
     private Observability observability = new Observability();
     private Profiles profiles = new Profiles();
+    private FailurePolicy failurePolicy = new FailurePolicy();
 
     public boolean isEnabled() {
         return enabled;
@@ -218,6 +219,14 @@ public class LlmProperties {
         this.profiles = profiles == null ? new Profiles() : profiles;
     }
 
+    public FailurePolicy getFailurePolicy() {
+        return failurePolicy;
+    }
+
+    public void setFailurePolicy(FailurePolicy failurePolicy) {
+        this.failurePolicy = failurePolicy == null ? new FailurePolicy() : failurePolicy;
+    }
+
     public boolean isReady() {
         return enabled
             && baseUrl != null && !baseUrl.isBlank()
@@ -304,6 +313,45 @@ public class LlmProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+    }
+
+    public static class FailurePolicy {
+        /**
+         * When enabled, diagnosis question copy generation fails fast on LLM errors.
+         */
+        private boolean diagnosisCopyStrict = false;
+        /**
+         * When enabled, diagnosis capability summary fails fast on LLM errors.
+         */
+        private boolean capabilitySummaryStrict = false;
+        /**
+         * When enabled, learning-plan decision fails fast on LLM errors.
+         */
+        private boolean learningPlanDecisionStrict = false;
+
+        public boolean isDiagnosisCopyStrict() {
+            return diagnosisCopyStrict;
+        }
+
+        public void setDiagnosisCopyStrict(boolean diagnosisCopyStrict) {
+            this.diagnosisCopyStrict = diagnosisCopyStrict;
+        }
+
+        public boolean isCapabilitySummaryStrict() {
+            return capabilitySummaryStrict;
+        }
+
+        public void setCapabilitySummaryStrict(boolean capabilitySummaryStrict) {
+            this.capabilitySummaryStrict = capabilitySummaryStrict;
+        }
+
+        public boolean isLearningPlanDecisionStrict() {
+            return learningPlanDecisionStrict;
+        }
+
+        public void setLearningPlanDecisionStrict(boolean learningPlanDecisionStrict) {
+            this.learningPlanDecisionStrict = learningPlanDecisionStrict;
         }
     }
 
