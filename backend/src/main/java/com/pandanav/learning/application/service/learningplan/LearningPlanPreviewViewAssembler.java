@@ -62,6 +62,7 @@ public class LearningPlanPreviewViewAssembler {
             selectedEntry.conceptId(),
             selectedEntry.conceptName(),
             selectedIntensity.code(),
+            selectedStrategy.code(),
             estimatedMinutes,
             pathPreview.size(),
             taskPreview.size(),

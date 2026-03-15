@@ -72,6 +72,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -396,6 +397,18 @@ public class LearningPlanService {
             explanations.explanationGenerated()
         );
         List<String> nextActions = buildNextActions(preview);
+        List<String> profileDrivenReasoning = buildProfileDrivenReasoning(context);
+        List<String> mergedEvidence = mergeEvidence(
+            evidenceSummary == null ? explanations.learnerEvidence() : evidenceSummary.topEvidence(),
+            profileDrivenReasoning
+        );
+        List<String> profileConflicts = buildProfileConflicts(context);
+        List<String> riskFlags = buildRiskFlags(profileConflicts);
+        String whyThisStep = mergeWhyThisStep(
+            evidenceSummary == null ? explanations.recommendedEntryReason() : evidenceSummary.whyThisStep(),
+            profileDrivenReasoning
+        );
+        String finalStrategyCode = resolveFinalStrategyCode(summary, explanations);
         return new LearningPlanPreviewResponse(
             String.valueOf(plan.getId()),
             committed ? COMMITTED : PREVIEW_READY,
@@ -413,17 +426,20 @@ public class LearningPlanService {
                 explanations.learnerEvidence()
             ),
             new LearningPlanPreviewResponse.RecommendedStrategyResponse(
-                explanations.strategyCode(),
-                explanations.strategyLabel(),
+                finalStrategyCode,
+                previewTemplateExplanationAssembler.strategyLabel(finalStrategyCode),
                 explanations.strategyExplanation()
             ),
             explanations.alternatives(),
             nextActions,
-            evidenceSummary == null ? explanations.recommendedEntryReason() : evidenceSummary.whyThisStep(),
-            evidenceSummary == null ? explanations.learnerEvidence() : evidenceSummary.topEvidence(),
+            whyThisStep,
+            mergedEvidence,
+            profileDrivenReasoning,
             evidenceSummary == null ? resolveRiskIfSkipped(preview.reasons(), summary) : evidenceSummary.skipRisk(),
             evidenceSummary == null ? "完成这一步后，你会更容易进入后续训练并减少回退。" : evidenceSummary.expectedGain(),
             evidenceSummary == null ? resolveConfidenceExplanation(context, null) : evidenceSummary.confidenceHint(),
+            riskFlags,
+            profileConflicts,
             new LearningPlanAdjustmentsDto(
                 preview.adjustments().intensity(),
                 preview.adjustments().learningMode(),
@@ -436,6 +452,145 @@ public class LearningPlanService {
             plan.getCreatedAt() == null ? OffsetDateTime.now() : plan.getCreatedAt(),
             TraceContext.traceId()
         );
+    }
+
+    private String resolveFinalStrategyCode(
+        LearningPlanSummary summary,
+        PreviewTemplateExplanationAssembler.PreviewExplanations explanations
+    ) {
+        if (summary != null && summary.selectedStrategyCode() != null && !summary.selectedStrategyCode().isBlank()) {
+            return summary.selectedStrategyCode().trim().toUpperCase(Locale.ROOT);
+        }
+        return explanations.strategyCode();
+    }
+
+    private String mergeWhyThisStep(String base, List<String> profileDrivenReasoning) {
+        String normalizedBase = base == null ? null : base.trim();
+        if (profileDrivenReasoning == null || profileDrivenReasoning.isEmpty()) {
+            return normalizedBase;
+        }
+        return (normalizedBase == null || normalizedBase.isBlank())
+            ? profileDrivenReasoning.get(0)
+            : normalizedBase + " " + profileDrivenReasoning.get(0);
+    }
+
+    private List<String> mergeEvidence(List<String> base, List<String> profileDrivenReasoning) {
+        List<String> merged = new ArrayList<>();
+        if (base != null) {
+            merged.addAll(base.stream()
+                .filter(item -> item != null && !item.isBlank())
+                .map(String::trim)
+                .toList());
+        }
+        if (profileDrivenReasoning != null) {
+            merged.addAll(profileDrivenReasoning.stream()
+                .filter(item -> item != null && !item.isBlank())
+                .map(String::trim)
+                .toList());
+        }
+        if (merged.isEmpty()) {
+            return List.of();
+        }
+        return merged.stream().distinct().limit(4).toList();
+    }
+
+    private List<String> buildProfileDrivenReasoning(LearningPlanPlanningContext context) {
+        if (context == null || context.learnerProfileSnapshot() == null) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>();
+        String learningPreference = readSnapshotValue(context, true, "learningPreference");
+        String supportPriority = readSnapshotValue(context, true, "supportPriority");
+        String timeBudget = readSnapshotValue(context, false, "timeBudget");
+        if (!learningPreference.isBlank()) {
+            result.add("画像显示学习偏好为「" + learningPreference + "」，本轮策略已按该偏好排序。");
+        }
+        if (!supportPriority.isBlank()) {
+            result.add("画像显示当前支持优先级为「" + supportPriority + "」，因此优先安排对应补齐动作。");
+        }
+        if (result.size() < 2 && !timeBudget.isBlank()) {
+            result.add("画像约束中的时间预算为「" + timeBudget + "」，当前节奏已做匹配。");
+        }
+        return result.stream().limit(2).toList();
+    }
+
+    private List<String> buildRiskFlags(List<String> profileConflicts) {
+        if (profileConflicts == null || profileConflicts.isEmpty()) {
+            return List.of();
+        }
+        List<String> flags = new ArrayList<>();
+        if (profileConflicts.stream().anyMatch(item -> item.contains("OVERCONFIDENCE"))) {
+            flags.add("OVERCONFIDENCE_RISK");
+        }
+        return flags.stream().distinct().toList();
+    }
+
+    private List<String> buildProfileConflicts(LearningPlanPlanningContext context) {
+        if (context == null || context.learnerProfileSnapshot() == null) {
+            return List.of();
+        }
+        List<String> conflicts = new ArrayList<>();
+        String foundationLevel = readFeatureValue(context, "foundation_level");
+        String practiceExperience = readFeatureValue(context, "practice_experience");
+        boolean selfRatedHigh = "PROFICIENT".equals(foundationLevel) || "ADVANCED".equals(foundationLevel);
+        boolean weakExperience = "NONE".equals(practiceExperience) || "COURSEWORK".equals(practiceExperience);
+        boolean weakRuntimeSignal = context.learnerSignalSnapshot() != null
+            && (isWeakTier(context.learnerSignalSnapshot().conceptUnderstanding())
+            || isWeakTier(context.learnerSignalSnapshot().relationshipUnderstanding())
+            || isWeakTier(context.learnerSignalSnapshot().codeMapping()));
+        if (selfRatedHigh && (weakExperience || weakRuntimeSignal)) {
+            conflicts.add("OVERCONFIDENCE_PROFILE_CONFLICT");
+        }
+        return conflicts.stream().distinct().toList();
+    }
+
+    private boolean isWeakTier(com.pandanav.learning.domain.enums.LearnerSignalTier tier) {
+        return tier == com.pandanav.learning.domain.enums.LearnerSignalTier.WEAK;
+    }
+
+    private String readSnapshotValue(LearningPlanPlanningContext context, boolean strategyHints, String key) {
+        if (context == null || context.learnerProfileSnapshot() == null || key == null || key.isBlank()) {
+            return "";
+        }
+        Map<String, Object> source = strategyHints
+            ? context.learnerProfileSnapshot().getStrategyHints()
+            : context.learnerProfileSnapshot().getConstraints();
+        if (source == null || source.isEmpty()) {
+            return "";
+        }
+        Object value = source.get(key);
+        if (value == null) {
+            return "";
+        }
+        return String.valueOf(value).trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String readFeatureValue(LearningPlanPlanningContext context, String featureKey) {
+        if (context == null
+            || context.learnerProfileSnapshot() == null
+            || context.learnerProfileSnapshot().getFeatureSummary() == null
+            || featureKey == null
+            || featureKey.isBlank()) {
+            return "";
+        }
+        Object features = context.learnerProfileSnapshot().getFeatureSummary().get("features");
+        if (!(features instanceof List<?> list)) {
+            return "";
+        }
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> map)) {
+                continue;
+            }
+            Object key = map.get("featureKey");
+            if (key == null || !featureKey.equalsIgnoreCase(String.valueOf(key).trim())) {
+                continue;
+            }
+            Object value = map.get("featureValue");
+            if (value != null) {
+                return String.valueOf(value).trim().toUpperCase(Locale.ROOT);
+            }
+        }
+        return "";
     }
 
     private Integer resolveEstimatedMinutes(LearningPlanSummary summary) {

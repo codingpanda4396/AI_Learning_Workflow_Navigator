@@ -7,6 +7,7 @@ public record LearningPlanSummary(
     String recommendedStartNodeId,
     String recommendedStartNodeName,
     String recommendedPace,
+    String selectedStrategyCode,
     Integer estimatedMinutes,
     Integer estimatedNodeCount,
     Integer estimatedStageCount,

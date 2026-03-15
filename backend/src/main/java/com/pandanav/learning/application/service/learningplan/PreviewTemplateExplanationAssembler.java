@@ -401,6 +401,12 @@ public class PreviewTemplateExplanationAssembler {
     }
 
     private String resolveRecommendedStrategyCode(LearningPlanPlanningContext context, LearningPlanPreview preview) {
+        if (preview != null
+            && preview.summary() != null
+            && preview.summary().selectedStrategyCode() != null
+            && !preview.summary().selectedStrategyCode().isBlank()) {
+            return preview.summary().selectedStrategyCode().trim();
+        }
         if (context != null && context.requestedStrategy() != null && !context.requestedStrategy().isBlank()) {
             return context.requestedStrategy().trim();
         }

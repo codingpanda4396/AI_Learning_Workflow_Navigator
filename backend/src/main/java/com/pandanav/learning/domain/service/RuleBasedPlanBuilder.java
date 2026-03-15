@@ -40,6 +40,7 @@ public class RuleBasedPlanBuilder {
                 startNode.planNodeId(),
                 startNode.nodeName(),
                 context.adjustments().intensity(),
+                resolveSelectedStrategyCode(context),
                 totalMinutes,
                 selected.size(),
                 4,
@@ -200,6 +201,22 @@ public class RuleBasedPlanBuilder {
 
     private String resolvePriority(LearningPlanContextNode startNode) {
         return startNode.mastery() != null && startNode.mastery() < 50 ? "HIGH" : "MEDIUM";
+    }
+
+    private String resolveSelectedStrategyCode(LearningPlanPlanningContext context) {
+        if (context.requestedStrategy() != null && !context.requestedStrategy().isBlank()) {
+            return context.requestedStrategy().trim().toUpperCase();
+        }
+        if ("PRACTICE_DRIVEN".equalsIgnoreCase(context.adjustments().learningMode())) {
+            return "PRACTICE_FIRST";
+        }
+        if ("LIGHT".equalsIgnoreCase(context.adjustments().intensity())) {
+            return "COMPRESSED_10_MIN";
+        }
+        if (!context.adjustments().preferPrerequisite()) {
+            return "FAST_TRACK";
+        }
+        return "FOUNDATION_FIRST";
     }
 
     private List<PlanAlternative> buildAlternatives(LearningPlanContextNode startNode) {

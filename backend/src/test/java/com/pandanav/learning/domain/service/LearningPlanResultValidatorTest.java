@@ -119,6 +119,7 @@ class LearningPlanResultValidatorTest {
                 "101",
                 "tree basics",
                 "STANDARD",
+                "FOUNDATION_FIRST",
                 36,
                 2,
                 4,
