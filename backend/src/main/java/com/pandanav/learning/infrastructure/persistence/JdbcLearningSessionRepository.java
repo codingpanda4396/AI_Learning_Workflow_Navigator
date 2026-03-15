@@ -58,7 +58,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
             LearningSession session = jdbcTemplate.queryForObject(
                 """
                     SELECT id, user_id, user_pk, course_id, chapter_id, goal_text, current_node_id, current_stage,
-                           status, completed_at, last_active_at, created_at, updated_at
+                           current_plan_instance_id, status, completed_at, last_active_at, created_at, updated_at
                     FROM learning_session
                     WHERE id = ?
                     """,
@@ -77,7 +77,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
             LearningSession session = jdbcTemplate.queryForObject(
                 """
                     SELECT id, user_id, user_pk, course_id, chapter_id, goal_text, current_node_id, current_stage,
-                           status, completed_at, last_active_at, created_at, updated_at
+                           current_plan_instance_id, status, completed_at, last_active_at, created_at, updated_at
                     FROM learning_session
                     WHERE user_id = ?
                     ORDER BY created_at DESC, id DESC
@@ -98,7 +98,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
             LearningSession session = jdbcTemplate.queryForObject(
                 """
                     SELECT id, user_id, user_pk, course_id, chapter_id, goal_text, current_node_id, current_stage,
-                           status, completed_at, last_active_at, created_at, updated_at
+                           current_plan_instance_id, status, completed_at, last_active_at, created_at, updated_at
                     FROM learning_session
                     WHERE id = ? AND user_pk = ?
                     """,
@@ -118,7 +118,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
             LearningSession session = jdbcTemplate.queryForObject(
                 """
                     SELECT id, user_id, user_pk, course_id, chapter_id, goal_text, current_node_id, current_stage,
-                           status, completed_at, last_active_at, created_at, updated_at
+                           current_plan_instance_id, status, completed_at, last_active_at, created_at, updated_at
                     FROM learning_session
                     WHERE user_pk = ?
                       AND status IN (
@@ -143,7 +143,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
             return jdbcTemplate.query(
                 """
                     SELECT id, user_id, user_pk, course_id, chapter_id, goal_text, current_node_id, current_stage,
-                           status, completed_at, last_active_at, created_at, updated_at
+                           current_plan_instance_id, status, completed_at, last_active_at, created_at, updated_at
                     FROM learning_session
                     WHERE user_pk = ?
                     ORDER BY last_active_at DESC, id DESC
@@ -158,7 +158,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
         return jdbcTemplate.query(
             """
                 SELECT id, user_id, user_pk, course_id, chapter_id, goal_text, current_node_id, current_stage,
-                       status, completed_at, last_active_at, created_at, updated_at
+                       current_plan_instance_id, status, completed_at, last_active_at, created_at, updated_at
                 FROM learning_session
                 WHERE user_pk = ?
                   AND status = ?
@@ -225,6 +225,21 @@ public class JdbcLearningSessionRepository implements SessionRepository {
     }
 
     @Override
+    public void updateCurrentPlanInstance(Long sessionId, Long planInstanceId) {
+        jdbcTemplate.update(
+            """
+                UPDATE learning_session
+                SET current_plan_instance_id = ?,
+                    updated_at = now(),
+                    last_active_at = now()
+                WHERE id = ?
+                """,
+            planInstanceId,
+            sessionId
+        );
+    }
+
+    @Override
     public void touchLastActive(Long sessionId) {
         jdbcTemplate.update(
             """
@@ -246,6 +261,7 @@ public class JdbcLearningSessionRepository implements SessionRepository {
         item.setChapterId(rs.getString("chapter_id"));
         item.setGoalText(rs.getString("goal_text"));
         item.setCurrentNodeId(rs.getLong("current_node_id"));
+        item.setCurrentPlanInstanceId(rs.getObject("current_plan_instance_id", Long.class));
         String stage = rs.getString("current_stage");
         item.setCurrentStage(stage == null ? null : Stage.valueOf(stage));
         item.setStatus(SessionStatus.fromDb(rs.getString("status")));

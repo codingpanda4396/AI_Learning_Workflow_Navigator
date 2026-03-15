@@ -38,19 +38,22 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
     private final TaskRepository taskRepository;
     private final TaskObjectiveTemplateStrategy taskObjectiveTemplateStrategy;
     private final PersonalizedPathPlannerService personalizedPathPlannerService;
+    private final PlanInstanceService planInstanceService;
 
     public PlanSessionTasksService(
         SessionRepository sessionRepository,
         ConceptNodeRepository conceptNodeRepository,
         TaskRepository taskRepository,
         TaskObjectiveTemplateStrategy taskObjectiveTemplateStrategy,
-        PersonalizedPathPlannerService personalizedPathPlannerService
+        PersonalizedPathPlannerService personalizedPathPlannerService,
+        PlanInstanceService planInstanceService
     ) {
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
         this.taskRepository = taskRepository;
         this.taskObjectiveTemplateStrategy = taskObjectiveTemplateStrategy;
         this.personalizedPathPlannerService = personalizedPathPlannerService;
+        this.planInstanceService = planInstanceService;
     }
 
     @Override
@@ -67,6 +70,7 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
 
         List<Task> existingTasks = taskRepository.findBySessionIdWithStatus(sessionId);
         if (!existingTasks.isEmpty()) {
+            planInstanceService.ensureActiveForSession(sessionId, null);
             sessionRepository.updateStatus(sessionId, SessionStatus.LEARNING);
             return buildPlanResponse(sessionId, existingTasks, nodes);
         }
@@ -83,6 +87,7 @@ public class PlanSessionTasksService implements PlanSessionTasksUseCase {
         appendInsertedTasks(sessionId, session.getCourseId(), session.getChapterId(), session.getGoalText(), nodes, planResult.insertedTasks(), uniqueTasks);
 
         List<Task> saved = taskRepository.saveAll(new ArrayList<>(uniqueTasks.values()));
+        planInstanceService.ensureActiveForSession(sessionId, null);
         sessionRepository.updateStatus(sessionId, SessionStatus.LEARNING);
         return buildPlanResponse(sessionId, saved, nodes);
     }

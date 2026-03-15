@@ -14,6 +14,7 @@ public class LearningSession {
     private String chapterId;
     private String goalText;
     private Long currentNodeId;
+    private Long currentPlanInstanceId;
     private Stage currentStage;
     private SessionStatus status;
     private OffsetDateTime completedAt;
@@ -83,6 +84,14 @@ public class LearningSession {
 
     public void setCurrentStage(Stage currentStage) {
         this.currentStage = currentStage;
+    }
+
+    public Long getCurrentPlanInstanceId() {
+        return currentPlanInstanceId;
+    }
+
+    public void setCurrentPlanInstanceId(Long currentPlanInstanceId) {
+        this.currentPlanInstanceId = currentPlanInstanceId;
     }
 
     public SessionStatus getStatus() {

@@ -605,6 +605,7 @@ export function normalizeOverview(data: Record<string, unknown>): SessionOvervie
 
   return {
     sessionId: toNumber(data.session_id ?? data.sessionId) ?? 0,
+    planInstanceId: toNumber(data.plan_instance_id ?? data.planInstanceId),
     courseId: String(data.course_id ?? data.courseId ?? ''),
     chapterId: String(data.chapter_id ?? data.chapterId ?? ''),
     goalText: String(data.goal_text ?? data.goalText ?? ''),

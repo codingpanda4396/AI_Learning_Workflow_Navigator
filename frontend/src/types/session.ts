@@ -40,6 +40,7 @@ export interface MasterySummaryItem {
 
 export interface SessionOverview {
   sessionId: number;
+  planInstanceId?: number;
   courseId: string;
   chapterId: string;
   goalText?: string;

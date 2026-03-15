@@ -27,6 +27,8 @@ public interface SessionRepository {
 
     void updateStatus(Long sessionId, SessionStatus status);
 
+    void updateCurrentPlanInstance(Long sessionId, Long planInstanceId);
+
     void touchLastActive(Long sessionId);
 }
 

@@ -25,6 +25,7 @@ import com.pandanav.learning.api.dto.plan.PlanTaskPreviewResponse;
 import com.pandanav.learning.application.command.AdjustLearningPlanCommand;
 import com.pandanav.learning.application.command.ConfirmLearningPlanCommand;
 import com.pandanav.learning.application.command.PreviewLearningPlanCommand;
+import com.pandanav.learning.application.service.PlanInstanceService;
 import com.pandanav.learning.domain.enums.LearningPlanStatus;
 import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.enums.Stage;
@@ -99,6 +100,7 @@ public class LearningPlanService {
     private final LearningPlanMetricsLogger learningPlanMetricsLogger;
     private final PersonalizedPreviewViewAssembler personalizedPreviewViewAssembler;
     private final PreviewDisplayCodeMapper previewDisplayCodeMapper;
+    private final PlanInstanceService planInstanceService;
 
     public LearningPlanService(
         PlanningContextAssembler planningContextAssembler,
@@ -115,7 +117,8 @@ public class LearningPlanService {
         LearnerEvidenceAggregator learnerEvidenceAggregator,
         LearningPlanMetricsLogger learningPlanMetricsLogger,
         PersonalizedPreviewViewAssembler personalizedPreviewViewAssembler,
-        PreviewDisplayCodeMapper previewDisplayCodeMapper
+        PreviewDisplayCodeMapper previewDisplayCodeMapper,
+        PlanInstanceService planInstanceService
     ) {
         this.planningContextAssembler = planningContextAssembler;
         this.learningPlanOrchestrator = learningPlanOrchestrator;
@@ -132,6 +135,7 @@ public class LearningPlanService {
         this.learningPlanMetricsLogger = learningPlanMetricsLogger;
         this.personalizedPreviewViewAssembler = personalizedPreviewViewAssembler;
         this.previewDisplayCodeMapper = previewDisplayCodeMapper;
+        this.planInstanceService = planInstanceService;
     }
 
     public LearningPlanPreviewResponse preview(PreviewLearningPlanCommand command) {
@@ -273,6 +277,7 @@ public class LearningPlanService {
         LearningPlanAggregate aggregate = load(command.previewId(), command.userId());
         LearningPlan previewDraft = aggregate.plan();
         if (previewDraft.getSessionId() != null) {
+            planInstanceService.ensureActiveForSession(previewDraft.getSessionId(), previewDraft.getId());
             return buildConfirmResponse(previewDraft);
         }
 
@@ -310,6 +315,7 @@ public class LearningPlanService {
             tasks.add(buildTask(savedSession.getId(), conceptNode.getId(), Stage.REFLECTION, conceptNode.getName()));
         }
         List<Task> savedTasks = taskRepository.saveAll(tasks);
+        planInstanceService.ensureActiveForSession(savedSession.getId(), previewDraft.getId());
         sessionRepository.updateStatus(savedSession.getId(), SessionStatus.LEARNING);
 
         previewDraft.setSessionId(savedSession.getId());

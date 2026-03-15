@@ -18,6 +18,7 @@ import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.MasteryRepository;
 import com.pandanav.learning.domain.repository.PracticeFeedbackReportRepository;
 import com.pandanav.learning.domain.repository.PracticeQuizRepository;
+import com.pandanav.learning.domain.repository.PlanInstanceRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
 import com.pandanav.learning.infrastructure.exception.NotFoundException;
@@ -36,6 +37,7 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
     private final MasteryRepository masteryRepository;
     private final PracticeQuizRepository practiceQuizRepository;
     private final PracticeFeedbackReportRepository practiceFeedbackReportRepository;
+    private final PlanInstanceRepository planInstanceRepository;
 
     public GetSessionOverviewService(
         SessionRepository sessionRepository,
@@ -43,7 +45,8 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
         ConceptNodeRepository conceptNodeRepository,
         MasteryRepository masteryRepository,
         PracticeQuizRepository practiceQuizRepository,
-        PracticeFeedbackReportRepository practiceFeedbackReportRepository
+        PracticeFeedbackReportRepository practiceFeedbackReportRepository,
+        PlanInstanceRepository planInstanceRepository
     ) {
         this.sessionRepository = sessionRepository;
         this.taskRepository = taskRepository;
@@ -51,6 +54,7 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
         this.masteryRepository = masteryRepository;
         this.practiceQuizRepository = practiceQuizRepository;
         this.practiceFeedbackReportRepository = practiceFeedbackReportRepository;
+        this.planInstanceRepository = planInstanceRepository;
     }
 
     @Override
@@ -98,9 +102,13 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
                 .divide(BigDecimal.valueOf(totalTaskCount), 4, java.math.RoundingMode.HALF_UP);
 
         SessionOverviewSummaryResponse summary = buildSummary(session.getId(), session.getStatus(), session.getCurrentStage(), nextTask, timelineTasks);
+        Long planInstanceId = session.getCurrentPlanInstanceId() != null
+            ? session.getCurrentPlanInstanceId()
+            : planInstanceRepository.findActiveBySessionId(session.getId()).map(pi -> pi.getId()).orElse(null);
 
         return new SessionOverviewResponse(
             session.getId(),
+            planInstanceId,
             session.getCourseId(),
             session.getChapterId(),
             session.getGoalText(),

@@ -10,6 +10,9 @@ public record SessionOverviewResponse(
     @JsonProperty("session_id")
     @Schema(name = "session_id", example = "123")
     Long sessionId,
+    @JsonProperty("plan_instance_id")
+    @Schema(name = "plan_instance_id", example = "2001", nullable = true)
+    Long planInstanceId,
     @JsonProperty("course_id")
     @Schema(name = "course_id", example = "computer_network")
     String courseId,
