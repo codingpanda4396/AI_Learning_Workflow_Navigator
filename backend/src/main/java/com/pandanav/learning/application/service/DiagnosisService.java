@@ -50,6 +50,7 @@ import com.pandanav.learning.domain.repository.LearnerFeatureSignalRepository;
 import com.pandanav.learning.domain.repository.LearnerProfileSnapshotRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.application.service.diagnosis.DiagnosisProfileDerivationService;
+import com.pandanav.learning.application.service.diagnosis.SnapshotToDisplayMapper;
 import com.pandanav.learning.application.service.diagnosis.StructuredDiagnosisQuestionFactory;
 import com.pandanav.learning.domain.service.CapabilityProfileBuilder;
 import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
@@ -110,6 +111,7 @@ public class DiagnosisService {
     private final ObjectMapper objectMapper;
     private final StructuredDiagnosisQuestionFactory structuredDiagnosisQuestionFactory;
     private final DiagnosisProfileDerivationService diagnosisProfileDerivationService;
+    private final SnapshotToDisplayMapper snapshotToDisplayMapper;
 
     public DiagnosisService(
         SessionRepository sessionRepository,
@@ -145,7 +147,8 @@ public class DiagnosisService {
         LlmProperties llmProperties,
         ObjectMapper objectMapper,
         StructuredDiagnosisQuestionFactory structuredDiagnosisQuestionFactory,
-        DiagnosisProfileDerivationService diagnosisProfileDerivationService
+        DiagnosisProfileDerivationService diagnosisProfileDerivationService,
+        SnapshotToDisplayMapper snapshotToDisplayMapper
     ) {
         this.sessionRepository = sessionRepository;
         this.diagnosisSessionRepository = diagnosisSessionRepository;
@@ -181,6 +184,7 @@ public class DiagnosisService {
         this.objectMapper = objectMapper;
         this.structuredDiagnosisQuestionFactory = structuredDiagnosisQuestionFactory;
         this.diagnosisProfileDerivationService = diagnosisProfileDerivationService;
+        this.snapshotToDisplayMapper = snapshotToDisplayMapper;
     }
 
     /** 主链路：固定 8 题（6 通用 + 2 主题），不调用 LLM，首屏快速响应。 */
@@ -348,12 +352,16 @@ public class DiagnosisService {
 
         LearnerProfileSnapshot savedSnapshot = learnerProfileSnapshotRepository.saveOrUpdate(snapshot);
         diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.EVALUATED, OffsetDateTime.now());
-        DiagnosisExplanationAssembler.DiagnosisExplanation explanation = diagnosisExplanationAssembler.assemble(
+        // 解释与展示均以 learnerProfileSnapshot 为单一事实源
+        DiagnosisExplanationAssembler.DiagnosisExplanation explanation = diagnosisExplanationAssembler.assembleFromSnapshot(
             questions,
             answers,
-            draft,
+            structuredSnapshot,
             answerCodesByDimension
         );
+        CapabilityProfileDto displayProfile = snapshotToDisplayMapper.toCapabilityProfileDto(structuredSnapshot);
+        String insightsSummary = structuredSnapshot.summary() != null ? nullToEmpty(structuredSnapshot.summary().currentState()) : savedProfile.getSummaryText();
+        String planExplanation = buildPlanExplanationFromSnapshot(structuredSnapshot);
 
         log.info(
             "DiagnosisService: submit completed. diagnosisId={}, sessionId={}, reasoningStepCount={}, strengthSourceCount={}, weaknessSourceCount={}, featureSignalCount={}, snapshotId={}",
@@ -370,10 +378,10 @@ public class DiagnosisService {
             diagnosisSession.getId(),
             learningSession.getId(),
             DiagnosisStatus.EVALUATED.name(),
-            toProfileDto(savedProfile),
+            displayProfile,
             new DiagnosisInsightsDto(
-                savedProfile.getSummaryText(),
-                savedProfile.getPlanExplanation(),
+                insightsSummary,
+                planExplanation,
                 savedSnapshot.getFeatureSummary(),
                 savedSnapshot.getStrategyHints(),
                 savedSnapshot.getConstraints()
@@ -386,6 +394,40 @@ public class DiagnosisService {
             explanation.weaknessSources(),
             structuredSnapshot
         );
+    }
+
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s.trim();
+    }
+
+    /** 从 snapshot 推导 planExplanation，与 planHints / riskTags / foundationLevel / primaryBlocker 一致。 */
+    private String buildPlanExplanationFromSnapshot(LearnerProfileStructuredSnapshotDto snapshot) {
+        if (snapshot == null) return "";
+        String foundation = nullToEmpty(snapshot.foundationLevel());
+        String blocker = nullToEmpty(snapshot.primaryBlocker());
+        String goalType = nullToEmpty(snapshot.goalType());
+        LearnerProfileStructuredSnapshotDto.PlanHintsDto hints = snapshot.planHints();
+        List<String> riskTags = snapshot.riskTags();
+        StringBuilder sb = new StringBuilder();
+        if (hints != null) {
+            sb.append("入口方式：").append(hints.entryMode() != null ? hints.entryMode() : "FOUNDATION_FIRST");
+            if (hints.pace() != null) sb.append("，节奏：").append(hints.pace());
+            if (hints.taskGranularity() != null) sb.append("，任务粒度：").append(hints.taskGranularity());
+            sb.append("。");
+        }
+        if ("BEGINNER".equals(foundation)) {
+            sb.append(" 建议先建立基本概念框架再推进。");
+        }
+        if ("FOLLOW_BUT_CANNOT_DO".equals(blocker)) {
+            sb.append(" 会优先用示例带你建立操作过程。");
+        }
+        if (riskTags != null && !riskTags.isEmpty()) {
+            sb.append(" 已标记风险：").append(String.join("、", riskTags)).append("，规划时会考虑。");
+        }
+        if (sb.length() == 0) {
+            sb.append("根据你的选择，系统会据此安排下一步学习节奏。");
+        }
+        return sb.toString().trim();
     }
 
     private DiagnosisExplanationDto buildCreatePhaseExplanation(String goalText, String topic) {

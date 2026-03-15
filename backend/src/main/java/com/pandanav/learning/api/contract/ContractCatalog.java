@@ -129,6 +129,39 @@ public final class ContractCatalog {
         "IMMERSIVE", "每周 10 小时以上"
     );
 
+    /** 诊断 snapshot 基础阶段 → 展示（与 learnerProfileSnapshot.foundationLevel 一致，单一事实源）. */
+    private static final Map<String, String> SNAPSHOT_FOUNDATION_LEVEL_LABELS = Map.of(
+        "BEGINNER", "入门",
+        "BASIC", "基础阶段",
+        "PROFICIENT", "具备基础应用能力",
+        "ADVANCED", "可独立应用"
+    );
+
+    /** 诊断 snapshot 目标类型 → 展示（与 learnerProfileSnapshot.goalType 一致）. */
+    private static final Map<String, String> SNAPSHOT_GOAL_TYPE_LABELS = Map.of(
+        "QUICK_START", "快速入门",
+        "EXAM", "应对考试",
+        "INTERVIEW", "面试准备",
+        "PROJECT", "项目实践",
+        "PATCH_WEAKNESS", "查缺补漏"
+    );
+
+    /** 诊断 snapshot 学习方式偏好 → 展示（与 learnerProfileSnapshot.learningPreference 一致）. */
+    private static final Map<String, String> SNAPSHOT_PREFERENCE_LABELS = Map.of(
+        "VISUAL_FIRST", "先看图解或结构示意",
+        "TEXT_FIRST", "先看文字讲解",
+        "CODE_FIRST", "先看代码示例",
+        "PRACTICE_FIRST", "先做小题再总结"
+    );
+
+    /** 诊断单次时长 → 展示（与 learnerProfileSnapshot.timeBudget 一致）. */
+    private static final Map<String, String> SNAPSHOT_TIME_BUDGET_LABELS = Map.of(
+        "SHORT_10", "10 分钟左右",
+        "MEDIUM_30", "20~30 分钟",
+        "LONG_60", "40~60 分钟",
+        "SYSTEMATIC", "可以系统学一轮"
+    );
+
     private static final Map<String, String> NEXT_ACTION_LABELS = Map.of(
         "PATH_PLAN", "进入个性化学习路径"
     );
@@ -288,6 +321,26 @@ public final class ContractCatalog {
             ? normalize(codeOrLabel)
             : diagnosisOptionCode(DiagnosisDimension.TIME_BUDGET, codeOrLabel);
         return new CodeLabelDto(code, TIME_BUDGET_LABELS.getOrDefault(code, diagnosisOptionLabel(DiagnosisDimension.TIME_BUDGET, codeOrLabel)));
+    }
+
+    /** 从 learnerProfileSnapshot.foundationLevel 生成展示（单一事实源展示层）. */
+    public static CodeLabelDto snapshotFoundationLevel(String code) {
+        return labeled(code, SNAPSHOT_FOUNDATION_LEVEL_LABELS);
+    }
+
+    /** 从 learnerProfileSnapshot.goalType 生成展示. */
+    public static CodeLabelDto snapshotGoalType(String code) {
+        return labeled(code, SNAPSHOT_GOAL_TYPE_LABELS);
+    }
+
+    /** 从 learnerProfileSnapshot.learningPreference 生成展示. */
+    public static CodeLabelDto snapshotPreference(String code) {
+        return labeled(code, SNAPSHOT_PREFERENCE_LABELS);
+    }
+
+    /** 从 learnerProfileSnapshot.timeBudget 生成展示（单次时长）. */
+    public static CodeLabelDto snapshotTimeBudgetSession(String code) {
+        return labeled(code, SNAPSHOT_TIME_BUDGET_LABELS);
     }
 
     public static CodeLabelDto nextAction(String code) {

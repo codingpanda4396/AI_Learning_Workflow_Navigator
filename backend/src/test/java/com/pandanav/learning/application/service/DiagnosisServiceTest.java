@@ -9,6 +9,7 @@ import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionRequest;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionResponse;
 import com.pandanav.learning.application.service.diagnosis.DefaultTopicQuestionBank;
 import com.pandanav.learning.application.service.diagnosis.DiagnosisProfileDerivationService;
+import com.pandanav.learning.application.service.diagnosis.SnapshotToDisplayMapper;
 import com.pandanav.learning.application.service.diagnosis.StructuredDiagnosisQuestionFactory;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.enums.DiagnosisStatus;
@@ -110,7 +111,8 @@ class DiagnosisServiceTest {
             llmPropertiesWithCapabilitySummaryStrict(),
             objectMapper,
             new StructuredDiagnosisQuestionFactory(new DefaultTopicQuestionBank()),
-            new DiagnosisProfileDerivationService()
+            new DiagnosisProfileDerivationService(),
+            new SnapshotToDisplayMapper()
         );
     }
 
@@ -206,15 +208,16 @@ class DiagnosisServiceTest {
 
         SubmitDiagnosisSessionResponse response = diagnosisService.submitDiagnosisSession(501L, buildSubmitRequest(), 10L);
         assertEquals("EVALUATED", response.status());
-        assertEquals("INTERMEDIATE", response.capabilityProfile().currentLevel().code());
-        assertEquals("INTERVIEW", response.capabilityProfile().goalOrientation().code());
-        assertEquals("PRACTICE_FIRST", response.capabilityProfile().learningPreference().code());
+        // capabilityProfile 由 learnerProfileSnapshot 派生，与 snapshot 一致（本测试为 5 题旧格式，snapshot 仅有 q_foundation/q_time_budget）
+        assertEquals("BASIC", response.capabilityProfile().currentLevel().code());
         assertEquals("STANDARD", response.capabilityProfile().timeBudget().code());
         assertEquals("RULE", response.fallback().contentSource());
-        assertTrue(response.insights().planExplanation().contains("training"));
+        assertTrue(response.insights().summary() != null && !response.insights().summary().isBlank());
         assertEquals(5, response.reasoningSteps().size());
-        assertTrue(response.strengthSources().size() >= 1);
-        assertTrue(response.weaknessSources().size() >= 1);
+        // strength/weakness 仅当可追溯到 sourceQuestionId 时产出，不允许 unknown-question
+        assertFalse(response.reasoningSteps().stream().anyMatch(s -> "unknown-question".equals(s.questionId())));
+        assertFalse(response.strengthSources().stream().anyMatch(s -> "unknown-question".equals(s.sourceQuestionId())));
+        assertFalse(response.weaknessSources().stream().anyMatch(s -> "unknown-question".equals(s.sourceQuestionId())));
 
         ArgumentCaptor<List<DiagnosisAnswer>> answersCaptor = ArgumentCaptor.forClass(List.class);
         verify(diagnosisAnswerRepository).saveAll(answersCaptor.capture());
