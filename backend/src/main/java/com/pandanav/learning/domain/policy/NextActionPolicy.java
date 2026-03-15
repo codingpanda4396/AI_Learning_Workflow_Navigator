@@ -7,7 +7,11 @@ import java.util.Set;
 
 public interface NextActionPolicy {
 
-    NextAction decide(int score, Set<ErrorTag> errorTags);
+    default NextAction decide(int score, Set<ErrorTag> errorTags) {
+        return decide(score, errorTags, NextActionContext.empty()).action();
+    }
+
+    NextActionDecision decide(int score, Set<ErrorTag> errorTags, NextActionContext context);
 }
 
 

@@ -1,7 +1,6 @@
 package com.pandanav.learning.application.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pandanav.learning.api.dto.task.FeedbackResponse;
 import com.pandanav.learning.api.dto.task.SubmitTaskRequest;
 import com.pandanav.learning.api.dto.task.SubmitTaskResponse;
 import com.pandanav.learning.application.service.MasteryUpdateService.MasteryUpdateResult;
@@ -13,8 +12,10 @@ import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.Task;
+import com.pandanav.learning.domain.policy.NextActionDecision;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.EvidenceRepository;
+import com.pandanav.learning.domain.repository.LearningStepRepository;
 import com.pandanav.learning.domain.repository.LlmCallLogRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
@@ -32,6 +33,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +48,8 @@ class SubmitTrainingAnswerServiceTest {
     private ConceptNodeRepository conceptNodeRepository;
     @Mock
     private EvidenceRepository evidenceRepository;
+    @Mock
+    private LearningStepRepository learningStepRepository;
     @Mock
     private LlmCallLogRepository llmCallLogRepository;
     @Mock
@@ -64,6 +68,7 @@ class SubmitTrainingAnswerServiceTest {
             sessionRepository,
             conceptNodeRepository,
             evidenceRepository,
+            learningStepRepository,
             llmCallLogRepository,
             answerEvaluator,
             masteryUpdateService,
@@ -104,7 +109,9 @@ class SubmitTrainingAnswerServiceTest {
         when(masteryUpdateService.update("u1", 101L, "Three-way Handshake", 72)).thenReturn(
             new MasteryUpdateResult(new BigDecimal("0.550"), new BigDecimal("0.010"), new BigDecimal("0.560"))
         );
-        when(nextActionPolicyService.decide(any(), any())).thenReturn(NextAction.INSERT_TRAINING_VARIANTS);
+        when(nextActionPolicyService.decideWithReason(any(), any(), any(), anyInt(), anyInt()))
+            .thenReturn(new NextActionDecision(NextAction.INSERT_TRAINING_VARIANTS, "need variants"));
+        when(learningStepRepository.findByTaskIdOrderByStepOrder(any())).thenReturn(List.of());
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> {
             Task t = invocation.getArgument(0);
             t.setId(2001L);

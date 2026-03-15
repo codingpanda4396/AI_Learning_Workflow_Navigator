@@ -1,5 +1,7 @@
 package com.pandanav.learning.application.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pandanav.learning.api.dto.session.MasterySummaryResponse;
 import com.pandanav.learning.api.dto.session.NextTaskResponse;
 import com.pandanav.learning.api.dto.session.ProgressResponse;
@@ -13,8 +15,10 @@ import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.model.PracticeFeedbackReport;
 import com.pandanav.learning.domain.model.PracticeQuiz;
 import com.pandanav.learning.domain.model.Task;
+import com.pandanav.learning.domain.model.Evidence;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
+import com.pandanav.learning.domain.repository.EvidenceRepository;
 import com.pandanav.learning.domain.repository.MasteryRepository;
 import com.pandanav.learning.domain.repository.PracticeFeedbackReportRepository;
 import com.pandanav.learning.domain.repository.PracticeQuizRepository;
@@ -26,6 +30,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Comparator;
 import java.util.Optional;
 
 @Service
@@ -33,11 +38,14 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
 
     private final SessionRepository sessionRepository;
     private final TaskRepository taskRepository;
+    @SuppressWarnings("unused")
     private final ConceptNodeRepository conceptNodeRepository;
     private final MasteryRepository masteryRepository;
     private final PracticeQuizRepository practiceQuizRepository;
     private final PracticeFeedbackReportRepository practiceFeedbackReportRepository;
     private final PlanInstanceRepository planInstanceRepository;
+    private final EvidenceRepository evidenceRepository;
+    private final ObjectMapper objectMapper;
 
     public GetSessionOverviewService(
         SessionRepository sessionRepository,
@@ -46,7 +54,9 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
         MasteryRepository masteryRepository,
         PracticeQuizRepository practiceQuizRepository,
         PracticeFeedbackReportRepository practiceFeedbackReportRepository,
-        PlanInstanceRepository planInstanceRepository
+        PlanInstanceRepository planInstanceRepository,
+        EvidenceRepository evidenceRepository,
+        ObjectMapper objectMapper
     ) {
         this.sessionRepository = sessionRepository;
         this.taskRepository = taskRepository;
@@ -55,6 +65,8 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
         this.practiceQuizRepository = practiceQuizRepository;
         this.practiceFeedbackReportRepository = practiceFeedbackReportRepository;
         this.planInstanceRepository = planInstanceRepository;
+        this.evidenceRepository = evidenceRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -180,6 +192,12 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
 
         String recentReportSummary = findRecentReportSummary(sessionId, timelineTasks)
             .orElse("No report is available yet for this session.");
+        Optional<ActionHint> actionHint = findLatestActionHint(timelineTasks);
+        String recommendedAction = actionHint.map(ActionHint::action).orElse(null);
+        String recommendedActionReason = actionHint.map(ActionHint::reason).orElse(null);
+        if (recommendedActionReason != null && !recommendedActionReason.isBlank()) {
+            nextStepHint = recommendedActionReason;
+        }
 
         return new SessionOverviewSummaryResponse(
             currentTaskTitle,
@@ -187,7 +205,9 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
             nextStepHint,
             primaryActionLabel,
             primaryActionPath,
-            recentReportSummary
+            recentReportSummary,
+            recommendedAction,
+            recommendedActionReason
         );
     }
 
@@ -212,6 +232,38 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
             .filter(text -> text != null && !text.isBlank());
     }
 
+    private Optional<ActionHint> findLatestActionHint(List<Task> timelineTasks) {
+        Optional<Task> latestTrainingTask = timelineTasks.stream()
+            .filter(task -> task.getStage() == Stage.TRAINING)
+            .max(Comparator.comparing(Task::getId, Comparator.nullsLast(Long::compareTo)));
+        if (latestTrainingTask.isEmpty()) {
+            return Optional.empty();
+        }
+        return evidenceRepository.findByTaskId(latestTrainingTask.get().getId()).stream()
+            .max(Comparator
+                .comparing(Evidence::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Evidence::getId, Comparator.nullsLast(Long::compareTo)))
+            .flatMap(this::parseActionHintFromEvidence);
+    }
+
+    private Optional<ActionHint> parseActionHintFromEvidence(Evidence evidence) {
+        String contentJson = evidence.getContentJson();
+        if (contentJson == null || contentJson.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonNode payload = objectMapper.readTree(contentJson);
+            String action = payload.path("next_action").asText(null);
+            String reason = payload.path("next_action_reason").asText(null);
+            if ((action == null || action.isBlank()) && (reason == null || reason.isBlank())) {
+                return Optional.empty();
+            }
+            return Optional.of(new ActionHint(action, reason));
+        } catch (Exception ex) {
+            return Optional.empty();
+        }
+    }
+
     private String stageTitle(Stage stage) {
         if (stage == null) {
             return "Continue current session";
@@ -234,6 +286,9 @@ public class GetSessionOverviewService implements GetSessionOverviewUseCase {
             case TRAINING -> "Use the current training task to confirm mastery and expose weak points.";
             case REFLECTION -> "Review the latest results and stabilize the concepts that are still weak.";
         };
+    }
+
+    record ActionHint(String action, String reason) {
     }
 }
 

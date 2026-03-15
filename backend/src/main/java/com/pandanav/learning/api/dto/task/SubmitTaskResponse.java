@@ -37,6 +37,8 @@ public record SubmitTaskResponse(
     BigDecimal masteryAfter,
     @JsonProperty("next_action")
     String nextAction,
+    @JsonProperty("next_action_reason")
+    String nextActionReason,
     @JsonProperty("next_task")
     NextTaskResponse nextTask
 ) {

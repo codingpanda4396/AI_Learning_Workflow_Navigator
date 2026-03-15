@@ -27,6 +27,7 @@ import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.LearningStep;
 import com.pandanav.learning.domain.model.LlmCallLog;
 import com.pandanav.learning.domain.model.Task;
+import com.pandanav.learning.domain.policy.NextActionDecision;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.EvidenceRepository;
 import com.pandanav.learning.domain.repository.LearningStepRepository;
@@ -179,19 +180,37 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             ));
         }
 
-        persistEvidence(session, task, evaluation.score(), parsedErrorTags, feedbackResponse, evaluation.strengths());
+        LearningStep currentStep = resolveCurrentStep(task.getId());
+        List<LearningStep> allSteps = learningStepRepository.findByTaskIdOrderByStepOrder(task.getId());
+        int consecutiveStepFailures = resolveConsecutiveStepFailures(allSteps);
+        int stageDeviationScore = resolveStageDeviationScore(evaluation.score(), task.getStage());
 
-        NextAction action = nextActionPolicyService.decide(evaluation.score(), parsedErrorTags);
+        NextActionDecision decision = nextActionPolicyService.decideWithReason(
+            evaluation.score(),
+            parsedErrorTags,
+            task.getStage(),
+            consecutiveStepFailures,
+            stageDeviationScore
+        );
+        NextAction action = decision.action();
+        String actionReason = decision.reason();
         Task nextTask = null;
 
-        if (action == NextAction.ADVANCE_TO_NEXT_NODE) {
+        if (action == NextAction.INSERT_REMEDIAL_STEP) {
+            applyRemedialStepAdjustment(task, currentStep, allSteps);
+        } else if (action == NextAction.SKIP_CURRENT_STEP) {
+            applySkipCurrentStepAdjustment(task, currentStep);
+        } else if (action == NextAction.ADVANCE_TO_NEXT_NODE) {
             Task advanced = advanceToNextNodeIfPossible(session, task.getNodeId());
             if (advanced == null) {
                 action = NextAction.NOOP;
+                actionReason = "Current node is already the last node; keep current plan.";
             } else {
                 nextTask = advanced;
             }
-        } else if (action != NextAction.NOOP) {
+        } else if (action == NextAction.INSERT_REMEDIAL_UNDERSTANDING
+            || action == NextAction.INSERT_TRAINING_VARIANTS
+            || action == NextAction.INSERT_TRAINING_REINFORCEMENT) {
             nextTask = createAdaptiveTask(
                 session.getCourseId(),
                 session.getChapterId(),
@@ -202,6 +221,8 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
                 action
             );
         }
+
+        persistEvidence(session, task, evaluation.score(), parsedErrorTags, feedbackResponse, evaluation.strengths(), action, actionReason, currentStep);
 
         return new SubmitTaskResponse(
             task.getId(),
@@ -218,6 +239,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             mastery.masteryDelta(),
             mastery.masteryAfter(),
             action.name(),
+            actionReason,
             nextTask == null ? null : new NextTaskResponse(nextTask.getId(), nextTask.getStage().name(), nextTask.getNodeId())
         );
     }
@@ -228,7 +250,10 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         Integer score,
         List<ErrorTag> errorTags,
         FeedbackResponse feedback,
-        List<String> strengths
+        List<String> strengths,
+        NextAction nextAction,
+        String nextActionReason,
+        LearningStep currentStep
     ) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("session_id", session.getId());
@@ -241,7 +266,8 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             "fixes", feedback.fixes(),
             "strengths", strengths
         ));
-        LearningStep currentStep = resolveCurrentStep(task.getId());
+        payload.put("next_action", nextAction == null ? null : nextAction.name());
+        payload.put("next_action_reason", nextActionReason);
         if (currentStep != null) {
             payload.put("step_id", currentStep.getId());
             payload.put("step_index", currentStep.getStepOrder());
@@ -265,6 +291,79 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             .filter(step -> step.getStatus() == LearningStepStatus.ACTIVE)
             .findFirst()
             .orElseGet(() -> steps.get(steps.size() - 1));
+    }
+
+    private int resolveConsecutiveStepFailures(List<LearningStep> steps) {
+        if (steps == null || steps.isEmpty()) {
+            return 0;
+        }
+        int failures = 0;
+        for (int i = steps.size() - 1; i >= 0; i--) {
+            LearningStepStatus status = steps.get(i).getStatus();
+            if (status == LearningStepStatus.FAILED) {
+                failures++;
+            } else if (status != LearningStepStatus.TODO) {
+                break;
+            }
+        }
+        return failures;
+    }
+
+    private int resolveStageDeviationScore(Integer score, Stage stage) {
+        if (score == null || stage == null) {
+            return 0;
+        }
+        int baseline = switch (stage) {
+            case STRUCTURE -> 70;
+            case UNDERSTANDING -> 75;
+            case TRAINING -> 80;
+            case REFLECTION -> 85;
+        };
+        return Math.max(0, baseline - score);
+    }
+
+    private void applyRemedialStepAdjustment(Task task, LearningStep currentStep, List<LearningStep> allSteps) {
+        if (task.getStage() != Stage.TRAINING) {
+            return;
+        }
+        if (currentStep != null && currentStep.getStatus() == LearningStepStatus.ACTIVE) {
+            currentStep.markFailed();
+            learningStepRepository.updateStatus(currentStep.getId(), currentStep.getStatus());
+        }
+
+        int nextOrder = allSteps.stream()
+            .map(LearningStep::getStepOrder)
+            .filter(java.util.Objects::nonNull)
+            .mapToInt(Integer::intValue)
+            .max()
+            .orElse(0) + 1;
+        LearningStep remedial = new LearningStep();
+        remedial.setTaskId(task.getId());
+        remedial.setStage(task.getStage());
+        remedial.setType("REMEDIAL");
+        remedial.setStepOrder(nextOrder);
+        remedial.setStatus(LearningStepStatus.ACTIVE);
+        remedial.setObjective("补救步骤：先修复当前薄弱点，再继续后续训练。");
+        remedial.setCompletionRule(currentStep == null
+            ? new com.pandanav.learning.domain.model.CompletionRule("MANUAL_CONFIRM", 1, List.of(), 2)
+            : currentStep.getCompletionRule());
+        learningStepRepository.save(remedial);
+    }
+
+    private void applySkipCurrentStepAdjustment(Task task, LearningStep currentStep) {
+        if (task.getStage() != Stage.TRAINING || currentStep == null || currentStep.getStatus() != LearningStepStatus.ACTIVE) {
+            return;
+        }
+        currentStep.markSkipped();
+        learningStepRepository.updateStatus(currentStep.getId(), currentStep.getStatus());
+
+        learningStepRepository.findByTaskIdOrderByStepOrder(task.getId()).stream()
+            .filter(step -> step.getStatus() == LearningStepStatus.TODO)
+            .findFirst()
+            .ifPresent(step -> {
+                step.activate();
+                learningStepRepository.updateStatus(step.getId(), step.getStatus());
+            });
     }
 
     private Task createAdaptiveTask(

@@ -14,6 +14,10 @@ public record SessionOverviewSummaryResponse(
     @JsonProperty("primary_action_path")
     String primaryActionPath,
     @JsonProperty("recent_report_summary")
-    String recentReportSummary
+    String recentReportSummary,
+    @JsonProperty("recommended_action")
+    String recommendedAction,
+    @JsonProperty("recommended_action_reason")
+    String recommendedActionReason
 ) {
 }
