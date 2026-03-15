@@ -22,19 +22,19 @@ let timer: number | undefined;
 const statusText = computed(() => {
   switch (quizStore.status) {
     case 'generating':
-      return '正在生成这一轮练习题。';
+      return '正在准备练习题目。';
     case 'submitting':
-      return '正在提交答案并生成反馈。';
+      return '正在提交，即将进入学习结果评估。';
     case 'answering':
-      return '先独立作答，做完再看反馈。';
+      return '作答完成后点击下方提交。';
     case 'reviewing':
-      return '这一轮已经进入复盘阶段。';
+      return '已进入复盘。';
     case 'report-ready':
-      return '反馈已经准备好了。';
+      return '已就绪，即将跳转。';
     case 'next-round':
-      return '系统已经进入下一轮建议状态。';
+      return '已就绪。';
     case 'failed':
-      return '当前练习暂时不可用，请稍后重试。';
+      return '练习暂时不可用，请稍后重试。';
     default:
       return '';
   }
@@ -54,13 +54,11 @@ function stopPolling() {
 
 async function handleSnapshot() {
   const snapshot = await quizStore.fetchQuizStatus(sessionId.value);
-
   if (snapshot.quizStatus === 'REPORT_READY' || snapshot.quizStatus === 'REVIEWING' || snapshot.quizStatus === 'NEXT_ROUND') {
     stopPolling();
     await flowStore.goToStage('EVALUATION');
     return;
   }
-
   if (snapshot.generationStatus === 'SUCCEEDED' && snapshot.quizStatus === 'READY') {
     stopPolling();
     await quizStore.fetchQuiz(sessionId.value);
@@ -69,9 +67,7 @@ async function handleSnapshot() {
 
 function startPolling() {
   stopPolling();
-  timer = window.setInterval(async () => {
-    await handleSnapshot();
-  }, 2000);
+  timer = window.setInterval(handleSnapshot, 2000);
 }
 
 async function generate() {
@@ -107,23 +103,21 @@ onMounted(async () => {
   }
 });
 
-onBeforeUnmount(() => {
-  stopPolling();
-});
+onBeforeUnmount(stopPolling);
 </script>
 
 <template>
   <AppShell>
     <div class="space-y-6 pb-28">
       <section class="app-hero">
-        <p class="app-eyebrow">学习检测</p>
-        <h1 class="app-title-lg mt-4">先专注答题，反馈会在提交后自动生成</h1>
+        <p class="app-eyebrow">练习</p>
+        <h1 class="app-title-lg mt-4">完成作答后提交，查看学习结果评估</h1>
         <p class="app-text-lead mt-4 max-w-2xl">
-          不需要同时处理太多信息。先做题，系统再告诉你这轮学会了什么、下一步该怎么走。
+          独立完成下方题目，提交后系统会给出本轮的掌握情况与下一步建议。
         </p>
       </section>
 
-      <StepProgress v-if="questionCount" :current="answeredCount" :total="questionCount" label="已完成题数" />
+      <StepProgress v-if="questionCount" :current="answeredCount" :total="questionCount" label="已完成" />
       <InfoHint v-if="statusText">{{ statusText }}</InfoHint>
 
       <LoadingState v-if="quizStore.loading && !quizStore.quiz" />
@@ -141,10 +135,10 @@ onBeforeUnmount(() => {
 
       <EmptyStatePanel
         v-else
-        title="这一轮练习还没准备好"
-        description="点击下方按钮开始生成题目，题目就绪后会自动进入答题状态。"
+        title="练习尚未准备"
+        description="点击下方按钮开始生成题目，准备完成后即可作答。"
       >
-        <AppButton size="lg" :loading="quizStore.loading" @click="generate">开始生成题目</AppButton>
+        <AppButton size="lg" :loading="quizStore.loading" @click="generate">开始练习</AppButton>
       </EmptyStatePanel>
 
       <div class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/88 backdrop-blur-xl">
@@ -156,7 +150,7 @@ onBeforeUnmount(() => {
             :loading="quizStore.submitting"
             @click="submit"
           >
-            提交这轮答案
+            提交练习
           </AppButton>
           <AppButton
             v-else
@@ -165,7 +159,7 @@ onBeforeUnmount(() => {
             :loading="quizStore.status === 'generating'"
             @click="generate"
           >
-            开始生成题目
+            开始练习
           </AppButton>
         </div>
       </div>

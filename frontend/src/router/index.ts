@@ -4,6 +4,7 @@ import DiagnosisView from '@/views/DiagnosisView.vue';
 import HomeView from '@/views/HomeView.vue';
 import LearningPlanView from '@/views/LearningPlanView.vue';
 import LoginView from '@/views/LoginView.vue';
+import NextActionView from '@/views/NextActionView.vue';
 import QuizView from '@/views/QuizView.vue';
 import ReportView from '@/views/ReportView.vue';
 import SessionView from '@/views/SessionView.vue';
@@ -23,7 +24,7 @@ const router = createRouter({
     { path: '/learn/:sessionId/task', name: 'learn-task', component: TaskRunView, meta: { learn: true } },
     { path: '/learn/:sessionId/training', name: 'learn-training', component: QuizView, meta: { learn: true } },
     { path: '/learn/:sessionId/evaluation', name: 'learn-evaluation', component: ReportView, meta: { learn: true } },
-    { path: '/learn/:sessionId/next', name: 'learn-next', redirect: (to) => ({ name: 'learn', params: to.params }) },
+    { path: '/learn/:sessionId/next', name: 'learn-next', component: NextActionView, meta: { learn: true } },
     // 旧路由兼容：重定向到 /learn
     { path: '/sessions/:sessionId', name: 'session', redirect: (to) => ({ name: 'learn', params: { sessionId: to.params.sessionId } }) },
     { path: '/tasks/:taskId/run', name: 'task-run', component: TaskRunView, meta: { learnCompat: true } },
