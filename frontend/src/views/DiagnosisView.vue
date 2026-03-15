@@ -6,10 +6,17 @@ import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import LoadingState from '@/components/common/LoadingState.vue';
 import DiagnosisFooter from '@/components/diagnosis/DiagnosisFooter.vue';
+import DiagnosisResultPanel from '@/components/diagnosis/DiagnosisResultPanel.vue';
 import ProgressIndicator from '@/components/diagnosis/ProgressIndicator.vue';
 import QuestionCard from '@/components/diagnosis/QuestionCard.vue';
 import { useDiagnosisStore } from '@/stores/diagnosis';
-import type { DiagnosisAnswer, DiagnosisAnswerValue, DiagnosisNextAction, DiagnosisQuestion } from '@/types/diagnosis';
+import type {
+  DiagnosisAnswer,
+  DiagnosisAnswerValue,
+  DiagnosisNextAction,
+  DiagnosisQuestion,
+  DiagnosisSubmitResponse,
+} from '@/types/diagnosis';
 
 const route = useRoute();
 const router = useRouter();
@@ -28,6 +35,7 @@ const diagnosisExplanation = ref('');
 const loading = ref(false);
 const submitting = ref(false);
 const error = ref('');
+const submitResult = ref<DiagnosisSubmitResponse | null>(null);
 
 const totalQuestions = computed(() => questions.value.length);
 const currentQuestion = computed(() => diagnosisStore.currentQuestion);
@@ -120,12 +128,17 @@ async function submitCurrentAnswers() {
   error.value = '';
   try {
     const response = await submitDiagnosisApi(diagnosisId.value, buildSubmitAnswers());
-    await enterPlanFlow(response.nextAction ?? nextAction.value);
+    submitResult.value = response;
   } catch (submitError) {
     error.value = submitError instanceof Error ? submitError.message : '提交失败，请稍后重试。';
   } finally {
     submitting.value = false;
   }
+}
+
+function handleViewPlan() {
+  const next = submitResult.value?.nextAction ?? nextAction.value;
+  enterPlanFlow(next);
 }
 
 async function handleContinue() {
@@ -142,6 +155,7 @@ async function handleContinue() {
 
 async function loadDiagnosis() {
   diagnosisStore.reset();
+  submitResult.value = null;
   questions.value = [];
   diagnosisId.value = '';
   responseSessionId.value = '';
@@ -180,37 +194,43 @@ onMounted(loadDiagnosis);
 <template>
   <AppShell>
     <div class="mx-auto max-w-[860px] space-y-6 pb-10">
-      <section class="app-hero">
-        <h1 class="text-xl font-semibold tracking-[-0.02em] text-slate-900">
-          {{ goalText || '为本次学习定制路径' }}
-        </h1>
-        <p class="mt-2 text-sm text-slate-600">
-          {{ diagnosisExplanation || '下面几道题是围绕你的目标定制的，用于生成更适合你的学习路径。' }}
-        </p>
-        <p class="mt-1 text-sm text-slate-500">
-          答完后将为你生成个性化学习路径。
-        </p>
-      </section>
-
-      <LoadingState v-if="loading" />
-
-      <template v-else-if="!error && currentQuestion">
-        <ProgressIndicator :current="currentStep" :total="totalQuestions" />
-        <QuestionCard :question="currentQuestion" :model-value="currentAnswer" @update:model-value="updateAnswer" />
-        <DiagnosisFooter
-          :disabled="buttonDisabled"
-          :loading="submitting"
-          :is-last="isLastQuestion"
-          @continue="handleContinue"
-        />
+      <template v-if="submitResult">
+        <DiagnosisResultPanel :result="submitResult" @view-plan="handleViewPlan" />
       </template>
 
-      <div v-else class="space-y-4">
-        <ErrorState :message="error || '页面加载失败，请稍后重试。'" />
-        <button class="app-btn app-btn-secondary app-btn-md" type="button" @click="loadDiagnosis">
-          重新加载
-        </button>
-      </div>
+      <template v-else>
+        <section class="app-hero">
+          <h1 class="text-xl font-semibold tracking-[-0.02em] text-slate-900">
+            {{ goalText || '为本次学习定制路径' }}
+          </h1>
+          <p class="mt-2 text-sm text-slate-600">
+            {{ diagnosisExplanation || '下面几道题是围绕你的目标定制的，用于生成更适合你的学习路径。' }}
+          </p>
+          <p class="mt-1 text-sm text-slate-500">
+            答完后将为你生成个性化学习路径。
+          </p>
+        </section>
+
+        <LoadingState v-if="loading" />
+
+        <template v-else-if="!error && currentQuestion">
+          <ProgressIndicator :current="currentStep" :total="totalQuestions" />
+          <QuestionCard :question="currentQuestion" :model-value="currentAnswer" @update:model-value="updateAnswer" />
+          <DiagnosisFooter
+            :disabled="buttonDisabled"
+            :loading="submitting"
+            :is-last="isLastQuestion"
+            @continue="handleContinue"
+          />
+        </template>
+
+        <div v-else class="space-y-4">
+          <ErrorState :message="error || '页面加载失败，请稍后重试。'" />
+          <button class="app-btn app-btn-secondary app-btn-md" type="button" @click="loadDiagnosis">
+            重新加载
+          </button>
+        </div>
+      </template>
     </div>
   </AppShell>
 </template>
