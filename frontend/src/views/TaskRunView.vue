@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import LearningContentSection from '@/components/common/LearningContentSection.vue';
@@ -10,13 +10,21 @@ import SectionCard from '@/components/ui/SectionCard.vue';
 import { formatStage } from '@/utils/format';
 import { getPreviewMetricsSnapshot, trackFirstTaskCompleted } from '@/utils/previewMetrics';
 import { useTaskStore } from '@/stores/task';
+import { useLearningFlowStore } from '@/stores/learningFlow';
 import { normalizeLearningContent } from '@/utils/taskContent';
 
 const route = useRoute();
-const router = useRouter();
 const taskStore = useTaskStore();
+const flowStore = useLearningFlowStore();
 
-const taskId = computed(() => Number(route.params.taskId));
+const isLearnRoute = computed(() => route.name === 'learn-task');
+const sessionId = computed(() =>
+  isLearnRoute.value ? Number(route.params.sessionId) : (taskStore.currentTaskDetail?.sessionId ?? 0),
+);
+const taskId = computed(() =>
+  isLearnRoute.value ? (flowStore.snapshot?.currentTaskId ?? taskStore.currentTaskDetail?.taskId ?? 0) : Number(route.params.taskId),
+);
+
 const detail = computed(() => taskStore.currentTaskDetail);
 const result = computed(() => taskStore.currentTaskResult);
 const stage = computed(() => result.value?.stage || detail.value?.stage);
@@ -27,27 +35,31 @@ const content = computed(() =>
 );
 
 const taskGoal = computed(() => detail.value?.objective || content.value.summary || '先完成这一步的学习内容。');
-const sessionId = computed(() => detail.value?.sessionId);
 
-async function backToSession() {
-  if (sessionId.value) {
-    await router.push(`/sessions/${sessionId.value}`);
-  }
+function backToSession() {
+  flowStore.goToStage('NEXT_ACTION');
 }
 
 async function goPrimary() {
   trackFirstTaskCompleted(taskId.value);
   console.info('[metrics] first task progress', getPreviewMetricsSnapshot());
-  if (isTraining.value && sessionId.value) {
-    await router.push(`/sessions/${sessionId.value}/quiz`);
+  if (isTraining.value) {
+    await flowStore.goToStage('TRAINING');
     return;
   }
-  await backToSession();
+  await flowStore.goToStage('NEXT_ACTION');
 }
 
 onMounted(async () => {
-  await taskStore.fetchTaskDetail(taskId.value);
-  await taskStore.runTask(taskId.value);
+  if (isLearnRoute.value && sessionId.value) {
+    await flowStore.ensureCurrentTaskLoaded();
+  } else {
+    const tid = Number(route.params.taskId);
+    if (Number.isFinite(tid)) {
+      await taskStore.fetchTaskDetail(tid);
+      await taskStore.runTask(tid);
+    }
+  }
 });
 </script>
 

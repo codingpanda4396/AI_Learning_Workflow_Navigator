@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import LoadingState from '@/components/common/LoadingState.vue';
@@ -10,10 +10,11 @@ import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
 import InfoHint from '@/components/ui/InfoHint.vue';
 import StepProgress from '@/components/ui/StepProgress.vue';
 import { useQuizStore } from '@/stores/quiz';
+import { useLearningFlowStore } from '@/stores/learningFlow';
 
 const route = useRoute();
-const router = useRouter();
 const quizStore = useQuizStore();
+const flowStore = useLearningFlowStore();
 const sessionId = computed(() => Number(route.params.sessionId));
 const answers = reactive<Record<number, string>>({});
 let timer: number | undefined;
@@ -56,7 +57,7 @@ async function handleSnapshot() {
 
   if (snapshot.quizStatus === 'REPORT_READY' || snapshot.quizStatus === 'REVIEWING' || snapshot.quizStatus === 'NEXT_ROUND') {
     stopPolling();
-    await router.push(`/sessions/${sessionId.value}/report`);
+    await flowStore.goToStage('EVALUATION');
     return;
   }
 
@@ -84,14 +85,14 @@ async function submit() {
     answer: answers[question.questionId] || '',
   }));
   await quizStore.submitQuiz(sessionId.value, payload);
-  await router.push(`/sessions/${sessionId.value}/report`);
+  await flowStore.goToStage('EVALUATION');
 }
 
 onMounted(async () => {
   try {
     const status = await quizStore.fetchQuizStatus(sessionId.value);
     if (status.quizStatus === 'REPORT_READY' || status.quizStatus === 'REVIEWING' || status.quizStatus === 'NEXT_ROUND') {
-      await router.push(`/sessions/${sessionId.value}/report`);
+      await flowStore.goToStage('EVALUATION');
       return;
     }
     if (status.generationStatus === 'SUCCEEDED' && status.quizStatus === 'READY') {

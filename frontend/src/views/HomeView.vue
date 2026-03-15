@@ -133,7 +133,7 @@ async function continueCurrentSession() {
     return;
   }
 
-  await router.push(`/sessions/${activeSession.value.id}`);
+  await router.push(`/learn/${activeSession.value.id}`);
 }
 
 async function loadCurrentSession() {

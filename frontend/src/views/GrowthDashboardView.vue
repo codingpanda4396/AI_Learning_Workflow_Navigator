@@ -35,7 +35,7 @@ onMounted(async () => {
               这里保留最有用的结果：你已经学了多少、现在卡在哪、下一步更适合怎么走。
             </p>
           </div>
-          <AppButton variant="secondary" @click="router.push(`/sessions/${sessionId}`)">返回学习导航</AppButton>
+          <AppButton variant="secondary" @click="router.push(`/learn/${sessionId}`)">返回学习导航</AppButton>
         </div>
       </section>
 

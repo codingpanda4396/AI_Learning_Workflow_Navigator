@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import LoadingState from '@/components/common/LoadingState.vue';
@@ -8,32 +8,26 @@ import AppButton from '@/components/ui/AppButton.vue';
 import SectionCard from '@/components/ui/SectionCard.vue';
 import { formatSessionStatus, formatStage } from '@/utils/format';
 import { useSessionStore } from '@/stores/session';
+import { useLearningFlowStore } from '@/stores/learningFlow';
 
 const route = useRoute();
-const router = useRouter();
 const sessionStore = useSessionStore();
+const flowStore = useLearningFlowStore();
 
 const sessionId = computed(() => Number(route.params.sessionId));
 const overview = computed(() => sessionStore.overview);
 const summary = computed(() => overview.value?.summary);
 const timeline = computed(() => overview.value?.timeline ?? []);
 
-async function loadOverview() {
-  if (!sessionId.value) {
-    return;
-  }
-  await sessionStore.fetchOverview(sessionId.value);
-}
-
 async function openPrimaryAction() {
-  const path = summary.value?.primaryActionPath;
-  if (!path) {
-    return;
-  }
-  await router.push(path);
+  const cta = flowStore.snapshot?.primaryCTA;
+  if (cta) await flowStore.goToStage(cta.stage);
 }
 
-onMounted(loadOverview);
+async function loadOverview() {
+  if (!sessionId.value) return;
+  await flowStore.loadSessionFlow(sessionId.value);
+}
 </script>
 
 <template>
@@ -57,7 +51,7 @@ onMounted(loadOverview);
           </div>
           <div class="flex flex-col gap-3">
             <AppButton size="lg" @click="openPrimaryAction">
-              {{ summary?.primaryActionLabel || '继续下一步' }}
+              {{ flowStore.snapshot?.primaryCTA?.label ?? summary?.primaryActionLabel ?? '继续下一步' }}
             </AppButton>
             <span class="app-badge justify-center">{{ formatSessionStatus(overview.sessionStatus) }}</span>
           </div>
@@ -85,9 +79,9 @@ onMounted(loadOverview);
         <SectionCard strong title="你现在该做什么" :description="summary?.nextStepHint || '先完成当前任务，后面的步骤会自动接上。'">
           <div class="flex flex-wrap items-center gap-3">
             <AppButton size="lg" @click="openPrimaryAction">
-              {{ summary?.primaryActionLabel || '继续下一步' }}
+              {{ flowStore.snapshot?.primaryCTA?.label ?? summary?.primaryActionLabel ?? '继续下一步' }}
             </AppButton>
-            <AppButton variant="secondary" @click="router.push('/')">回到首页</AppButton>
+            <AppButton variant="secondary" @click="$router.push('/')">回到首页</AppButton>
           </div>
         </SectionCard>
 

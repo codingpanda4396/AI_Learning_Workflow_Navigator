@@ -9,12 +9,14 @@ import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { DEFAULT_PLAN_ADJUSTMENTS } from '@/constants/learningPlan';
 import { useLearningPlanStore } from '@/stores/learningPlan';
+import { useLearningFlowStore } from '@/stores/learningFlow';
 import { getPreviewMetricsSnapshot, trackPreviewAccepted, trackPreviewShown } from '@/utils/previewMetrics';
 import { buildLearningPlanPreviewView } from '@/utils/useLearningPlanPreviewView';
 
 const route = useRoute();
 const router = useRouter();
 const learningPlanStore = useLearningPlanStore();
+const flowStore = useLearningFlowStore();
 
 const preview = computed(() => learningPlanStore.preview);
 const error = computed(() => learningPlanStore.error);
@@ -62,17 +64,15 @@ async function startLearning() {
       trackPreviewAccepted(preview.value.id, result.firstTaskId);
       console.info('[metrics] preview accepted', getPreviewMetricsSnapshot());
     }
+    if (!result.sessionId) return;
+    await flowStore.loadSessionFlow(result.sessionId);
     if (result.firstTaskId) {
-      await router.push(`/tasks/${result.firstTaskId}/run`);
+      await flowStore.goToStage('LEARNING_TASK');
       return;
     }
-    if (result.nextPage) {
-      await router.push(result.nextPage);
-      return;
-    }
-    if (result.sessionId) {
-      await router.push(`/sessions/${result.sessionId}`);
-    }
+    if (result.nextPage?.includes('/quiz')) await flowStore.goToStage('TRAINING');
+    else if (result.nextPage?.includes('/report')) await flowStore.goToStage('EVALUATION');
+    else await flowStore.goToStage('NEXT_ACTION');
   } catch {
     return;
   }

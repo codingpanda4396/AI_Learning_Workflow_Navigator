@@ -10,7 +10,7 @@ const props = defineProps<{
 const router = useRouter();
 
 function continueLearning() {
-  router.push(`/sessions/${props.session.id}`);
+  router.push(`/learn/${props.session.id}`);
 }
 </script>
 

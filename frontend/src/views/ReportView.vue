@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import LoadingState from '@/components/common/LoadingState.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import SectionCard from '@/components/ui/SectionCard.vue';
 import { useFeedbackStore } from '@/stores/feedback';
+import { useLearningFlowStore } from '@/stores/learningFlow';
 import { formatPercent } from '@/utils/format';
 
 const route = useRoute();
-const router = useRouter();
 const feedbackStore = useFeedbackStore();
+const flowStore = useLearningFlowStore();
 
 const sessionId = computed(() => Number(route.params.sessionId));
 const report = computed(() => feedbackStore.report);
@@ -57,11 +58,11 @@ async function submitPrimaryAction() {
 
   const targetTaskType = report.value?.nextStep?.targetTaskType || '';
   if (targetTaskType === 'TRAINING' || action === 'REINFORCE' || action === 'BACKTRACK') {
-    await router.push(`/sessions/${sessionId.value}/quiz`);
+    await flowStore.goToStage('TRAINING');
     return;
   }
 
-  await router.push(`/sessions/${sessionId.value}`);
+  await flowStore.goToStage('NEXT_ACTION');
 }
 
 onMounted(loadReport);
@@ -96,8 +97,8 @@ onMounted(loadReport);
           <AppButton size="lg" :loading="feedbackStore.loading" @click="submitPrimaryAction">
             应用下一步建议
           </AppButton>
-          <AppButton variant="secondary" @click="router.push(`/sessions/${sessionId}`)">返回学习导航</AppButton>
-          <AppButton variant="ghost" @click="router.push(`/sessions/${sessionId}/growth`)">查看成长看板</AppButton>
+          <AppButton variant="secondary" @click="flowStore.goToStage('NEXT_ACTION')">返回学习导航</AppButton>
+          <AppButton variant="ghost" @click="$router.push(`/sessions/${sessionId}/growth`)">查看成长看板</AppButton>
         </div>
       </SectionCard>
 
