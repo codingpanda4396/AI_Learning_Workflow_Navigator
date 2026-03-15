@@ -15,44 +15,85 @@ import java.util.Optional;
 
 public final class ContractCatalog {
 
-    private static final Map<DiagnosisDimension, List<OptionDef>> DIAGNOSIS_OPTIONS = Map.of(
-        DiagnosisDimension.FOUNDATION, List.of(
+    private static final Map<DiagnosisDimension, List<OptionDef>> DIAGNOSIS_OPTIONS = Map.ofEntries(
+        Map.entry(DiagnosisDimension.FOUNDATION, List.of(
             option("BEGINNER", "刚开始接触"),
             option("BASIC", "学过但还不太熟"),
             option("PROFICIENT", "基础比较熟"),
             option("ADVANCED", "已经能独立应用")
-        ),
-        DiagnosisDimension.EXPERIENCE, List.of(
+        )),
+        Map.entry(DiagnosisDimension.EXPERIENCE, List.of(
             option("COURSEWORK", "上过相关课程"),
             option("ASSIGNMENTS", "做过作业或实验"),
             option("PROJECTS", "做过项目或作品"),
             option("EXAM_PREP", "准备过考试或面试"),
             option("NO_EXPERIENCE", "几乎没有相关经验")
-        ),
-        DiagnosisDimension.GOAL_STYLE, List.of(
+        )),
+        Map.entry(DiagnosisDimension.GOAL_STYLE, List.of(
             option("COURSE", "应对课程学习与作业"),
             option("EXAM", "准备考试或测验"),
             option("INTERVIEW", "准备实习或求职面试"),
             option("PROJECT", "完成项目或作品")
-        ),
-        DiagnosisDimension.TIME_BUDGET, List.of(
+        )),
+        Map.entry(DiagnosisDimension.TIME_BUDGET, List.of(
             option("LIGHT", "每周 1-3 小时"),
             option("STANDARD", "每周 4-6 小时"),
             option("INTENSIVE", "每周 7-10 小时"),
-            option("IMMERSIVE", "每周 10 小时以上")
-        ),
-        DiagnosisDimension.LEARNING_PREFERENCE, List.of(
+            option("IMMERSIVE", "每周 10 小时以上"),
+            option("SHORT_10", "10 分钟左右"),
+            option("MEDIUM_30", "20~30 分钟"),
+            option("LONG_60", "40~60 分钟"),
+            option("SYSTEMATIC", "可以系统学一轮")
+        )),
+        Map.entry(DiagnosisDimension.LEARNING_PREFERENCE, List.of(
             option("CONCEPT_FIRST", "先讲清概念，再做练习"),
             option("EXAMPLE_FIRST", "先看例子，再总结方法"),
             option("PRACTICE_FIRST", "先做题，在反馈中查漏补缺"),
             option("PROJECT_DRIVEN", "边学边做项目，穿插补基础")
-        ),
-        DiagnosisDimension.DIFFICULTY_PAIN_POINT, List.of(
+        )),
+        Map.entry(DiagnosisDimension.DIFFICULTY_PAIN_POINT, List.of(
             option("CONCEPT_UNDERSTANDING", "理解概念"),
             option("TRANSFER_APPLICATION", "做题迁移"),
             option("IMPLEMENTATION", "实现代码"),
             option("LONG_TERM_MEMORY", "长期记忆")
-        )
+        )),
+        Map.entry(DiagnosisDimension.BLOCKER, List.of(
+            option("CONCEPT_CONFUSION", "概念本身就不太清楚"),
+            option("FOLLOW_BUT_CANNOT_DO", "看懂例子但自己不会做"),
+            option("BASIC_OK_BUT_FAIL_ON_VARIATION", "基础题会，一变形就容易卡住"),
+            option("CAN_DO_BUT_CANNOT_EXPLAIN", "能写出来，但讲不清为什么")
+        )),
+        Map.entry(DiagnosisDimension.PRACTICE, List.of(
+            option("NONE", "几乎没练过"),
+            option("FEW", "做过少量基础内容"),
+            option("SOME", "做过一些典型练习"),
+            option("MANY", "做过较多练习或实际用过")
+        )),
+        Map.entry(DiagnosisDimension.PREFERENCE, List.of(
+            option("VISUAL_FIRST", "先看图解或结构示意"),
+            option("TEXT_FIRST", "先看文字讲解"),
+            option("CODE_FIRST", "先看代码示例"),
+            option("PRACTICE_FIRST", "先做小题再总结")
+        )),
+        Map.entry(DiagnosisDimension.GOAL, List.of(
+            option("QUICK_START", "快速入门"),
+            option("EXAM", "应对考试"),
+            option("INTERVIEW", "面试准备"),
+            option("PROJECT", "项目实践"),
+            option("PATCH_WEAKNESS", "查缺补漏")
+        )),
+        Map.entry(DiagnosisDimension.TOPIC_CORE, List.of(
+            option("NOT_CLEAR", "还不太清楚"),
+            option("PARTLY_CLEAR", "大概知道，但不稳定"),
+            option("CLEAR", "基本清楚"),
+            option("VERY_CLEAR", "很清楚，能自己复述")
+        )),
+        Map.entry(DiagnosisDimension.TOPIC_OPERATION, List.of(
+            option("NO_IDEA", "不知道从哪下手"),
+            option("PROCESS_CONFUSION", "过程容易乱"),
+            option("BOUNDARY_WEAKNESS", "边界条件容易错"),
+            option("EXPRESSION_WEAKNESS", "会做但表达不清")
+        ))
     );
 
     private static final Map<String, String> QUESTION_TYPE_LABELS = Map.of(
@@ -146,6 +187,12 @@ public final class ContractCatalog {
             case TIME_BUDGET -> "时间预算";
             case LEARNING_PREFERENCE -> "学习偏好";
             case DIFFICULTY_PAIN_POINT -> "学习卡点";
+            case BLOCKER -> "当前卡点";
+            case PRACTICE -> "练习量";
+            case PREFERENCE -> "学习方式";
+            case GOAL -> "学习目标";
+            case TOPIC_CORE -> "主题概念";
+            case TOPIC_OPERATION -> "主题应用";
         });
     }
 

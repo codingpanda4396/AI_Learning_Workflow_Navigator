@@ -14,6 +14,8 @@ public class LearnerProfileSnapshot {
     private Map<String, Object> strategyHints;
     private Map<String, Object> constraints;
     private Map<String, Object> explanations;
+    /** v1 结构化画像 JSON，供规划页消费 currentState/evidence/planHints */
+    private String structuredSnapshotJson;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
@@ -87,6 +89,14 @@ public class LearnerProfileSnapshot {
 
     public void setExplanations(Map<String, Object> explanations) {
         this.explanations = explanations;
+    }
+
+    public String getStructuredSnapshotJson() {
+        return structuredSnapshotJson;
+    }
+
+    public void setStructuredSnapshotJson(String structuredSnapshotJson) {
+        this.structuredSnapshotJson = structuredSnapshotJson;
     }
 
     public OffsetDateTime getCreatedAt() {

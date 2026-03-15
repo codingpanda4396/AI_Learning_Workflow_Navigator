@@ -23,6 +23,18 @@ const error = computed(() => learningPlanStore.error);
 const previewVm = computed(() => (preview.value ? buildLearningPlanPreviewView(preview.value) : null));
 const explanationExpanded = ref(false);
 
+const riskFlagLabels: Record<string, string> = {
+  TRANSFER_WEAKNESS: '迁移弱项',
+  EXPRESSION_WEAKNESS: '表达弱项',
+  BOUNDARY_WEAKNESS: '边界易错',
+  FOUNDATION_GAP: '基础薄弱',
+  INTERVIEW_FOUNDATION_RISK: '面试基础风险',
+  OVERCONFIDENCE_RISK: '自评偏高',
+};
+function riskFlagLabel(flag: string) {
+  return riskFlagLabels[flag] ?? flag;
+}
+
 const context = computed(() => {
   const sessionId = Number(route.query.sessionId ?? 0);
   const diagnosisId = String(route.query.diagnosisId ?? '').trim();
@@ -143,6 +155,34 @@ onBeforeUnmount(() => {
               <span v-for="tag in previewVm.summary.tags" :key="tag" class="app-badge">
                 {{ tag }}
               </span>
+            </div>
+          </section>
+
+          <section v-if="preview?.learnerSnapshotV2 || preview?.whyThisStep || (preview?.riskFlags && preview.riskFlags.length) || preview?.recommendedStrategy" class="app-card rounded-[26px] p-6 md:p-8 space-y-5">
+            <p class="text-sm font-semibold text-slate-500">基于诊断的规划依据</p>
+            <div v-if="preview?.learnerSnapshotV2?.currentState" class="rounded-2xl bg-slate-50 px-4 py-3">
+              <p class="font-semibold text-slate-900">系统看到了什么</p>
+              <p class="mt-1 text-sm leading-7 text-slate-700">{{ preview.learnerSnapshotV2.currentState }}</p>
+              <ul v-if="preview.learnerSnapshotV2.evidence?.length" class="mt-2 list-inside list-disc space-y-0.5 text-sm text-slate-600">
+                <li v-for="(item, idx) in preview.learnerSnapshotV2.evidence" :key="idx">{{ item }}</li>
+              </ul>
+            </div>
+            <div v-if="preview?.whyThisStep" class="rounded-2xl bg-slate-50 px-4 py-3">
+              <p class="font-semibold text-slate-900">为什么先学这一步</p>
+              <p class="mt-1 text-sm leading-7 text-slate-700">{{ preview.whyThisStep }}</p>
+            </div>
+            <div v-if="preview?.riskFlags?.length" class="rounded-2xl bg-amber-50/80 px-4 py-3">
+              <p class="font-semibold text-slate-900">当前重点风险</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <span v-for="flag in preview.riskFlags" :key="flag" class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                  {{ riskFlagLabel(flag) }}
+                </span>
+              </div>
+            </div>
+            <div v-if="preview?.recommendedStrategy?.label" class="rounded-2xl bg-slate-50 px-4 py-3">
+              <p class="font-semibold text-slate-900">推荐进入方式</p>
+              <p class="mt-1 text-sm font-medium text-slate-800">{{ preview.recommendedStrategy.label }}</p>
+              <p v-if="preview.recommendedStrategy.explanation" class="mt-0.5 text-sm leading-7 text-slate-600">{{ preview.recommendedStrategy.explanation }}</p>
             </div>
           </section>
 

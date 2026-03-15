@@ -11,6 +11,7 @@ import com.pandanav.learning.api.dto.plan.LearningPlanLearnerSnapshotResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanMetadataResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanGuidanceResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanPersonalizationResponse;
+import com.pandanav.learning.api.dto.diagnosis.LearnerProfileStructuredSnapshotDto;
 import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanRecommendationResponse;
 import com.pandanav.learning.api.dto.plan.LearningPlanStrategyComparisonResponse;
@@ -410,16 +411,21 @@ public class LearningPlanService {
         );
         List<String> nextActions = buildNextActions(preview);
         List<String> profileDrivenReasoning = buildProfileDrivenReasoning(context);
-        List<String> mergedEvidence = mergeEvidence(
-            evidenceSummary == null ? explanations.learnerEvidence() : evidenceSummary.topEvidence(),
-            profileDrivenReasoning
-        );
+        Optional<LearnerProfileStructuredSnapshotDto> structuredSnapshot = parseStructuredSnapshot(context);
+        List<String> baseEvidence = evidenceSummary == null ? explanations.learnerEvidence() : evidenceSummary.topEvidence();
+        List<String> mergedEvidence = structuredSnapshot.isPresent() && structuredSnapshot.get().summary() != null
+            && structuredSnapshot.get().summary().evidence() != null && !structuredSnapshot.get().summary().evidence().isEmpty()
+            ? mergeEvidence(structuredSnapshot.get().summary().evidence(), profileDrivenReasoning)
+            : mergeEvidence(baseEvidence, profileDrivenReasoning);
         List<String> profileConflicts = buildProfileConflicts(context);
-        List<String> riskFlags = buildRiskFlags(profileConflicts);
-        String whyThisStep = mergeWhyThisStep(
-            evidenceSummary == null ? explanations.recommendedEntryReason() : evidenceSummary.whyThisStep(),
-            profileDrivenReasoning
-        );
+        List<String> riskFlags = buildRiskFlagsFromStructured(structuredSnapshot, profileConflicts);
+        String whyThisStep = structuredSnapshot.isPresent() && structuredSnapshot.get().summary() != null
+            && structuredSnapshot.get().summary().currentState() != null && !structuredSnapshot.get().summary().currentState().isBlank()
+            ? structuredSnapshot.get().summary().currentState()
+            : mergeWhyThisStep(
+                evidenceSummary == null ? explanations.recommendedEntryReason() : evidenceSummary.whyThisStep(),
+                profileDrivenReasoning
+            );
         PersonalizedPreviewViewAssembler.PersonalizedPreviewView displayView = personalizedPreviewViewAssembler.assemble(
             context,
             preview,
@@ -428,6 +434,27 @@ public class LearningPlanService {
             evidenceSummary == null ? "完成这一步后，你会更容易进入后续训练并减少回退。" : evidenceSummary.expectedGain()
         );
         String finalStrategyCode = resolveFinalStrategyCode(summary, explanations);
+        String strategyTitle = finalStrategyCode;
+        String strategyReason = explanations.strategyExplanation();
+        if (structuredSnapshot.isPresent() && structuredSnapshot.get().planHints() != null
+            && structuredSnapshot.get().planHints().entryMode() != null
+            && !structuredSnapshot.get().planHints().entryMode().isBlank()) {
+            finalStrategyCode = structuredSnapshot.get().planHints().entryMode();
+            strategyTitle = previewDisplayCodeMapper.recommendedStrategyTitle(finalStrategyCode);
+            strategyReason = previewDisplayCodeMapper.recommendedStrategyReason(finalStrategyCode);
+        } else {
+            strategyTitle = previewTemplateExplanationAssembler.strategyLabel(finalStrategyCode);
+        }
+        LearningPlanPreviewResponse.LearnerSnapshotResponse learnerSnapshotResponse = structuredSnapshot.isPresent()
+            && structuredSnapshot.get().summary() != null
+            ? new LearningPlanPreviewResponse.LearnerSnapshotResponse(
+                structuredSnapshot.get().summary().currentState(),
+                structuredSnapshot.get().summary().evidence() != null ? structuredSnapshot.get().summary().evidence() : List.of()
+            )
+            : new LearningPlanPreviewResponse.LearnerSnapshotResponse(
+                explanations.learnerCurrentState(),
+                explanations.learnerEvidence()
+            );
         return new LearningPlanPreviewResponse(
             String.valueOf(plan.getId()),
             committed ? COMMITTED : PREVIEW_READY,
@@ -440,14 +467,11 @@ public class LearningPlanService {
                 resolveEstimatedMinutes(summary),
                 explanations.recommendedEntryReason()
             ),
-            new LearningPlanPreviewResponse.LearnerSnapshotResponse(
-                explanations.learnerCurrentState(),
-                explanations.learnerEvidence()
-            ),
+            learnerSnapshotResponse,
             new LearningPlanPreviewResponse.RecommendedStrategyResponse(
                 finalStrategyCode,
-                previewTemplateExplanationAssembler.strategyLabel(finalStrategyCode),
-                explanations.strategyExplanation()
+                strategyTitle,
+                strategyReason
             ),
             explanations.alternatives(),
             nextActions,
@@ -546,6 +570,37 @@ public class LearningPlanService {
             flags.add("OVERCONFIDENCE_RISK");
         }
         return flags.stream().distinct().toList();
+    }
+
+    private List<String> buildRiskFlagsFromStructured(
+        Optional<LearnerProfileStructuredSnapshotDto> structuredSnapshot,
+        List<String> profileConflicts
+    ) {
+        List<String> flags = new ArrayList<>(buildRiskFlags(profileConflicts));
+        if (structuredSnapshot.isPresent() && structuredSnapshot.get().riskTags() != null) {
+            for (String tag : structuredSnapshot.get().riskTags()) {
+                if (tag != null && !tag.isBlank() && !flags.contains(tag)) {
+                    flags.add(tag);
+                }
+            }
+        }
+        return flags;
+    }
+
+    private Optional<LearnerProfileStructuredSnapshotDto> parseStructuredSnapshot(LearningPlanPlanningContext context) {
+        if (context == null || context.learnerProfileSnapshot() == null) {
+            return Optional.empty();
+        }
+        String json = context.learnerProfileSnapshot().getStructuredSnapshotJson();
+        if (json == null || json.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(objectMapper.readValue(json, LearnerProfileStructuredSnapshotDto.class));
+        } catch (Exception ex) {
+            log.warn("Failed to parse structured learner snapshot. traceId={}", TraceContext.traceId(), ex);
+            return Optional.empty();
+        }
     }
 
     private List<String> buildProfileConflicts(LearningPlanPlanningContext context) {

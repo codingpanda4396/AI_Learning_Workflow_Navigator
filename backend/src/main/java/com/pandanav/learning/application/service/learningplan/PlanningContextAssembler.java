@@ -17,6 +17,8 @@ import com.pandanav.learning.domain.repository.LearnerProfileSnapshotRepository;
 import com.pandanav.learning.domain.repository.NodeMasteryRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pandanav.learning.api.dto.diagnosis.LearnerProfileStructuredSnapshotDto;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -39,6 +41,7 @@ public class PlanningContextAssembler {
     private final LearnerSignalInterpreter learnerSignalInterpreter;
     private final LearnerEvidenceAggregator learnerEvidenceAggregator;
     private final LearnerProfileSnapshotRepository learnerProfileSnapshotRepository;
+    private final ObjectMapper objectMapper;
 
     public PlanningContextAssembler(
         SessionRepository sessionRepository,
@@ -49,7 +52,8 @@ public class PlanningContextAssembler {
         LearnerStateInterpreter learnerStateInterpreter,
         LearnerSignalInterpreter learnerSignalInterpreter,
         LearnerEvidenceAggregator learnerEvidenceAggregator,
-        LearnerProfileSnapshotRepository learnerProfileSnapshotRepository
+        LearnerProfileSnapshotRepository learnerProfileSnapshotRepository,
+        ObjectMapper objectMapper
     ) {
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
@@ -60,6 +64,7 @@ public class PlanningContextAssembler {
         this.learnerSignalInterpreter = learnerSignalInterpreter;
         this.learnerEvidenceAggregator = learnerEvidenceAggregator;
         this.learnerProfileSnapshotRepository = learnerProfileSnapshotRepository;
+        this.objectMapper = objectMapper;
     }
 
     public LearningPlanPlanningContext assemble(PreviewLearningPlanCommand command) {
@@ -192,6 +197,20 @@ public class PlanningContextAssembler {
     }
 
     private String buildSnapshotSummary(LearnerProfileSnapshot snapshot) {
+        if (snapshot.getStructuredSnapshotJson() != null && !snapshot.getStructuredSnapshotJson().isBlank()) {
+            try {
+                LearnerProfileStructuredSnapshotDto structured = objectMapper.readValue(
+                    snapshot.getStructuredSnapshotJson(),
+                    LearnerProfileStructuredSnapshotDto.class
+                );
+                if (structured.summary() != null && structured.summary().currentState() != null
+                    && !structured.summary().currentState().isBlank()) {
+                    return structured.summary().currentState();
+                }
+            } catch (Exception ignored) {
+                // fall through to legacy summary
+            }
+        }
         String preference = readMapValue(snapshot.getStrategyHints(), "learningPreference");
         String supportPriority = readMapValue(snapshot.getStrategyHints(), "supportPriority");
         String timeBudget = readMapValue(snapshot.getConstraints(), "timeBudget");

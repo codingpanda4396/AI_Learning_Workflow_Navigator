@@ -62,6 +62,7 @@ public class DiagnosisTemplateFactory {
             case TIME_BUDGET -> List.of("time_budget", "learning_intensity");
             case LEARNING_PREFERENCE -> List.of("learning_preference", "feedback_style");
             case DIFFICULTY_PAIN_POINT -> List.of("difficulty_pain_point", "support_priority");
+            case BLOCKER, PRACTICE, PREFERENCE, GOAL, TOPIC_CORE, TOPIC_OPERATION -> List.of();
         };
     }
 
@@ -155,6 +156,7 @@ public class DiagnosisTemplateFactory {
                     signal("support_priority", "SPACED_REVIEW", 0.7, 0.88, "pain_point")
                 )
             );
+            case BLOCKER, PRACTICE, PREFERENCE, GOAL, TOPIC_CORE, TOPIC_OPERATION -> Map.of();
         };
     }
 

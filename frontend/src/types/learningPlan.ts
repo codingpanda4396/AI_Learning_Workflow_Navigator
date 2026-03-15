@@ -221,6 +221,7 @@ export interface LearningPlanPreview {
   nextActionsDetail?: PreviewNextAction[];
   whyThisStep?: string;
   keyEvidence?: string[];
+  riskFlags?: string[];
   skipRisk?: string;
   expectedGain?: string;
   confidenceHint?: string;

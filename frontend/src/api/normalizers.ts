@@ -207,6 +207,7 @@ export function normalizeDiagnosisSubmitResponse(data: Record<string, unknown>):
       dimension: String(item.dimension ?? 'FOUNDATION'),
       sourceQuestionId: String(item.source_question_id ?? item.sourceQuestionId ?? 'unknown-question'),
     })),
+    learnerProfileSnapshot: (data.learner_profile_snapshot ?? data.learnerProfileSnapshot) as DiagnosisSubmitResponse['learnerProfileSnapshot'],
   };
 }
 
@@ -888,6 +889,7 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     nextActionsDetail: nextActionDetails.length ? nextActionDetails : undefined,
     whyThisStep: String(data.why_this_step ?? data.whyThisStep ?? recommendedEntryRaw?.reason ?? '').trim() || undefined,
     keyEvidence: readArray(data.key_evidence ?? data.keyEvidence).slice(0, 3),
+    riskFlags: readArray(data.risk_flags ?? data.riskFlags).slice(0, 6),
     skipRisk: String(data.skip_risk ?? data.skipRisk ?? '').trim() || undefined,
     expectedGain: String(data.expected_gain ?? data.expectedGain ?? '').trim() || undefined,
     confidenceHint: String(data.confidence_hint ?? data.confidenceHint ?? '').trim() || undefined,

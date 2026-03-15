@@ -24,6 +24,10 @@ public class PreviewDisplayCodeMapper {
             case "STANDARD", "NORMAL" -> "每周 4-6 小时";
             case "INTENSIVE" -> "每周 7-10 小时";
             case "IMMERSIVE" -> "每周 10 小时以上";
+            case "SHORT_10" -> "10 分钟左右";
+            case "MEDIUM_30" -> "20~30 分钟";
+            case "LONG_60" -> "40~60 分钟";
+            case "SYSTEMATIC" -> "可以系统学一轮";
             default -> "时间节奏待补充";
         };
     }
@@ -55,6 +59,32 @@ public class PreviewDisplayCodeMapper {
             case "INTERMEDIATE", "PARTIAL", "COURSEWORK" -> "有一定基础，仍需针对性巩固";
             case "ADVANCED", "PROFICIENT", "STABLE" -> "基础较好，可进入强化阶段";
             default -> "基础状态待进一步确认";
+        };
+    }
+
+    /** 诊断画像推荐策略：入口模式 → 中文标题。 */
+    public String recommendedStrategyTitle(String code) {
+        return switch (normalize(code)) {
+            case "FOUNDATION_FIRST" -> "先补基础再推进";
+            case "VISUAL_ENTRY", "VISUAL_WITH_MINI_EXAMPLE" -> "图解优先进入";
+            case "EXAMPLE_FIRST" -> "先看示例再动手";
+            case "EXAMPLE_THEN_RULE", "EXAMPLE_TO_RULE" -> "示例归纳再规则";
+            case "INTERVIEW_ORIENTED", "HIGH_FREQUENCY_PATTERNS" -> "面试高频优先";
+            case "PROJECT_DRIVEN", "IMPLEMENTATION_FLOW" -> "按实现流程推进";
+            default -> "按当前起点稳步推进";
+        };
+    }
+
+    /** 诊断画像推荐策略：入口模式 → 推荐理由（一句中文）。 */
+    public String recommendedStrategyReason(String code) {
+        return switch (normalize(code)) {
+            case "FOUNDATION_FIRST" -> "你当前更适合先把概念和结构搞清楚，再做题会更稳。";
+            case "VISUAL_ENTRY", "VISUAL_WITH_MINI_EXAMPLE" -> "你更适合先看图解或结构示意，所以先从图示入手。";
+            case "EXAMPLE_FIRST" -> "你看懂例子后自己动手容易卡住，先多跟几个示例再独立练。";
+            case "EXAMPLE_THEN_RULE", "EXAMPLE_TO_RULE" -> "你基础题会但变形易卡，先通过示例归纳规律再练变形。";
+            case "INTERVIEW_ORIENTED", "HIGH_FREQUENCY_PATTERNS" -> "你目标是面试，优先练高频考点和常见套路。";
+            case "PROJECT_DRIVEN", "IMPLEMENTATION_FLOW" -> "你更偏向项目实践，按实现流程和常见场景安排。";
+            default -> "根据你的诊断结果，先完成这一步更有利于后续推进。";
         };
     }
 

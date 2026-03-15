@@ -101,6 +101,30 @@ export interface DiagnosisEvidenceSource {
   sourceQuestionId: string;
 }
 
+export interface LearnerProfileStructuredSnapshot {
+  profileVersion?: string;
+  foundationLevel?: string;
+  primaryBlocker?: string;
+  practiceLevel?: string;
+  learningPreference?: string;
+  goalType?: string;
+  timeBudget?: string;
+  topicConceptClarity?: string;
+  topicOperationRisk?: string;
+  riskTags?: string[];
+  planHints?: {
+    entryMode?: string;
+    explanationStyle?: string;
+    pace?: string;
+    taskGranularity?: string;
+    focusMode?: string;
+  };
+  summary?: {
+    currentState?: string;
+    evidence?: string[];
+  };
+}
+
 export interface DiagnosisSubmitResponse {
   diagnosisId: string;
   sessionId: string;
@@ -113,6 +137,7 @@ export interface DiagnosisSubmitResponse {
   reasoningSteps: DiagnosisReasoningStep[];
   strengthSources: DiagnosisEvidenceSource[];
   weaknessSources: DiagnosisEvidenceSource[];
+  learnerProfileSnapshot?: LearnerProfileStructuredSnapshot;
 }
 
 const DEFAULT_QUESTION_DESCRIPTION = '请根据你当前的真实情况作答。这不是考试，只是帮助系统更准确地理解你的学习起点。';

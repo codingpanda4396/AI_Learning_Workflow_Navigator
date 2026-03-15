@@ -24,6 +24,8 @@ public record SubmitDiagnosisSessionResponse(
     @JsonProperty("strengthSources")
     java.util.List<DiagnosisEvidenceSourceDto> strengthSources,
     @JsonProperty("weaknessSources")
-    java.util.List<DiagnosisEvidenceSourceDto> weaknessSources
+    java.util.List<DiagnosisEvidenceSourceDto> weaknessSources,
+    @JsonProperty("learnerProfileSnapshot")
+    LearnerProfileStructuredSnapshotDto learnerProfileSnapshot
 ) {
 }

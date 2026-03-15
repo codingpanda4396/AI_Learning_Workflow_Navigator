@@ -19,6 +19,7 @@ import com.pandanav.learning.api.dto.diagnosis.DiagnosisStrategyDto;
 import com.pandanav.learning.api.dto.diagnosis.LearnerSnapshotDto;
 import com.pandanav.learning.api.dto.diagnosis.PersonalizationMetaDto;
 import com.pandanav.learning.api.dto.diagnosis.QuestionRationaleDto;
+import com.pandanav.learning.api.dto.diagnosis.LearnerProfileStructuredSnapshotDto;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionRequest;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionResponse;
 import com.pandanav.learning.domain.enums.DiagnosisDimension;
@@ -48,6 +49,8 @@ import com.pandanav.learning.domain.repository.DiagnosisSessionRepository;
 import com.pandanav.learning.domain.repository.LearnerFeatureSignalRepository;
 import com.pandanav.learning.domain.repository.LearnerProfileSnapshotRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
+import com.pandanav.learning.application.service.diagnosis.DiagnosisProfileDerivationService;
+import com.pandanav.learning.application.service.diagnosis.StructuredDiagnosisQuestionFactory;
 import com.pandanav.learning.domain.service.CapabilityProfileBuilder;
 import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
@@ -105,6 +108,8 @@ public class DiagnosisService {
     private final LearnerProfileSnapshotRepository learnerProfileSnapshotRepository;
     private final LlmProperties llmProperties;
     private final ObjectMapper objectMapper;
+    private final StructuredDiagnosisQuestionFactory structuredDiagnosisQuestionFactory;
+    private final DiagnosisProfileDerivationService diagnosisProfileDerivationService;
 
     public DiagnosisService(
         SessionRepository sessionRepository,
@@ -138,7 +143,9 @@ public class DiagnosisService {
         LearnerFeatureSignalRepository learnerFeatureSignalRepository,
         LearnerProfileSnapshotRepository learnerProfileSnapshotRepository,
         LlmProperties llmProperties,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        StructuredDiagnosisQuestionFactory structuredDiagnosisQuestionFactory,
+        DiagnosisProfileDerivationService diagnosisProfileDerivationService
     ) {
         this.sessionRepository = sessionRepository;
         this.diagnosisSessionRepository = diagnosisSessionRepository;
@@ -172,84 +179,24 @@ public class DiagnosisService {
         this.learnerProfileSnapshotRepository = learnerProfileSnapshotRepository;
         this.llmProperties = llmProperties;
         this.objectMapper = objectMapper;
+        this.structuredDiagnosisQuestionFactory = structuredDiagnosisQuestionFactory;
+        this.diagnosisProfileDerivationService = diagnosisProfileDerivationService;
     }
 
+    /** 主链路：固定 8 题（6 通用 + 2 主题），不调用 LLM，首屏快速响应。 */
     public CreateDiagnosisSessionResponse createDiagnosisSession(Long sessionId, Long userId) {
         LearningSession session = sessionRepository.findByIdAndUserPk(sessionId, userId)
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
         PlanningContext planningContext = buildPlanningContext(session);
-        DiagnosisLearnerProfileSnapshot profileSnapshot = diagnosisLearnerProfileBuilder.build(session, planningContext);
-        DiagnosisStrategyDecision strategyDecision = diagnosisStrategyDecisionService.decide(session, planningContext, profileSnapshot);
         String topic = resolveTopic(planningContext);
+        List<DiagnosisQuestion> questions = structuredDiagnosisQuestionFactory.build(topic);
         log.info(
-            "DIAGNOSIS_GENERATION_START traceId={} sessionId={} generationMode={} questionCount={} topic={}",
+            "DIAGNOSIS_STRUCTURED traceId={} sessionId={} questionCount={} topic={}",
             TraceContext.traceId(),
             session.getId(),
-            "PENDING",
-            0,
+            questions.size(),
             topic
         );
-
-        List<DiagnosisQuestionCandidate> candidates =
-            diagnosisQuestionCandidateFactory.buildCandidates(session, planningContext);
-        DiagnosisLlmSelectionResult llmSelectionResult = null;
-        List<DiagnosisQuestionDraft> selectedDrafts;
-        DiagnosisGenerationMode generationMode = DiagnosisGenerationMode.LLM;
-        DiagnosisStrategyDecision effectiveStrategy = strategyDecision;
-        try {
-            DiagnosisLlmSelectionResult selection = strategySelectionLlmService.select(
-                profileSnapshot,
-                strategyDecision,
-                candidates,
-                topic,
-                safeText(session.getGoalText()),
-                planningContext.chapterName()
-            );
-            if (diagnosisSelectionValidator.validate(selection, candidates, strategyDecision)) {
-                selection = diagnosisSelectionOutputNormalizer.normalize(selection, profileSnapshot, topic, candidates);
-                llmSelectionResult = selection;
-                selectedDrafts = draftFromSelectionFactory.fromSelection(selection, candidates);
-                effectiveStrategy = strategyFromLlmSelection(selection, strategyDecision);
-                log.info(
-                    "DIAGNOSIS_LLM_SELECTION traceId={} sessionId={} strategyCode={} selectedIds={} suppressedIds={}",
-                    TraceContext.traceId(),
-                    session.getId(),
-                    selection.strategyCode(),
-                    selection.selectedQuestionIds(),
-                    selection.suppressedQuestionIds()
-                );
-            } else {
-                selectedDrafts = personalizedQuestionSelector.select(candidates, strategyDecision, profileSnapshot);
-                generationMode = DiagnosisGenerationMode.RULE;
-            }
-        } catch (Exception ex) {
-            log.warn("Diagnosis LLM selection fallback to rule. sessionId={} reason={}", session.getId(), ex.getMessage());
-            selectedDrafts = personalizedQuestionSelector.select(candidates, strategyDecision, profileSnapshot);
-            generationMode = DiagnosisGenerationMode.RULE;
-        }
-
-        List<DiagnosisQuestion> adaptedQuestions =
-            diagnosisQuestionCopyAdapter.adapt(selectedDrafts, planningContext, profileSnapshot, effectiveStrategy);
-        List<DiagnosisQuestion> assembledQuestions = diagnosisQuestionAssembler.assemble(session, adaptedQuestions);
-        boolean fallbackApplied = generationMode != DiagnosisGenerationMode.LLM;
-        List<String> fallbackReasons = fallbackApplied && generationMode == DiagnosisGenerationMode.RULE
-            ? List.of("LLM_SELECTION_UNAVAILABLE") : List.of();
-        List<DiagnosisQuestion> questions;
-        try {
-            questions = diagnosisQuestionCopyLlmService.enhanceQuestions(session, assembledQuestions);
-        } catch (Exception ex) {
-            if (isDiagnosisCopyStrictMode()) {
-                if (ex instanceof AiGenerationException aiEx) {
-                    throw aiEx;
-                }
-                throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "API_ERROR");
-            }
-            generationMode = generationMode == DiagnosisGenerationMode.LLM ? DiagnosisGenerationMode.RULE_FALLBACK : generationMode;
-            fallbackApplied = true;
-            fallbackReasons = List.of(resolveFailureReason(ex, "LLM_DIAGNOSIS_COPY_UNAVAILABLE"));
-            questions = assembledQuestions;
-        }
-        questions = diagnosisQuestionCopyNormalizer.normalize(questions);
 
         DiagnosisSession diagnosisSession = new DiagnosisSession();
         diagnosisSession.setLearningSessionId(session.getId());
@@ -257,43 +204,41 @@ public class DiagnosisService {
         diagnosisSession.setStatus(DiagnosisStatus.READY);
         diagnosisSession.setGeneratedQuestionsJson(toJson(questionsToMap(questions)));
         diagnosisSession.setStartedAt(OffsetDateTime.now());
-
         DiagnosisSession saved = diagnosisSessionRepository.save(diagnosisSession);
-        DiagnosisExplanationDto diagnosisExplanation = diagnosisExplanationBuilder.build(
-            planningContext, profileSnapshot, effectiveStrategy, questions);
-        DiagnosisDecisionHintsDto decisionHints = buildDecisionHints(effectiveStrategy, profileSnapshot);
-        LearnerSnapshotDto learnerSnapshotDto = buildLearnerSnapshotDto(profileSnapshot, planningContext, llmSelectionResult);
-        DiagnosisStrategyDto diagnosisStrategyDto = buildDiagnosisStrategyDto(effectiveStrategy);
-        List<QuestionRationaleDto> questionRationales =
-            questionRationaleBuilder.build(selectedDrafts, profileSnapshot, effectiveStrategy, planningContext);
-        List<String> selectedQuestionIds = selectedDrafts.stream()
-            .map(d -> d.question().questionId())
-            .toList();
-        PersonalizationMetaDto personalizationMeta = buildPersonalizationMetaDto(
-            profileSnapshot, strategyDecision, selectedQuestionIds);
-        log.info(
-            "DIAGNOSIS_GENERATION_RESULT traceId={} sessionId={} generationMode={} questionCount={} topic={}",
-            TraceContext.traceId(),
-            session.getId(),
-            generationMode.name(),
-            questions.size(),
-            topic
+
+        DiagnosisExplanationDto diagnosisExplanation = new DiagnosisExplanationDto(
+            "根据你的选择，系统会生成学习画像并安排下一步规划。",
+            List.of(),
+            "规划将基于画像推荐学习入口与节奏。"
+        );
+        DiagnosisDecisionHintsDto decisionHints = new DiagnosisDecisionHintsDto(
+            List.of("前置基础", "时间投入", "学习目标")
+        );
+        LearnerSnapshotDto learnerSnapshotDto = new LearnerSnapshotDto(
+            "完成下方题目后，系统会据此生成你的学习画像并推荐学习路径。",
+            List.of(),
+            List.of()
+        );
+        DiagnosisStrategyDto diagnosisStrategyDto = new DiagnosisStrategyDto(
+            "FOUNDATION_FIRST",
+            "先确认起点，再决定后续规划",
+            List.of("前置基础", "时间投入", "学习目标")
         );
         return diagnosisResponseAssembler.assemble(
             saved.getId(),
             session.getId(),
             DiagnosisStatus.READY.name(),
-            generationMode.name(),
+            "STRUCTURED",
             toQuestionDtos(questions),
             diagnosisExplanation,
             buildNextAction(session.getId(), saved.getId()),
             decisionHints,
-            sourceMeta(fallbackApplied, fallbackReasons, generationMode.name()),
+            sourceMeta(false, List.of(), "RULE"),
             new DiagnosisMetadataDto(questions.size(), null, null),
             learnerSnapshotDto,
             diagnosisStrategyDto,
-            questionRationales,
-            personalizationMeta
+            List.of(),
+            new PersonalizationMetaDto("MEDIUM", List.of("goalText", "chapterId"), "PROFILE_DRIVEN")
         );
     }
 
@@ -366,6 +311,20 @@ public class DiagnosisService {
         profile.setVersion(nextVersion(learningSession.getId()));
 
         CapabilityProfile savedProfile = capabilityProfileRepository.save(profile);
+
+        Map<String, String> answerByQuestionId = normalizedAnswers.stream()
+            .collect(Collectors.toMap(
+                DiagnosisAnswerNormalizer.NormalizedDiagnosisAnswer::questionId,
+                a -> a.selectedOptionCodes().isEmpty() ? "" : a.selectedOptionCodes().get(0),
+                (a, b) -> a,
+                LinkedHashMap::new
+            ));
+        String topicForSnapshot = resolveTopic(buildPlanningContext(learningSession));
+        LearnerProfileStructuredSnapshotDto structuredSnapshot = diagnosisProfileDerivationService.derive(
+            answerByQuestionId,
+            topicForSnapshot
+        );
+
         LearnerProfileSnapshot snapshot = learnerProfileSnapshotBuilder.build(
             diagnosisSession.getId(),
             learningSession.getId(),
@@ -373,6 +332,24 @@ public class DiagnosisService {
             savedProfile.getVersion(),
             aggregationResult
         );
+        try {
+            snapshot.setStructuredSnapshotJson(objectMapper.writeValueAsString(structuredSnapshot));
+        } catch (JsonProcessingException e) {
+            throw new InternalServerException("Failed to serialize learner profile snapshot.");
+        }
+        if (structuredSnapshot.planHints() != null) {
+            Map<String, Object> hints = new LinkedHashMap<>();
+            hints.put("entryMode", structuredSnapshot.planHints().entryMode());
+            hints.put("explanationStyle", structuredSnapshot.planHints().explanationStyle());
+            hints.put("pace", structuredSnapshot.planHints().pace());
+            hints.put("taskGranularity", structuredSnapshot.planHints().taskGranularity());
+            hints.put("focusMode", structuredSnapshot.planHints().focusMode());
+            snapshot.setStrategyHints(hints);
+        }
+        snapshot.setConstraints(Map.of(
+            "timeBudget", structuredSnapshot.timeBudget() != null ? structuredSnapshot.timeBudget() : ""
+        ));
+
         LearnerProfileSnapshot savedSnapshot = learnerProfileSnapshotRepository.saveOrUpdate(snapshot);
         diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.EVALUATED, OffsetDateTime.now());
         DiagnosisExplanationAssembler.DiagnosisExplanation explanation = diagnosisExplanationAssembler.assemble(
@@ -406,11 +383,12 @@ public class DiagnosisService {
                 savedSnapshot.getConstraints()
             ),
             buildNextAction(learningSession.getId(), diagnosisSession.getId()),
-            sourceMeta(false, List.of(), "LLM"),
+            sourceMeta(false, List.of(), "RULE"),
             new DiagnosisMetadataDto(questions.size(), answers.size(), savedProfile.getVersion()),
             explanation.reasoningSteps(),
             explanation.strengthSources(),
-            explanation.weaknessSources()
+            explanation.weaknessSources(),
+            structuredSnapshot
         );
     }
 

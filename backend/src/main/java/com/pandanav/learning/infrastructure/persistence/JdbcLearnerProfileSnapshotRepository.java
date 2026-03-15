@@ -31,8 +31,9 @@ public class JdbcLearnerProfileSnapshotRepository implements LearnerProfileSnaps
             """
                 INSERT INTO learner_profile_snapshot
                   (diagnosis_session_id, learning_session_id, user_id, profile_version,
-                   feature_summary_json, strategy_hints_json, constraints_json, explanations_json)
-                VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb)
+                   feature_summary_json, strategy_hints_json, constraints_json, explanations_json,
+                   structured_snapshot_json)
+                VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb)
                 ON CONFLICT (diagnosis_session_id) DO UPDATE
                   SET learning_session_id = EXCLUDED.learning_session_id,
                       user_id = EXCLUDED.user_id,
@@ -41,6 +42,7 @@ public class JdbcLearnerProfileSnapshotRepository implements LearnerProfileSnaps
                       strategy_hints_json = EXCLUDED.strategy_hints_json,
                       constraints_json = EXCLUDED.constraints_json,
                       explanations_json = EXCLUDED.explanations_json,
+                      structured_snapshot_json = EXCLUDED.structured_snapshot_json,
                       updated_at = now()
                 RETURNING id, created_at, updated_at
                 """,
@@ -57,7 +59,8 @@ public class JdbcLearnerProfileSnapshotRepository implements LearnerProfileSnaps
             writeJson(snapshot.getFeatureSummary()),
             writeJson(snapshot.getStrategyHints()),
             writeJson(snapshot.getConstraints()),
-            writeJson(snapshot.getExplanations())
+            writeJson(snapshot.getExplanations()),
+            snapshot.getStructuredSnapshotJson()
         );
         if (saved == null) {
             throw new InternalServerException("Failed to save learner profile snapshot.");
@@ -72,7 +75,7 @@ public class JdbcLearnerProfileSnapshotRepository implements LearnerProfileSnaps
                 """
                     SELECT id, diagnosis_session_id, learning_session_id, user_id, profile_version,
                            feature_summary_json, strategy_hints_json, constraints_json, explanations_json,
-                           created_at, updated_at
+                           structured_snapshot_json, created_at, updated_at
                     FROM learner_profile_snapshot
                     WHERE diagnosis_session_id = ?
                     LIMIT 1
@@ -88,6 +91,7 @@ public class JdbcLearnerProfileSnapshotRepository implements LearnerProfileSnaps
                     item.setStrategyHints(readJsonMap(rs.getString("strategy_hints_json")));
                     item.setConstraints(readJsonMap(rs.getString("constraints_json")));
                     item.setExplanations(readJsonMap(rs.getString("explanations_json")));
+                    item.setStructuredSnapshotJson(rs.getString("structured_snapshot_json"));
                     item.setCreatedAt(rs.getObject("created_at", OffsetDateTime.class));
                     item.setUpdatedAt(rs.getObject("updated_at", OffsetDateTime.class));
                     return item;
