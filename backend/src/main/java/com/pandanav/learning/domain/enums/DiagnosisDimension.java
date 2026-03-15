@@ -18,5 +18,7 @@ public enum DiagnosisDimension {
     /** 主题题：核心概念把握 */
     TOPIC_CORE,
     /** 主题题：实际操作卡点 */
-    TOPIC_OPERATION
+    TOPIC_OPERATION,
+    /** 主题题：学习顺序偏好（先原理还是先代码） */
+    TOPIC_FOCUS
 }

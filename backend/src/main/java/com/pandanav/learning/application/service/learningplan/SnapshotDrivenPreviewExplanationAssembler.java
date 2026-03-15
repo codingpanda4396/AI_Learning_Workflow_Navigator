@@ -183,7 +183,7 @@ public class SnapshotDrivenPreviewExplanationAssembler {
         String time = orEmpty(codeMapper.timeBudget(n(snapshot.timeBudget())), "暂未识别");
 
         List<LearningPlanPreviewResponse.LearnerProfileItemResponse> learnerProfile = List.of(
-            new LearningPlanPreviewResponse.LearnerProfileItemResponse("当前基础", foundation),
+            new LearningPlanPreviewResponse.LearnerProfileItemResponse("当前状态", foundation),
             new LearningPlanPreviewResponse.LearnerProfileItemResponse("主要卡点", blocker),
             new LearningPlanPreviewResponse.LearnerProfileItemResponse("学习偏好", preference),
             new LearningPlanPreviewResponse.LearnerProfileItemResponse("当前目标", goal),

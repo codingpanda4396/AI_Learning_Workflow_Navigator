@@ -107,7 +107,11 @@ public class SnapshotToDisplayMapper {
                     case "EXPRESSION_WEAKNESS" -> out.add("表达与归纳还需加强。");
                     case "INTERVIEW_FOUNDATION_RISK" -> out.add("面试目标下基础尚需扎牢，建议先稳核心再刷题。");
                     case "PROCESS_CONFUSION" -> out.add("操作步骤容易混淆，需要先理清流程再练。");
-                    case "INDEPENDENT_SOLVING_WEAKNESS" -> out.add("独立解题还不足，会多安排从模仿到独立的练习。");
+                    case "INDEPENDENT_SOLVING_WEAKNESS" -> {
+                        if (out.stream().noneMatch(s -> s.contains("模仿到独立"))) {
+                            out.add("独立解题还不足，会多安排从模仿到独立的练习。");
+                        }
+                    }
                     case "EXAM_ORIENTED_SURFACE_LEARNING_RISK" -> out.add("考试导向下建议先稳概念再刷题，避免只记套路。");
                     case "CONCEPT_NOT_STABLE" -> out.add("核心概念还不稳，建议先巩固定义与结构。");
                     case "BOUNDARY_WEAKNESS" -> out.add("边界与特殊情况容易出错，后续会加强这类练习。");

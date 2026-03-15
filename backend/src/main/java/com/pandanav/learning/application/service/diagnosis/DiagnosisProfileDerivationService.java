@@ -42,7 +42,7 @@ public class DiagnosisProfileDerivationService {
             V1,
             foundationLevel,
             primaryBlocker,
-            practiceLevel,
+            practiceLevel != null && !practiceLevel.isBlank() ? practiceLevel : null,
             learningPreference,
             goalType,
             timeBudget,

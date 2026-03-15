@@ -93,6 +93,11 @@ public final class ContractCatalog {
             option("PROCESS_CONFUSION", "过程容易乱"),
             option("BOUNDARY_WEAKNESS", "边界条件容易错"),
             option("EXPRESSION_WEAKNESS", "会做但表达不清")
+        )),
+        Map.entry(DiagnosisDimension.TOPIC_FOCUS, List.of(
+            option("PRINCIPLE_FIRST", "先搞清原理再写代码"),
+            option("CODE_FIRST", "先会写代码再补原理"),
+            option("BALANCED", "两者结合")
         ))
     );
 
@@ -226,6 +231,7 @@ public final class ContractCatalog {
             case GOAL -> "学习目标";
             case TOPIC_CORE -> "主题概念";
             case TOPIC_OPERATION -> "主题应用";
+            case TOPIC_FOCUS -> "学习侧重";
         });
     }
 

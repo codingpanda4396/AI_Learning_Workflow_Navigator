@@ -160,7 +160,7 @@ class LearningPlanControllerTest {
             ),
             new LearningPlanPreviewResponse.ExplanationPanelResponse(
                 List.of(
-                    new LearningPlanPreviewResponse.LearnerProfileItemResponse("当前基础", "学过相关内容，但基础还不稳定"),
+                    new LearningPlanPreviewResponse.LearnerProfileItemResponse("当前状态", "学过相关内容，但基础还不稳定"),
                     new LearningPlanPreviewResponse.LearnerProfileItemResponse("学习目标", "准备考试或测验"),
                     new LearningPlanPreviewResponse.LearnerProfileItemResponse("学习方式", "先理解概念再练习"),
                     new LearningPlanPreviewResponse.LearnerProfileItemResponse("时间节奏", "每周 4-6 小时")

@@ -2,31 +2,21 @@ package com.pandanav.learning.application.service;
 
 import com.pandanav.learning.domain.model.DiagnosisQuestion;
 import com.pandanav.learning.domain.model.DiagnosisQuestionDraft;
-import com.pandanav.learning.domain.model.DiagnosisQuestionOption;
-import com.pandanav.learning.domain.model.DiagnosisSignal;
 import com.pandanav.learning.domain.model.DiagnosisLearnerProfileSnapshot;
 import com.pandanav.learning.domain.model.DiagnosisStrategyDecision;
 import com.pandanav.learning.domain.model.PlanningContext;
 import org.springframework.stereotype.Component;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.IntStream;
 
 /**
  * Adapts selected question copy by topic and context; does not change which questions are asked.
- * For q_topic_focus, injects knowledge-point-level sub-focus options from TopicSubFocusResolver.
+ * q_topic_focus keeps principle/code options from the factory; only title is personalized.
  */
 @Component
 public class DefaultDiagnosisQuestionCopyAdapter implements DiagnosisQuestionCopyAdapter {
 
-    private static final String TOPIC_FOCUS_PREFIX = "TOPIC_FOCUS_";
-
-    private final TopicSubFocusResolver topicSubFocusResolver;
-
-    public DefaultDiagnosisQuestionCopyAdapter(TopicSubFocusResolver topicSubFocusResolver) {
-        this.topicSubFocusResolver = topicSubFocusResolver;
+    public DefaultDiagnosisQuestionCopyAdapter() {
     }
 
     @Override
@@ -52,34 +42,19 @@ public class DefaultDiagnosisQuestionCopyAdapter implements DiagnosisQuestionCop
             return q;
         }
         if ("q_topic_focus".equals(q.questionId())) {
-            List<String> subFocusLabels = topicSubFocusResolver.resolve(topic, goal);
-            List<DiagnosisQuestionOption> options = IntStream.range(0, subFocusLabels.size())
-                .mapToObj(i -> new DiagnosisQuestionOption(
-                    TOPIC_FOCUS_PREFIX + (i + 1),
-                    subFocusLabels.get(i),
-                    i + 1
-                ))
-                .toList();
-            Map<String, List<DiagnosisSignal>> optionSignalMapping = new LinkedHashMap<>();
-            for (int i = 0; i < subFocusLabels.size(); i++) {
-                String code = TOPIC_FOCUS_PREFIX + (i + 1);
-                optionSignalMapping.put(code, List.of(
-                    new DiagnosisSignal("topic_focus_gap", code, 0, 0.8, "self_assessment")
-                ));
-            }
             return new DiagnosisQuestion(
                 q.questionId(),
                 q.dimension(),
                 q.type(),
                 q.required(),
-                options,
+                q.options(),
                 personalizeCopy(q.title(), topic),
                 personalizeCopy(q.description(), topic),
                 q.placeholder(),
                 q.submitHint(),
                 q.sectionLabel(),
-                List.of("topic_focus_gap"),
-                optionSignalMapping
+                q.signalTargets(),
+                q.optionSignalMapping()
             );
         }
         return new DiagnosisQuestion(

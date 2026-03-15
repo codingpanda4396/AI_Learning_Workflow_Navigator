@@ -54,6 +54,7 @@ public class StructuredDiagnosisQuestionFactory {
         );
         List<DiagnosisQuestionOption> topicCoreOpts = ContractCatalog.diagnosisQuestionOptions(DiagnosisDimension.TOPIC_CORE);
         List<DiagnosisQuestionOption> topicOperationOpts = ContractCatalog.diagnosisQuestionOptions(DiagnosisDimension.TOPIC_OPERATION);
+        List<DiagnosisQuestionOption> topicFocusOpts = ContractCatalog.diagnosisQuestionOptions(DiagnosisDimension.TOPIC_FOCUS);
 
         return List.of(
             new DiagnosisQuestion(
@@ -128,10 +129,10 @@ public class StructuredDiagnosisQuestionFactory {
             ),
             new DiagnosisQuestion(
                 Q_TOPIC_FOCUS,
-                DiagnosisDimension.TOPIC_CORE,
+                DiagnosisDimension.TOPIC_FOCUS,
                 "SINGLE_CHOICE",
                 true,
-                topicCoreOpts,
+                topicFocusOpts,
                 topicFocusTitle,
                 null, null, null, "侧重",
                 List.of(), Map.of()

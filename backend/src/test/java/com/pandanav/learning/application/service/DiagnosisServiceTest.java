@@ -96,7 +96,7 @@ class DiagnosisServiceTest {
             new DiagnosisSelectionValidator(),
             new DiagnosisSelectionOutputNormalizer(),
             new DiagnosisQuestionDraftFromSelectionFactory(),
-            new DefaultDiagnosisQuestionCopyAdapter(new TopicSubFocusResolver()),
+            new DefaultDiagnosisQuestionCopyAdapter(),
             new QuestionRationaleBuilder(),
             new DiagnosisResponseAssembler(),
             new CapabilityProfileBuilder(),
@@ -147,7 +147,7 @@ class DiagnosisServiceTest {
         assertEquals(501L, response.diagnosisId());
         assertEquals("READY", response.status());
         assertEquals("STRUCTURED", response.generationMode());
-        assertTrue(response.diagnosisExplanation().whyTheseQuestions().contains("基础起点"));
+        assertTrue(response.diagnosisExplanation().whyTheseQuestions().contains("基础"));
         assertTrue(response.decisionHints().planningFactors().size() >= 3);
         assertEquals("PROFILE_SAMPLING", response.diagnosisStrategy().code());
         assertEquals(8, response.questions().size());

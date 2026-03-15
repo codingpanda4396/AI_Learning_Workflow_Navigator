@@ -156,12 +156,16 @@ public class PreviewDisplayCodeMapper {
 
     private static final Pattern FOUNDATION_OF = Pattern.compile("(?i)Foundation of\\s+(\\S+)");
 
-    /** 清除用户文案中的内部概念泄漏（如 "Foundation of 图"），统一为中文表达。 */
+    /** 清除用户文案中的内部概念泄漏（如 "Foundation of 图"），统一为中文表达；并去掉句末残留「 基础」。 */
     public static String sanitizeUserFacingText(String text) {
         if (text == null || text.isBlank()) {
             return text;
         }
-        return FOUNDATION_OF.matcher(text.trim()).replaceAll("$1 基础");
+        String s = FOUNDATION_OF.matcher(text.trim()).replaceAll("$1 基础");
+        if (s.endsWith(" 基础") || s.endsWith("。基础")) {
+            s = s.replaceFirst("\\s*基础\\s*$", "").trim();
+        }
+        return s;
     }
 
     private String normalize(String code) {

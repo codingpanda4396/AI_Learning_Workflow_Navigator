@@ -152,7 +152,7 @@ public class LearnerEvidenceAggregator {
         }
         return evidenceCount >= 2
             ? "当前证据仍在补齐中，系统会根据你完成第一步后的表现快速校准。"
-            : "当前证据有限，系统先给出稳健起步动作。";
+            : "这是基于本轮诊断生成的首个起步方案，后续会根据你的学习表现继续微调。";
     }
 
     private String signalTierText(LearnerSignalTier tier) {

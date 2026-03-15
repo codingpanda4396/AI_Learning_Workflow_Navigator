@@ -860,9 +860,12 @@ public class LearningPlanService {
         LearnerSignalSnapshot learnerSignal = context.learnerSignalSnapshot() != null
             ? context.learnerSignalSnapshot()
             : learnerSignalInterpreter.interpret(context);
-        String recommendedNodeName = orchestrated.preview() == null || orchestrated.preview().summary() == null
+        String rawNodeName = orchestrated.preview() == null || orchestrated.preview().summary() == null
             ? null
             : orchestrated.preview().summary().recommendedStartNodeName();
+        String recommendedNodeName = rawNodeName != null && !rawNodeName.isBlank()
+            ? conceptDisplayTitleMapper.toDisplayTitle(rawNodeName)
+            : rawNodeName;
         LearnerEvidenceSummary learnerEvidence = learnerEvidenceAggregator.aggregate(context, learnerSignal, recommendedNodeName);
         return new LearningPlanPlanningContext(
             context.userId(),

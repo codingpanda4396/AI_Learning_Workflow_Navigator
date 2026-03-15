@@ -162,7 +162,7 @@ public class PersonalizedPreviewViewAssembler {
         String concept
     ) {
         List<LearningPlanPreviewResponse.LearnerProfileItemResponse> learnerProfile = List.of(
-            new LearningPlanPreviewResponse.LearnerProfileItemResponse("当前基础", capability),
+            new LearningPlanPreviewResponse.LearnerProfileItemResponse("当前状态", capability),
             new LearningPlanPreviewResponse.LearnerProfileItemResponse("学习目标", goalOrientation),
             new LearningPlanPreviewResponse.LearnerProfileItemResponse("学习方式", learningPreference),
             new LearningPlanPreviewResponse.LearnerProfileItemResponse("时间节奏", timeBudget)

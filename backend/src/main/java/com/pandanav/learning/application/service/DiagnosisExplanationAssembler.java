@@ -307,7 +307,8 @@ public class DiagnosisExplanationAssembler {
             if (riskTags.contains("PROCESS_CONFUSION")) {
                 out.add(new EvidenceItem(DiagnosisDimension.TOPIC_OPERATION, "操作步骤容易混淆，需要先理清流程再练。"));
             }
-            if (riskTags.contains("INDEPENDENT_SOLVING_WEAKNESS")) {
+            if (riskTags.contains("INDEPENDENT_SOLVING_WEAKNESS")
+                && out.stream().noneMatch(e -> e.label().contains("模仿到独立"))) {
                 out.add(new EvidenceItem(DiagnosisDimension.BLOCKER, "独立解题还不足，会多安排从模仿到独立的练习。"));
             }
             if (riskTags.contains("EXAM_ORIENTED_SURFACE_LEARNING_RISK")) {
