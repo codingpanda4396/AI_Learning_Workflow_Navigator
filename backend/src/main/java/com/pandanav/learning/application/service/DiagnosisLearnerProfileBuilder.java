@@ -55,6 +55,7 @@ public class DiagnosisLearnerProfileBuilder {
         if (hasContradictionRisk) riskTags.add("CONTRADICTION_RISK");
         if (hasRecentFailures) riskTags.add("RECENT_FAILURES");
         if (weaknessTags != null) riskTags.addAll(weaknessTags);
+        riskTags.addAll(inferRiskTagsFromGoalAndTopic(goal, topic));
         List<String> historySignals = new ArrayList<>();
         if (hasHistory) historySignals.add("HAS_HISTORY");
         if (hasRecentFailures) historySignals.add("RECENT_FAILURES");
@@ -106,5 +107,40 @@ public class DiagnosisLearnerProfileBuilder {
             return CLARITY_MEDIUM;
         }
         return CLARITY_LOW;
+    }
+
+    /**
+     * Rule-based risk tags from goal and topic. Used when no history evidence exists.
+     */
+    private static List<String> inferRiskTagsFromGoalAndTopic(String goal, String topic) {
+        List<String> tags = new ArrayList<>();
+        String goalLower = (goal != null ? goal : "").toLowerCase(Locale.ROOT);
+        String topicLower = (topic != null ? topic : "").toLowerCase(Locale.ROOT);
+        String combined = goalLower + " " + topicLower;
+
+        if (combined.contains("算法") || combined.contains("最短路径") || combined.contains("进阶")
+            || combined.contains("高级") || combined.contains("深入")) {
+            tags.add("ALGORITHM_JUMP_RISK");
+            if (!combined.contains("基础") && !combined.contains("入门")) {
+                tags.add("FOUNDATION_GAP_RISK");
+            }
+        }
+
+        boolean goalNarrow = (goal != null && goal.length() >= 4)
+            && (goalLower.contains("理解") || goalLower.contains("掌握") || goalLower.contains("学会"));
+        boolean topicBroader = topic != null && topic.length() >= 2
+            && (topicLower.contains("图") || topicLower.contains("树") || topicLower.contains("数据结构"));
+        if (goalNarrow && topicBroader && (goalLower.contains("最短路径") || goalLower.contains("遍历"))) {
+            if (!tags.contains("GOAL_SCOPE_RISK")) {
+                tags.add("GOAL_SCOPE_RISK");
+            }
+        }
+
+        if (goalLower.contains("时间") || goalLower.contains("紧急") || goalLower.contains("考前")
+            || goalLower.contains("几天") || goalLower.contains("一周")) {
+            tags.add("TIME_CONSTRAINT_RISK");
+        }
+
+        return tags;
     }
 }

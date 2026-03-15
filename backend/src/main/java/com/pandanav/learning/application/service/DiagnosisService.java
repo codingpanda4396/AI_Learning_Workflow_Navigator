@@ -89,6 +89,7 @@ public class DiagnosisService {
     private final PersonalizedQuestionSelector personalizedQuestionSelector;
     private final DiagnosisStrategySelectionLlmService strategySelectionLlmService;
     private final DiagnosisSelectionValidator diagnosisSelectionValidator;
+    private final DiagnosisSelectionOutputNormalizer diagnosisSelectionOutputNormalizer;
     private final DiagnosisQuestionDraftFromSelectionFactory draftFromSelectionFactory;
     private final DiagnosisQuestionCopyAdapter diagnosisQuestionCopyAdapter;
     private final QuestionRationaleBuilder questionRationaleBuilder;
@@ -122,6 +123,7 @@ public class DiagnosisService {
         PersonalizedQuestionSelector personalizedQuestionSelector,
         DiagnosisStrategySelectionLlmService strategySelectionLlmService,
         DiagnosisSelectionValidator diagnosisSelectionValidator,
+        DiagnosisSelectionOutputNormalizer diagnosisSelectionOutputNormalizer,
         DiagnosisQuestionDraftFromSelectionFactory draftFromSelectionFactory,
         DiagnosisQuestionCopyAdapter diagnosisQuestionCopyAdapter,
         QuestionRationaleBuilder questionRationaleBuilder,
@@ -154,6 +156,7 @@ public class DiagnosisService {
         this.personalizedQuestionSelector = personalizedQuestionSelector;
         this.strategySelectionLlmService = strategySelectionLlmService;
         this.diagnosisSelectionValidator = diagnosisSelectionValidator;
+        this.diagnosisSelectionOutputNormalizer = diagnosisSelectionOutputNormalizer;
         this.draftFromSelectionFactory = draftFromSelectionFactory;
         this.diagnosisQuestionCopyAdapter = diagnosisQuestionCopyAdapter;
         this.questionRationaleBuilder = questionRationaleBuilder;
@@ -203,6 +206,7 @@ public class DiagnosisService {
                 planningContext.chapterName()
             );
             if (diagnosisSelectionValidator.validate(selection, candidates, strategyDecision)) {
+                selection = diagnosisSelectionOutputNormalizer.normalize(selection, profileSnapshot, topic, candidates);
                 llmSelectionResult = selection;
                 selectedDrafts = draftFromSelectionFactory.fromSelection(selection, candidates);
                 effectiveStrategy = strategyFromLlmSelection(selection, strategyDecision);
@@ -261,8 +265,12 @@ public class DiagnosisService {
         LearnerSnapshotDto learnerSnapshotDto = buildLearnerSnapshotDto(profileSnapshot, planningContext, llmSelectionResult);
         DiagnosisStrategyDto diagnosisStrategyDto = buildDiagnosisStrategyDto(effectiveStrategy);
         List<QuestionRationaleDto> questionRationales =
-            questionRationaleBuilder.build(selectedDrafts, profileSnapshot, effectiveStrategy);
-        PersonalizationMetaDto personalizationMeta = buildPersonalizationMetaDto(profileSnapshot, strategyDecision);
+            questionRationaleBuilder.build(selectedDrafts, profileSnapshot, effectiveStrategy, planningContext);
+        List<String> selectedQuestionIds = selectedDrafts.stream()
+            .map(d -> d.question().questionId())
+            .toList();
+        PersonalizationMetaDto personalizationMeta = buildPersonalizationMetaDto(
+            profileSnapshot, strategyDecision, selectedQuestionIds);
         log.info(
             "DIAGNOSIS_GENERATION_RESULT traceId={} sessionId={} generationMode={} questionCount={} topic={}",
             TraceContext.traceId(),
@@ -456,10 +464,16 @@ public class DiagnosisService {
         DiagnosisLlmSelectionResult llmSelectionResult
     ) {
         String topic = resolveTopic(planningContext);
-        String summary = (llmSelectionResult != null && llmSelectionResult.learnerSummary() != null
-            && !llmSelectionResult.learnerSummary().isBlank())
-            ? llmSelectionResult.learnerSummary()
-            : buildLearnerSnapshotSummary(profile, topic);
+        boolean onlyBasicEvidence = profile.evidence() != null && profile.evidence().size() <= 2 && !profile.hasHistory();
+        String summary;
+        if (onlyBasicEvidence) {
+            summary = buildLearnerSnapshotSummary(profile, topic);
+        } else if (llmSelectionResult != null && llmSelectionResult.learnerSummary() != null
+            && !llmSelectionResult.learnerSummary().isBlank()) {
+            summary = llmSelectionResult.learnerSummary();
+        } else {
+            summary = buildLearnerSnapshotSummary(profile, topic);
+        }
         List<String> signals = new ArrayList<>(profile.evidence() != null ? profile.evidence() : List.of());
         List<String> riskTags = new ArrayList<>(profile.riskTags() != null ? profile.riskTags() : List.of());
         if (profile.hasContradictionRisk() && !riskTags.contains("CONTRADICTION_RISK")) {
@@ -547,7 +561,8 @@ public class DiagnosisService {
 
     private PersonalizationMetaDto buildPersonalizationMetaDto(
         DiagnosisLearnerProfileSnapshot profile,
-        DiagnosisStrategyDecision strategy
+        DiagnosisStrategyDecision strategy,
+        List<String> selectedQuestionIds
     ) {
         List<String> usedSignals = new ArrayList<>();
         if (profile.evidence() != null && !profile.evidence().isEmpty()) {
@@ -558,8 +573,20 @@ public class DiagnosisService {
         if (profile.weaknessTags() != null && !profile.weaknessTags().isEmpty()) {
             usedSignals.add("recentWeaknessTags");
         }
-        String level = usedSignals.size() >= 2 || (strategy != null && strategy.personalizationReasons() != null && !strategy.personalizationReasons().isEmpty())
-            ? "HIGH" : "MEDIUM";
+        boolean hasTopicQuestion = selectedQuestionIds != null && selectedQuestionIds.contains("q_topic_focus");
+        boolean strategyDiffers = strategy != null && strategy.strategyCode() != null
+            && !"FOUNDATION_FIRST".equals(strategy.strategyCode());
+        boolean hasHistoryOrRisk = profile.hasHistory()
+            || (profile.riskTags() != null && !profile.riskTags().isEmpty());
+
+        String level;
+        if (!hasHistoryOrRisk && usedSignals.size() <= 2 && !hasTopicQuestion && !strategyDiffers) {
+            level = "LOW";
+        } else if (hasHistoryOrRisk) {
+            level = "HIGH";
+        } else {
+            level = "MEDIUM";
+        }
         return new PersonalizationMetaDto(level, usedSignals, "PROFILE_DRIVEN");
     }
 

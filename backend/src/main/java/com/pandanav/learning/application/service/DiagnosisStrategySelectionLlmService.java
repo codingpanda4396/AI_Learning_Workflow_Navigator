@@ -76,15 +76,14 @@ public class DiagnosisStrategySelectionLlmService {
         String ruleStrategyText = formatRuleStrategy(ruleStrategy);
 
         String userPrompt = """
-            You are an AI learning diagnosis planner.
-            Your task is to select the most appropriate diagnostic questions for a learner.
+            你是学习诊断规划助手，从候选题目中选出最合适的诊断题。
 
-            Constraints:
-            1. You must ONLY select from the provided candidate questions.
-            2. Do NOT invent new questions.
-            3. Ensure the selected questions match the learner's context.
-            4. Prefer questions that reveal the learner's starting point.
-            5. Ensure coverage of mandatory dimensions.
+            硬性约束：
+            1. 只能从提供的候选题目中选择，不得新增题目。
+            2. 所选题目须覆盖必选维度，并尽量体现学习者起点。
+            3. 所有自然语言输出必须为简体中文，禁止输出英文的 explanation、label、summary。
+            4. selectionReasons：每个 questionId 对应一句简短中文说明，8～16 个中文字符，产品化表述（例如：确认图论基础、定位最模糊环节、对齐学习目标、控制学习节奏）。
+            5. learnerSummary：仅总结当前已提供的证据（如目标、章节/主题）；不得断言用户尚未回答的内容（如“中等时间”“基础阶段”“目标明确”等）。只可写“本次将确认……”之类，不可写“用户已具备……”。若 profile 中仅有 goal 与 topic，则 summary 只概括这两点并说明本次将确认哪些维度。
 
             Learner Profile:
             %s
@@ -104,14 +103,14 @@ public class DiagnosisStrategySelectionLlmService {
             Mandatory dimensions (must cover): %s
             Optional dimensions: %s
 
-            Return JSON only with structure:
+            仅返回 JSON，不要 markdown 或解释。结构示例（所有中文字段请按上述要求用简体中文填写）：
             {
-              "strategyCode": "...",
-              "selectedQuestionIds": [],
-              "questionOrder": { "questionId": order },
-              "selectionReasons": { "questionId": "..." },
+              "strategyCode": "FOUNDATION_FIRST",
+              "selectedQuestionIds": ["q_foundation", "q_goal_style", "q_time_budget", "q_topic_focus", "q_learning_preference"],
+              "questionOrder": { "q_foundation": 1, "q_goal_style": 2, "q_time_budget": 3, "q_topic_focus": 4, "q_learning_preference": 5 },
+              "selectionReasons": { "q_foundation": "确认图论基础", "q_goal_style": "对齐学习目标", "q_time_budget": "控制学习节奏", "q_topic_focus": "定位最模糊环节", "q_learning_preference": "定制内容交付方式" },
               "suppressedQuestionIds": [],
-              "learnerSummary": "..."
+              "learnerSummary": "当前已知目标与章节，本次将确认前置基础、时间投入与具体模糊点。"
             }
             """
             .formatted(
