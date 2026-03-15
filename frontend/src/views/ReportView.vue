@@ -38,6 +38,7 @@ const nextStepTitle = computed(() => {
 });
 const nextStepReason = computed(() => report.value?.nextStep?.reason || report.value?.nextRoundAdvice || '按这份反馈继续往下走会更稳。');
 const score = computed(() => formatPercent(report.value?.overallAccuracy ?? report.value?.overallScore));
+const stepEvidence = computed(() => report.value?.stepEvidence?.slice(0, 6) ?? []);
 
 async function loadReport() {
   if (!sessionId.value) {
@@ -117,6 +118,24 @@ onMounted(loadReport);
           </div>
         </SectionCard>
       </div>
+
+      <SectionCard title="本步证据摘要" description="来自当前任务步骤的可追溯评估证据">
+        <div v-if="stepEvidence.length" class="grid gap-3">
+          <div
+            v-for="item in stepEvidence"
+            :key="item.evidenceId"
+            class="app-option text-sm leading-7 text-slate-700"
+          >
+            <p class="font-medium text-slate-900">
+              第{{ item.stepIndex || '-' }}步 · {{ item.evidenceType || 'EVIDENCE' }}
+            </p>
+            <p>{{ item.summary || '已记录步骤证据。' }}</p>
+          </div>
+        </div>
+        <p v-else class="text-sm leading-7 text-slate-500">
+          当前还没有可展示的步骤证据，完成更多步骤后会自动生成。
+        </p>
+      </SectionCard>
     </div>
   </AppShell>
 </template>

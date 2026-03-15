@@ -12,4 +12,6 @@ public interface EvidenceRepository {
     Optional<Evidence> findById(Long id);
 
     List<Evidence> findByTaskId(Long taskId);
+
+    List<Evidence> findByTaskIdAndStepId(Long taskId, Long stepId);
 }

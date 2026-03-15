@@ -15,6 +15,7 @@ import com.pandanav.learning.domain.llm.model.EvaluationContext;
 import com.pandanav.learning.domain.llm.model.EvaluationResult;
 import com.pandanav.learning.application.usecase.SubmitTrainingAnswerUseCase;
 import com.pandanav.learning.domain.enums.ErrorTag;
+import com.pandanav.learning.domain.enums.LearningStepStatus;
 import com.pandanav.learning.domain.enums.NextAction;
 import com.pandanav.learning.domain.enums.SessionStatus;
 import com.pandanav.learning.domain.enums.Stage;
@@ -23,10 +24,12 @@ import com.pandanav.learning.domain.model.AttemptLlmMetadata;
 import com.pandanav.learning.domain.model.ConceptNode;
 import com.pandanav.learning.domain.model.Evidence;
 import com.pandanav.learning.domain.model.LearningSession;
+import com.pandanav.learning.domain.model.LearningStep;
 import com.pandanav.learning.domain.model.LlmCallLog;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
 import com.pandanav.learning.domain.repository.EvidenceRepository;
+import com.pandanav.learning.domain.repository.LearningStepRepository;
 import com.pandanav.learning.domain.repository.LlmCallLogRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.repository.TaskRepository;
@@ -53,6 +56,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
     private final SessionRepository sessionRepository;
     private final ConceptNodeRepository conceptNodeRepository;
     private final EvidenceRepository evidenceRepository;
+    private final LearningStepRepository learningStepRepository;
     private final LlmCallLogRepository llmCallLogRepository;
     private final AnswerEvaluator answerEvaluator;
     private final MasteryUpdateService masteryUpdateService;
@@ -64,6 +68,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         SessionRepository sessionRepository,
         ConceptNodeRepository conceptNodeRepository,
         EvidenceRepository evidenceRepository,
+        LearningStepRepository learningStepRepository,
         LlmCallLogRepository llmCallLogRepository,
         AnswerEvaluator answerEvaluator,
         MasteryUpdateService masteryUpdateService,
@@ -74,6 +79,7 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
         this.evidenceRepository = evidenceRepository;
+        this.learningStepRepository = learningStepRepository;
         this.llmCallLogRepository = llmCallLogRepository;
         this.answerEvaluator = answerEvaluator;
         this.masteryUpdateService = masteryUpdateService;
@@ -235,12 +241,30 @@ public class SubmitTrainingAnswerService implements SubmitTrainingAnswerUseCase 
             "fixes", feedback.fixes(),
             "strengths", strengths
         ));
+        LearningStep currentStep = resolveCurrentStep(task.getId());
+        if (currentStep != null) {
+            payload.put("step_id", currentStep.getId());
+            payload.put("step_index", currentStep.getStepOrder());
+        }
 
         Evidence evidence = new Evidence();
         evidence.setTaskId(task.getId());
+        evidence.setStepId(currentStep == null ? null : currentStep.getId());
+        evidence.setStepIndex(currentStep == null ? null : currentStep.getStepOrder());
         evidence.setEvidenceType("TRAINING_SUBMISSION_EVAL");
         evidence.setContentJson(toJson(payload));
         evidenceRepository.save(evidence);
+    }
+
+    private LearningStep resolveCurrentStep(Long taskId) {
+        List<LearningStep> steps = learningStepRepository.findByTaskIdOrderByStepOrder(taskId);
+        if (steps.isEmpty()) {
+            return null;
+        }
+        return steps.stream()
+            .filter(step -> step.getStatus() == LearningStepStatus.ACTIVE)
+            .findFirst()
+            .orElseGet(() -> steps.get(steps.size() - 1));
     }
 
     private Task createAdaptiveTask(

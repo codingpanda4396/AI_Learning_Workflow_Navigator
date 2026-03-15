@@ -2,21 +2,26 @@ package com.pandanav.learning.application.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pandanav.learning.api.dto.task.LearningStepResponse;
 import com.pandanav.learning.api.dto.task.RunTaskResponse;
 import com.pandanav.learning.application.usecase.RunTaskUseCase;
 import com.pandanav.learning.auth.UserContextHolder;
+import com.pandanav.learning.domain.enums.LearningStepStatus;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.llm.StageContentGenerator;
 import com.pandanav.learning.domain.llm.model.LlmStage;
 import com.pandanav.learning.domain.llm.model.StageContent;
 import com.pandanav.learning.domain.llm.model.StageGenerationContext;
 import com.pandanav.learning.domain.model.AttemptLlmMetadata;
+import com.pandanav.learning.domain.model.CompletionRule;
 import com.pandanav.learning.domain.model.ConceptNode;
+import com.pandanav.learning.domain.model.LearningStep;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.LlmCallLog;
 import com.pandanav.learning.domain.model.Mastery;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
+import com.pandanav.learning.domain.repository.LearningStepRepository;
 import com.pandanav.learning.domain.repository.LlmCallLogRepository;
 import com.pandanav.learning.domain.repository.MasteryRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
@@ -34,6 +39,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class TaskRunnerService implements RunTaskUseCase {
@@ -44,6 +50,7 @@ public class TaskRunnerService implements RunTaskUseCase {
     private final SessionRepository sessionRepository;
     private final ConceptNodeRepository conceptNodeRepository;
     private final MasteryRepository masteryRepository;
+    private final LearningStepRepository learningStepRepository;
     private final StageContentGenerator stageContentGenerator;
     private final LlmCallLogRepository llmCallLogRepository;
     private final LlmProperties llmProperties;
@@ -56,6 +63,7 @@ public class TaskRunnerService implements RunTaskUseCase {
         SessionRepository sessionRepository,
         ConceptNodeRepository conceptNodeRepository,
         MasteryRepository masteryRepository,
+        LearningStepRepository learningStepRepository,
         StageContentGenerator stageContentGenerator,
         LlmCallLogRepository llmCallLogRepository,
         LlmProperties llmProperties,
@@ -67,6 +75,7 @@ public class TaskRunnerService implements RunTaskUseCase {
         this.sessionRepository = sessionRepository;
         this.conceptNodeRepository = conceptNodeRepository;
         this.masteryRepository = masteryRepository;
+        this.learningStepRepository = learningStepRepository;
         this.stageContentGenerator = stageContentGenerator;
         this.llmCallLogRepository = llmCallLogRepository;
         this.llmProperties = llmProperties;
@@ -84,7 +93,9 @@ public class TaskRunnerService implements RunTaskUseCase {
             .orElseThrow(() -> new NotFoundException("Session or task not found."));
 
         if (task.getStatus() == TaskStatus.SUCCEEDED && hasOutput(task.getOutputJson())) {
-            return toResponse(task, "CACHED", "Output loaded from existing successful attempt.", parseOutput(task.getOutputJson()));
+            JsonNode cachedOutput = parseOutput(task.getOutputJson());
+            List<LearningStep> steps = ensureLearningSteps(task, cachedOutput);
+            return toResponse(task, "CACHED", "Output loaded from existing successful attempt.", cachedOutput, steps);
         }
         if (task.getStatus() == TaskStatus.RUNNING) {
             throw new ConflictException("Task is currently running.");
@@ -191,7 +202,8 @@ public class TaskRunnerService implements RunTaskUseCase {
         }
 
         task.markSucceeded(outputJson);
-        return toResponse(task, metadata.generationMode(), generationReason, generated);
+        List<LearningStep> steps = ensureLearningSteps(task, generated);
+        return toResponse(task, metadata.generationMode(), generationReason, generated, steps);
     }
 
     private boolean hasOutput(String outputJson) {
@@ -238,7 +250,14 @@ public class TaskRunnerService implements RunTaskUseCase {
         ));
     }
 
-    private RunTaskResponse toResponse(Task task, String generationMode, String generationReason, JsonNode output) {
+    private RunTaskResponse toResponse(
+        Task task,
+        String generationMode,
+        String generationReason,
+        JsonNode output,
+        List<LearningStep> steps
+    ) {
+        LearningStepResponse currentStep = toCurrentStep(steps);
         return new RunTaskResponse(
             task.getId(),
             task.getStage().name(),
@@ -246,7 +265,91 @@ public class TaskRunnerService implements RunTaskUseCase {
             TaskStatus.SUCCEEDED.name(),
             generationMode,
             generationReason,
-            output
+            output,
+            currentStep,
+            buildNextStepHint(currentStep),
+            steps.stream().map(this::toStepResponse).toList()
+        );
+    }
+
+    private List<LearningStep> ensureLearningSteps(Task task, JsonNode output) {
+        if (task.getStage() != com.pandanav.learning.domain.enums.Stage.TRAINING) {
+            return List.of();
+        }
+        List<LearningStep> existing = learningStepRepository.findByTaskIdOrderByStepOrder(task.getId());
+        if (!existing.isEmpty()) {
+            return existing;
+        }
+        int stepCount = resolveTrainingStepCount(output);
+        List<LearningStep> created = java.util.stream.IntStream.rangeClosed(1, stepCount)
+            .mapToObj(order -> buildTrainingStep(task, output, order))
+            .toList();
+        return learningStepRepository.saveAll(created);
+    }
+
+    private int resolveTrainingStepCount(JsonNode output) {
+        JsonNode questions = output == null ? null : output.path("questions");
+        if (questions != null && questions.isArray() && questions.size() > 0) {
+            return questions.size();
+        }
+        return 1;
+    }
+
+    private LearningStep buildTrainingStep(Task task, JsonNode output, int order) {
+        LearningStep step = new LearningStep();
+        step.setTaskId(task.getId());
+        step.setStage(task.getStage());
+        step.setType("QUESTION");
+        step.setStepOrder(order);
+        step.setStatus(order == 1 ? LearningStepStatus.ACTIVE : LearningStepStatus.TODO);
+        step.setObjective(resolveQuestionObjective(output, order));
+        step.setCompletionRule(new CompletionRule("MANUAL_CONFIRM", 1, List.of(), 3));
+        return step;
+    }
+
+    private String resolveQuestionObjective(JsonNode output, int order) {
+        JsonNode questions = output == null ? null : output.path("questions");
+        if (questions != null && questions.isArray() && questions.size() >= order) {
+            JsonNode item = questions.get(order - 1);
+            String question = item.path("question").asText(null);
+            if (question != null && !question.isBlank()) {
+                return question;
+            }
+        }
+        return "完成训练步骤 " + order;
+    }
+
+    private LearningStepResponse toCurrentStep(List<LearningStep> steps) {
+        Optional<LearningStep> active = steps.stream()
+            .filter(step -> step.getStatus() == LearningStepStatus.ACTIVE)
+            .findFirst();
+        if (active.isPresent()) {
+            return toStepResponse(active.get());
+        }
+        return steps.stream()
+            .filter(step -> step.getStatus() == LearningStepStatus.TODO)
+            .findFirst()
+            .map(this::toStepResponse)
+            .orElse(null);
+    }
+
+    private String buildNextStepHint(LearningStepResponse currentStep) {
+        if (currentStep == null) {
+            return "当前任务暂无可执行步骤。";
+        }
+        return "继续下一步：" + currentStep.objective();
+    }
+
+    private LearningStepResponse toStepResponse(LearningStep step) {
+        return new LearningStepResponse(
+            step.getId(),
+            step.getTaskId(),
+            step.getStage().name(),
+            step.getType(),
+            step.getStepOrder(),
+            step.getStatus().name(),
+            step.getObjective(),
+            step.getCompletionRule()
         );
     }
 

@@ -7,12 +7,14 @@ import com.pandanav.learning.api.dto.feedback.LearningReportQuestionResponse;
 import com.pandanav.learning.api.dto.feedback.LearningReportResponse;
 import com.pandanav.learning.api.dto.feedback.NextStepRecommendationResponse;
 import com.pandanav.learning.api.dto.feedback.SessionReportResponse;
+import com.pandanav.learning.api.dto.feedback.StepEvidenceResponse;
 import com.pandanav.learning.api.dto.feedback.WeakPointNodeResponse;
 import com.pandanav.learning.api.dto.session.GrowthDashboardNodeResponse;
 import com.pandanav.learning.api.dto.session.GrowthDashboardRecentPerformanceResponse;
 import com.pandanav.learning.api.dto.session.GrowthDashboardResponse;
 import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.model.ConceptNode;
+import com.pandanav.learning.domain.model.Evidence;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.NodeMastery;
 import com.pandanav.learning.domain.model.PracticeFeedbackReport;
@@ -22,6 +24,7 @@ import com.pandanav.learning.domain.model.PracticeSubmission;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.model.TrainingAttemptSummary;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
+import com.pandanav.learning.domain.repository.EvidenceRepository;
 import com.pandanav.learning.domain.repository.NodeMasteryRepository;
 import com.pandanav.learning.domain.repository.PracticeFeedbackReportRepository;
 import com.pandanav.learning.domain.repository.PracticeQuizRepository;
@@ -54,6 +57,7 @@ public class LearningInsightQueryService {
     private final PracticeSubmissionRepository practiceSubmissionRepository;
     private final NodeMasteryRepository nodeMasteryRepository;
     private final ConceptNodeRepository conceptNodeRepository;
+    private final EvidenceRepository evidenceRepository;
     private final WeakPointDiagnosisService weakPointDiagnosisService;
     private final ObjectMapper objectMapper;
 
@@ -66,6 +70,7 @@ public class LearningInsightQueryService {
         PracticeSubmissionRepository practiceSubmissionRepository,
         NodeMasteryRepository nodeMasteryRepository,
         ConceptNodeRepository conceptNodeRepository,
+        EvidenceRepository evidenceRepository,
         WeakPointDiagnosisService weakPointDiagnosisService,
         ObjectMapper objectMapper
     ) {
@@ -77,6 +82,7 @@ public class LearningInsightQueryService {
         this.practiceSubmissionRepository = practiceSubmissionRepository;
         this.nodeMasteryRepository = nodeMasteryRepository;
         this.conceptNodeRepository = conceptNodeRepository;
+        this.evidenceRepository = evidenceRepository;
         this.weakPointDiagnosisService = weakPointDiagnosisService;
         this.objectMapper = objectMapper;
     }
@@ -109,6 +115,10 @@ public class LearningInsightQueryService {
     public SessionReportResponse getSessionReport(Long sessionId, Long userId) {
         LearningReportView reportView = buildLearningReportView(sessionId, userId);
         PracticeFeedbackReport feedbackReport = reportView.feedbackReport();
+        List<StepEvidenceResponse> stepEvidence = evidenceRepository.findByTaskId(reportView.taskId()).stream()
+            .limit(20)
+            .map(this::toStepEvidenceResponse)
+            .toList();
 
         return new SessionReportResponse(
             reportView.sessionId(),
@@ -130,6 +140,7 @@ public class LearningInsightQueryService {
             reportView.reviewFocus(),
             reportView.questionResults(),
             reportView.weakPoints(),
+            stepEvidence,
             feedbackReport == null ? null : feedbackReport.getNextRoundAdvice(),
             feedbackReport == null ? reportView.nextStep().recommendedAction() : feedbackReport.getRecommendedAction(),
             feedbackReport == null ? reportView.nextStep().recommendedAction() : feedbackReport.getRecommendedAction(),
@@ -508,6 +519,42 @@ public class LearningInsightQueryService {
             .distinct()
             .limit(3)
             .toList();
+    }
+
+    private StepEvidenceResponse toStepEvidenceResponse(Evidence evidence) {
+        return new StepEvidenceResponse(
+            evidence.getId(),
+            evidence.getStepId(),
+            evidence.getStepIndex(),
+            evidence.getEvidenceType(),
+            summarizeEvidence(evidence.getContentJson()),
+            evidence.getCreatedAt()
+        );
+    }
+
+    private String summarizeEvidence(String contentJson) {
+        if (contentJson == null || contentJson.isBlank()) {
+            return "暂无证据摘要";
+        }
+        try {
+            JsonNode node = objectMapper.readTree(contentJson);
+            Integer score = node.path("score").isNumber() ? node.path("score").asInt() : null;
+            String diagnosis = node.path("feedback_json").path("diagnosis").asText("");
+            if (diagnosis.isBlank()) {
+                diagnosis = node.path("feedback").asText("");
+            }
+            List<String> tags = readStringList(node.path("error_tags").toString());
+            String scoreText = score == null ? null : ("得分 " + score);
+            String tagText = tags.isEmpty() ? null : ("标签 " + String.join(" / ", tags.stream().limit(2).toList()));
+            String diagnosisText = diagnosis.isBlank() ? null : diagnosis;
+            return java.util.stream.Stream.of(scoreText, tagText, diagnosisText)
+                .filter(item -> item != null && !item.isBlank())
+                .limit(3)
+                .reduce((a, b) -> a + "；" + b)
+                .orElse("已记录步骤证据");
+        } catch (Exception ex) {
+            return "已记录步骤证据";
+        }
     }
 
     private String masteryStatus(NodeMastery mastery) {

@@ -38,6 +38,8 @@ public record SessionReportResponse(
     List<LearningReportQuestionResponse> questionResults,
     @JsonProperty("weak_points")
     List<WeakPointNodeResponse> weakPoints,
+    @JsonProperty("step_evidence")
+    List<StepEvidenceResponse> stepEvidence,
     @JsonProperty("next_round_advice")
     String nextRoundAdvice,
     @JsonProperty("suggested_next_action")

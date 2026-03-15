@@ -29,6 +29,15 @@ export interface NextStepRecommendation {
   confidence?: number;
 }
 
+export interface StepEvidenceItem {
+  evidenceId: number;
+  stepId?: number;
+  stepIndex?: number;
+  evidenceType?: string;
+  summary: string;
+  createdAt?: string;
+}
+
 export interface LearningReport {
   sessionId: number;
   taskId?: number;
@@ -46,6 +55,7 @@ export interface LearningReport {
   weaknesses: string[];
   reviewFocus: string[];
   weakPoints: WeakPointItem[];
+  stepEvidence: StepEvidenceItem[];
   questionResults: ReportQuestionResult[];
   recommendedAction?: string;
   suggestedNextAction?: string;

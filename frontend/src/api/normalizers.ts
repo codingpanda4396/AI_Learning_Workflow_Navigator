@@ -735,6 +735,17 @@ function normalizeQuestionResult(item: Record<string, unknown>): ReportQuestionR
   };
 }
 
+function normalizeStepEvidence(item: Record<string, unknown>) {
+  return {
+    evidenceId: toNumber(item.evidence_id ?? item.evidenceId) ?? 0,
+    stepId: toNumber(item.step_id ?? item.stepId),
+    stepIndex: toNumber(item.step_index ?? item.stepIndex),
+    evidenceType: String(item.evidence_type ?? item.evidenceType ?? ''),
+    summary: String(item.summary ?? ''),
+    createdAt: String(item.created_at ?? item.createdAt ?? ''),
+  };
+}
+
 function normalizeNextStep(raw: unknown): NextStepRecommendation | null {
   if (!raw || typeof raw !== 'object') {
     return null;
@@ -757,6 +768,9 @@ export function normalizeSessionReport(data: Record<string, unknown>): LearningR
   const questionResultsRaw = (Array.isArray(data.question_results ?? data.questionResults)
     ? (data.question_results ?? data.questionResults)
     : []) as Record<string, unknown>[];
+  const stepEvidenceRaw = (Array.isArray(data.step_evidence ?? data.stepEvidence)
+    ? (data.step_evidence ?? data.stepEvidence)
+    : []) as Record<string, unknown>[];
   return {
     sessionId: toNumber(data.session_id ?? data.sessionId) ?? 0,
     taskId: toNumber(data.task_id ?? data.taskId),
@@ -774,6 +788,7 @@ export function normalizeSessionReport(data: Record<string, unknown>): LearningR
     weaknesses: readArray(data.weaknesses),
     reviewFocus: readArray(data.review_focus ?? data.reviewFocus),
     weakPoints: weakPoints.map((item) => normalizeWeakPoint(item)),
+    stepEvidence: stepEvidenceRaw.map((item) => normalizeStepEvidence(item)),
     questionResults: questionResultsRaw.map((item) => normalizeQuestionResult(item)),
     recommendedAction: String(data.recommended_action ?? data.recommendedAction ?? ''),
     suggestedNextAction: String(data.suggested_next_action ?? data.suggestedNextAction ?? ''),

@@ -6,6 +6,8 @@ public class Evidence {
 
     private Long id;
     private Long taskId;
+    private Long stepId;
+    private Integer stepIndex;
     private String evidenceType;
     private String contentJson;
     private OffsetDateTime createdAt;
@@ -24,6 +26,22 @@ public class Evidence {
 
     public void setTaskId(Long taskId) {
         this.taskId = taskId;
+    }
+
+    public Long getStepId() {
+        return stepId;
+    }
+
+    public void setStepId(Long stepId) {
+        this.stepId = stepId;
+    }
+
+    public Integer getStepIndex() {
+        return stepIndex;
+    }
+
+    public void setStepIndex(Integer stepIndex) {
+        this.stepIndex = stepIndex;
     }
 
     public String getEvidenceType() {

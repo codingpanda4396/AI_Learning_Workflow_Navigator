@@ -7,6 +7,7 @@ import com.pandanav.learning.domain.enums.Stage;
 import com.pandanav.learning.domain.enums.TaskStatus;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
+import com.pandanav.learning.domain.repository.LearningStepRepository;
 import com.pandanav.learning.domain.repository.LlmCallLogRepository;
 import com.pandanav.learning.domain.repository.MasteryRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
@@ -40,6 +41,8 @@ class TaskRunnerServiceTest {
     @Mock
     private MasteryRepository masteryRepository;
     @Mock
+    private LearningStepRepository learningStepRepository;
+    @Mock
     private StageContentGenerator stageContentGenerator;
     @Mock
     private LlmCallLogRepository llmCallLogRepository;
@@ -52,6 +55,7 @@ class TaskRunnerServiceTest {
             sessionRepository,
             conceptNodeRepository,
             masteryRepository,
+            learningStepRepository,
             stageContentGenerator,
             llmCallLogRepository,
             llmProperties,
@@ -77,6 +81,7 @@ class TaskRunnerServiceTest {
         assertEquals("SUCCEEDED", response.status());
         assertNotNull(response.output());
         assertEquals(true, response.output().get("cached").asBoolean());
+        assertEquals(null, response.currentStep());
 
         verify(taskRepository, never()).createRunningAttempt(1002L);
         verify(taskRepository, never()).markAttemptSucceeded(
