@@ -188,8 +188,9 @@ public class DiagnosisService {
         LearningSession session = sessionRepository.findByIdAndUserPk(sessionId, userId)
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
         PlanningContext planningContext = buildPlanningContext(session);
+        String goalText = planningContext.learningGoal();
         String topic = resolveTopic(planningContext);
-        List<DiagnosisQuestion> questions = structuredDiagnosisQuestionFactory.build(topic);
+        List<DiagnosisQuestion> questions = structuredDiagnosisQuestionFactory.build(goalText, topic);
         log.info(
             "DIAGNOSIS_STRUCTURED traceId={} sessionId={} questionCount={} topic={}",
             TraceContext.traceId(),
@@ -206,23 +207,18 @@ public class DiagnosisService {
         diagnosisSession.setStartedAt(OffsetDateTime.now());
         DiagnosisSession saved = diagnosisSessionRepository.save(diagnosisSession);
 
-        DiagnosisExplanationDto diagnosisExplanation = new DiagnosisExplanationDto(
-            "根据你的选择，系统会生成学习画像并安排下一步规划。",
-            List.of(),
-            "规划将基于画像推荐学习入口与节奏。"
-        );
-        DiagnosisDecisionHintsDto decisionHints = new DiagnosisDecisionHintsDto(
-            List.of("前置基础", "时间投入", "学习目标")
-        );
+        DiagnosisExplanationDto diagnosisExplanation = buildCreatePhaseExplanation(goalText, topic);
+        List<String> samplingFocuses = List.of("基础起点", "学习目标", "时间投入");
+        DiagnosisDecisionHintsDto decisionHints = new DiagnosisDecisionHintsDto(samplingFocuses);
         LearnerSnapshotDto learnerSnapshotDto = new LearnerSnapshotDto(
             "完成下方题目后，系统会据此生成你的学习画像并推荐学习路径。",
             List.of(),
             List.of()
         );
         DiagnosisStrategyDto diagnosisStrategyDto = new DiagnosisStrategyDto(
-            "FOUNDATION_FIRST",
-            "先确认起点，再决定后续规划",
-            List.of("前置基础", "时间投入", "学习目标")
+            "PROFILE_SAMPLING",
+            "先了解你的起点，再生成个性化规划",
+            samplingFocuses
         );
         return diagnosisResponseAssembler.assemble(
             saved.getId(),
@@ -238,7 +234,7 @@ public class DiagnosisService {
             learnerSnapshotDto,
             diagnosisStrategyDto,
             List.of(),
-            new PersonalizationMetaDto("MEDIUM", List.of("goalText", "chapterId"), "PROFILE_DRIVEN")
+            new PersonalizationMetaDto(null, List.of("goalText", "chapterId"), "STRUCTURED_TEMPLATE")
         );
     }
 
@@ -390,6 +386,18 @@ public class DiagnosisService {
             explanation.weaknessSources(),
             structuredSnapshot
         );
+    }
+
+    private DiagnosisExplanationDto buildCreatePhaseExplanation(String goalText, String topic) {
+        String why = "这组问题会先判断你的基础起点、主要卡点、学习目标和时间节奏。";
+        List<String> whatWillBeInferred = new ArrayList<>();
+        if (topic != null && !topic.isBlank() && (goalText == null || goalText.isBlank())) {
+            whatWillBeInferred.add("本轮诊断先采样你在「" + topic + "」中的整体起点，规划阶段会再结合你的学习目标做细化入口推荐。");
+        } else if (topic != null && !topic.isBlank() && goalText != null && !goalText.isBlank()) {
+            whatWillBeInferred.add("先评估整体基础，再结合本次学习目标（如「" + goalText + "」）细化规划入口。");
+        }
+        String how = "系统不会直接给你一条固定路线，而是会根据你的回答决定从哪里开始、先讲什么、第一步多大颗粒度更合适。";
+        return new DiagnosisExplanationDto(why, whatWillBeInferred, how);
     }
 
     private DiagnosisNextActionDto buildNextAction(Long sessionId, Long diagnosisId) {

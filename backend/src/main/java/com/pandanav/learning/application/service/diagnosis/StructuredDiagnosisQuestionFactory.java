@@ -30,8 +30,13 @@ public class StructuredDiagnosisQuestionFactory {
         this.topicQuestionBank = topicQuestionBank;
     }
 
-    public List<DiagnosisQuestion> build(String topicTitle) {
+    /**
+     * 固定 8 题；若 goalText 非空则主题题题干体现「本次目标 + 所属主题」。
+     */
+    public List<DiagnosisQuestion> build(String goalText, String topicTitle) {
         String topic = topicTitle == null ? "当前主题" : topicTitle.trim();
+        String topicCoreTitle = topicQuestionBank.topicCoreTitle(goalText, topic);
+        String topicOperationTitle = topicQuestionBank.topicOperationTitle(goalText, topic);
         List<DiagnosisQuestionOption> foundationOpts = ContractCatalog.diagnosisQuestionOptions(DiagnosisDimension.FOUNDATION);
         List<DiagnosisQuestionOption> blockerOpts = ContractCatalog.diagnosisQuestionOptions(DiagnosisDimension.BLOCKER);
         List<DiagnosisQuestionOption> practiceOpts = ContractCatalog.diagnosisQuestionOptions(DiagnosisDimension.PRACTICE);
@@ -113,7 +118,7 @@ public class StructuredDiagnosisQuestionFactory {
                 "SINGLE_CHOICE",
                 true,
                 topicCoreOpts,
-                topicQuestionBank.topicCoreTitle(topic),
+                topicCoreTitle,
                 null, null, null, "主题概念",
                 List.of(), Map.of()
             ),
@@ -123,7 +128,7 @@ public class StructuredDiagnosisQuestionFactory {
                 "SINGLE_CHOICE",
                 true,
                 topicOperationOpts,
-                topicQuestionBank.topicOperationTitle(topic),
+                topicOperationTitle,
                 null, null, null, "主题应用",
                 List.of(), Map.of()
             )

@@ -52,4 +52,16 @@ public class DefaultTopicQuestionBank implements TopicQuestionBank {
     public boolean supportsTopic(String topicTitle) {
         return topicTitle != null && TOPIC_CORE_TITLES.containsKey(topicTitle.trim());
     }
+
+    @Override
+    public String topicCoreTitleWithGoal(String goalText, String topicTitle) {
+        String topic = (topicTitle == null || topicTitle.isBlank()) ? "主题" : topicTitle;
+        return "关于「" + goalText + "」相关的" + topic + "基础，你对核心概念的把握更接近哪种状态？";
+    }
+
+    @Override
+    public String topicOperationTitleWithGoal(String goalText, String topicTitle) {
+        String topic = (topicTitle == null || topicTitle.isBlank()) ? "主题" : topicTitle;
+        return "一到「" + goalText + "」与「" + topic + "」的实际应用时，你更容易卡在哪？";
+    }
 }

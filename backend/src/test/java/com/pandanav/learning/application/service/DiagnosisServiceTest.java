@@ -7,6 +7,9 @@ import com.pandanav.learning.api.dto.diagnosis.CreateDiagnosisSessionResponse;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisAnswerSubmissionDto;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionRequest;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionResponse;
+import com.pandanav.learning.application.service.diagnosis.DefaultTopicQuestionBank;
+import com.pandanav.learning.application.service.diagnosis.DiagnosisProfileDerivationService;
+import com.pandanav.learning.application.service.diagnosis.StructuredDiagnosisQuestionFactory;
 import com.pandanav.learning.application.service.llm.LlmJsonParser;
 import com.pandanav.learning.domain.enums.DiagnosisStatus;
 import com.pandanav.learning.domain.llm.LlmGateway;
@@ -43,6 +46,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -104,7 +108,9 @@ class DiagnosisServiceTest {
             mock(LearnerFeatureSignalRepository.class),
             learnerProfileSnapshotRepository,
             llmPropertiesWithCapabilitySummaryStrict(),
-            objectMapper
+            objectMapper,
+            new StructuredDiagnosisQuestionFactory(new DefaultTopicQuestionBank()),
+            new DiagnosisProfileDerivationService()
         );
     }
 
@@ -128,85 +134,6 @@ class DiagnosisServiceTest {
         savedDiagnosis.setId(501L);
 
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
-        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class)))
-            .thenReturn(llmText(selectionLlmJson()))
-            .thenReturn(llmText("""
-            {
-              "questions": [
-                {
-                  "questionId": "q_foundation",
-                  "title": "How solid is your foundation?",
-                  "description": "Choose the closest option.",
-                  "placeholder": "",
-                  "submitHint": "This helps set the starting point.",
-                  "sectionLabel": "FOUNDATION",
-                  "options": [
-                    {"code":"BEGINNER","label":"Starter"},
-                    {"code":"BASIC","label":"Basic"},
-                    {"code":"PROFICIENT","label":"Proficient"},
-                    {"code":"ADVANCED","label":"Advanced"}
-                  ]
-                },
-                {
-                  "questionId": "q_experience",
-                  "title": "Experience",
-                  "description": "Past experience",
-                  "placeholder": "",
-                  "submitHint": "This helps sequence the plan.",
-                  "sectionLabel": "EXPERIENCE",
-                  "options": [
-                    {"code":"COURSEWORK","label":"Coursework"},
-                    {"code":"ASSIGNMENTS","label":"Assignments"},
-                    {"code":"PROJECTS","label":"Projects"},
-                    {"code":"EXAM_PREP","label":"Exam prep"},
-                    {"code":"NO_EXPERIENCE","label":"No experience"}
-                  ]
-                },
-                {
-                  "questionId": "q_goal_style",
-                  "title": "Goal",
-                  "description": "Main goal",
-                  "placeholder": "",
-                  "submitHint": "This sets the plan focus.",
-                  "sectionLabel": "GOAL",
-                  "options": [
-                    {"code":"COURSE","label":"Course"},
-                    {"code":"EXAM","label":"Exam"},
-                    {"code":"INTERVIEW","label":"Interview"},
-                    {"code":"PROJECT","label":"Project"}
-                  ]
-                },
-                {
-                  "questionId": "q_time_budget",
-                  "title": "Time",
-                  "description": "Weekly time",
-                  "placeholder": "",
-                  "submitHint": "This affects the pace.",
-                  "sectionLabel": "TIME",
-                  "options": [
-                    {"code":"LIGHT","label":"1-3h"},
-                    {"code":"STANDARD","label":"4-6h"},
-                    {"code":"INTENSIVE","label":"7-10h"},
-                    {"code":"IMMERSIVE","label":"10h+"}
-                  ]
-                },
-                {
-                  "questionId": "q_learning_preference",
-                  "title": "Learning style",
-                  "description": "How you prefer to learn",
-                  "placeholder": "",
-                  "submitHint": "Affects delivery.",
-                  "sectionLabel": "PREFERENCE",
-                  "options": [
-                    {"code":"CONCEPT_FIRST","label":"Concept first"},
-                    {"code":"EXAMPLE_FIRST","label":"Example first"},
-                    {"code":"PRACTICE_FIRST","label":"Practice first"},
-                    {"code":"PROJECT_DRIVEN","label":"Project driven"}
-                  ]
-                }
-              ]
-            }
-            """));
         when(diagnosisSessionRepository.save(any(DiagnosisSession.class))).thenAnswer(invocation -> {
             DiagnosisSession diagnosis = invocation.getArgument(0);
             diagnosis.setId(savedDiagnosis.getId());
@@ -217,9 +144,11 @@ class DiagnosisServiceTest {
 
         assertEquals(501L, response.diagnosisId());
         assertEquals("READY", response.status());
-        assertEquals("LLM", response.generationMode());
-        assertTrue(response.diagnosisExplanation().whyTheseQuestions().contains("系统"));
+        assertEquals("STRUCTURED", response.generationMode());
+        assertTrue(response.diagnosisExplanation().whyTheseQuestions().contains("基础起点"));
         assertTrue(response.decisionHints().planningFactors().size() >= 3);
+        assertEquals("PROFILE_SAMPLING", response.diagnosisStrategy().code());
+        assertEquals(8, response.questions().size());
         assertEquals("BEGINNER", response.questions().get(0).options().get(0).code());
         assertEquals(4, response.questions().get(0).options().size());
         assertEquals("/plan", response.nextAction().target().route());
@@ -232,9 +161,6 @@ class DiagnosisServiceTest {
         savedDiagnosis.setId(501L);
 
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
-        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class)))
-            .thenReturn(llmText(selectionLlmJson()))
-            .thenThrow(new RuntimeException("llm down"));
         when(diagnosisSessionRepository.save(any(DiagnosisSession.class))).thenAnswer(invocation -> {
             DiagnosisSession diagnosis = invocation.getArgument(0);
             diagnosis.setId(savedDiagnosis.getId());
@@ -243,9 +169,9 @@ class DiagnosisServiceTest {
 
         CreateDiagnosisSessionResponse response = diagnosisService.createDiagnosisSession(101L, 10L);
         assertEquals("READY", response.status());
-        assertEquals("RULE_FALLBACK", response.generationMode());
-        assertTrue(response.fallback().applied());
-        assertEquals("RULE_FALLBACK", response.fallback().contentSource());
+        assertEquals("STRUCTURED", response.generationMode());
+        assertFalse(response.fallback().applied());
+        assertEquals(8, response.questions().size());
     }
 
     @Test
@@ -284,7 +210,7 @@ class DiagnosisServiceTest {
         assertEquals("INTERVIEW", response.capabilityProfile().goalOrientation().code());
         assertEquals("PRACTICE_FIRST", response.capabilityProfile().learningPreference().code());
         assertEquals("STANDARD", response.capabilityProfile().timeBudget().code());
-        assertEquals("LLM", response.fallback().contentSource());
+        assertEquals("RULE", response.fallback().contentSource());
         assertTrue(response.insights().planExplanation().contains("training"));
         assertEquals(5, response.reasoningSteps().size());
         assertTrue(response.strengthSources().size() >= 1);

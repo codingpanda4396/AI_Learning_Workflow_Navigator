@@ -29,6 +29,34 @@ public interface TopicQuestionBank {
     String topicOperationTitle(String topicTitle);
 
     /**
+     * 主题题 1：优先体现「本次目标 + 所属主题」关系；goalText 为空时等同 topicCoreTitle(topicTitle)。
+     */
+    default String topicCoreTitle(String goalText, String topicTitle) {
+        return (goalText != null && !goalText.isBlank())
+            ? topicCoreTitleWithGoal(goalText.trim(), topicTitle != null ? topicTitle.trim() : "当前主题")
+            : topicCoreTitle(topicTitle);
+    }
+
+    /**
+     * 主题题 2：同上。
+     */
+    default String topicOperationTitle(String goalText, String topicTitle) {
+        return (goalText != null && !goalText.isBlank())
+            ? topicOperationTitleWithGoal(goalText.trim(), topicTitle != null ? topicTitle.trim() : "当前主题")
+            : topicOperationTitle(topicTitle);
+    }
+
+    /**
+     * 带目标的主题题 1 标题（本次目标 + 所属主题）。
+     */
+    String topicCoreTitleWithGoal(String goalText, String topicTitle);
+
+    /**
+     * 带目标的主题题 2 标题。
+     */
+    String topicOperationTitleWithGoal(String goalText, String topicTitle);
+
+    /**
      * 是否支持该主题（仅影响标题是否用通用模板，选项始终用 ContractCatalog 的 TOPIC_CORE/TOPIC_OPERATION）。
      */
     boolean supportsTopic(String topicTitle);
