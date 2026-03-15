@@ -3,6 +3,7 @@ package com.pandanav.learning.application.service;
 import com.pandanav.learning.domain.enums.DiagnosisDimension;
 import com.pandanav.learning.domain.model.DiagnosisQuestion;
 import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
+import com.pandanav.learning.domain.model.DiagnosisSignal;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.service.DiagnosisQuestionCopyFactory;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Component
 public class DiagnosisQuestionAssembler {
@@ -58,7 +60,40 @@ public class DiagnosisQuestionAssembler {
             copy.description(),
             copy.placeholder(),
             copy.submitHint(),
-            copy.sectionLabel()
+            copy.sectionLabel(),
+            signalTargets(dimension),
+            optionSignalMapping(dimension)
+        );
+    }
+
+    private List<String> signalTargets(DiagnosisDimension dimension) {
+        if (dimension != DiagnosisDimension.DIFFICULTY_PAIN_POINT) {
+            return List.of();
+        }
+        return List.of("difficulty_pain_point", "support_priority");
+    }
+
+    private Map<String, List<DiagnosisSignal>> optionSignalMapping(DiagnosisDimension dimension) {
+        if (dimension != DiagnosisDimension.DIFFICULTY_PAIN_POINT) {
+            return Map.of();
+        }
+        return Map.of(
+            "CONCEPT_UNDERSTANDING", List.of(
+                new DiagnosisSignal("difficulty_pain_point", "CONCEPT_UNDERSTANDING", 0.9, 0.95, "pain_point"),
+                new DiagnosisSignal("support_priority", "UNDERSTANDING", 0.7, 0.88, "pain_point")
+            ),
+            "TRANSFER_APPLICATION", List.of(
+                new DiagnosisSignal("difficulty_pain_point", "TRANSFER_APPLICATION", 0.9, 0.95, "pain_point"),
+                new DiagnosisSignal("support_priority", "TRAINING_VARIANTS", 0.7, 0.88, "pain_point")
+            ),
+            "IMPLEMENTATION", List.of(
+                new DiagnosisSignal("difficulty_pain_point", "IMPLEMENTATION", 0.9, 0.95, "pain_point"),
+                new DiagnosisSignal("support_priority", "GUIDED_PRACTICE", 0.7, 0.88, "pain_point")
+            ),
+            "LONG_TERM_MEMORY", List.of(
+                new DiagnosisSignal("difficulty_pain_point", "LONG_TERM_MEMORY", 0.9, 0.95, "pain_point"),
+                new DiagnosisSignal("support_priority", "SPACED_REVIEW", 0.7, 0.88, "pain_point")
+            )
         );
     }
 

@@ -29,7 +29,9 @@ public class DefaultDiagnosisQuestionPersonalizer implements DiagnosisQuestionPe
                 personalizeCopy(question.description(), topic),
                 question.placeholder(),
                 question.submitHint(),
-                question.sectionLabel()
+                question.sectionLabel(),
+                question.signalTargets(),
+                question.optionSignalMapping()
             ))
             .toList();
     }

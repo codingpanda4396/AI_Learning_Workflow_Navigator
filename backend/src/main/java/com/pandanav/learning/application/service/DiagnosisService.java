@@ -27,6 +27,7 @@ import com.pandanav.learning.domain.model.DiagnosisAnswer;
 import com.pandanav.learning.domain.model.DiagnosisQuestion;
 import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
 import com.pandanav.learning.domain.model.DiagnosisQuestionOption;
+import com.pandanav.learning.domain.model.DiagnosisSignal;
 import com.pandanav.learning.domain.model.DiagnosisSession;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.PlanningContext;
@@ -49,6 +50,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -415,7 +417,9 @@ public class DiagnosisService {
                     description,
                     placeholder,
                     submitHint,
-                    sectionLabel
+                    sectionLabel,
+                    readSignalTargets(item.path("signalTargets")),
+                    readOptionSignalMapping(item.path("optionSignalMapping"))
                 ));
             }
             return questions;
@@ -473,6 +477,61 @@ public class DiagnosisService {
         return options.isEmpty() ? defaults : options;
     }
 
+    private List<String> readSignalTargets(JsonNode signalTargetsNode) {
+        if (signalTargetsNode == null || !signalTargetsNode.isArray() || signalTargetsNode.isEmpty()) {
+            return List.of();
+        }
+        List<String> targets = new ArrayList<>();
+        for (JsonNode targetNode : signalTargetsNode) {
+            String target = textOrDefault(targetNode.asText(""), "");
+            if (!target.isBlank()) {
+                targets.add(target);
+            }
+        }
+        return targets;
+    }
+
+    private Map<String, List<DiagnosisSignal>> readOptionSignalMapping(JsonNode mappingNode) {
+        if (mappingNode == null || !mappingNode.isObject()) {
+            return Map.of();
+        }
+        Map<String, List<DiagnosisSignal>> mapping = new LinkedHashMap<>();
+        mappingNode.fields().forEachRemaining(entry -> {
+            String optionCode = normalizeOptionCodeForSignalMapping(entry.getKey());
+            List<DiagnosisSignal> signals = readSignals(entry.getValue());
+            if (!optionCode.isBlank() && !signals.isEmpty()) {
+                mapping.put(optionCode, signals);
+            }
+        });
+        return mapping;
+    }
+
+    private List<DiagnosisSignal> readSignals(JsonNode signalsNode) {
+        if (signalsNode == null || !signalsNode.isArray() || signalsNode.isEmpty()) {
+            return List.of();
+        }
+        List<DiagnosisSignal> signals = new ArrayList<>();
+        for (JsonNode signalNode : signalsNode) {
+            String featureKey = textOrDefault(signalNode.path("featureKey").asText(""), "");
+            String featureValue = textOrDefault(signalNode.path("featureValue").asText(""), "");
+            if (featureKey.isBlank() || featureValue.isBlank()) {
+                continue;
+            }
+            double scoreDelta = signalNode.path("scoreDelta").asDouble(0.0);
+            double confidence = signalNode.path("confidence").asDouble(0.0);
+            String evidence = textOrDefault(signalNode.path("evidence").asText(""), "");
+            signals.add(new DiagnosisSignal(featureKey, featureValue, scoreDelta, confidence, evidence));
+        }
+        return signals;
+    }
+
+    private String normalizeOptionCodeForSignalMapping(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.trim().replace('-', '_').replace(' ', '_').toUpperCase(Locale.ROOT);
+    }
+
     private List<Map<String, Object>> questionsToMap(List<DiagnosisQuestion> questions) {
         return questions.stream().map(question -> {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -486,6 +545,8 @@ public class DiagnosisService {
             item.put("submitHint", question.submitHint());
             item.put("sectionLabel", question.sectionLabel());
             item.put("options", question.options());
+            item.put("signalTargets", question.signalTargets());
+            item.put("optionSignalMapping", question.optionSignalMapping());
             return item;
         }).toList();
     }

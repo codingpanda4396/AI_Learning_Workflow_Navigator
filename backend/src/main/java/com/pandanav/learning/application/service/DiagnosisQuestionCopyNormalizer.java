@@ -39,7 +39,9 @@ public class DiagnosisQuestionCopyNormalizer {
             description,
             "",
             question.submitHint(),
-            question.sectionLabel()
+            question.sectionLabel(),
+            question.signalTargets(),
+            question.optionSignalMapping()
         );
     }
 
@@ -55,7 +57,9 @@ public class DiagnosisQuestionCopyNormalizer {
             description,
             "",
             question.submitHint(),
-            question.sectionLabel()
+            question.sectionLabel(),
+            question.signalTargets(),
+            question.optionSignalMapping()
         );
     }
 
@@ -74,7 +78,9 @@ public class DiagnosisQuestionCopyNormalizer {
             question.description(),
             placeholder,
             question.submitHint(),
-            question.sectionLabel()
+            question.sectionLabel(),
+            question.signalTargets(),
+            question.optionSignalMapping()
         );
     }
 

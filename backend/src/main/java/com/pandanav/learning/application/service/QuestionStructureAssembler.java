@@ -40,7 +40,9 @@ public class QuestionStructureAssembler {
                 description,
                 original.placeholder(),
                 submitHint,
-                sectionLabel
+                sectionLabel,
+                original.signalTargets(),
+                original.optionSignalMapping()
             ));
         }
         return assembled;
