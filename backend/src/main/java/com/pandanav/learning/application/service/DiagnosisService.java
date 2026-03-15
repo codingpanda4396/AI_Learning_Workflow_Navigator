@@ -29,11 +29,15 @@ import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
 import com.pandanav.learning.domain.model.DiagnosisQuestionOption;
 import com.pandanav.learning.domain.model.DiagnosisSignal;
 import com.pandanav.learning.domain.model.DiagnosisSession;
+import com.pandanav.learning.domain.model.LearnerFeatureSignal;
+import com.pandanav.learning.domain.model.LearnerProfileSnapshot;
 import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.model.PlanningContext;
 import com.pandanav.learning.domain.repository.CapabilityProfileRepository;
 import com.pandanav.learning.domain.repository.DiagnosisAnswerRepository;
 import com.pandanav.learning.domain.repository.DiagnosisSessionRepository;
+import com.pandanav.learning.domain.repository.LearnerFeatureSignalRepository;
+import com.pandanav.learning.domain.repository.LearnerProfileSnapshotRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.service.CapabilityProfileBuilder;
 import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
@@ -71,6 +75,12 @@ public class DiagnosisService {
     private final CapabilityProfileBuilder capabilityProfileBuilder;
     private final DiagnosisExplanationAssembler diagnosisExplanationAssembler;
     private final CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService;
+    private final DiagnosisAnswerNormalizer diagnosisAnswerNormalizer;
+    private final LearnerFeatureExtractor learnerFeatureExtractor;
+    private final LearnerFeatureAggregator learnerFeatureAggregator;
+    private final LearnerProfileSnapshotBuilder learnerProfileSnapshotBuilder;
+    private final LearnerFeatureSignalRepository learnerFeatureSignalRepository;
+    private final LearnerProfileSnapshotRepository learnerProfileSnapshotRepository;
     private final ObjectMapper objectMapper;
 
     public DiagnosisService(
@@ -87,6 +97,12 @@ public class DiagnosisService {
         CapabilityProfileBuilder capabilityProfileBuilder,
         DiagnosisExplanationAssembler diagnosisExplanationAssembler,
         CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService,
+        DiagnosisAnswerNormalizer diagnosisAnswerNormalizer,
+        LearnerFeatureExtractor learnerFeatureExtractor,
+        LearnerFeatureAggregator learnerFeatureAggregator,
+        LearnerProfileSnapshotBuilder learnerProfileSnapshotBuilder,
+        LearnerFeatureSignalRepository learnerFeatureSignalRepository,
+        LearnerProfileSnapshotRepository learnerProfileSnapshotRepository,
         ObjectMapper objectMapper
     ) {
         this.sessionRepository = sessionRepository;
@@ -102,6 +118,12 @@ public class DiagnosisService {
         this.capabilityProfileBuilder = capabilityProfileBuilder;
         this.diagnosisExplanationAssembler = diagnosisExplanationAssembler;
         this.capabilityProfileSummaryLlmService = capabilityProfileSummaryLlmService;
+        this.diagnosisAnswerNormalizer = diagnosisAnswerNormalizer;
+        this.learnerFeatureExtractor = learnerFeatureExtractor;
+        this.learnerFeatureAggregator = learnerFeatureAggregator;
+        this.learnerProfileSnapshotBuilder = learnerProfileSnapshotBuilder;
+        this.learnerFeatureSignalRepository = learnerFeatureSignalRepository;
+        this.learnerProfileSnapshotRepository = learnerProfileSnapshotRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -188,12 +210,22 @@ public class DiagnosisService {
         diagnosisAnswerRepository.saveAll(answers);
         diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.SUBMITTED, null);
 
-        Map<DiagnosisDimension, List<String>> answerCodesByDimension = answers.stream()
+        List<DiagnosisAnswerNormalizer.NormalizedDiagnosisAnswer> normalizedAnswers =
+            diagnosisAnswerNormalizer.normalize(questions, answers);
+        Map<DiagnosisDimension, List<String>> answerCodesByDimension = normalizedAnswers.stream()
             .collect(Collectors.groupingBy(
-                DiagnosisAnswer::getDimension,
+                normalizedAnswer -> questionMap.get(normalizedAnswer.questionId()).dimension(),
                 LinkedHashMap::new,
-                Collectors.flatMapping(answer -> extractAnswerCodes(answer).stream(), Collectors.toList())
+                Collectors.flatMapping(normalizedAnswer -> normalizedAnswer.selectedOptionCodes().stream(), Collectors.toList())
             ));
+        List<LearnerFeatureSignal> featureSignals = learnerFeatureExtractor.extract(
+            learningSession.getId(),
+            userId,
+            questions,
+            normalizedAnswers
+        );
+        learnerFeatureSignalRepository.saveAll(featureSignals);
+        LearnerFeatureAggregator.AggregationResult aggregationResult = learnerFeatureAggregator.aggregate(featureSignals);
 
         CapabilityProfileDraft draft = capabilityProfileBuilder.build(answerCodesByDimension);
         CapabilityProfileSummaryCopy summaryCopy =
@@ -214,6 +246,14 @@ public class DiagnosisService {
         profile.setVersion(nextVersion(learningSession.getId()));
 
         CapabilityProfile savedProfile = capabilityProfileRepository.save(profile);
+        LearnerProfileSnapshot snapshot = learnerProfileSnapshotBuilder.build(
+            diagnosisSession.getId(),
+            learningSession.getId(),
+            userId,
+            savedProfile.getVersion(),
+            aggregationResult
+        );
+        LearnerProfileSnapshot savedSnapshot = learnerProfileSnapshotRepository.saveOrUpdate(snapshot);
         diagnosisSessionRepository.updateStatus(diagnosisSession.getId(), DiagnosisStatus.EVALUATED, OffsetDateTime.now());
         DiagnosisExplanationAssembler.DiagnosisExplanation explanation = diagnosisExplanationAssembler.assemble(
             questions,
@@ -223,12 +263,14 @@ public class DiagnosisService {
         );
 
         log.info(
-            "DiagnosisService: submit completed. diagnosisId={}, sessionId={}, reasoningStepCount={}, strengthSourceCount={}, weaknessSourceCount={}",
+            "DiagnosisService: submit completed. diagnosisId={}, sessionId={}, reasoningStepCount={}, strengthSourceCount={}, weaknessSourceCount={}, featureSignalCount={}, snapshotId={}",
             diagnosisSession.getId(),
             learningSession.getId(),
             explanation.reasoningSteps().size(),
             explanation.strengthSources().size(),
-            explanation.weaknessSources().size()
+            explanation.weaknessSources().size(),
+            featureSignals.size(),
+            savedSnapshot.getId()
         );
 
         return new SubmitDiagnosisSessionResponse(
@@ -236,7 +278,13 @@ public class DiagnosisService {
             learningSession.getId(),
             DiagnosisStatus.EVALUATED.name(),
             toProfileDto(savedProfile),
-            new DiagnosisInsightsDto(savedProfile.getSummaryText(), savedProfile.getPlanExplanation()),
+            new DiagnosisInsightsDto(
+                savedProfile.getSummaryText(),
+                savedProfile.getPlanExplanation(),
+                savedSnapshot.getFeatureSummary(),
+                savedSnapshot.getStrategyHints(),
+                savedSnapshot.getConstraints()
+            ),
             buildNextAction(learningSession.getId(), diagnosisSession.getId()),
             sourceMeta(false, List.of(), "LLM"),
             new DiagnosisMetadataDto(questions.size(), answers.size(), savedProfile.getVersion()),
@@ -359,33 +407,6 @@ public class DiagnosisService {
             answers.add(answer);
         }
         return answers;
-    }
-
-    private List<String> extractAnswerCodes(DiagnosisAnswer answer) {
-        try {
-            JsonNode jsonNode = objectMapper.readTree(answer.getAnswerValueJson());
-            if (jsonNode.isArray()) {
-                List<String> values = new ArrayList<>();
-                for (JsonNode item : jsonNode) {
-                    values.add(normalizeOptionCode(answer.getDimension(), item.asText("")));
-                }
-                return values;
-            }
-            return List.of(normalizeOptionCode(answer.getDimension(), jsonNode.asText("")));
-        } catch (Exception ex) {
-            if (answer.getRawText() == null || answer.getRawText().isBlank()) {
-                return List.of();
-            }
-            String[] parts = answer.getRawText().split("\\|");
-            List<String> fallback = new ArrayList<>();
-            for (String part : parts) {
-                String code = normalizeOptionCode(answer.getDimension(), part.trim());
-                if (!code.isBlank()) {
-                    fallback.add(code);
-                }
-            }
-            return fallback;
-        }
     }
 
     private String normalizeOptionCode(DiagnosisDimension dimension, String raw) {
