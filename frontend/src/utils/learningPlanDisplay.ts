@@ -26,6 +26,14 @@ export function cleanText(value: unknown, fallback = ''): string {
   return text || fallback;
 }
 
+/** 产品文案短句：过长截断，避免策略说明整段上屏 */
+export function productCopy(value: unknown, fallback = '', maxLen = 100): string {
+  const s = cleanText(value, fallback);
+  if (s === fallback || s.length <= maxLen) return s;
+  const truncated = s.slice(0, maxLen).replace(/,|;|，|；\s*[^,;，；]*$/, '').trim();
+  return truncated || fallback;
+}
+
 export function normalizeConceptTitle(value: unknown, fallback = '当前关键知识点'): string {
   const source = cleanText(value);
   if (!source) {

@@ -3,16 +3,16 @@ import { formatPlanMinutes } from '@/utils/normalizePlanPreview';
 import {
   cleanText,
   formatPreviewDisplayTitle,
-  mapRhythmCodeToLabel,
-  mapStrategyCodeToLabel,
   pickCompactList,
+  productCopy,
 } from '@/utils/learningPlanDisplay';
 
+/** 四区块：为什么从这一步开始 / 这一小步做什么 / 为什么适合你 / 确认后获得什么 */
 export interface LearningPlanPreviewViewModel {
-  summary: {
-    title: string;
-    description: string;
-    tags: string[];
+  hero: {
+    goal: string;
+    startPoint: string;
+    oneLineReason: string;
   };
   taskCard: {
     title: string;
@@ -21,37 +21,37 @@ export interface LearningPlanPreviewViewModel {
     tasks: string[];
     completionGains: string[];
   };
-  explanation: {
-    whyRecommended: string;
-    whyThisStepFirst: string;
-    learnerProfile: string;
-    systemDecision: string;
+  whyFitsYou: string[];
+  afterConfirm: {
+    expectedGain: string;
+    startGuide: string;
   };
 }
 
-function buildSummary(preview: LearningPlanPreview): LearningPlanPreviewViewModel['summary'] {
-  const fallbackTitle = `为你安排：${formatPreviewDisplayTitle(preview.recommendedEntry?.title)}`;
-  const fallbackDescription = cleanText(
-    preview.learnerSnapshotV2?.currentState || preview.recommendedEntry?.reason,
-    '根据你当前的学习状态，先完成这一步会更稳。',
+function buildHero(preview: LearningPlanPreview): LearningPlanPreviewViewModel['hero'] {
+  const goal = productCopy(
+    preview.context?.goalText || preview.learnerGoal,
+    '把当前最值得推进的一步学明白',
   );
-  const tags = preview.personalizedSummary?.tags?.length
-    ? pickCompactList(preview.personalizedSummary.tags, [], 3)
-    : pickCompactList(
-      [
-        mapStrategyCodeToLabel(preview.recommendedStrategy?.code, cleanText(preview.recommendedStrategy?.label, '稳步推进')),
-        mapRhythmCodeToLabel(preview.adjustments?.intensity, cleanText(preview.summary?.recommendedRhythmLabel, '按当前节奏推进')),
-        preview.adjustments?.prioritizeFoundation ? '先补基础' : '直接推进',
-      ],
-      ['个性化安排'],
-      3,
-    );
-
-  return {
-    title: cleanText(preview.personalizedSummary?.title, fallbackTitle),
-    description: cleanText(preview.personalizedSummary?.description, fallbackDescription),
-    tags,
-  };
+  const startPoint = formatPreviewDisplayTitle(
+    preview.summary?.recommendedStartNode?.displayName
+      || preview.summary?.recommendedStartNode?.nodeName
+      || preview.recommendedEntry?.title
+      || preview.currentFocus
+      || preview.priorityNodes?.[0]?.title,
+    '当前推荐起步点',
+  );
+  const oneLineReason = productCopy(
+    preview.whyStartHere
+      || preview.whyThisStep
+      || preview.personalizedReasons?.whyThisStepFirst
+      || preview.personalizedReasons?.whyRecommended
+      || preview.recommendedEntry?.reason
+      || preview.reasons?.[0]?.description
+      || preview.nextStepNote,
+    '先完成这一步，后续会更顺。',
+  );
+  return { goal, startPoint, oneLineReason };
 }
 
 function buildTaskCard(preview: LearningPlanPreview): LearningPlanPreviewViewModel['taskCard'] {
@@ -65,14 +65,14 @@ function buildTaskCard(preview: LearningPlanPreview): LearningPlanPreviewViewMod
     ?? preview.recommendedEntry?.estimatedMinutes
     ?? preview.taskPreviews?.[0]?.estimatedTaskMinutes;
   const tasks = preview.currentTaskCard?.tasks?.length
-    ? pickCompactList(preview.currentTaskCard.tasks, [], 4)
+    ? pickCompactList(preview.currentTaskCard.tasks, [], 5)
     : pickCompactList(
       [
         ...((preview.nextActionsDetail ?? []).map((item) => item.learnerAction || item.title)),
         ...(preview.nextActionsV2 ?? []),
       ],
-      ['明确本步关键概念', '完成一个最小练习', '自测并确认掌握情况'],
-      4,
+      ['明确本步关键概念', '完成一个最小练习', '自测并确认掌握'],
+      5,
     );
   const completionGains = preview.currentTaskCard?.completionGains?.length
     ? pickCompactList(preview.currentTaskCard.completionGains, [], 3)
@@ -91,32 +91,51 @@ function buildTaskCard(preview: LearningPlanPreview): LearningPlanPreviewViewMod
   };
 }
 
-function buildExplanation(preview: LearningPlanPreview): LearningPlanPreviewViewModel['explanation'] {
-  const evidence = preview.keyEvidence?.length ? `关键依据：${preview.keyEvidence.slice(0, 2).join('；')}` : '';
+/** 融合 explanationPanel / personalizedReasons / whyThisStep / keyEvidence，去重为 1～2 条短句 */
+function buildWhyFitsYou(preview: LearningPlanPreview): string[] {
+  const candidates: string[] = [];
+  const add = (raw: unknown, fallback: string) => {
+    const s = productCopy(raw, fallback, 80);
+    if (s !== fallback && !candidates.includes(s)) candidates.push(s);
+  };
+  add(preview.personalizedReasons?.whyRecommended, '');
+  add(preview.personalizedReasons?.whyThisStepFirst, '');
+  add(preview.whyThisStep, '');
+  add(preview.whyStartHere, '');
+  add(preview.explanationPanel?.learnerProfile, '');
+  add(preview.learnerSnapshotV2?.currentState, '');
+  add(preview.explanationPanel?.systemDecision, '');
+  add(preview.recommendedStrategy?.explanation, '');
+  if (preview.keyEvidence?.length) {
+    const one = productCopy(preview.keyEvidence[0], '', 60);
+    if (one && !candidates.includes(one)) candidates.push(one);
+  }
+  const out = candidates.filter(Boolean).slice(0, 2);
+  if (out.length) return out;
+  return ['根据你当前状态，先做这一步最合适。'];
+}
+
+function buildAfterConfirm(preview: LearningPlanPreview): LearningPlanPreviewViewModel['afterConfirm'] {
   return {
-    whyRecommended: cleanText(
-      preview.personalizedReasons?.whyRecommended || preview.whyThisStep || preview.recommendedEntry?.reason,
-      '这一步最能直接解决你当前的关键卡点。',
+    expectedGain: productCopy(
+      preview.expectedGain
+        || preview.currentTaskCard?.completionGains?.[0]
+        || preview.taskPreviews?.[0]?.completionCriteria,
+      '完成后你会更容易进入下一步，系统会根据表现继续为你规划。',
     ),
-    whyThisStepFirst: cleanText(
-      preview.personalizedReasons?.whyThisStepFirst || preview.whyStartHere || preview.nextStepNote,
-      '先完成这一步，后续学习会更顺畅。',
-    ),
-    learnerProfile: cleanText(
-      preview.explanationPanel?.learnerProfile || preview.learnerSnapshotV2?.currentState || preview.profileDrivenReasoning,
-      '你当前需要先补稳基础，再进入强化训练。',
-    ),
-    systemDecision: cleanText(
-      preview.explanationPanel?.systemDecision || preview.recommendedStrategy?.explanation || evidence,
-      '系统会根据你的完成情况动态调整下一步。',
+    startGuide: productCopy(
+      preview.startGuide,
+      '确认后立即进入第一步，按你的完成情况实时调节。',
+      80,
     ),
   };
 }
 
 export function buildLearningPlanPreviewView(preview: LearningPlanPreview): LearningPlanPreviewViewModel {
   return {
-    summary: buildSummary(preview),
+    hero: buildHero(preview),
     taskCard: buildTaskCard(preview),
-    explanation: buildExplanation(preview),
+    whyFitsYou: buildWhyFitsYou(preview),
+    afterConfirm: buildAfterConfirm(preview),
   };
 }

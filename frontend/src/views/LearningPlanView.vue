@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import PreviewExplanationPanel from '@/components/plan/PreviewExplanationPanel.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
@@ -21,19 +20,6 @@ const flowStore = useLearningFlowStore();
 const preview = computed(() => learningPlanStore.preview);
 const error = computed(() => learningPlanStore.error);
 const previewVm = computed(() => (preview.value ? buildLearningPlanPreviewView(preview.value) : null));
-const explanationExpanded = ref(false);
-
-const riskFlagLabels: Record<string, string> = {
-  TRANSFER_WEAKNESS: '迁移弱项',
-  EXPRESSION_WEAKNESS: '表达弱项',
-  BOUNDARY_WEAKNESS: '边界易错',
-  FOUNDATION_GAP: '基础薄弱',
-  INTERVIEW_FOUNDATION_RISK: '面试基础风险',
-  OVERCONFIDENCE_RISK: '自评偏高',
-};
-function riskFlagLabel(flag: string) {
-  return riskFlagLabels[flag] ?? flag;
-}
 
 const context = computed(() => {
   const sessionId = Number(route.query.sessionId ?? 0);
@@ -92,19 +78,14 @@ async function startLearning() {
 
 watch(
   () => [route.query.sessionId, route.query.diagnosisId, route.query.goal, route.query.course, route.query.chapter],
-  async () => {
-    explanationExpanded.value = false;
-    await loadPlan();
-  },
+  async () => { await loadPlan(); },
   { immediate: true },
 );
 
 watch(
   () => preview.value?.id,
   (previewId) => {
-    if (!previewId) {
-      return;
-    }
+    if (!previewId) return;
     trackPreviewShown(previewId);
     console.info('[metrics] preview shown', getPreviewMetricsSnapshot());
   },
@@ -117,128 +98,94 @@ onBeforeUnmount(() => {
 
 <template>
   <AppShell>
-    <div class="mx-auto max-w-[1120px] space-y-8 pb-12">
+    <div class="mx-auto max-w-[720px] space-y-10 pb-16 pt-2">
       <div v-if="viewState === 'loading'" class="space-y-6">
-        <section class="app-hero min-h-[320px]">
-          <div class="grid h-full gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-            <div class="space-y-4">
-              <SkeletonBlock width="96px" :height="16" rounded="999px" />
-              <SkeletonBlock width="72%" :height="56" rounded="14px" />
-              <SkeletonBlock width="88%" :height="20" rounded="10px" />
-              <SkeletonBlock width="70%" :height="20" rounded="10px" />
-            </div>
-            <SkeletonBlock :height="220" rounded="20px" />
-          </div>
-        </section>
-        <SkeletonBlock :height="180" rounded="24px" />
-        <SkeletonBlock :height="220" rounded="24px" />
+        <div class="space-y-4">
+          <SkeletonBlock width="120px" :height="14" rounded="999px" />
+          <SkeletonBlock width="85%" :height="32" rounded="12px" />
+          <SkeletonBlock width="70%" :height="20" rounded="10px" />
+        </div>
+        <SkeletonBlock :height="200" rounded="24px" />
+        <SkeletonBlock :height="120" rounded="20px" />
       </div>
 
       <div v-else-if="viewState === 'error'" class="space-y-4">
         <ErrorState :message="error || '学习规划生成失败。'" />
-        <AppButton @click="loadPlan">重新生成学习规划</AppButton>
+        <AppButton @click="loadPlan">重新生成</AppButton>
       </div>
 
       <template v-else-if="preview && previewVm">
+        <!-- 1. 现在为什么从这一步开始 -->
+        <header class="space-y-3 text-center">
+          <p class="text-sm font-medium text-slate-500">你的目标</p>
+          <h1 class="text-xl font-semibold text-slate-900">{{ previewVm.hero.goal }}</h1>
+          <p class="text-base font-medium text-slate-700">推荐起步：{{ previewVm.hero.startPoint }}</p>
+          <p class="text-sm leading-relaxed text-slate-600">{{ previewVm.hero.oneLineReason }}</p>
+        </header>
+
+        <!-- 2. 当前这一小步要做什么（页面中心） -->
+        <section class="app-card app-card-strong rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_20px_56px_rgba(15,23,42,0.08)] sm:p-8">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">第一步</span>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+              约 {{ previewVm.taskCard.estimatedTime }}
+            </span>
+          </div>
+          <h2 class="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{{ previewVm.taskCard.title }}</h2>
+          <p class="mt-2 text-sm leading-7 text-slate-600">{{ previewVm.taskCard.goal }}</p>
+
+          <div class="mt-6">
+            <h3 class="text-sm font-semibold text-slate-800">接下来你会做这几件事</h3>
+            <ol class="mt-2 space-y-2 text-sm leading-7 text-slate-700">
+              <li v-for="(item, index) in previewVm.taskCard.tasks" :key="index" class="flex gap-2">
+                <span class="shrink-0 font-medium text-slate-500">{{ index + 1 }}.</span>
+                <span>{{ item }}</span>
+              </li>
+            </ol>
+          </div>
+
+          <div class="mt-6 rounded-2xl bg-slate-50/80 px-4 py-3">
+            <h3 class="text-sm font-semibold text-slate-800">做完会得到</h3>
+            <ul class="mt-1.5 space-y-1 text-sm text-slate-700">
+              <li v-for="(gain, index) in previewVm.taskCard.completionGains" :key="index" class="flex gap-2">
+                <span class="text-emerald-600">✓</span>
+                <span>{{ gain }}</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 3. 为什么这一步适合你 -->
+        <section v-if="previewVm.whyFitsYou.length" class="rounded-2xl bg-slate-50/60 px-5 py-4">
+          <p class="text-sm font-semibold text-slate-700">为什么先做这一步</p>
+          <ul class="mt-2 space-y-1.5 text-sm leading-6 text-slate-600">
+            <li v-for="(line, index) in previewVm.whyFitsYou" :key="index">{{ line }}</li>
+          </ul>
+        </section>
+
+        <!-- 4. 确认后会获得什么 + CTA -->
         <section class="space-y-6">
-          <header class="space-y-2">
-            <p class="text-sm font-medium text-slate-500">学习规划</p>
-            <h1 class="text-3xl font-semibold tracking-tight text-slate-900">AI 学习导航</h1>
-            <p class="text-sm text-slate-600">根据你的当前状态，系统为你安排了下一步任务。</p>
-          </header>
-
-          <section class="app-card rounded-[26px] p-6 md:p-8">
-            <p class="text-sm font-semibold text-slate-500">个性化摘要</p>
-            <h2 class="mt-2 text-2xl font-semibold text-slate-900">{{ previewVm.summary.title }}</h2>
-            <p class="mt-2 text-sm leading-7 text-slate-600">{{ previewVm.summary.description }}</p>
-            <div class="mt-4 flex flex-wrap gap-2">
-              <span v-for="tag in previewVm.summary.tags" :key="tag" class="app-badge">
-                {{ tag }}
-              </span>
-            </div>
-          </section>
-
-          <section v-if="preview?.learnerSnapshotV2 || preview?.whyThisStep || (preview?.riskFlags && preview.riskFlags.length) || preview?.recommendedStrategy" class="app-card rounded-[26px] p-6 md:p-8 space-y-5">
-            <p class="text-sm font-semibold text-slate-500">基于诊断的规划依据</p>
-            <div v-if="preview?.learnerSnapshotV2?.currentState" class="rounded-2xl bg-slate-50 px-4 py-3">
-              <p class="font-semibold text-slate-900">系统看到了什么</p>
-              <p class="mt-1 text-sm leading-7 text-slate-700">{{ preview.learnerSnapshotV2.currentState }}</p>
-              <ul v-if="preview.learnerSnapshotV2.evidence?.length" class="mt-2 list-inside list-disc space-y-0.5 text-sm text-slate-600">
-                <li v-for="(item, idx) in preview.learnerSnapshotV2.evidence" :key="idx">{{ item }}</li>
-              </ul>
-            </div>
-            <div v-if="preview?.whyThisStep" class="rounded-2xl bg-slate-50 px-4 py-3">
-              <p class="font-semibold text-slate-900">为什么先学这一步</p>
-              <p class="mt-1 text-sm leading-7 text-slate-700">{{ preview.whyThisStep }}</p>
-            </div>
-            <div v-if="preview?.riskFlags?.length" class="rounded-2xl bg-amber-50/80 px-4 py-3">
-              <p class="font-semibold text-slate-900">当前重点风险</p>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <span v-for="flag in preview.riskFlags" :key="flag" class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                  {{ riskFlagLabel(flag) }}
-                </span>
-              </div>
-            </div>
-            <div v-if="preview?.recommendedStrategy?.label" class="rounded-2xl bg-slate-50 px-4 py-3">
-              <p class="font-semibold text-slate-900">推荐进入方式</p>
-              <p class="mt-1 text-sm font-medium text-slate-800">{{ preview.recommendedStrategy.label }}</p>
-              <p v-if="preview.recommendedStrategy.explanation" class="mt-0.5 text-sm leading-7 text-slate-600">{{ preview.recommendedStrategy.explanation }}</p>
-            </div>
-          </section>
-
-          <section class="app-card app-card-strong rounded-[30px] p-6 shadow-[0_20px_56px_rgba(15,23,42,0.12)] md:p-9">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-semibold tracking-wide text-slate-500">下一步任务</p>
-              <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                预计 {{ previewVm.taskCard.estimatedTime }}
-              </span>
-            </div>
-            <h2 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{{ previewVm.taskCard.title }}</h2>
-            <p class="mt-3 text-sm leading-7 text-slate-600">{{ previewVm.taskCard.goal }}</p>
-
-            <div class="mt-8 grid gap-6 md:grid-cols-2">
-              <div>
-                <h3 class="text-base font-semibold text-slate-900">你需要做什么</h3>
-                <ol class="mt-3 space-y-2 text-sm leading-7 text-slate-700">
-                  <li v-for="(item, index) in previewVm.taskCard.tasks" :key="`task-${index}`">{{ index + 1 }}. {{ item }}</li>
-                </ol>
-              </div>
-              <div>
-                <h3 class="text-base font-semibold text-slate-900">完成后你将掌握</h3>
-                <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-700">
-                  <li v-for="(item, index) in previewVm.taskCard.completionGains" :key="`gain-${index}`">- {{ item }}</li>
-                </ul>
-              </div>
-            </div>
-
-            <div class="mt-9">
-              <AppButton
-                variant="primary"
-                block
-                :loading="learningPlanStore.confirming"
-                class="!min-h-[48px] !rounded-2xl text-base font-semibold transition-transform duration-200 hover:-translate-y-0.5"
-                @click="startLearning"
-              >
-                开始学习
-              </AppButton>
-            </div>
-          </section>
-
-          <PreviewExplanationPanel
-            :expanded="explanationExpanded"
-            :why-recommended="previewVm.explanation.whyRecommended"
-            :why-this-step-first="previewVm.explanation.whyThisStepFirst"
-            :learner-profile="previewVm.explanation.learnerProfile"
-            :system-decision="previewVm.explanation.systemDecision"
-            @toggle="explanationExpanded = !explanationExpanded"
-          />
+          <div class="rounded-2xl border border-slate-200/80 bg-white px-5 py-4">
+            <p class="text-sm font-semibold text-slate-800">确认后你会</p>
+            <p class="mt-1 text-sm leading-6 text-slate-600">{{ previewVm.afterConfirm.expectedGain }}</p>
+            <p class="mt-2 text-xs text-slate-500">{{ previewVm.afterConfirm.startGuide }}</p>
+          </div>
+          <AppButton
+            variant="primary"
+            block
+            :loading="learningPlanStore.confirming"
+            class="!min-h-[52px] !rounded-2xl text-base font-semibold shadow-lg transition hover:opacity-95"
+            @click="startLearning"
+          >
+            确认并开始第一步
+          </AppButton>
         </section>
       </template>
 
       <EmptyStatePanel
         v-else
-        title="还没有拿到这次学习规划"
-        description="先完成诊断，系统才能判断你现在最该先学哪一步。"
+        title="还没有学习规划"
+        description="先完成诊断，系统会为你推荐最该先学的一步。"
       >
         <AppButton @click="router.push('/')">返回首页</AppButton>
       </EmptyStatePanel>
