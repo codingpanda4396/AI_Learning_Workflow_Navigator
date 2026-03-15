@@ -2,6 +2,7 @@ package com.pandanav.learning.domain.llm.model;
 
 public enum LlmStage {
     CAPABILITY_SUMMARY,
+    DIAGNOSIS_LLM_SELECTION,
     DIAGNOSIS_QUESTION_COPY,
     PATH_PLAN,
     LEARNING_PLAN,

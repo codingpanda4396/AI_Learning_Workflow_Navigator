@@ -27,6 +27,7 @@ import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.service.CapabilityProfileBuilder;
 import com.pandanav.learning.domain.service.DiagnosisQuestionCopyFactory;
 import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
+import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
 import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
@@ -86,6 +87,9 @@ class DiagnosisServiceTest {
             new DiagnosisStrategyDecisionService(),
             new DiagnosisQuestionCandidateFactory(new DiagnosisTemplateFactory(new DiagnosisQuestionCopyFactory())),
             new PersonalizedQuestionSelector(),
+            new DiagnosisStrategySelectionLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class)),
+            new DiagnosisSelectionValidator(),
+            new DiagnosisQuestionDraftFromSelectionFactory(),
             new DefaultDiagnosisQuestionCopyAdapter(),
             new QuestionRationaleBuilder(),
             new DiagnosisResponseAssembler(),
@@ -103,6 +107,19 @@ class DiagnosisServiceTest {
         );
     }
 
+    private static String selectionLlmJson() {
+        return """
+            {
+              "strategyCode": "FOUNDATION_FIRST",
+              "selectedQuestionIds": ["q_foundation", "q_experience", "q_goal_style", "q_time_budget", "q_learning_preference"],
+              "questionOrder": {"q_foundation": 1, "q_experience": 2, "q_goal_style": 3, "q_time_budget": 4, "q_learning_preference": 5},
+              "selectionReasons": {},
+              "suppressedQuestionIds": [],
+              "learnerSummary": ""
+            }
+            """;
+    }
+
     @Test
     void createDiagnosisSessionShouldReturnStructuredOptionsWhenLlmSucceeds() {
         LearningSession session = learningSession(101L, 10L);
@@ -110,7 +127,9 @@ class DiagnosisServiceTest {
         savedDiagnosis.setId(501L);
 
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
-        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class))).thenReturn(llmText("""
+        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class)))
+            .thenReturn(llmText(selectionLlmJson()))
+            .thenReturn(llmText("""
             {
               "questions": [
                 {
@@ -171,17 +190,17 @@ class DiagnosisServiceTest {
                   ]
                 },
                 {
-                  "questionId": "q_difficulty_pain_point",
-                  "title": "Pain point",
-                  "description": "Main bottleneck",
+                  "questionId": "q_learning_preference",
+                  "title": "Learning style",
+                  "description": "How you prefer to learn",
                   "placeholder": "",
-                  "submitHint": "This affects content delivery.",
-                  "sectionLabel": "PAIN_POINT",
+                  "submitHint": "Affects delivery.",
+                  "sectionLabel": "PREFERENCE",
                   "options": [
-                    {"code":"CONCEPT_UNDERSTANDING","label":"Concept understanding"},
-                    {"code":"TRANSFER_APPLICATION","label":"Transfer application"},
-                    {"code":"IMPLEMENTATION","label":"Implementation"},
-                    {"code":"LONG_TERM_MEMORY","label":"Long-term memory"}
+                    {"code":"CONCEPT_FIRST","label":"Concept first"},
+                    {"code":"EXAMPLE_FIRST","label":"Example first"},
+                    {"code":"PRACTICE_FIRST","label":"Practice first"},
+                    {"code":"PROJECT_DRIVEN","label":"Project driven"}
                   ]
                 }
               ]
@@ -212,7 +231,9 @@ class DiagnosisServiceTest {
         savedDiagnosis.setId(501L);
 
         when(sessionRepository.findByIdAndUserPk(101L, 10L)).thenReturn(Optional.of(session));
-        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class))).thenThrow(new RuntimeException("llm down"));
+        when(llmGateway.generate(any(LlmStage.class), any(LlmPrompt.class)))
+            .thenReturn(llmText(selectionLlmJson()))
+            .thenThrow(new RuntimeException("llm down"));
         when(diagnosisSessionRepository.save(any(DiagnosisSession.class))).thenAnswer(invocation -> {
             DiagnosisSession diagnosis = invocation.getArgument(0);
             diagnosis.setId(savedDiagnosis.getId());

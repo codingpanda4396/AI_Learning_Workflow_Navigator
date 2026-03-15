@@ -51,6 +51,15 @@ public class DiagnosisLearnerProfileBuilder {
         boolean hasHistory = false;
         boolean hasRecentFailures = false;
         boolean hasContradictionRisk = false;
+        List<String> riskTags = new ArrayList<>();
+        if (hasContradictionRisk) riskTags.add("CONTRADICTION_RISK");
+        if (hasRecentFailures) riskTags.add("RECENT_FAILURES");
+        if (weaknessTags != null) riskTags.addAll(weaknessTags);
+        List<String> historySignals = new ArrayList<>();
+        if (hasHistory) historySignals.add("HAS_HISTORY");
+        if (hasRecentFailures) historySignals.add("RECENT_FAILURES");
+        if (goal != null && !goal.isEmpty()) historySignals.add("GOAL_PROVIDED");
+        if (topic != null && !topic.isEmpty()) historySignals.add("TOPIC_PROVIDED");
 
         return new DiagnosisLearnerProfileSnapshot(
             learnerStage,
@@ -62,7 +71,9 @@ public class DiagnosisLearnerProfileBuilder {
             evidence,
             hasHistory,
             hasRecentFailures,
-            hasContradictionRisk
+            hasContradictionRisk,
+            riskTags,
+            historySignals
         );
     }
 

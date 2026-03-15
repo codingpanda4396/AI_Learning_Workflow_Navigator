@@ -270,6 +270,7 @@ public class LlmProperties {
             case "PATH_PLAN" -> pathPlanMaxOutputTokens;
             case "LEARNING_PLAN_DECISION" -> Math.max(pathPlanMaxOutputTokens, 420);
             case "TUTOR" -> tutorMaxOutputTokens;
+            case "DIAGNOSIS_LLM_SELECTION" -> 800;
             default -> fallbackMaxTokens;
         };
     }

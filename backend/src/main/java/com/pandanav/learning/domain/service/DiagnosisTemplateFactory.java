@@ -26,12 +26,18 @@ public class DiagnosisTemplateFactory {
             createQuestion(session, "q_experience", DiagnosisDimension.EXPERIENCE, "multiple_choice"),
             createQuestion(session, "q_goal_style", DiagnosisDimension.GOAL_STYLE, "single_choice"),
             createQuestion(session, "q_time_budget", DiagnosisDimension.TIME_BUDGET, "single_choice"),
-            createQuestion(session, "q_learning_preference", DiagnosisDimension.LEARNING_PREFERENCE, "single_choice")
+            createQuestion(session, "q_learning_preference", DiagnosisDimension.LEARNING_PREFERENCE, "single_choice"),
+            createQuestion(session, "q_topic_focus", DiagnosisDimension.FOUNDATION, "single_choice"),
+            createQuestion(session, "q_topic_depth", DiagnosisDimension.FOUNDATION, "single_choice"),
+            createQuestion(session, "q_goal_type", DiagnosisDimension.GOAL_STYLE, "single_choice"),
+            createQuestion(session, "q_skip_foundation", DiagnosisDimension.FOUNDATION, "single_choice"),
+            createQuestion(session, "q_time_constrained", DiagnosisDimension.TIME_BUDGET, "single_choice"),
+            createQuestion(session, "q_interview_oriented", DiagnosisDimension.GOAL_STYLE, "single_choice")
         );
     }
 
     private DiagnosisQuestion createQuestion(LearningSession session, String questionId, DiagnosisDimension dimension, String type) {
-        DiagnosisQuestionCopy copy = diagnosisQuestionCopyFactory.build(session, dimension, type);
+        DiagnosisQuestionCopy copy = diagnosisQuestionCopyFactory.build(session, dimension, type, questionId);
         return new DiagnosisQuestion(
             questionId,
             dimension,

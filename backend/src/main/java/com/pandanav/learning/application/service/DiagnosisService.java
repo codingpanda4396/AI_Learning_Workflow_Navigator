@@ -30,6 +30,7 @@ import com.pandanav.learning.domain.model.CapabilityProfileSummaryCopy;
 import com.pandanav.learning.domain.model.DiagnosisAnswer;
 import com.pandanav.learning.domain.model.DiagnosisLearnerProfileSnapshot;
 import com.pandanav.learning.domain.model.DiagnosisQuestion;
+import com.pandanav.learning.domain.model.DiagnosisLlmSelectionResult;
 import com.pandanav.learning.domain.model.DiagnosisQuestionCandidate;
 import com.pandanav.learning.domain.model.DiagnosisQuestionDraft;
 import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
@@ -86,6 +87,9 @@ public class DiagnosisService {
     private final DiagnosisStrategyDecisionService diagnosisStrategyDecisionService;
     private final DiagnosisQuestionCandidateFactory diagnosisQuestionCandidateFactory;
     private final PersonalizedQuestionSelector personalizedQuestionSelector;
+    private final DiagnosisStrategySelectionLlmService strategySelectionLlmService;
+    private final DiagnosisSelectionValidator diagnosisSelectionValidator;
+    private final DiagnosisQuestionDraftFromSelectionFactory draftFromSelectionFactory;
     private final DiagnosisQuestionCopyAdapter diagnosisQuestionCopyAdapter;
     private final QuestionRationaleBuilder questionRationaleBuilder;
     private final DiagnosisResponseAssembler diagnosisResponseAssembler;
@@ -116,6 +120,9 @@ public class DiagnosisService {
         DiagnosisStrategyDecisionService diagnosisStrategyDecisionService,
         DiagnosisQuestionCandidateFactory diagnosisQuestionCandidateFactory,
         PersonalizedQuestionSelector personalizedQuestionSelector,
+        DiagnosisStrategySelectionLlmService strategySelectionLlmService,
+        DiagnosisSelectionValidator diagnosisSelectionValidator,
+        DiagnosisQuestionDraftFromSelectionFactory draftFromSelectionFactory,
         DiagnosisQuestionCopyAdapter diagnosisQuestionCopyAdapter,
         QuestionRationaleBuilder questionRationaleBuilder,
         DiagnosisResponseAssembler diagnosisResponseAssembler,
@@ -145,6 +152,9 @@ public class DiagnosisService {
         this.diagnosisStrategyDecisionService = diagnosisStrategyDecisionService;
         this.diagnosisQuestionCandidateFactory = diagnosisQuestionCandidateFactory;
         this.personalizedQuestionSelector = personalizedQuestionSelector;
+        this.strategySelectionLlmService = strategySelectionLlmService;
+        this.diagnosisSelectionValidator = diagnosisSelectionValidator;
+        this.draftFromSelectionFactory = draftFromSelectionFactory;
         this.diagnosisQuestionCopyAdapter = diagnosisQuestionCopyAdapter;
         this.questionRationaleBuilder = questionRationaleBuilder;
         this.diagnosisResponseAssembler = diagnosisResponseAssembler;
@@ -179,14 +189,47 @@ public class DiagnosisService {
 
         List<DiagnosisQuestionCandidate> candidates =
             diagnosisQuestionCandidateFactory.buildCandidates(session, planningContext);
-        List<DiagnosisQuestionDraft> selectedDrafts =
-            personalizedQuestionSelector.select(candidates, strategyDecision, profileSnapshot);
-        List<DiagnosisQuestion> adaptedQuestions =
-            diagnosisQuestionCopyAdapter.adapt(selectedDrafts, planningContext, profileSnapshot, strategyDecision);
-        List<DiagnosisQuestion> assembledQuestions = diagnosisQuestionAssembler.assemble(session, adaptedQuestions);
+        DiagnosisLlmSelectionResult llmSelectionResult = null;
+        List<DiagnosisQuestionDraft> selectedDrafts;
         DiagnosisGenerationMode generationMode = DiagnosisGenerationMode.LLM;
-        boolean fallbackApplied = false;
-        List<String> fallbackReasons = List.of();
+        DiagnosisStrategyDecision effectiveStrategy = strategyDecision;
+        try {
+            DiagnosisLlmSelectionResult selection = strategySelectionLlmService.select(
+                profileSnapshot,
+                strategyDecision,
+                candidates,
+                topic,
+                safeText(session.getGoalText()),
+                planningContext.chapterName()
+            );
+            if (diagnosisSelectionValidator.validate(selection, candidates, strategyDecision)) {
+                llmSelectionResult = selection;
+                selectedDrafts = draftFromSelectionFactory.fromSelection(selection, candidates);
+                effectiveStrategy = strategyFromLlmSelection(selection, strategyDecision);
+                log.info(
+                    "DIAGNOSIS_LLM_SELECTION traceId={} sessionId={} strategyCode={} selectedIds={} suppressedIds={}",
+                    TraceContext.traceId(),
+                    session.getId(),
+                    selection.strategyCode(),
+                    selection.selectedQuestionIds(),
+                    selection.suppressedQuestionIds()
+                );
+            } else {
+                selectedDrafts = personalizedQuestionSelector.select(candidates, strategyDecision, profileSnapshot);
+                generationMode = DiagnosisGenerationMode.RULE;
+            }
+        } catch (Exception ex) {
+            log.warn("Diagnosis LLM selection fallback to rule. sessionId={} reason={}", session.getId(), ex.getMessage());
+            selectedDrafts = personalizedQuestionSelector.select(candidates, strategyDecision, profileSnapshot);
+            generationMode = DiagnosisGenerationMode.RULE;
+        }
+
+        List<DiagnosisQuestion> adaptedQuestions =
+            diagnosisQuestionCopyAdapter.adapt(selectedDrafts, planningContext, profileSnapshot, effectiveStrategy);
+        List<DiagnosisQuestion> assembledQuestions = diagnosisQuestionAssembler.assemble(session, adaptedQuestions);
+        boolean fallbackApplied = generationMode != DiagnosisGenerationMode.LLM;
+        List<String> fallbackReasons = fallbackApplied && generationMode == DiagnosisGenerationMode.RULE
+            ? List.of("LLM_SELECTION_UNAVAILABLE") : List.of();
         List<DiagnosisQuestion> questions;
         try {
             questions = diagnosisQuestionCopyLlmService.enhanceQuestions(session, assembledQuestions);
@@ -197,7 +240,7 @@ public class DiagnosisService {
                 }
                 throw new AiGenerationException("DIAGNOSIS_QUESTION_COPY", "API_ERROR");
             }
-            generationMode = DiagnosisGenerationMode.RULE_FALLBACK;
+            generationMode = generationMode == DiagnosisGenerationMode.LLM ? DiagnosisGenerationMode.RULE_FALLBACK : generationMode;
             fallbackApplied = true;
             fallbackReasons = List.of(resolveFailureReason(ex, "LLM_DIAGNOSIS_COPY_UNAVAILABLE"));
             questions = assembledQuestions;
@@ -213,12 +256,12 @@ public class DiagnosisService {
 
         DiagnosisSession saved = diagnosisSessionRepository.save(diagnosisSession);
         DiagnosisExplanationDto diagnosisExplanation = diagnosisExplanationBuilder.build(
-            planningContext, profileSnapshot, strategyDecision, questions);
-        DiagnosisDecisionHintsDto decisionHints = buildDecisionHints(strategyDecision, profileSnapshot);
-        LearnerSnapshotDto learnerSnapshotDto = buildLearnerSnapshotDto(profileSnapshot, planningContext);
-        DiagnosisStrategyDto diagnosisStrategyDto = buildDiagnosisStrategyDto(strategyDecision);
+            planningContext, profileSnapshot, effectiveStrategy, questions);
+        DiagnosisDecisionHintsDto decisionHints = buildDecisionHints(effectiveStrategy, profileSnapshot);
+        LearnerSnapshotDto learnerSnapshotDto = buildLearnerSnapshotDto(profileSnapshot, planningContext, llmSelectionResult);
+        DiagnosisStrategyDto diagnosisStrategyDto = buildDiagnosisStrategyDto(effectiveStrategy);
         List<QuestionRationaleDto> questionRationales =
-            questionRationaleBuilder.build(selectedDrafts, profileSnapshot, strategyDecision);
+            questionRationaleBuilder.build(selectedDrafts, profileSnapshot, effectiveStrategy);
         PersonalizationMetaDto personalizationMeta = buildPersonalizationMetaDto(profileSnapshot, strategyDecision);
         log.info(
             "DIAGNOSIS_GENERATION_RESULT traceId={} sessionId={} generationMode={} questionCount={} topic={}",
@@ -409,22 +452,42 @@ public class DiagnosisService {
 
     private LearnerSnapshotDto buildLearnerSnapshotDto(
         DiagnosisLearnerProfileSnapshot profile,
-        PlanningContext planningContext
+        PlanningContext planningContext,
+        DiagnosisLlmSelectionResult llmSelectionResult
     ) {
         String topic = resolveTopic(planningContext);
-        String summary = buildLearnerSnapshotSummary(profile, topic);
+        String summary = (llmSelectionResult != null && llmSelectionResult.learnerSummary() != null
+            && !llmSelectionResult.learnerSummary().isBlank())
+            ? llmSelectionResult.learnerSummary()
+            : buildLearnerSnapshotSummary(profile, topic);
         List<String> signals = new ArrayList<>(profile.evidence() != null ? profile.evidence() : List.of());
-        List<String> riskTags = new ArrayList<>();
-        if (profile.hasContradictionRisk()) {
+        List<String> riskTags = new ArrayList<>(profile.riskTags() != null ? profile.riskTags() : List.of());
+        if (profile.hasContradictionRisk() && !riskTags.contains("CONTRADICTION_RISK")) {
             riskTags.add("CONTRADICTION_RISK");
         }
-        if (profile.hasRecentFailures()) {
+        if (profile.hasRecentFailures() && !riskTags.contains("RECENT_FAILURES")) {
             riskTags.add("RECENT_FAILURES");
         }
         if (profile.weaknessTags() != null && !profile.weaknessTags().isEmpty()) {
-            riskTags.addAll(profile.weaknessTags());
+            for (String t : profile.weaknessTags()) {
+                if (!riskTags.contains(t)) riskTags.add(t);
+            }
         }
         return new LearnerSnapshotDto(summary, signals, riskTags);
+    }
+
+    private DiagnosisStrategyDecision strategyFromLlmSelection(
+        DiagnosisLlmSelectionResult selection,
+        DiagnosisStrategyDecision ruleDecision
+    ) {
+        return new DiagnosisStrategyDecision(
+            selection.strategyCode(),
+            ruleDecision.priorityDimensions(),
+            ruleDecision.suppressedDimensions(),
+            ruleDecision.targetQuestionCount(),
+            ruleDecision.toneStyle(),
+            ruleDecision.personalizationReasons()
+        );
     }
 
     private String buildLearnerSnapshotSummary(DiagnosisLearnerProfileSnapshot profile, String topic) {
