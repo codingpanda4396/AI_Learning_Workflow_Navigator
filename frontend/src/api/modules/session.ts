@@ -1,6 +1,9 @@
 import apiClient from '@/api/client';
+import { getSessionOverviewMock } from '@/api/learnMocks';
 import { normalizeCurrentSession, normalizeOverview } from '@/api/normalizers';
 import type { CurrentSessionInfo, SessionCreatePayload, SessionOverview } from '@/types/session';
+
+const useLearnMock = import.meta.env.VITE_USE_LEARN_MOCK === 'true';
 
 export async function createSessionApi(payload: SessionCreatePayload) {
   const { data } = await apiClient.post('/api/sessions/create', {
@@ -17,6 +20,7 @@ export async function planSessionApi(sessionId: number) {
 }
 
 export async function fetchOverviewApi(sessionId: number): Promise<SessionOverview> {
+  if (useLearnMock) return Promise.resolve(getSessionOverviewMock(sessionId));
   const { data } = await apiClient.get(`/api/sessions/${sessionId}/overview`);
   return normalizeOverview(data);
 }

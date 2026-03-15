@@ -115,14 +115,6 @@ export interface DiagnosisSubmitResponse {
   weaknessSources: DiagnosisEvidenceSource[];
 }
 
-export interface DiagnosisResultViewModel {
-  level: string;
-  summary: string;
-  strengths: string[];
-  weaknesses: string[];
-  suggestion: string;
-}
-
 const DEFAULT_QUESTION_DESCRIPTION = '请根据你当前的真实情况作答。这不是考试，只是帮助系统更准确地理解你的学习起点。';
 const DEFAULT_TEXT_PLACEHOLDER = '可以简单描述你当前的经验、习惯，或最近遇到的学习阻碍。';
 const DEFAULT_SUBMIT_HINT = '你的回答将用于生成能力快照，并据此安排下一步学习路径。';
@@ -264,18 +256,4 @@ export function resolveDiagnosisMetaSummary(metadata?: DiagnosisMetadata | null)
   }
 
   return parts.join(' / ') || '本次诊断的辅助信息将在这里展示。';
-}
-
-export function resolveDiagnosisResultViewModel(
-  profile?: CapabilityProfile | null,
-  insights?: DiagnosisInsights | null,
-  nextAction?: DiagnosisNextAction | null,
-): DiagnosisResultViewModel {
-  return {
-    level: profile?.currentLevel?.label || '待判断',
-    summary: insights?.summary || 'AI 已根据你的作答整理出当前能力判断。',
-    strengths: profile?.strengths?.filter(Boolean) ?? [],
-    weaknesses: profile?.weaknesses?.filter(Boolean) ?? [],
-    suggestion: insights?.planExplanation || nextAction?.label || '继续查看 AI 为你生成的学习路径。',
-  };
 }

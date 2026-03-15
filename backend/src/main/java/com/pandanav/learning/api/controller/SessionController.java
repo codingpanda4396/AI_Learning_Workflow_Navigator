@@ -6,10 +6,8 @@ import com.pandanav.learning.api.dto.session.CreateSessionRequest;
 import com.pandanav.learning.api.dto.session.CreateSessionResponse;
 import com.pandanav.learning.api.dto.session.PathResponse;
 import com.pandanav.learning.api.dto.session.PlanSessionResponse;
-import com.pandanav.learning.api.dto.session.SessionOverviewResponse;
 import com.pandanav.learning.application.usecase.CreateSessionUseCase;
 import com.pandanav.learning.application.usecase.GetCurrentSessionUseCase;
-import com.pandanav.learning.application.usecase.GetSessionOverviewUseCase;
 import com.pandanav.learning.application.usecase.GetSessionPathUseCase;
 import com.pandanav.learning.application.usecase.PlanSessionTasksUseCase;
 import com.pandanav.learning.auth.UserContextHolder;
@@ -38,20 +36,17 @@ public class SessionController {
 
     private final CreateSessionUseCase createSessionUseCase;
     private final PlanSessionTasksUseCase planSessionTasksUseCase;
-    private final GetSessionOverviewUseCase getSessionOverviewUseCase;
     private final GetCurrentSessionUseCase getCurrentSessionUseCase;
     private final GetSessionPathUseCase getSessionPathUseCase;
 
     public SessionController(
         CreateSessionUseCase createSessionUseCase,
         PlanSessionTasksUseCase planSessionTasksUseCase,
-        GetSessionOverviewUseCase getSessionOverviewUseCase,
         GetCurrentSessionUseCase getCurrentSessionUseCase,
         GetSessionPathUseCase getSessionPathUseCase
     ) {
         this.createSessionUseCase = createSessionUseCase;
         this.planSessionTasksUseCase = planSessionTasksUseCase;
-        this.getSessionOverviewUseCase = getSessionOverviewUseCase;
         this.getCurrentSessionUseCase = getCurrentSessionUseCase;
         this.getSessionPathUseCase = getSessionPathUseCase;
     }
@@ -91,19 +86,6 @@ public class SessionController {
         } catch (IllegalArgumentException ex) {
             throw new BadRequestException(ex.getMessage());
         }
-    }
-
-    @Operation(summary = "Get session overview")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "OK"),
-        @ApiResponse(responseCode = "404", description = "Not Found",
-            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-        @ApiResponse(responseCode = "500", description = "Internal Error",
-            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
-    })
-    @GetMapping("/{sessionId}/overview")
-    public SessionOverviewResponse getOverview(@PathVariable @Positive Long sessionId) {
-        return getSessionOverviewUseCase.execute(sessionId);
     }
 
     @Operation(summary = "Get learning path for session")
