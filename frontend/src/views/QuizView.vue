@@ -2,13 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, reactive } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
-import ErrorState from '@/components/common/ErrorState.vue';
-import LoadingState from '@/components/common/LoadingState.vue';
+import LearningPageHeader from '@/components/learning/LearningPageHeader.vue';
+import LearningStatePanel from '@/components/learning/LearningStatePanel.vue';
 import QuizQuestionCard from '@/components/common/QuizQuestionCard.vue';
 import AppButton from '@/components/ui/AppButton.vue';
-import EmptyStatePanel from '@/components/ui/EmptyStatePanel.vue';
 import InfoHint from '@/components/ui/InfoHint.vue';
 import StepProgress from '@/components/ui/StepProgress.vue';
+import { PRIMARY_CTA, SECONDARY_LABELS, STATE_COPY } from '@/constants/learningFlow';
 import { useQuizStore } from '@/stores/quiz';
 import { useLearningFlowStore } from '@/stores/learningFlow';
 
@@ -22,19 +22,13 @@ let timer: number | undefined;
 const statusText = computed(() => {
   switch (quizStore.status) {
     case 'generating':
-      return '正在准备练习题目。';
+      return STATE_COPY.LOADING;
     case 'submitting':
-      return '正在提交，即将进入学习结果评估。';
+      return '提交中，即将进入学习结果评估';
     case 'answering':
-      return '作答完成后点击下方提交。';
-    case 'reviewing':
-      return '已进入复盘。';
-    case 'report-ready':
-      return '已就绪，即将跳转。';
-    case 'next-round':
-      return '已就绪。';
+      return '作答完成后点击下方提交';
     case 'failed':
-      return '练习暂时不可用，请稍后重试。';
+      return STATE_COPY.BLOCKED_HINT;
     default:
       return '';
   }
@@ -109,19 +103,23 @@ onBeforeUnmount(stopPolling);
 <template>
   <AppShell>
     <div class="space-y-6 pb-28">
-      <section class="app-hero">
-        <p class="app-eyebrow">练习</p>
-        <h1 class="app-title-lg mt-4">完成作答后提交，查看学习结果评估</h1>
-        <p class="app-text-lead mt-4 max-w-2xl">
-          独立完成下方题目，提交后系统会给出本轮的掌握情况与下一步建议。
-        </p>
-      </section>
+      <LearningPageHeader
+        eyebrow="练习"
+        title="完成作答后提交，查看学习结果评估"
+        lead="独立完成下方题目，提交后系统会给出本轮的掌握情况与下一步建议。"
+      />
 
       <StepProgress v-if="questionCount" :current="answeredCount" :total="questionCount" label="已完成" />
       <InfoHint v-if="statusText">{{ statusText }}</InfoHint>
 
-      <LoadingState v-if="quizStore.loading && !quizStore.quiz" />
-      <ErrorState v-else-if="quizStore.error && !quizStore.quiz" :message="quizStore.error" />
+      <LearningStatePanel v-if="quizStore.loading && !quizStore.quiz" state="loading" />
+      <LearningStatePanel
+        v-else-if="quizStore.error && !quizStore.quiz"
+        state="error"
+        :message="quizStore.error"
+        :action-label="SECONDARY_LABELS.RETRY"
+        @action="() => quizStore.fetchQuizStatus(sessionId)"
+      />
 
       <section v-else-if="quizStore.quiz?.questions.length" class="app-stack-md">
         <QuizQuestionCard
@@ -133,13 +131,9 @@ onBeforeUnmount(stopPolling);
         />
       </section>
 
-      <EmptyStatePanel
-        v-else
-        title="练习尚未准备"
-        description="点击下方按钮开始生成题目，准备完成后即可作答。"
-      >
-        <AppButton size="lg" :loading="quizStore.loading" @click="generate">开始练习</AppButton>
-      </EmptyStatePanel>
+      <LearningStatePanel v-else state="empty" message="练习尚未准备">
+        <AppButton size="lg" :loading="quizStore.loading" @click="generate">{{ PRIMARY_CTA.START_TRAINING }}</AppButton>
+      </LearningStatePanel>
 
       <div class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/88 backdrop-blur-xl">
         <div class="mx-auto flex max-w-[1120px] justify-end px-4 py-4 md:px-0">
@@ -150,7 +144,7 @@ onBeforeUnmount(stopPolling);
             :loading="quizStore.submitting"
             @click="submit"
           >
-            提交练习
+            {{ PRIMARY_CTA.SUBMIT_TRAINING }}
           </AppButton>
           <AppButton
             v-else
@@ -159,7 +153,7 @@ onBeforeUnmount(stopPolling);
             :loading="quizStore.status === 'generating'"
             @click="generate"
           >
-            开始练习
+            {{ PRIMARY_CTA.START_TRAINING }}
           </AppButton>
         </div>
       </div>

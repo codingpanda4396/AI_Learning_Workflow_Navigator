@@ -2,10 +2,12 @@
 import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
-import ErrorState from '@/components/common/ErrorState.vue';
-import LoadingState from '@/components/common/LoadingState.vue';
+import LearningActionBar from '@/components/learning/LearningActionBar.vue';
+import LearningPageHeader from '@/components/learning/LearningPageHeader.vue';
+import LearningStatePanel from '@/components/learning/LearningStatePanel.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import SectionCard from '@/components/ui/SectionCard.vue';
+import { PRIMARY_CTA, SECONDARY_LABELS } from '@/constants/learningFlow';
 import { useFeedbackStore } from '@/stores/feedback';
 import { useLearningFlowStore } from '@/stores/learningFlow';
 import { formatPercent } from '@/utils/format';
@@ -34,27 +36,27 @@ async function loadReport() {
   await feedbackStore.fetchReport(sessionId.value);
 }
 
-function goToNextSuggestions() {
-  flowStore.goToStage('NEXT_ACTION');
-}
+onMounted(loadReport);
 </script>
 
 <template>
   <AppShell>
-    <LoadingState v-if="feedbackStore.loading && !report" />
-
-    <div v-else-if="feedbackStore.error && !report" class="space-y-4">
-      <ErrorState :message="feedbackStore.error" />
-      <AppButton variant="secondary" @click="loadReport">重新加载</AppButton>
-    </div>
+    <LearningStatePanel v-if="feedbackStore.loading && !report" state="loading" />
+    <LearningStatePanel
+      v-else-if="feedbackStore.error && !report"
+      state="error"
+      :message="feedbackStore.error"
+      :action-label="SECONDARY_LABELS.RETRY"
+      @action="loadReport"
+    />
 
     <div v-else-if="report" class="mx-auto max-w-[720px] space-y-8">
-      <section class="app-hero">
-        <p class="app-eyebrow">学习结果评估</p>
-        <h1 class="app-title-lg mt-4">这轮结果怎么样</h1>
-        <p class="app-text-lead mt-4">{{ summary }}</p>
-        <div v-if="score !== '--'" class="mt-4 text-2xl font-semibold text-slate-900">{{ score }}</div>
-      </section>
+      <LearningPageHeader
+        eyebrow="学习结果评估"
+        title="这轮结果怎么样"
+        :lead="summary"
+      />
+      <div v-if="score !== '--'" class="text-2xl font-semibold text-slate-900">{{ score }}</div>
 
       <div class="grid gap-5 md:grid-cols-2">
         <SectionCard title="已掌握">
@@ -69,10 +71,18 @@ function goToNextSuggestions() {
         </SectionCard>
       </div>
 
-      <div class="flex flex-col gap-3">
-        <AppButton size="lg" @click="$router.push(`/learn/${sessionId}/next`)">查看下一步建议</AppButton>
-        <AppButton variant="secondary" @click="flowStore.goToStage('NEXT_ACTION')">返回当前进度</AppButton>
-      </div>
+      <LearningActionBar>
+        <template #primary>
+          <AppButton size="lg" @click="$router.push(`/learn/${sessionId}/next`)">
+            {{ PRIMARY_CTA.VIEW_NEXT_SUGGESTION }}
+          </AppButton>
+        </template>
+        <template #secondary>
+          <AppButton variant="secondary" @click="flowStore.goToStage('NEXT_ACTION')">
+            {{ SECONDARY_LABELS.BACK_TO_PROGRESS }}
+          </AppButton>
+        </template>
+      </LearningActionBar>
     </div>
   </AppShell>
 </template>

@@ -2,9 +2,11 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '@/components/common/AppShell.vue';
-import ErrorState from '@/components/common/ErrorState.vue';
-import LoadingState from '@/components/common/LoadingState.vue';
+import LearningActionBar from '@/components/learning/LearningActionBar.vue';
+import LearningPageHeader from '@/components/learning/LearningPageHeader.vue';
+import LearningStatePanel from '@/components/learning/LearningStatePanel.vue';
 import AppButton from '@/components/ui/AppButton.vue';
+import { PRIMARY_CTA, SECONDARY_LABELS } from '@/constants/learningFlow';
 import { useSessionStore } from '@/stores/session';
 import { useLearningFlowStore } from '@/stores/learningFlow';
 
@@ -14,7 +16,7 @@ const flowStore = useLearningFlowStore();
 
 const sessionId = computed(() => Number(route.params.sessionId));
 const overview = computed(() => sessionStore.overview);
-const hint = computed(() => overview.value?.summary?.nextStepHint || '先完成当前步骤，系统会自动推进。');
+const hint = computed(() => overview.value?.summary?.nextStepHint || '');
 
 async function openPrimaryAction() {
   const cta = flowStore.snapshot?.primaryCTA;
@@ -29,19 +31,24 @@ async function loadOverview() {
 
 <template>
   <AppShell>
-    <LoadingState v-if="sessionStore.loading && !overview" />
-
-    <div v-else-if="sessionStore.error && !overview" class="space-y-4">
-      <ErrorState :message="sessionStore.error" />
-      <AppButton variant="secondary" @click="loadOverview">重新加载</AppButton>
-    </div>
+    <LearningStatePanel
+      v-if="sessionStore.loading && !overview"
+      state="loading"
+    />
+    <LearningStatePanel
+      v-else-if="sessionStore.error && !overview"
+      state="error"
+      :message="sessionStore.error"
+      :action-label="SECONDARY_LABELS.RETRY"
+      @action="loadOverview"
+    />
 
     <div v-else-if="overview" class="mx-auto max-w-[640px] space-y-8">
-      <section class="app-hero">
-        <p class="app-eyebrow">当前学习进度</p>
-        <h1 class="app-title-lg mt-4">{{ overview.summary?.currentTaskTitle || '继续当前学习' }}</h1>
-        <p class="app-text-lead mt-4">{{ hint }}</p>
-      </section>
+      <LearningPageHeader
+        eyebrow="当前学习进度"
+        :title="overview.summary?.currentTaskTitle || '继续当前学习'"
+        :lead="hint"
+      />
 
       <div class="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-5">
         <dl class="grid gap-4 sm:grid-cols-2">
@@ -58,18 +65,22 @@ async function loadOverview() {
         </dl>
       </div>
 
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <AppButton size="lg" class="w-full sm:w-auto" @click="openPrimaryAction">
-          {{ flowStore.snapshot?.primaryCTA?.label ?? '继续当前步骤' }}
-        </AppButton>
-        <AppButton
-          variant="secondary"
-          class="w-full sm:w-auto"
-          @click="$router.push(`/sessions/${sessionId}/growth`)"
-        >
-          查看学习记录
-        </AppButton>
-      </div>
+      <LearningActionBar>
+        <template #primary>
+          <AppButton size="lg" class="w-full sm:w-auto" @click="openPrimaryAction">
+            {{ PRIMARY_CTA.CONTINUE_TASK }}
+          </AppButton>
+        </template>
+        <template #secondary>
+          <AppButton
+            variant="secondary"
+            class="w-full sm:w-auto"
+            @click="$router.push(`/sessions/${sessionId}/growth`)"
+          >
+            {{ SECONDARY_LABELS.VIEW_RECORDS }}
+          </AppButton>
+        </template>
+      </LearningActionBar>
     </div>
   </AppShell>
 </template>
