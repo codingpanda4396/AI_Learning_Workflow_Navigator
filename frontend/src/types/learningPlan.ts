@@ -183,6 +183,30 @@ export interface PreviewAlternativeStrategy {
   notRecommendedReason: string;
 }
 
+export interface PreviewPersonalizedSummary {
+  title: string;
+  description: string;
+  tags: string[];
+}
+
+export interface PreviewCurrentTaskCard {
+  title: string;
+  estimatedMinutes?: number;
+  goal?: string;
+  tasks: string[];
+  completionGains: string[];
+}
+
+export interface PreviewPersonalizedReasons {
+  whyRecommended?: string;
+  whyThisStepFirst?: string;
+}
+
+export interface PreviewExplanationPanel {
+  learnerProfile?: string;
+  systemDecision?: string;
+}
+
 export interface LearningPlanPreview {
   id: string;
   status: CodeLabel;
@@ -244,6 +268,11 @@ export interface LearningPlanPreview {
   ifPerformWell?: string;
   ifStillStruggle?: string;
   ifNoTime?: string;
+  profileDrivenReasoning?: string;
+  personalizedSummary?: PreviewPersonalizedSummary;
+  currentTaskCard?: PreviewCurrentTaskCard;
+  personalizedReasons?: PreviewPersonalizedReasons;
+  explanationPanel?: PreviewExplanationPanel;
 }
 
 export interface PlanConfirmResult {

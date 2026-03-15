@@ -19,6 +19,10 @@ import type {
 import type {
   LearningPlanPreview,
   LearningPlanRequest,
+  PreviewCurrentTaskCard,
+  PreviewExplanationPanel,
+  PreviewPersonalizedReasons,
+  PreviewPersonalizedSummary,
   LearningPlanPersonalization,
   PathDifficulty,
   PathMasteryStatus,
@@ -392,6 +396,78 @@ function normalizeKickoffSteps(value: unknown): string[] {
     .slice(0, 4);
 }
 
+function normalizePersonalizedSummary(value: unknown): PreviewPersonalizedSummary | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const row = value as Record<string, unknown>;
+  const title = String(row.title ?? row.headline ?? '').trim();
+  const description = String(row.description ?? row.summary ?? '').trim();
+  const tags = readArray(row.tags).slice(0, 3);
+  if (!title && !description && !tags.length) {
+    return undefined;
+  }
+  return {
+    title,
+    description,
+    tags,
+  };
+}
+
+function normalizeCurrentTaskCard(value: unknown): PreviewCurrentTaskCard | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const row = value as Record<string, unknown>;
+  const title = String(row.title ?? row.task_title ?? row.taskTitle ?? '').trim();
+  const goal = String(row.goal ?? row.learning_goal ?? row.learningGoal ?? '').trim() || undefined;
+  const tasks = readArray(row.tasks ?? row.task_list ?? row.taskList).slice(0, 5);
+  const completionGains = readArray(row.completion_gains ?? row.completionGains ?? row.expected_gain ?? row.expectedGain).slice(0, 4);
+  const estimatedMinutes = toNumber(row.estimated_minutes ?? row.estimatedMinutes ?? row.estimate_minutes ?? row.estimateMinutes);
+  if (!title && !goal && !tasks.length && !completionGains.length && !estimatedMinutes) {
+    return undefined;
+  }
+  return {
+    title,
+    estimatedMinutes,
+    goal,
+    tasks,
+    completionGains,
+  };
+}
+
+function normalizePersonalizedReasons(value: unknown): PreviewPersonalizedReasons | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const row = value as Record<string, unknown>;
+  const whyRecommended = String(row.why_recommended ?? row.whyRecommended ?? '').trim() || undefined;
+  const whyThisStepFirst = String(row.why_this_step_first ?? row.whyThisStepFirst ?? '').trim() || undefined;
+  if (!whyRecommended && !whyThisStepFirst) {
+    return undefined;
+  }
+  return {
+    whyRecommended,
+    whyThisStepFirst,
+  };
+}
+
+function normalizeExplanationPanel(value: unknown): PreviewExplanationPanel | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const row = value as Record<string, unknown>;
+  const learnerProfile = String(row.learner_profile ?? row.learnerProfile ?? '').trim() || undefined;
+  const systemDecision = String(row.system_decision ?? row.systemDecision ?? '').trim() || undefined;
+  if (!learnerProfile && !systemDecision) {
+    return undefined;
+  }
+  return {
+    learnerProfile,
+    systemDecision,
+  };
+}
+
 function normalizeTaskPreview(value: unknown): PlanTaskPreview[] {
   const items = Array.isArray(value) ? value : [];
   return items
@@ -759,6 +835,10 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     : readArray(nextActionsSource);
   const taskPreviewRaw = data.task_previews ?? data.taskPreviews ?? data.task_preview ?? data.taskPreview;
   const taskPreviews = normalizeTaskPreview(taskPreviewRaw);
+  const personalizedSummary = normalizePersonalizedSummary(data.personalized_summary ?? data.personalizedSummary);
+  const currentTaskCard = normalizeCurrentTaskCard(data.current_task_card ?? data.currentTaskCard);
+  const personalizedReasons = normalizePersonalizedReasons(data.personalized_reasons ?? data.personalizedReasons);
+  const explanationPanel = normalizeExplanationPanel(data.explanation_panel ?? data.explanationPanel);
   const recommendedTitle = String(recommendedEntryRaw?.title ?? '');
   const estimatedMinutes = toNumber(recommendedEntryRaw?.estimated_minutes ?? recommendedEntryRaw?.estimatedMinutes) ?? 15;
 
@@ -837,5 +917,10 @@ export function normalizeLearningPlanPreview(data: Record<string, unknown>, requ
     benefits: [],
     nextUnlocks: [],
     stageStatuses: [],
+    profileDrivenReasoning: String(data.profile_driven_reasoning ?? data.profileDrivenReasoning ?? '').trim() || undefined,
+    personalizedSummary,
+    currentTaskCard,
+    personalizedReasons,
+    explanationPanel,
   };
 }
