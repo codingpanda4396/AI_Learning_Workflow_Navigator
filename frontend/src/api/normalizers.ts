@@ -154,12 +154,16 @@ function normalizeCapabilityProfile(value: unknown): CapabilityProfile {
 
 export function normalizeDiagnosisGenerateResponse(data: Record<string, unknown>): DiagnosisGenerateResponse {
   const questions = (Array.isArray(data.questions) ? data.questions : []).map((item) => normalizeDiagnosisQuestion(item));
+  const rawExplanation = data.diagnosis_explanation ?? data.diagnosisExplanation;
+  const diagnosisExplanation =
+    typeof rawExplanation === 'string' && rawExplanation.trim().length > 0 ? rawExplanation.trim() : undefined;
   return {
     diagnosisId: String(data.diagnosis_id ?? data.diagnosisId ?? ''),
     sessionId: String(data.session_id ?? data.sessionId ?? ''),
     status: String(data.status ?? 'GENERATED') as DiagnosisGenerateResponse['status'],
     questions,
     nextAction: normalizeDiagnosisNextAction(data.next_action ?? data.nextAction),
+    diagnosisExplanation,
     fallback: normalizeDiagnosisFallback(data.fallback),
     metadata: normalizeDiagnosisMetadata(data.metadata),
   };

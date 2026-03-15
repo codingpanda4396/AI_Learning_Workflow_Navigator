@@ -8,7 +8,6 @@ import LoadingState from '@/components/common/LoadingState.vue';
 import DiagnosisFooter from '@/components/diagnosis/DiagnosisFooter.vue';
 import ProgressIndicator from '@/components/diagnosis/ProgressIndicator.vue';
 import QuestionCard from '@/components/diagnosis/QuestionCard.vue';
-import InfoHint from '@/components/ui/InfoHint.vue';
 import { useDiagnosisStore } from '@/stores/diagnosis';
 import type { DiagnosisAnswer, DiagnosisAnswerValue, DiagnosisNextAction, DiagnosisQuestion } from '@/types/diagnosis';
 
@@ -25,6 +24,7 @@ const diagnosisId = ref('');
 const responseSessionId = ref('');
 const nextAction = ref<DiagnosisNextAction | null>(null);
 const questions = ref<DiagnosisQuestion[]>([]);
+const diagnosisExplanation = ref('');
 const loading = ref(false);
 const submitting = ref(false);
 const error = ref('');
@@ -146,6 +146,7 @@ async function loadDiagnosis() {
   diagnosisId.value = '';
   responseSessionId.value = '';
   nextAction.value = null;
+  diagnosisExplanation.value = '';
   error.value = '';
 
   if (!sessionId.value) {
@@ -160,6 +161,7 @@ async function loadDiagnosis() {
     responseSessionId.value = response.sessionId;
     nextAction.value = response.nextAction ?? null;
     questions.value = response.questions;
+    diagnosisExplanation.value = response.diagnosisExplanation?.trim() ?? '';
     diagnosisStore.setCurrentIndex(0);
     syncCurrentQuestion();
     if (!questions.value.length) {
@@ -179,10 +181,14 @@ onMounted(loadDiagnosis);
   <AppShell>
     <div class="mx-auto max-w-[860px] space-y-6 pb-10">
       <section class="app-hero">
-        <p class="app-eyebrow">能力诊断</p>
-        <h1 class="app-title-lg mt-4">先回答几个问题，系统会帮你找准起点</h1>
-        <p class="app-text-lead mt-4 max-w-2xl">
-          这一步只为了知道你现在更适合从哪里开始，不是考试。回答越真实，后面的学习规划越顺手。
+        <h1 class="text-xl font-semibold tracking-[-0.02em] text-slate-900">
+          {{ goalText || '为本次学习定制路径' }}
+        </h1>
+        <p class="mt-2 text-sm text-slate-600">
+          {{ diagnosisExplanation || '下面几道题是围绕你的目标定制的，用于生成更适合你的学习路径。' }}
+        </p>
+        <p class="mt-1 text-sm text-slate-500">
+          答完后将为你生成个性化学习路径。
         </p>
       </section>
 
@@ -191,10 +197,12 @@ onMounted(loadDiagnosis);
       <template v-else-if="!error && currentQuestion">
         <ProgressIndicator :current="currentStep" :total="totalQuestions" />
         <QuestionCard :question="currentQuestion" :model-value="currentAnswer" @update:model-value="updateAnswer" />
-        <InfoHint>
-          {{ isLastQuestion ? '答完这题就会生成学习规划。' : '先专注当前这一题，完成后再进入下一题。' }}
-        </InfoHint>
-        <DiagnosisFooter :disabled="buttonDisabled" :loading="submitting" @continue="handleContinue" />
+        <DiagnosisFooter
+          :disabled="buttonDisabled"
+          :loading="submitting"
+          :is-last="isLastQuestion"
+          @continue="handleContinue"
+        />
       </template>
 
       <div v-else class="space-y-4">

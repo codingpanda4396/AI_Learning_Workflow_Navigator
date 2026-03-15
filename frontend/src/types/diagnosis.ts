@@ -55,6 +55,8 @@ export interface DiagnosisGenerateResponse {
   status: DiagnosisStatus;
   questions: DiagnosisQuestion[];
   nextAction?: DiagnosisNextAction;
+  /** 可选：一句说明「为什么问这些问题」，用于页面轻量展示 */
+  diagnosisExplanation?: string;
   fallback: DiagnosisFallback;
   metadata?: DiagnosisMetadata;
 }
@@ -203,6 +205,12 @@ const diagnosisQuestionCopyByDimension: Record<string, Required<Pick<DiagnosisQu
 
 function normalizeDimensionKey(dimension: string) {
   return dimension.trim().replace(/[\s-]+/g, '_').toUpperCase();
+}
+
+/** 是否与当前学习目标直接相关的题目维度（用于 UI 轻量强化） */
+const TOPIC_RELATED_DIMENSIONS = new Set(['TOPIC_CORE', 'TOPIC_OPERATION', 'TOPIC_CONCEPT', 'TOPIC_OPERATION_RISK', 'TOPIC_CONCEPT_CLARITY']);
+export function isTopicRelatedDimension(dimension: string): boolean {
+  return TOPIC_RELATED_DIMENSIONS.has(normalizeDimensionKey(dimension));
 }
 
 export function resolveDiagnosisQuestionCopy(question: DiagnosisQuestion) {
