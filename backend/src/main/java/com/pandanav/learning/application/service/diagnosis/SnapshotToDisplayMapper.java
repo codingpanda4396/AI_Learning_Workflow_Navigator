@@ -41,7 +41,7 @@ public class SnapshotToDisplayMapper {
 
         return new CapabilityProfileDto(
             currentLevel,
-            strengths.isEmpty() ? List.of("目标与起点已明确，将据此安排学习节奏。") : strengths,
+            strengths.isEmpty() ? List.of("已根据你的选择确定起点与目标，将据此安排学习节奏。") : strengths,
             weaknesses.isEmpty() ? List.of("将在后续训练中继续定位薄弱点。") : weaknesses,
             learningPreference,
             timeBudgetDto,
@@ -49,23 +49,39 @@ public class SnapshotToDisplayMapper {
         );
     }
 
+    /** 从用户回答提炼对学习有帮助的真实优势，避免空泛表述。 */
     private static List<String> deriveStrengths(LearnerProfileStructuredSnapshotDto snapshot) {
         List<String> out = new ArrayList<>();
         String foundation = nullToEmpty(snapshot.foundationLevel());
         String goalType = nullToEmpty(snapshot.goalType());
         String practice = nullToEmpty(snapshot.practiceLevel());
-        if ("ADVANCED".equals(foundation)) {
+        String preference = nullToEmpty(snapshot.learningPreference());
+        String timeBudget = nullToEmpty(snapshot.timeBudget());
+        if ("ADVANCED".equals(foundation) || "PROFICIENT".equals(foundation)) {
             out.add("基础相对扎实，可以更快进入综合应用。");
         }
         if ("MANY".equals(practice) && !"BEGINNER".equals(foundation)) {
             out.add("已有较多练习或实际使用经验，适合结合案例推进。");
         }
         if (!goalType.isBlank()) {
-            out.add("学习目标明确，便于安排个性化内容。");
+            if ("INTERVIEW".equals(goalType) || "EXAM".equals(goalType)) {
+                out.add("目标清晰（面试/考试导向），便于安排针对性训练。");
+            } else if ("PROJECT".equals(goalType)) {
+                out.add("以项目或实践为导向，适合按场景推进。");
+            } else {
+                out.add("学习目标明确，便于安排个性化内容。");
+            }
+        }
+        if (!preference.isBlank()) {
+            out.add("已选择学习偏好，后续讲解与练习会按此调整。");
+        }
+        if (!timeBudget.isBlank() && !"SHORT_10".equals(timeBudget)) {
+            out.add("时间投入较充足，可支持更完整的学习节奏。");
         }
         return out;
     }
 
+    /** 与风险标签联动、具体可感，不制造焦虑。 */
     private static List<String> deriveWeaknesses(LearnerProfileStructuredSnapshotDto snapshot) {
         List<String> out = new ArrayList<>();
         List<String> riskTags = snapshot.riskTags();
@@ -83,15 +99,19 @@ public class SnapshotToDisplayMapper {
         }
         if (riskTags != null) {
             for (String tag : riskTags) {
-                if ("FOUNDATION_GAP".equals(tag) && !out.stream().anyMatch(s -> s.contains("基础"))) {
+                if ("FOUNDATION_GAP".equals(tag) && out.stream().noneMatch(s -> s.contains("基础"))) {
                     continue;
                 }
-                if ("TRANSFER_WEAKNESS".equals(tag)) {
-                    out.add("变形与迁移还不稳定，需要针对性巩固。");
-                } else if ("EXPRESSION_WEAKNESS".equals(tag)) {
-                    out.add("表达与归纳还需加强。");
-                } else if ("INTERVIEW_FOUNDATION_RISK".equals(tag)) {
-                    out.add("面试目标下基础尚需扎牢，建议先稳核心再刷题。");
+                switch (tag) {
+                    case "TRANSFER_WEAKNESS" -> out.add("变形与迁移还不稳定，需要针对性巩固。");
+                    case "EXPRESSION_WEAKNESS" -> out.add("表达与归纳还需加强。");
+                    case "INTERVIEW_FOUNDATION_RISK" -> out.add("面试目标下基础尚需扎牢，建议先稳核心再刷题。");
+                    case "PROCESS_CONFUSION" -> out.add("操作步骤容易混淆，需要先理清流程再练。");
+                    case "INDEPENDENT_SOLVING_WEAKNESS" -> out.add("独立解题还不足，会多安排从模仿到独立的练习。");
+                    case "EXAM_ORIENTED_SURFACE_LEARNING_RISK" -> out.add("考试导向下建议先稳概念再刷题，避免只记套路。");
+                    case "CONCEPT_NOT_STABLE" -> out.add("核心概念还不稳，建议先巩固定义与结构。");
+                    case "BOUNDARY_WEAKNESS" -> out.add("边界与特殊情况容易出错，后续会加强这类练习。");
+                    default -> { }
                 }
             }
         }

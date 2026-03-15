@@ -74,7 +74,7 @@ public class PreviewDisplayCodeMapper {
         };
     }
 
-    /** riskTags 中文展示（与 snapshot.riskTags 一致）. */
+    /** riskTags 中文展示（与 snapshot.riskTags 一致，preview 强约束输入源）. */
     public String riskFlagLabel(String code) {
         return switch (normalize(code)) {
             case "FOUNDATION_GAP" -> "基础仍需补齐";
@@ -82,7 +82,30 @@ public class PreviewDisplayCodeMapper {
             case "EXPRESSION_WEAKNESS" -> "会做但表达不清";
             case "BOUNDARY_WEAKNESS" -> "边界条件容易错";
             case "INTERVIEW_FOUNDATION_RISK" -> "面试目标但基础尚不稳";
+            case "PROCESS_CONFUSION" -> "操作步骤容易混淆";
+            case "INDEPENDENT_SOLVING_WEAKNESS" -> "独立解题还不足";
+            case "EXAM_ORIENTED_SURFACE_LEARNING_RISK" -> "考试导向下需先稳概念";
+            case "CONCEPT_NOT_STABLE" -> "核心概念还不稳";
             default -> code != null && !code.isBlank() ? code : "";
+        };
+    }
+
+    /** 节奏/任务粒度展示，与 submissions planExplanation 一致. */
+    public String paceLabel(String code) {
+        return switch (normalize(code)) {
+            case "FAST" -> "节奏稍快";
+            case "DEEP" -> "节奏稍慢、把每一步走稳";
+            case "NORMAL" -> "常规节奏";
+            default -> "";
+        };
+    }
+
+    public String taskGranularityLabel(String code) {
+        return switch (normalize(code)) {
+            case "SMALL" -> "小步拆解";
+            case "MEDIUM" -> "中等步长";
+            case "LARGE" -> "较大单元";
+            default -> "";
         };
     }
 

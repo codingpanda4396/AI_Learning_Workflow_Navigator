@@ -113,3 +113,4 @@ public class DefaultTopicQuestionBank implements TopicQuestionBank {
         return g.contains("排序") || g.contains("查找") || g.contains("搜索")
             || "排序".equals(topic) || "哈希表".equals(topic);
     }
+}

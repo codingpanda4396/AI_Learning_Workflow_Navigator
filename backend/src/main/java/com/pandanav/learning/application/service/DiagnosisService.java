@@ -50,6 +50,7 @@ import com.pandanav.learning.domain.repository.LearnerFeatureSignalRepository;
 import com.pandanav.learning.domain.repository.LearnerProfileSnapshotRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.application.service.diagnosis.DiagnosisProfileDerivationService;
+import com.pandanav.learning.application.service.diagnosis.PlanExplanationDisplayHelper;
 import com.pandanav.learning.application.service.diagnosis.SnapshotToDisplayMapper;
 import com.pandanav.learning.application.service.diagnosis.StructuredDiagnosisQuestionFactory;
 import com.pandanav.learning.domain.service.CapabilityProfileBuilder;
@@ -363,6 +364,8 @@ public class DiagnosisService {
             savedSnapshot.getId()
         );
 
+        Map<String, Object> featureSummaryForResponse = sanitizeFeatureSummaryForResponse(savedSnapshot.getFeatureSummary());
+
         return new SubmitDiagnosisSessionResponse(
             diagnosisSession.getId(),
             learningSession.getId(),
@@ -371,7 +374,7 @@ public class DiagnosisService {
             new DiagnosisInsightsDto(
                 insightsSummary,
                 planExplanation,
-                savedSnapshot.getFeatureSummary(),
+                featureSummaryForResponse,
                 savedSnapshot.getStrategyHints(),
                 savedSnapshot.getConstraints()
             ),
@@ -389,19 +392,29 @@ public class DiagnosisService {
         return s == null ? "" : s.trim();
     }
 
-    /** 从 snapshot 推导 planExplanation，与 planHints / riskTags / foundationLevel / primaryBlocker 一致。 */
+    /** 无真实 feature 时不返回空结构，保证输出为成熟画像。 */
+    private static Map<String, Object> sanitizeFeatureSummaryForResponse(Map<String, Object> featureSummary) {
+        if (featureSummary == null) return null;
+        Object features = featureSummary.get("features");
+        if (features instanceof List<?> list && list.isEmpty()) return null;
+        return featureSummary;
+    }
+
+    /** 从 snapshot 推导 planExplanation，仅输出用户可见文案，不输出内部策略码。 */
     private String buildPlanExplanationFromSnapshot(LearnerProfileStructuredSnapshotDto snapshot) {
         if (snapshot == null) return "";
         String foundation = nullToEmpty(snapshot.foundationLevel());
         String blocker = nullToEmpty(snapshot.primaryBlocker());
-        String goalType = nullToEmpty(snapshot.goalType());
         LearnerProfileStructuredSnapshotDto.PlanHintsDto hints = snapshot.planHints();
         List<String> riskTags = snapshot.riskTags();
         StringBuilder sb = new StringBuilder();
         if (hints != null) {
-            sb.append("入口方式：").append(hints.entryMode() != null ? hints.entryMode() : "FOUNDATION_FIRST");
-            if (hints.pace() != null) sb.append("，节奏：").append(hints.pace());
-            if (hints.taskGranularity() != null) sb.append("，任务粒度：").append(hints.taskGranularity());
+            String entry = PlanExplanationDisplayHelper.entryModeToLabel(hints.entryMode());
+            sb.append("入口方式：").append(entry);
+            String pace = PlanExplanationDisplayHelper.paceToLabel(hints.pace());
+            if (!pace.isBlank()) sb.append("，节奏：").append(pace);
+            String gran = PlanExplanationDisplayHelper.taskGranularityToLabel(hints.taskGranularity());
+            if (!gran.isBlank()) sb.append("，任务粒度：").append(gran);
             sb.append("。");
         }
         if ("BEGINNER".equals(foundation)) {
@@ -410,8 +423,9 @@ public class DiagnosisService {
         if ("FOLLOW_BUT_CANNOT_DO".equals(blocker)) {
             sb.append(" 会优先用示例带你建立操作过程。");
         }
-        if (riskTags != null && !riskTags.isEmpty()) {
-            sb.append(" 已标记风险：").append(String.join("、", riskTags)).append("，规划时会考虑。");
+        List<String> riskLabels = PlanExplanationDisplayHelper.riskTagsToLabels(riskTags);
+        if (!riskLabels.isEmpty()) {
+            sb.append(" 已标记：").append(String.join("、", riskLabels)).append("，规划时会考虑。");
         }
         if (sb.length() == 0) {
             sb.append("根据你的选择，系统会据此安排下一步学习节奏。");

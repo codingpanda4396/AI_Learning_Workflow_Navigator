@@ -255,14 +255,26 @@ public class DiagnosisExplanationAssembler {
         String foundation = nullToEmpty(snapshot.foundationLevel());
         String practice = nullToEmpty(snapshot.practiceLevel());
         String goalType = nullToEmpty(snapshot.goalType());
-        if ("ADVANCED".equals(foundation)) {
+        String preference = nullToEmpty(snapshot.learningPreference());
+        String timeBudget = nullToEmpty(snapshot.timeBudget());
+        if ("ADVANCED".equals(foundation) || "PROFICIENT".equals(foundation)) {
             out.add(new EvidenceItem(DiagnosisDimension.FOUNDATION, "基础相对扎实，可以更快进入综合应用。"));
         }
         if ("MANY".equals(practice) && !"BEGINNER".equals(foundation)) {
             out.add(new EvidenceItem(DiagnosisDimension.PRACTICE, "已有较多练习或实际使用经验，适合结合案例推进。"));
         }
-        if (!goalType.isBlank()) {
+        if ("INTERVIEW".equals(goalType) || "EXAM".equals(goalType)) {
+            out.add(new EvidenceItem(DiagnosisDimension.GOAL, "目标清晰（面试/考试导向），便于安排针对性训练。"));
+        } else if ("PROJECT".equals(goalType)) {
+            out.add(new EvidenceItem(DiagnosisDimension.GOAL, "以项目或实践为导向，适合按场景推进。"));
+        } else if (!goalType.isBlank()) {
             out.add(new EvidenceItem(DiagnosisDimension.GOAL, "学习目标明确，便于安排个性化内容。"));
+        }
+        if (!preference.isBlank()) {
+            out.add(new EvidenceItem(DiagnosisDimension.PREFERENCE, "已选择学习偏好，后续讲解与练习会按此调整。"));
+        }
+        if (!timeBudget.isBlank() && !"SHORT_10".equals(timeBudget)) {
+            out.add(new EvidenceItem(DiagnosisDimension.TIME_BUDGET, "时间投入较充足，可支持更完整的学习节奏。"));
         }
         return out;
     }
@@ -291,6 +303,21 @@ public class DiagnosisExplanationAssembler {
             }
             if (riskTags.contains("INTERVIEW_FOUNDATION_RISK")) {
                 out.add(new EvidenceItem(DiagnosisDimension.FOUNDATION, "面试目标下基础尚需扎牢，建议先稳核心再刷题。"));
+            }
+            if (riskTags.contains("PROCESS_CONFUSION")) {
+                out.add(new EvidenceItem(DiagnosisDimension.TOPIC_OPERATION, "操作步骤容易混淆，需要先理清流程再练。"));
+            }
+            if (riskTags.contains("INDEPENDENT_SOLVING_WEAKNESS")) {
+                out.add(new EvidenceItem(DiagnosisDimension.BLOCKER, "独立解题还不足，会多安排从模仿到独立的练习。"));
+            }
+            if (riskTags.contains("EXAM_ORIENTED_SURFACE_LEARNING_RISK")) {
+                out.add(new EvidenceItem(DiagnosisDimension.GOAL, "考试导向下建议先稳概念再刷题，避免只记套路。"));
+            }
+            if (riskTags.contains("CONCEPT_NOT_STABLE")) {
+                out.add(new EvidenceItem(DiagnosisDimension.FOUNDATION, "核心概念还不稳，建议先巩固定义与结构。"));
+            }
+            if (riskTags.contains("BOUNDARY_WEAKNESS")) {
+                out.add(new EvidenceItem(DiagnosisDimension.TOPIC_OPERATION, "边界与特殊情况容易出错，后续会加强这类练习。"));
             }
         }
         return out;

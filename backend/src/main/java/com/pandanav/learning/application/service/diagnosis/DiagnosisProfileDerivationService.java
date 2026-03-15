@@ -8,8 +8,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 /**
  * 从诊断答案推导结构化 learnerProfileSnapshot（riskTags、planHints、summary），规则实现，不调用 LLM。
@@ -29,7 +27,9 @@ public class DiagnosisProfileDerivationService {
         String topicConceptClarity = get(answerByQuestionId, StructuredDiagnosisQuestionFactory.Q_TOPIC_CORE);
         String topicOperationRisk = get(answerByQuestionId, StructuredDiagnosisQuestionFactory.Q_TOPIC_OPERATION);
 
-        List<String> riskTags = deriveRiskTags(foundationLevel, primaryBlocker, goalType, topicOperationRisk);
+        List<String> riskTags = deriveRiskTags(
+            foundationLevel, primaryBlocker, goalType, topicOperationRisk, topicConceptClarity
+        );
         PlanHintsDto planHints = derivePlanHints(
             foundationLevel, primaryBlocker, learningPreference, timeBudget, goalType
         );
@@ -60,29 +60,45 @@ public class DiagnosisProfileDerivationService {
         return v == null ? "" : v.trim();
     }
 
+    /** 风险标签均来源于答题信号，数量控制在 1~3 个，按优先级保留。 */
     private static List<String> deriveRiskTags(
         String foundationLevel,
         String primaryBlocker,
         String goalType,
-        String topicOperationRisk
+        String topicOperationRisk,
+        String topicConceptClarity
     ) {
-        Set<String> tags = new TreeSet<>();
+        List<String> ordered = new ArrayList<>();
+        if ("BEGINNER".equals(foundationLevel)) {
+            ordered.add("FOUNDATION_GAP");
+        }
+        if ("CONCEPT_CONFUSION".equals(primaryBlocker) || "NOT_CLEAR".equals(topicConceptClarity) || "PARTLY_CLEAR".equals(topicConceptClarity)) {
+            if (!ordered.contains("CONCEPT_NOT_STABLE")) {
+                ordered.add("CONCEPT_NOT_STABLE");
+            }
+        }
+        if ("PROCESS_CONFUSION".equals(topicOperationRisk)) {
+            ordered.add("PROCESS_CONFUSION");
+        }
+        if ("FOLLOW_BUT_CANNOT_DO".equals(primaryBlocker)) {
+            ordered.add("INDEPENDENT_SOLVING_WEAKNESS");
+        }
         if ("BASIC_OK_BUT_FAIL_ON_VARIATION".equals(primaryBlocker)) {
-            tags.add("TRANSFER_WEAKNESS");
+            ordered.add("TRANSFER_WEAKNESS");
         }
         if ("CAN_DO_BUT_CANNOT_EXPLAIN".equals(primaryBlocker)) {
-            tags.add("EXPRESSION_WEAKNESS");
+            ordered.add("EXPRESSION_WEAKNESS");
         }
         if ("BOUNDARY_WEAKNESS".equals(topicOperationRisk)) {
-            tags.add("BOUNDARY_WEAKNESS");
-        }
-        if ("BEGINNER".equals(foundationLevel)) {
-            tags.add("FOUNDATION_GAP");
+            ordered.add("BOUNDARY_WEAKNESS");
         }
         if ("INTERVIEW".equals(goalType) && ("BEGINNER".equals(foundationLevel) || "BASIC".equals(foundationLevel))) {
-            tags.add("INTERVIEW_FOUNDATION_RISK");
+            ordered.add("INTERVIEW_FOUNDATION_RISK");
         }
-        return new ArrayList<>(tags);
+        if ("EXAM".equals(goalType) && ("BEGINNER".equals(foundationLevel) || "BASIC".equals(foundationLevel) || "NOT_CLEAR".equals(topicConceptClarity) || "PARTLY_CLEAR".equals(topicConceptClarity))) {
+            ordered.add("EXAM_ORIENTED_SURFACE_LEARNING_RISK");
+        }
+        return ordered.size() > 3 ? ordered.subList(0, 3) : ordered;
     }
 
     private static PlanHintsDto derivePlanHints(
