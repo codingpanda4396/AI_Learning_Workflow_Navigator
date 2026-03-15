@@ -15,6 +15,10 @@ import com.pandanav.learning.api.dto.diagnosis.DiagnosisInsightsDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisMetadataDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisNextActionDto;
 import com.pandanav.learning.api.dto.diagnosis.DiagnosisQuestionDto;
+import com.pandanav.learning.api.dto.diagnosis.DiagnosisStrategyDto;
+import com.pandanav.learning.api.dto.diagnosis.LearnerSnapshotDto;
+import com.pandanav.learning.api.dto.diagnosis.PersonalizationMetaDto;
+import com.pandanav.learning.api.dto.diagnosis.QuestionRationaleDto;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionRequest;
 import com.pandanav.learning.api.dto.diagnosis.SubmitDiagnosisSessionResponse;
 import com.pandanav.learning.domain.enums.DiagnosisDimension;
@@ -24,11 +28,15 @@ import com.pandanav.learning.domain.model.CapabilityProfile;
 import com.pandanav.learning.domain.model.CapabilityProfileDraft;
 import com.pandanav.learning.domain.model.CapabilityProfileSummaryCopy;
 import com.pandanav.learning.domain.model.DiagnosisAnswer;
+import com.pandanav.learning.domain.model.DiagnosisLearnerProfileSnapshot;
 import com.pandanav.learning.domain.model.DiagnosisQuestion;
+import com.pandanav.learning.domain.model.DiagnosisQuestionCandidate;
+import com.pandanav.learning.domain.model.DiagnosisQuestionDraft;
 import com.pandanav.learning.domain.model.DiagnosisQuestionCopy;
 import com.pandanav.learning.domain.model.DiagnosisQuestionOption;
 import com.pandanav.learning.domain.model.DiagnosisSignal;
 import com.pandanav.learning.domain.model.DiagnosisSession;
+import com.pandanav.learning.domain.model.DiagnosisStrategyDecision;
 import com.pandanav.learning.domain.model.LearnerFeatureSignal;
 import com.pandanav.learning.domain.model.LearnerProfileSnapshot;
 import com.pandanav.learning.domain.model.LearningSession;
@@ -74,6 +82,13 @@ public class DiagnosisService {
     private final DiagnosisQuestionPersonalizer diagnosisQuestionPersonalizer;
     private final DiagnosisQuestionCopyNormalizer diagnosisQuestionCopyNormalizer;
     private final DiagnosisExplanationBuilder diagnosisExplanationBuilder;
+    private final DiagnosisLearnerProfileBuilder diagnosisLearnerProfileBuilder;
+    private final DiagnosisStrategyDecisionService diagnosisStrategyDecisionService;
+    private final DiagnosisQuestionCandidateFactory diagnosisQuestionCandidateFactory;
+    private final PersonalizedQuestionSelector personalizedQuestionSelector;
+    private final DiagnosisQuestionCopyAdapter diagnosisQuestionCopyAdapter;
+    private final QuestionRationaleBuilder questionRationaleBuilder;
+    private final DiagnosisResponseAssembler diagnosisResponseAssembler;
     private final CapabilityProfileBuilder capabilityProfileBuilder;
     private final DiagnosisExplanationAssembler diagnosisExplanationAssembler;
     private final CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService;
@@ -97,6 +112,13 @@ public class DiagnosisService {
         DiagnosisQuestionPersonalizer diagnosisQuestionPersonalizer,
         DiagnosisQuestionCopyNormalizer diagnosisQuestionCopyNormalizer,
         DiagnosisExplanationBuilder diagnosisExplanationBuilder,
+        DiagnosisLearnerProfileBuilder diagnosisLearnerProfileBuilder,
+        DiagnosisStrategyDecisionService diagnosisStrategyDecisionService,
+        DiagnosisQuestionCandidateFactory diagnosisQuestionCandidateFactory,
+        PersonalizedQuestionSelector personalizedQuestionSelector,
+        DiagnosisQuestionCopyAdapter diagnosisQuestionCopyAdapter,
+        QuestionRationaleBuilder questionRationaleBuilder,
+        DiagnosisResponseAssembler diagnosisResponseAssembler,
         CapabilityProfileBuilder capabilityProfileBuilder,
         DiagnosisExplanationAssembler diagnosisExplanationAssembler,
         CapabilityProfileSummaryLlmService capabilityProfileSummaryLlmService,
@@ -119,6 +141,13 @@ public class DiagnosisService {
         this.diagnosisQuestionPersonalizer = diagnosisQuestionPersonalizer;
         this.diagnosisQuestionCopyNormalizer = diagnosisQuestionCopyNormalizer;
         this.diagnosisExplanationBuilder = diagnosisExplanationBuilder;
+        this.diagnosisLearnerProfileBuilder = diagnosisLearnerProfileBuilder;
+        this.diagnosisStrategyDecisionService = diagnosisStrategyDecisionService;
+        this.diagnosisQuestionCandidateFactory = diagnosisQuestionCandidateFactory;
+        this.personalizedQuestionSelector = personalizedQuestionSelector;
+        this.diagnosisQuestionCopyAdapter = diagnosisQuestionCopyAdapter;
+        this.questionRationaleBuilder = questionRationaleBuilder;
+        this.diagnosisResponseAssembler = diagnosisResponseAssembler;
         this.capabilityProfileBuilder = capabilityProfileBuilder;
         this.diagnosisExplanationAssembler = diagnosisExplanationAssembler;
         this.capabilityProfileSummaryLlmService = capabilityProfileSummaryLlmService;
@@ -136,6 +165,8 @@ public class DiagnosisService {
         LearningSession session = sessionRepository.findByIdAndUserPk(sessionId, userId)
             .orElseThrow(() -> new NotFoundException("Learning session not found."));
         PlanningContext planningContext = buildPlanningContext(session);
+        DiagnosisLearnerProfileSnapshot profileSnapshot = diagnosisLearnerProfileBuilder.build(session, planningContext);
+        DiagnosisStrategyDecision strategyDecision = diagnosisStrategyDecisionService.decide(session, planningContext, profileSnapshot);
         String topic = resolveTopic(planningContext);
         log.info(
             "DIAGNOSIS_GENERATION_START traceId={} sessionId={} generationMode={} questionCount={} topic={}",
@@ -146,8 +177,13 @@ public class DiagnosisService {
             topic
         );
 
-        List<DiagnosisQuestion> baseQuestions = diagnosisTemplateFactory.buildQuestions(session);
-        List<DiagnosisQuestion> assembledQuestions = diagnosisQuestionAssembler.assemble(session, baseQuestions);
+        List<DiagnosisQuestionCandidate> candidates =
+            diagnosisQuestionCandidateFactory.buildCandidates(session, planningContext);
+        List<DiagnosisQuestionDraft> selectedDrafts =
+            personalizedQuestionSelector.select(candidates, strategyDecision, profileSnapshot);
+        List<DiagnosisQuestion> adaptedQuestions =
+            diagnosisQuestionCopyAdapter.adapt(selectedDrafts, planningContext, profileSnapshot, strategyDecision);
+        List<DiagnosisQuestion> assembledQuestions = diagnosisQuestionAssembler.assemble(session, adaptedQuestions);
         DiagnosisGenerationMode generationMode = DiagnosisGenerationMode.LLM;
         boolean fallbackApplied = false;
         List<String> fallbackReasons = List.of();
@@ -166,7 +202,6 @@ public class DiagnosisService {
             fallbackReasons = List.of(resolveFailureReason(ex, "LLM_DIAGNOSIS_COPY_UNAVAILABLE"));
             questions = assembledQuestions;
         }
-        questions = diagnosisQuestionPersonalizer.personalize(questions, planningContext);
         questions = diagnosisQuestionCopyNormalizer.normalize(questions);
 
         DiagnosisSession diagnosisSession = new DiagnosisSession();
@@ -177,8 +212,14 @@ public class DiagnosisService {
         diagnosisSession.setStartedAt(OffsetDateTime.now());
 
         DiagnosisSession saved = diagnosisSessionRepository.save(diagnosisSession);
-        DiagnosisExplanationDto diagnosisExplanation = diagnosisExplanationBuilder.build(planningContext);
-        DiagnosisDecisionHintsDto decisionHints = buildDecisionHints();
+        DiagnosisExplanationDto diagnosisExplanation = diagnosisExplanationBuilder.build(
+            planningContext, profileSnapshot, strategyDecision, questions);
+        DiagnosisDecisionHintsDto decisionHints = buildDecisionHints(strategyDecision, profileSnapshot);
+        LearnerSnapshotDto learnerSnapshotDto = buildLearnerSnapshotDto(profileSnapshot, planningContext);
+        DiagnosisStrategyDto diagnosisStrategyDto = buildDiagnosisStrategyDto(strategyDecision);
+        List<QuestionRationaleDto> questionRationales =
+            questionRationaleBuilder.build(selectedDrafts, profileSnapshot, strategyDecision);
+        PersonalizationMetaDto personalizationMeta = buildPersonalizationMetaDto(profileSnapshot, strategyDecision);
         log.info(
             "DIAGNOSIS_GENERATION_RESULT traceId={} sessionId={} generationMode={} questionCount={} topic={}",
             TraceContext.traceId(),
@@ -187,7 +228,7 @@ public class DiagnosisService {
             questions.size(),
             topic
         );
-        return new CreateDiagnosisSessionResponse(
+        return diagnosisResponseAssembler.assemble(
             saved.getId(),
             session.getId(),
             DiagnosisStatus.READY.name(),
@@ -197,7 +238,11 @@ public class DiagnosisService {
             buildNextAction(session.getId(), saved.getId()),
             decisionHints,
             sourceMeta(fallbackApplied, fallbackReasons, generationMode.name()),
-            new DiagnosisMetadataDto(questions.size(), null, null)
+            new DiagnosisMetadataDto(questions.size(), null, null),
+            learnerSnapshotDto,
+            diagnosisStrategyDto,
+            questionRationales,
+            personalizationMeta
         );
     }
 
@@ -333,8 +378,126 @@ public class DiagnosisService {
         return new DiagnosisFallbackDto(applied, reasons == null ? List.of() : reasons, contentSource);
     }
 
-    private DiagnosisDecisionHintsDto buildDecisionHints() {
-        return new DiagnosisDecisionHintsDto(List.of("FOUNDATION_LEVEL", "TIME_BUDGET", "GOAL_STYLE"));
+    private DiagnosisDecisionHintsDto buildDecisionHints(
+        DiagnosisStrategyDecision strategyDecision,
+        DiagnosisLearnerProfileSnapshot profileSnapshot
+    ) {
+        List<String> factors = new ArrayList<>();
+        if (strategyDecision != null && strategyDecision.priorityDimensions() != null) {
+            for (String dim : strategyDecision.priorityDimensions()) {
+                String hint = switch (dim) {
+                    case "FOUNDATION" -> "FOUNDATION_LEVEL";
+                    case "TIME_BUDGET" -> "TIME_BUDGET";
+                    case "GOAL_STYLE" -> "GOAL_STYLE";
+                    case "LEARNING_PREFERENCE" -> "LEARNING_PREFERENCE";
+                    case "EXPERIENCE" -> "EXPERIENCE";
+                    case "DIFFICULTY_PAIN_POINT" -> "DIFFICULTY_PAIN_POINT";
+                    default -> dim;
+                };
+                if (!factors.contains(hint)) {
+                    factors.add(hint);
+                }
+            }
+        }
+        if (factors.isEmpty()) {
+            factors.add("FOUNDATION_LEVEL");
+            factors.add("TIME_BUDGET");
+            factors.add("GOAL_STYLE");
+        }
+        return new DiagnosisDecisionHintsDto(factors);
+    }
+
+    private LearnerSnapshotDto buildLearnerSnapshotDto(
+        DiagnosisLearnerProfileSnapshot profile,
+        PlanningContext planningContext
+    ) {
+        String topic = resolveTopic(planningContext);
+        String summary = buildLearnerSnapshotSummary(profile, topic);
+        List<String> signals = new ArrayList<>(profile.evidence() != null ? profile.evidence() : List.of());
+        List<String> riskTags = new ArrayList<>();
+        if (profile.hasContradictionRisk()) {
+            riskTags.add("CONTRADICTION_RISK");
+        }
+        if (profile.hasRecentFailures()) {
+            riskTags.add("RECENT_FAILURES");
+        }
+        if (profile.weaknessTags() != null && !profile.weaknessTags().isEmpty()) {
+            riskTags.addAll(profile.weaknessTags());
+        }
+        return new LearnerSnapshotDto(summary, signals, riskTags);
+    }
+
+    private String buildLearnerSnapshotSummary(DiagnosisLearnerProfileSnapshot profile, String topic) {
+        if (profile.goalClarity() != null && "HIGH".equals(profile.goalClarity())) {
+            if (topic != null && !topic.isBlank()) {
+                return "你当前目标比较明确，系统会重点确认你在「" + topic + "」上的前置基础与投入边界是否匹配。";
+            }
+            return "你当前目标比较明确，系统会重点确认前置基础与投入边界是否匹配。";
+        }
+        if (profile.evidence() == null || profile.evidence().isEmpty()) {
+            return "当前学习数据较少，系统会通过以下问题先确认你的起点与目标。";
+        }
+        return "系统将根据你的目标与主题，确认学习起点并据此规划路径。";
+    }
+
+    private DiagnosisStrategyDto buildDiagnosisStrategyDto(DiagnosisStrategyDecision strategy) {
+        if (strategy == null) {
+            return new DiagnosisStrategyDto("FOUNDATION_FIRST", "先确认起点，再决定后续规划", List.of("前置基础", "时间投入", "学习目标"));
+        }
+        String label = resolveStrategyLabel(strategy.strategyCode());
+        List<String> focuses = new ArrayList<>();
+        if (strategy.priorityDimensions() != null) {
+            for (String d : strategy.priorityDimensions()) {
+                focuses.add(dimensionToFocusLabel(d));
+            }
+        }
+        if (focuses.isEmpty()) {
+            focuses.add("前置基础");
+            focuses.add("时间投入");
+            focuses.add("学习目标");
+        }
+        return new DiagnosisStrategyDto(strategy.strategyCode(), label, focuses);
+    }
+
+    private String resolveStrategyLabel(String code) {
+        if (code == null) return "先确认起点，再决定后续规划";
+        return switch (code) {
+            case DiagnosisStrategyDecisionService.STRATEGY_FOUNDATION_FIRST -> "先确认起点，再决定是否直接进入目标内容";
+            case DiagnosisStrategyDecisionService.STRATEGY_CONFLICT_CHECK -> "优先核实目标与基础是否匹配，避免冲突";
+            case DiagnosisStrategyDecisionService.STRATEGY_FAST_TRIAGE -> "精简题量，快速定档后开始学习";
+            default -> "先确认起点，再决定后续规划";
+        };
+    }
+
+    private String dimensionToFocusLabel(String dimension) {
+        if (dimension == null) return "";
+        return switch (dimension) {
+            case "FOUNDATION" -> "前置基础";
+            case "TIME_BUDGET" -> "时间投入";
+            case "GOAL_STYLE" -> "学习目标";
+            case "LEARNING_PREFERENCE" -> "学习偏好";
+            case "EXPERIENCE" -> "过往经验";
+            case "DIFFICULTY_PAIN_POINT" -> "难点与支持";
+            default -> dimension;
+        };
+    }
+
+    private PersonalizationMetaDto buildPersonalizationMetaDto(
+        DiagnosisLearnerProfileSnapshot profile,
+        DiagnosisStrategyDecision strategy
+    ) {
+        List<String> usedSignals = new ArrayList<>();
+        if (profile.evidence() != null && !profile.evidence().isEmpty()) {
+            usedSignals.add("goalText");
+            usedSignals.add("chapterId");
+        }
+        if (profile.hasHistory()) usedSignals.add("historyAvailable");
+        if (profile.weaknessTags() != null && !profile.weaknessTags().isEmpty()) {
+            usedSignals.add("recentWeaknessTags");
+        }
+        String level = usedSignals.size() >= 2 || (strategy != null && strategy.personalizationReasons() != null && !strategy.personalizationReasons().isEmpty())
+            ? "HIGH" : "MEDIUM";
+        return new PersonalizationMetaDto(level, usedSignals, "PROFILE_DRIVEN");
     }
 
     private PlanningContext buildPlanningContext(LearningSession session) {

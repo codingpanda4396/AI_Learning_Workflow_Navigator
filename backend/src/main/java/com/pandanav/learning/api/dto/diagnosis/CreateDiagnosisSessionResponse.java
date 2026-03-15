@@ -24,6 +24,14 @@ public record CreateDiagnosisSessionResponse(
     @JsonProperty("fallback")
     DiagnosisFallbackDto fallback,
     @JsonProperty("metadata")
-    DiagnosisMetadataDto metadata
+    DiagnosisMetadataDto metadata,
+    @JsonProperty("learnerSnapshot")
+    LearnerSnapshotDto learnerSnapshot,
+    @JsonProperty("diagnosisStrategy")
+    DiagnosisStrategyDto diagnosisStrategy,
+    @JsonProperty("questionRationales")
+    List<QuestionRationaleDto> questionRationales,
+    @JsonProperty("personalizationMeta")
+    PersonalizationMetaDto personalizationMeta
 ) {
 }
