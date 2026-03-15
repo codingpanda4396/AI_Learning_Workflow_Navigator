@@ -58,10 +58,11 @@ public class SnapshotDrivenPreviewExplanationAssembler {
             levelPhrase, goalPhrase, entry, goalDesc.length() > 24 ? goalDesc.substring(0, 24) + "…" : goalDesc);
     }
 
+    /** 与 submissions 画像一致。 */
     private String levelPhrase(String level) {
         return switch (level) {
-            case "BEGINNER", "NONE", "WEAK" -> "基础起点较低";
-            case "BASIC" -> "有一定印象但还不稳";
+            case "BEGINNER", "NONE", "WEAK" -> "刚开始接触";
+            case "BASIC" -> "学过但还不太熟";
             case "INTERMEDIATE", "PARTIAL", "COURSEWORK" -> "基础尚可但需巩固";
             case "ADVANCED", "PROFICIENT", "STABLE" -> "基础较好";
             default -> "当前起点如画像所示";
@@ -110,23 +111,24 @@ public class SnapshotDrivenPreviewExplanationAssembler {
         return new LearningPlanPreviewResponse.PersonalizedSummaryResponse(title, description, tags);
     }
 
+    /** 与 submissions 画像一致：BEGINNER 对应起步/刚开始接触。 */
     private String summaryTitleFromSnapshot(String foundationLevel, String topicClarity, String topic) {
         if ("BEGINNER".equals(foundationLevel) || "NONE".equals(foundationLevel) || "WEAK".equals(foundationLevel)) {
             return "你当前还处在" + topic + "的起步阶段";
         }
         if ("BASIC".equals(foundationLevel) && "PARTLY_CLEAR".equals(topicClarity)) {
-            return "你已经有一些概念印象，但" + topic + "基础还不稳定";
+            return "你已有一些概念印象，但" + topic + "基础还不稳";
         }
         if ("BASIC".equals(foundationLevel)) {
-            return "你已经接触过" + topic + "，但基础还不稳定";
+            return "你学过但还不太熟，先稳一步" + topic + "再推进";
         }
         if ("INTERMEDIATE".equals(foundationLevel) || "PARTIAL".equals(foundationLevel)) {
-            return "你在" + topic + "上已有一定基础，可以开始更聚焦的训练";
+            return "你在" + topic + "上已有一定基础，可以更聚焦训练";
         }
         if ("ADVANCED".equals(foundationLevel) || "PROFICIENT".equals(foundationLevel)) {
-            return "你在" + topic + "上已有较好基础，可进入强化阶段";
+            return "你在" + topic + "上基础较好，可进入强化阶段";
         }
-        return "根据你的诊断，系统已识别你在" + topic + "的当前起点";
+        return "系统已根据诊断识别你在" + topic + "的当前起点";
     }
 
     private String summaryDescriptionFromSnapshot(LearnerProfileStructuredSnapshotDto snapshot, String goalText, String topic) {
@@ -163,6 +165,7 @@ public class SnapshotDrivenPreviewExplanationAssembler {
         return tags.stream().filter(t -> t != null && !t.isBlank()).distinct().limit(4).toList();
     }
 
+    /** 画像一律来自 snapshot；当前基础优先用 summary.currentState 与 submissions 一致，禁止「根据诊断结果安排」。 */
     public LearningPlanPreviewResponse.ExplanationPanelResponse buildExplanationPanel(
         LearnerProfileStructuredSnapshotDto snapshot,
         String expectedGain,
@@ -171,11 +174,13 @@ public class SnapshotDrivenPreviewExplanationAssembler {
         if (snapshot == null) {
             return null;
         }
-        String foundation = orEmpty(codeMapper.foundationLevel(n(snapshot.foundationLevel())), "根据诊断结果安排");
-        String blocker = orEmpty(codeMapper.primaryBlockerLabel(n(snapshot.primaryBlocker())), "根据诊断结果安排");
-        String preference = orEmpty(codeMapper.learningPreference(n(snapshot.learningPreference())), "根据诊断结果安排");
-        String goal = orEmpty(codeMapper.goalOrientation(n(snapshot.goalType())), "根据诊断结果安排");
-        String time = orEmpty(codeMapper.timeBudget(n(snapshot.timeBudget())), "根据诊断结果安排");
+        String foundation = snapshot.summary() != null && snapshot.summary().currentState() != null && !snapshot.summary().currentState().isBlank()
+            ? snapshot.summary().currentState().trim()
+            : orEmpty(codeMapper.foundationLevel(n(snapshot.foundationLevel())), "暂未识别");
+        String blocker = orEmpty(codeMapper.primaryBlockerLabel(n(snapshot.primaryBlocker())), "暂未识别");
+        String preference = orEmpty(codeMapper.learningPreference(n(snapshot.learningPreference())), "暂未识别");
+        String goal = orEmpty(codeMapper.goalOrientation(n(snapshot.goalType())), "暂未识别");
+        String time = orEmpty(codeMapper.timeBudget(n(snapshot.timeBudget())), "暂未识别");
 
         List<LearningPlanPreviewResponse.LearnerProfileItemResponse> learnerProfile = List.of(
             new LearningPlanPreviewResponse.LearnerProfileItemResponse("当前基础", foundation),
@@ -189,11 +194,12 @@ public class SnapshotDrivenPreviewExplanationAssembler {
         String systemDecision = expectedGain != null && !expectedGain.isBlank()
             ? expectedGain.trim()
             : (!conceptForDecision.isBlank()
-                ? "系统先安排一步" + conceptForDecision + "相关任务，与当前起点和目标一致，在练习中识别薄弱点。"
-                : "系统先安排一步与当前起点和目标一致的任务，在练习中识别薄弱点。");
+                ? "先安排一步" + conceptForDecision + "相关任务，与当前起点和目标一致。"
+                : "先安排一步与当前起点和目标一致的任务。");
         return new LearningPlanPreviewResponse.ExplanationPanelResponse(learnerProfile, systemDecision);
     }
 
+    /** 仅当有真实映射值时才加入对应理由，避免假个性化（如「更适合根据诊断结果安排」）。 */
     public LearningPlanPreviewResponse.PersonalizedReasonsResponse buildPersonalizedReasons(
         LearnerProfileStructuredSnapshotDto snapshot,
         String goalText,
@@ -208,17 +214,26 @@ public class SnapshotDrivenPreviewExplanationAssembler {
         if (topic.equals("当前主题")) {
             topic = recommendedEntryTitle != null && !recommendedEntryTitle.isBlank() ? recommendedEntryTitle.trim() : "当前知识点";
         }
-        String goal = orEmpty(codeMapper.goalOrientation(n(snapshot.goalType())), "根据诊断结果安排");
-        String pref = orEmpty(codeMapper.learningPreference(n(snapshot.learningPreference())), "根据诊断结果安排");
-        String budget = orEmpty(codeMapper.timeBudget(n(snapshot.timeBudget())), "根据诊断结果安排");
+        String goalLabel = codeMapper.goalOrientation(n(snapshot.goalType()));
+        String prefLabel = codeMapper.learningPreference(n(snapshot.learningPreference()));
+        String budgetLabel = codeMapper.timeBudget(n(snapshot.timeBudget()));
 
         LinkedHashSet<String> whyRecommended = new LinkedHashSet<>();
-        whyRecommended.add("你当前目标是" + goal + "，先稳住" + topic + "基础会更高效。");
-        whyRecommended.add("你的学习方式更适合" + pref + "，短任务更容易快速进入状态。");
-        if (estimatedMinutes != null && estimatedMinutes > 0) {
-            whyRecommended.add("你当前可投入" + budget + "，这一步约" + estimatedMinutes + "分钟，更容易坚持。");
-        } else {
-            whyRecommended.add("你当前可投入" + budget + "，节奏已做匹配。");
+        if (goalLabel != null && !goalLabel.isBlank()) {
+            whyRecommended.add("你当前目标是" + goalLabel + "，先稳住" + topic + "基础会更高效。");
+        }
+        if (prefLabel != null && !prefLabel.isBlank()) {
+            whyRecommended.add("你更适合" + prefLabel + "，这一步会按这个方式安排。");
+        }
+        if (budgetLabel != null && !budgetLabel.isBlank()) {
+            if (estimatedMinutes != null && estimatedMinutes > 0) {
+                whyRecommended.add("你当前可投入" + budgetLabel + "，这一步约" + estimatedMinutes + "分钟，节奏已匹配。");
+            } else {
+                whyRecommended.add("你当前可投入" + budgetLabel + "，节奏已做匹配。");
+            }
+        }
+        if (whyRecommended.isEmpty()) {
+            whyRecommended.add("先稳住" + topic + "基础，再推进后续目标。");
         }
 
         LinkedHashSet<String> whyStepFirst = new LinkedHashSet<>();
@@ -234,10 +249,10 @@ public class SnapshotDrivenPreviewExplanationAssembler {
         );
     }
 
-    /** 按主题区分，禁止图场景出现“插入、删除”等链表/线性结构用语。 */
+    /** 按主题区分；图/路径场景强调表示与路径直觉，避免直接进算法步骤。 */
     private String whyThisStepFirstSentence(String topic, String recommendedEntryTitle) {
         if (topic != null && (topic.contains("图") || topic.contains("路径"))) {
-            return topic + "的基础表示与路径概念是后续算法（如最短路径）的共同前提，先建立节点、边与路径的直观认识更稳。";
+            return "图的表示方式与路径概念是理解最短路径算法的共同前提；先建立节点、边和路径的直观认识，比直接进算法步骤更稳。";
         }
         if (topic != null && (topic.contains("树") || topic.contains("二叉树"))) {
             return topic + "的基础结构是后续遍历与递归应用的共同前提，先建立结构定义与基本操作更稳。";
@@ -285,12 +300,13 @@ public class SnapshotDrivenPreviewExplanationAssembler {
         return "先建立对" + (topic != null ? topic : "当前知识点") + "关键结构与基本概念的直观认识。";
     }
 
+    /** 用户可执行的动作短句，非策略标签。 */
     private List<String> taskCardTasks(String topic, String goalText) {
         List<String> tasks = new ArrayList<>();
         if (topic != null && (topic.contains("图") || topic.contains("路径"))) {
-            tasks.add("识别图中的节点、边和路径");
-            tasks.add("区分邻接矩阵与邻接表的基本含义");
-            tasks.add("用一个简单样例说明路径在图中的表示");
+            tasks.add("先用一个简单样例认清图中的节点、边和路径");
+            tasks.add("再区分邻接表和邻接矩阵各自表示什么");
+            tasks.add("最后用一条路径例子建立后续最短路径的直觉");
             return tasks;
         }
         if (topic != null && (topic.contains("树") || topic.contains("二叉树"))) {

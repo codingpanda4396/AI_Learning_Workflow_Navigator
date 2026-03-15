@@ -3,19 +3,24 @@ package com.pandanav.learning.application.service.learningplan;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 @Component
 public class PreviewDisplayCodeMapper {
 
+    /** 与 submissions / ContractCatalog.SNAPSHOT_PREFERENCE_LABELS 一致，单一事实源。 */
     public String learningPreference(String code) {
         return switch (normalize(code)) {
-            case "PRACTICE_FIRST", "PRACTICE_THEN_LEARN" -> "先练再纠偏";
+            case "TEXT_FIRST" -> "先看文字讲解";
+            case "VISUAL_FIRST" -> "先看图解或结构示意";
+            case "CODE_FIRST" -> "先看代码示例";
+            case "PRACTICE_FIRST", "PRACTICE_THEN_LEARN" -> "先做小题再总结";
             case "CONCEPT_FIRST", "LEARN_THEN_PRACTICE" -> "先理解概念再练习";
             case "EXAMPLE_FIRST" -> "先看例子再总结";
             case "PROJECT_DRIVEN" -> "边做边学";
             case "MIXED" -> "讲练结合";
-        default -> "";
-    };
+            default -> "";
+        };
     }
 
     public String timeBudget(String code) {
@@ -40,13 +45,15 @@ public class PreviewDisplayCodeMapper {
             case "PROJECT", "PROJECT_DRIVEN", "QUICK_START" -> "完成项目或作品";
             case "UNDERSTAND_PRINCIPLE" -> "系统理解核心原理";
             case "REVIEW_FIX" -> "查漏补缺巩固基础";
-        default -> "";
-    };
+            default -> "";
+        };
     }
 
+    /** 与 foundationLevel 表述一致，供无 snapshot.summary 时兜底。 */
     public String capabilityLevel(String code) {
         return switch (normalize(code)) {
-            case "BASIC", "BEGINNER", "WEAK" -> "学过相关内容，但基础还不稳定";
+            case "NONE", "BEGINNER", "WEAK" -> "刚开始接触";
+            case "BASIC" -> "学过但还不太熟";
             case "INTERMEDIATE", "PARTIAL" -> "有一定基础，正在向稳定应用过渡";
             case "ADVANCED", "PROFICIENT", "STABLE" -> "基础较好，可开始更高阶训练";
             default -> "";
@@ -65,9 +72,11 @@ public class PreviewDisplayCodeMapper {
         };
     }
 
+    /** 与 submissions 画像一致：BEGINNER 对应「刚开始接触」，单一事实源。 */
     public String foundationLevel(String code) {
         return switch (normalize(code)) {
-            case "NONE", "BASIC", "BEGINNER", "WEAK" -> "学过相关内容，但基础还不稳定";
+            case "NONE", "BEGINNER", "WEAK" -> "刚开始接触";
+            case "BASIC" -> "学过但还不太熟";
             case "INTERMEDIATE", "PARTIAL", "COURSEWORK" -> "有一定基础，仍需针对性巩固";
             case "ADVANCED", "PROFICIENT", "STABLE" -> "基础较好，可进入强化阶段";
             default -> "";
@@ -133,6 +142,26 @@ public class PreviewDisplayCodeMapper {
             case "PROJECT_DRIVEN", "IMPLEMENTATION_FLOW" -> "你更偏向项目实践，按实现流程和常见场景安排。";
             default -> "根据你的诊断结果，先完成这一步更有利于后续推进。";
         };
+    }
+
+    /** 非推荐策略的 notRecommendedReason，与策略含义一致，避免泛泛而谈。 */
+    public String alternativeNotRecommendedReason(String strategyCode) {
+        return switch (normalize(strategyCode)) {
+            case "FAST_TRACK" -> "你当前基础更适合先稳一步再推进，直接快跑容易在概念连接处卡住。";
+            case "PRACTICE_FIRST" -> "概念和表示还没稳，先练容易反复试错，建议先理清再练。";
+            case "EXAMPLE_FIRST" -> "当前更需要先建立结构和路径的直观认识，再看示例会更顺。";
+            default -> "当前证据更支持先稳住这一步，再考虑其他方式。";
+        };
+    }
+
+    private static final Pattern FOUNDATION_OF = Pattern.compile("(?i)Foundation of\\s+(\\S+)");
+
+    /** 清除用户文案中的内部概念泄漏（如 "Foundation of 图"），统一为中文表达。 */
+    public static String sanitizeUserFacingText(String text) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        return FOUNDATION_OF.matcher(text.trim()).replaceAll("$1 基础");
     }
 
     private String normalize(String code) {

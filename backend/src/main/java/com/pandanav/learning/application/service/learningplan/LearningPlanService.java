@@ -415,7 +415,6 @@ public class LearningPlanService {
             explanations.templateFallback(),
             explanations.explanationGenerated()
         );
-        List<String> nextActions = buildNextActions(preview);
         List<String> profileDrivenReasoning = buildProfileDrivenReasoning(context);
         Optional<LearnerProfileStructuredSnapshotDto> structuredSnapshot = parseStructuredSnapshot(context);
         int estimatedMinutes = Optional.ofNullable(resolveEstimatedMinutes(summary)).orElse(8);
@@ -461,6 +460,14 @@ public class LearningPlanService {
             displayView = personalizedPreviewViewAssembler.assemble(
                 context, preview, whyThisStep, profileDrivenReasoning, expectedGain);
         }
+
+        List<String> nextActions = resolveNextActions(displayView, preview);
+        List<LearningPlanPreviewResponse.AlternativeStrategyResponse> alternatives = mapAlternativesWithReasons(explanations.alternatives());
+        String skipRiskRaw = evidenceSummary == null ? resolveRiskIfSkipped(preview.reasons(), summary) : evidenceSummary.skipRisk();
+        String skipRisk = PreviewDisplayCodeMapper.sanitizeUserFacingText(skipRiskRaw);
+        String confidenceHint = evidenceSummary != null
+            ? evidenceSummary.confidenceHint()
+            : "这是基于本轮诊断生成的首个起步方案，后续会根据你的实际完成情况继续微调。";
 
         List<String> profileConflicts = buildProfileConflicts(context);
         List<String> riskFlags = buildRiskFlagsFromStructured(structuredSnapshot, profileConflicts);
@@ -510,7 +517,7 @@ public class LearningPlanService {
                 summary.recommendedStartNodeId(),
                 recommendedEntryTitle,
                 estimatedMinutes,
-                entryReason
+                PreviewDisplayCodeMapper.sanitizeUserFacingText(entryReason)
             ),
             learnerSnapshotResponse,
             new LearningPlanPreviewResponse.RecommendedStrategyResponse(
@@ -518,14 +525,14 @@ public class LearningPlanService {
                 strategyTitle,
                 strategyReason
             ),
-            explanations.alternatives(),
+            alternatives,
             nextActions,
-            whyThisStep,
+            PreviewDisplayCodeMapper.sanitizeUserFacingText(whyThisStep),
             keyEvidence,
             profileDrivenReasoning,
-            evidenceSummary == null ? resolveRiskIfSkipped(preview.reasons(), summary) : evidenceSummary.skipRisk(),
-            expectedGain,
-            evidenceSummary == null ? resolveConfidenceExplanation(context, null) : evidenceSummary.confidenceHint(),
+            skipRisk,
+            PreviewDisplayCodeMapper.sanitizeUserFacingText(expectedGain),
+            confidenceHint,
             riskFlags,
             riskFlagLabels,
             profileConflicts,
@@ -727,6 +734,38 @@ public class LearningPlanService {
         return Math.max(6, summary.estimatedMinutes() / Math.max(summary.estimatedStageCount() == null ? 1 : summary.estimatedStageCount(), 1));
     }
 
+    /** 优先用 currentTaskCard.tasks（用户可执行动作），否则兜底为通用动作句。 */
+    private List<String> resolveNextActions(
+        PersonalizedPreviewViewAssembler.PersonalizedPreviewView displayView,
+        LearningPlanPreview preview
+    ) {
+        if (displayView != null && displayView.currentTaskCard() != null && displayView.currentTaskCard().tasks() != null
+            && !displayView.currentTaskCard().tasks().isEmpty()) {
+            return displayView.currentTaskCard().tasks().stream()
+                .map(PreviewDisplayCodeMapper::sanitizeUserFacingText)
+                .limit(5)
+                .toList();
+        }
+        return buildNextActions(preview);
+    }
+
+    private List<LearningPlanPreviewResponse.AlternativeStrategyResponse> mapAlternativesWithReasons(
+        List<LearningPlanPreviewResponse.AlternativeStrategyResponse> fromExplanations
+    ) {
+        if (fromExplanations == null) {
+            return List.of();
+        }
+        return fromExplanations.stream()
+            .map(a -> new LearningPlanPreviewResponse.AlternativeStrategyResponse(
+                a.code(),
+                a.label(),
+                PreviewDisplayCodeMapper.sanitizeUserFacingText(
+                    previewDisplayCodeMapper.alternativeNotRecommendedReason(a.code())
+                )
+            ))
+            .toList();
+    }
+
     private List<String> buildNextActions(LearningPlanPreview preview) {
         List<String> actions = new ArrayList<>();
         if (preview.taskPreview() != null) {
@@ -734,7 +773,7 @@ public class LearningPlanService {
                 if (item == null || item.title() == null || item.title().isBlank()) {
                     continue;
                 }
-                actions.add(item.title().trim());
+                actions.add(PreviewDisplayCodeMapper.sanitizeUserFacingText(item.title().trim()));
                 if (actions.size() >= 3) {
                     break;
                 }
@@ -742,9 +781,9 @@ public class LearningPlanService {
         }
         while (actions.size() < 3) {
             actions.add(switch (actions.size()) {
-                case 0 -> "先完成第一步的结构梳理";
-                case 1 -> "再做一次关键理解检查";
-                default -> "最后用一轮短练习确认掌握";
+                case 0 -> "先用一个简单样例认清当前知识点的基本结构";
+                case 1 -> "再区分关键概念与表示方式";
+                default -> "最后用一条例子建立后续学习的直觉";
             });
         }
         return actions;
