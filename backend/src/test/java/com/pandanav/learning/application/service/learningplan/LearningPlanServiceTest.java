@@ -145,7 +145,9 @@ class LearningPlanServiceTest {
             mock(LearningPlanMetricsLogger.class),
             new PersonalizedPreviewViewAssembler(new PreviewDisplayCodeMapper(), new ConceptDisplayTitleMapper()),
             new PreviewDisplayCodeMapper(),
-            mock(PlanInstanceService.class)
+            mock(PlanInstanceService.class),
+            new ConceptDisplayTitleMapper(),
+            new SnapshotDrivenPreviewExplanationAssembler(new PreviewDisplayCodeMapper())
         );
 
         AdjustLearningPlanResponse response = service.adjust(new AdjustLearningPlanCommand(
@@ -223,7 +225,9 @@ class LearningPlanServiceTest {
             mock(LearningPlanMetricsLogger.class),
             new PersonalizedPreviewViewAssembler(new PreviewDisplayCodeMapper(), new ConceptDisplayTitleMapper()),
             new PreviewDisplayCodeMapper(),
-            mock(PlanInstanceService.class)
+            mock(PlanInstanceService.class),
+            new ConceptDisplayTitleMapper(),
+            new SnapshotDrivenPreviewExplanationAssembler(new PreviewDisplayCodeMapper())
         );
 
         ConfirmLearningPlanResponse response = service.confirm(new ConfirmLearningPlanCommand(99L, 1L));
@@ -254,7 +258,9 @@ class LearningPlanServiceTest {
             mock(LearningPlanMetricsLogger.class),
             new PersonalizedPreviewViewAssembler(new PreviewDisplayCodeMapper(), new ConceptDisplayTitleMapper()),
             new PreviewDisplayCodeMapper(),
-            mock(PlanInstanceService.class)
+            mock(PlanInstanceService.class),
+            new ConceptDisplayTitleMapper(),
+            new SnapshotDrivenPreviewExplanationAssembler(new PreviewDisplayCodeMapper())
         );
     }
 

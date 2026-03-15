@@ -137,6 +137,7 @@ class LearningPlanControllerTest {
             "完成后会更容易进入下一轮训练。",
             "当前推荐基于近期学习证据，可信度中等偏高。",
             List.of("OVERCONFIDENCE_RISK"),
+            List.of(),
             List.of("OVERCONFIDENCE_PROFILE_CONFLICT"),
             new LearningPlanAdjustmentsDto("STANDARD", "LEARN_THEN_PRACTICE", true),
             "确认后系统会创建正式计划，并带你进入第一步任务。",

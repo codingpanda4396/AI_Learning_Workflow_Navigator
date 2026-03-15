@@ -142,8 +142,8 @@ public class PersonalizedPreviewViewAssembler {
         }
 
         LinkedHashSet<String> whyStepFirst = new LinkedHashSet<>();
-        whyStepFirst.add(concept + "基础结构是后续插入、删除与综合应用的共同前提。");
-        whyStepFirst.add("如果这一步不稳，后续练习容易反复卡在基础连接和表达上。");
+        whyStepFirst.add(whyStepFirstSentenceForConcept(concept));
+        whyStepFirst.add("如果这一步不稳，后续练习容易反复卡在基础概念和表示方式上。");
         if (whyThisStep != null && !whyThisStep.isBlank()) {
             whyStepFirst.add(normalizeReason(whyThisStep));
         }
@@ -255,6 +255,26 @@ public class PersonalizedPreviewViewAssembler {
             return text.substring(2, text.length() - 5);
         }
         return text;
+    }
+
+    /** 按主题区分，禁止图场景出现“插入、删除”等链表用语。 */
+    private String whyStepFirstSentenceForConcept(String concept) {
+        if (concept == null) {
+            return "当前知识点基础结构是后续学习的前提，先完成这一步更稳。";
+        }
+        if (concept.contains("图") || concept.contains("路径")) {
+            return concept + "的基础表示与路径概念是后续算法（如最短路径）的共同前提，先建立节点、边与路径的直观认识更稳。";
+        }
+        if (concept.contains("树") || concept.contains("二叉树")) {
+            return concept + "的基础结构是后续遍历与递归应用的共同前提，先建立结构定义与基本操作更稳。";
+        }
+        if (concept.contains("链表")) {
+            return concept + "的节点与指针关系是后续插入、删除与综合应用的共同前提，先建立基本结构更稳。";
+        }
+        if (concept.contains("数组")) {
+            return concept + "的索引与遍历是后续查找、排序等操作的共同前提，先建立基本用法更稳。";
+        }
+        return concept + "的基础结构是后续学习的前提，先完成这一步更稳。";
     }
 
     public record PersonalizedPreviewView(

@@ -1,6 +1,7 @@
 package com.pandanav.learning.api.dto.plan;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.pandanav.learning.api.dto.CodeLabelDto;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -24,6 +25,7 @@ public record LearningPlanPreviewResponse(
     String expectedGain,
     String confidenceHint,
     List<String> riskFlags,
+    List<CodeLabelDto> riskFlagLabels,
     List<String> profileConflicts,
     LearningPlanAdjustmentsDto adjustments,
     String startGuide,

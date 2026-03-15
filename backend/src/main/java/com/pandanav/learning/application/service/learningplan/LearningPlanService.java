@@ -102,6 +102,8 @@ public class LearningPlanService {
     private final PersonalizedPreviewViewAssembler personalizedPreviewViewAssembler;
     private final PreviewDisplayCodeMapper previewDisplayCodeMapper;
     private final PlanInstanceService planInstanceService;
+    private final ConceptDisplayTitleMapper conceptDisplayTitleMapper;
+    private final SnapshotDrivenPreviewExplanationAssembler snapshotDrivenPreviewExplanationAssembler;
 
     public LearningPlanService(
         PlanningContextAssembler planningContextAssembler,
@@ -119,7 +121,9 @@ public class LearningPlanService {
         LearningPlanMetricsLogger learningPlanMetricsLogger,
         PersonalizedPreviewViewAssembler personalizedPreviewViewAssembler,
         PreviewDisplayCodeMapper previewDisplayCodeMapper,
-        PlanInstanceService planInstanceService
+        PlanInstanceService planInstanceService,
+        ConceptDisplayTitleMapper conceptDisplayTitleMapper,
+        SnapshotDrivenPreviewExplanationAssembler snapshotDrivenPreviewExplanationAssembler
     ) {
         this.planningContextAssembler = planningContextAssembler;
         this.learningPlanOrchestrator = learningPlanOrchestrator;
@@ -137,6 +141,8 @@ public class LearningPlanService {
         this.personalizedPreviewViewAssembler = personalizedPreviewViewAssembler;
         this.previewDisplayCodeMapper = previewDisplayCodeMapper;
         this.planInstanceService = planInstanceService;
+        this.conceptDisplayTitleMapper = conceptDisplayTitleMapper;
+        this.snapshotDrivenPreviewExplanationAssembler = snapshotDrivenPreviewExplanationAssembler;
     }
 
     public LearningPlanPreviewResponse preview(PreviewLearningPlanCommand command) {
@@ -412,27 +418,60 @@ public class LearningPlanService {
         List<String> nextActions = buildNextActions(preview);
         List<String> profileDrivenReasoning = buildProfileDrivenReasoning(context);
         Optional<LearnerProfileStructuredSnapshotDto> structuredSnapshot = parseStructuredSnapshot(context);
-        List<String> baseEvidence = evidenceSummary == null ? explanations.learnerEvidence() : evidenceSummary.topEvidence();
-        List<String> mergedEvidence = structuredSnapshot.isPresent() && structuredSnapshot.get().summary() != null
-            && structuredSnapshot.get().summary().evidence() != null && !structuredSnapshot.get().summary().evidence().isEmpty()
-            ? mergeEvidence(structuredSnapshot.get().summary().evidence(), profileDrivenReasoning)
-            : mergeEvidence(baseEvidence, profileDrivenReasoning);
+        int estimatedMinutes = Optional.ofNullable(resolveEstimatedMinutes(summary)).orElse(8);
+        String recommendedEntryTitle = conceptDisplayTitleMapper.toDisplayTitle(summary.recommendedStartNodeName());
+        String entryReason = explanations.recommendedEntryReason();
+        String whyThisStep;
+        List<String> keyEvidence;
+        PersonalizedPreviewViewAssembler.PersonalizedPreviewView displayView;
+        String expectedGain = evidenceSummary == null ? "完成这一步后，你会更容易进入后续训练并减少回退。" : evidenceSummary.expectedGain();
+
+        if (structuredSnapshot.isPresent()) {
+            LearnerProfileStructuredSnapshotDto snapshot = structuredSnapshot.get();
+            entryReason = snapshotDrivenPreviewExplanationAssembler.buildRecommendedEntryReason(
+                snapshot, context == null ? null : context.goalText(), recommendedEntryTitle);
+            if (entryReason == null || entryReason.isBlank()) {
+                entryReason = explanations.recommendedEntryReason();
+            }
+            whyThisStep = snapshotDrivenPreviewExplanationAssembler.buildWhyThisStep(
+                snapshot, context == null ? null : context.goalText(), recommendedEntryTitle, estimatedMinutes);
+            if (whyThisStep == null || whyThisStep.isBlank()) {
+                whyThisStep = mergeWhyThisStep(
+                    evidenceSummary == null ? explanations.recommendedEntryReason() : evidenceSummary.whyThisStep(),
+                    profileDrivenReasoning);
+            }
+            keyEvidence = snapshotDrivenPreviewExplanationAssembler.buildKeyEvidence(snapshot, profileDrivenReasoning);
+            displayView = new PersonalizedPreviewViewAssembler.PersonalizedPreviewView(
+                snapshotDrivenPreviewExplanationAssembler.buildPersonalizedSummary(
+                    snapshot, context == null ? null : context.goalText(), recommendedEntryTitle),
+                snapshotDrivenPreviewExplanationAssembler.buildCurrentTaskCard(
+                    recommendedEntryTitle, estimatedMinutes, context == null ? null : context.goalText()),
+                snapshotDrivenPreviewExplanationAssembler.buildPersonalizedReasons(
+                    snapshot, context == null ? null : context.goalText(), recommendedEntryTitle, whyThisStep, estimatedMinutes),
+                snapshotDrivenPreviewExplanationAssembler.buildExplanationPanel(
+                    snapshot, expectedGain, recommendedEntryTitle)
+            );
+        } else {
+            whyThisStep = mergeWhyThisStep(
+                evidenceSummary == null ? explanations.recommendedEntryReason() : evidenceSummary.whyThisStep(),
+                profileDrivenReasoning);
+            List<String> baseEvidence = evidenceSummary == null ? explanations.learnerEvidence() : evidenceSummary.topEvidence();
+            keyEvidence = mergeEvidence(baseEvidence, profileDrivenReasoning);
+            keyEvidence = keyEvidence.size() > 4 ? keyEvidence.subList(0, 4) : keyEvidence;
+            displayView = personalizedPreviewViewAssembler.assemble(
+                context, preview, whyThisStep, profileDrivenReasoning, expectedGain);
+        }
+
         List<String> profileConflicts = buildProfileConflicts(context);
         List<String> riskFlags = buildRiskFlagsFromStructured(structuredSnapshot, profileConflicts);
-        String whyThisStep = structuredSnapshot.isPresent() && structuredSnapshot.get().summary() != null
-            && structuredSnapshot.get().summary().currentState() != null && !structuredSnapshot.get().summary().currentState().isBlank()
-            ? structuredSnapshot.get().summary().currentState()
-            : mergeWhyThisStep(
-                evidenceSummary == null ? explanations.recommendedEntryReason() : evidenceSummary.whyThisStep(),
-                profileDrivenReasoning
-            );
-        PersonalizedPreviewViewAssembler.PersonalizedPreviewView displayView = personalizedPreviewViewAssembler.assemble(
-            context,
-            preview,
-            whyThisStep,
-            profileDrivenReasoning,
-            evidenceSummary == null ? "完成这一步后，你会更容易进入后续训练并减少回退。" : evidenceSummary.expectedGain()
-        );
+        List<CodeLabelDto> riskFlagLabels = riskFlags.stream()
+            .map(code -> new CodeLabelDto(code, previewDisplayCodeMapper.riskFlagLabel(code)))
+            .filter(dto -> dto.label() != null && !dto.label().isBlank())
+            .collect(Collectors.toList());
+        if (riskFlagLabels.isEmpty() && !riskFlags.isEmpty()) {
+            riskFlagLabels = riskFlags.stream().map(code -> new CodeLabelDto(code, code)).collect(Collectors.toList());
+        }
+
         String finalStrategyCode = resolveFinalStrategyCode(summary, explanations);
         String strategyTitle = finalStrategyCode;
         String strategyReason = explanations.strategyExplanation();
@@ -445,16 +484,22 @@ public class LearningPlanService {
         } else {
             strategyTitle = previewTemplateExplanationAssembler.strategyLabel(finalStrategyCode);
         }
-        LearningPlanPreviewResponse.LearnerSnapshotResponse learnerSnapshotResponse = structuredSnapshot.isPresent()
-            && structuredSnapshot.get().summary() != null
+
+        String currentStateForSnapshot = structuredSnapshot.isPresent() && structuredSnapshot.get().summary() != null
+            ? snapshotDrivenPreviewExplanationAssembler.buildCurrentState(structuredSnapshot.get())
+            : null;
+        List<String> evidenceForSnapshot = structuredSnapshot.isPresent() && structuredSnapshot.get().summary() != null
+            && structuredSnapshot.get().summary().evidence() != null
+            ? structuredSnapshot.get().summary().evidence()
+            : null;
+        LearningPlanPreviewResponse.LearnerSnapshotResponse learnerSnapshotResponse = (currentStateForSnapshot != null || (evidenceForSnapshot != null && !evidenceForSnapshot.isEmpty()))
             ? new LearningPlanPreviewResponse.LearnerSnapshotResponse(
-                structuredSnapshot.get().summary().currentState(),
-                structuredSnapshot.get().summary().evidence() != null ? structuredSnapshot.get().summary().evidence() : List.of()
-            )
+                currentStateForSnapshot != null ? currentStateForSnapshot : "",
+                evidenceForSnapshot != null ? evidenceForSnapshot : List.of())
             : new LearningPlanPreviewResponse.LearnerSnapshotResponse(
                 explanations.learnerCurrentState(),
-                explanations.learnerEvidence()
-            );
+                explanations.learnerEvidence());
+
         return new LearningPlanPreviewResponse(
             String.valueOf(plan.getId()),
             committed ? COMMITTED : PREVIEW_READY,
@@ -463,9 +508,9 @@ public class LearningPlanService {
             context == null ? null : context.goalText(),
             new LearningPlanPreviewResponse.RecommendedEntryResponse(
                 summary.recommendedStartNodeId(),
-                summary.recommendedStartNodeName(),
-                resolveEstimatedMinutes(summary),
-                explanations.recommendedEntryReason()
+                recommendedEntryTitle,
+                estimatedMinutes,
+                entryReason
             ),
             learnerSnapshotResponse,
             new LearningPlanPreviewResponse.RecommendedStrategyResponse(
@@ -476,12 +521,13 @@ public class LearningPlanService {
             explanations.alternatives(),
             nextActions,
             whyThisStep,
-            mergedEvidence,
+            keyEvidence,
             profileDrivenReasoning,
             evidenceSummary == null ? resolveRiskIfSkipped(preview.reasons(), summary) : evidenceSummary.skipRisk(),
-            evidenceSummary == null ? "完成这一步后，你会更容易进入后续训练并减少回退。" : evidenceSummary.expectedGain(),
+            expectedGain,
             evidenceSummary == null ? resolveConfidenceExplanation(context, null) : evidenceSummary.confidenceHint(),
             riskFlags,
+            riskFlagLabels,
             profileConflicts,
             new LearningPlanAdjustmentsDto(
                 preview.adjustments().intensity(),
