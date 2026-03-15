@@ -59,6 +59,7 @@ class PlanCandidatePlannerTest {
             null,
             null,
             null,
+            null,
             null
         );
         LearnerState learnerState = new LearnerState(
@@ -88,7 +89,7 @@ class PlanCandidatePlannerTest {
         List<String> contextNodeIds = context.nodes().stream().map(LearningPlanContextNode::planNodeId).toList();
         assertTrue(candidateSet.entries().stream().allMatch(item -> contextNodeIds.contains(item.conceptId())));
 
-        LlmPlanDecisionResult decision = defaultDecisionFactory.create(learnerState, candidateSet);
+        LlmPlanDecisionResult decision = defaultDecisionFactory.create(context, learnerState, candidateSet);
         assertNotNull(decision.selectedConceptId());
         assertNotNull(decision.selectedStrategyCode());
         assertNotNull(decision.selectedIntensityCode());

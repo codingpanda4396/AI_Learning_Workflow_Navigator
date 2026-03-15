@@ -74,6 +74,7 @@ class LearnerEvidenceAggregatorRegressionTest {
             null,
             null,
             null,
+            null,
             null
         );
     }

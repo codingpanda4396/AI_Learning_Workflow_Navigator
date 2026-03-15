@@ -14,6 +14,7 @@ import com.pandanav.learning.domain.model.PracticeSubmission;
 import com.pandanav.learning.domain.model.Task;
 import com.pandanav.learning.domain.model.TrainingAttemptSummary;
 import com.pandanav.learning.domain.repository.ConceptNodeRepository;
+import com.pandanav.learning.domain.repository.EvidenceRepository;
 import com.pandanav.learning.domain.repository.NodeMasteryRepository;
 import com.pandanav.learning.domain.repository.PracticeFeedbackReportRepository;
 import com.pandanav.learning.domain.repository.PracticeQuizRepository;
@@ -56,6 +57,8 @@ class LearningInsightQueryServiceTest {
     @Mock
     private ConceptNodeRepository conceptNodeRepository;
     @Mock
+    private EvidenceRepository evidenceRepository;
+    @Mock
     private WeakPointDiagnosisService weakPointDiagnosisService;
 
     private LearningInsightQueryService learningInsightQueryService;
@@ -71,6 +74,7 @@ class LearningInsightQueryServiceTest {
             practiceSubmissionRepository,
             nodeMasteryRepository,
             conceptNodeRepository,
+            evidenceRepository,
             weakPointDiagnosisService,
             new ObjectMapper()
         );

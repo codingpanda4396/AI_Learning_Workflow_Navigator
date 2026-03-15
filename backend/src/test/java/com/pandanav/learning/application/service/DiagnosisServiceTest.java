@@ -20,10 +20,13 @@ import com.pandanav.learning.domain.model.LearningSession;
 import com.pandanav.learning.domain.repository.CapabilityProfileRepository;
 import com.pandanav.learning.domain.repository.DiagnosisAnswerRepository;
 import com.pandanav.learning.domain.repository.DiagnosisSessionRepository;
+import com.pandanav.learning.domain.repository.LearnerFeatureSignalRepository;
+import com.pandanav.learning.domain.repository.LearnerProfileSnapshotRepository;
 import com.pandanav.learning.domain.repository.SessionRepository;
 import com.pandanav.learning.domain.service.CapabilityProfileBuilder;
 import com.pandanav.learning.domain.service.DiagnosisQuestionCopyFactory;
 import com.pandanav.learning.domain.service.DiagnosisTemplateFactory;
+import com.pandanav.learning.infrastructure.config.LlmProperties;
 import com.pandanav.learning.infrastructure.exception.AiGenerationException;
 import com.pandanav.learning.infrastructure.exception.BadRequestException;
 import com.pandanav.learning.infrastructure.observability.LlmCallLogger;
@@ -79,6 +82,13 @@ class DiagnosisServiceTest {
             new CapabilityProfileBuilder(),
             new DiagnosisExplanationAssembler(objectMapper),
             new CapabilityProfileSummaryLlmService(llmGateway, llmJsonParser, mock(LlmCallLogger.class)),
+            new DiagnosisAnswerNormalizer(objectMapper),
+            new LearnerFeatureExtractor(),
+            new LearnerFeatureAggregator(),
+            new LearnerProfileSnapshotBuilder(),
+            mock(LearnerFeatureSignalRepository.class),
+            mock(LearnerProfileSnapshotRepository.class),
+            new LlmProperties(),
             objectMapper
         );
     }

@@ -47,6 +47,8 @@ class PlanSessionTasksServiceTest {
     private TaskObjectiveTemplateStrategy taskObjectiveTemplateStrategy;
     @Mock
     private PersonalizedPathPlannerService personalizedPathPlannerService;
+    @Mock
+    private PlanInstanceService planInstanceService;
 
     @AfterEach
     void clearContext() {
@@ -68,7 +70,8 @@ class PlanSessionTasksServiceTest {
             conceptNodeRepository,
             taskRepository,
             taskObjectiveTemplateStrategy,
-            personalizedPathPlannerService
+            personalizedPathPlannerService,
+            planInstanceService
         );
 
         PlanSessionResponse response = service.execute(sessionId, PlanMode.AUTO);
@@ -117,7 +120,8 @@ class PlanSessionTasksServiceTest {
             conceptNodeRepository,
             taskRepository,
             taskObjectiveTemplateStrategy,
-            personalizedPathPlannerService
+            personalizedPathPlannerService,
+            planInstanceService
         );
 
         PlanSessionResponse response = service.execute(sessionId, PlanMode.AUTO);
@@ -177,7 +181,8 @@ class PlanSessionTasksServiceTest {
             conceptNodeRepository,
             taskRepository,
             taskObjectiveTemplateStrategy,
-            personalizedPathPlannerService
+            personalizedPathPlannerService,
+            planInstanceService
         );
 
         PlanSessionResponse response = service.execute(sessionId, PlanMode.AUTO);

@@ -25,6 +25,7 @@ import com.pandanav.learning.domain.model.LlmPlanDecisionResult;
 import com.pandanav.learning.domain.model.PlanCandidateSet;
 import com.pandanav.learning.domain.model.StrategyCandidate;
 import com.pandanav.learning.domain.service.LearningPlanDecisionPromptBuilder;
+import com.pandanav.learning.infrastructure.config.LlmProperties;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -33,6 +34,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class LearningPlanDecisionLlmServiceTest {
 
@@ -78,10 +81,14 @@ class LearningPlanDecisionLlmServiceTest {
     }
 
     private LearningPlanDecisionLlmService service(LlmGateway gateway) {
+        LlmProperties llmProperties = mock(LlmProperties.class);
+        when(llmProperties.isEnabled()).thenReturn(true);
+        when(llmProperties.isReady()).thenReturn(true);
         return new LearningPlanDecisionLlmService(
             gateway,
             new LlmJsonParser(new ObjectMapper()),
-            new LearningPlanDecisionPromptBuilder()
+            new LearningPlanDecisionPromptBuilder(),
+            llmProperties
         );
     }
 

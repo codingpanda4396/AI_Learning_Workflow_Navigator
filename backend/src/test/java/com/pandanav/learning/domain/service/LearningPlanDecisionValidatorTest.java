@@ -17,7 +17,9 @@ import com.pandanav.learning.domain.model.EntryCandidate;
 import com.pandanav.learning.domain.model.IntensityCandidate;
 import com.pandanav.learning.domain.model.LearnerState;
 import com.pandanav.learning.domain.model.LearningPlanDecisionValidationResult;
+import com.pandanav.learning.domain.model.LearningPlanPlanningContext;
 import com.pandanav.learning.domain.model.LlmPlanDecisionResult;
+import com.pandanav.learning.domain.model.PlanAdjustments;
 import com.pandanav.learning.domain.model.PlanCandidateSet;
 import com.pandanav.learning.domain.model.StrategyCandidate;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,7 @@ class LearningPlanDecisionValidatorTest {
     @Test
     void shouldUseL1WhenOnlyCopyQualityIsPoor() {
         LearningPlanDecisionValidationResult result = validator.validateAndFallback(
+            sampleContext(),
             sampleLearnerState(),
             sampleCandidateSet(),
             new LlmPlanDecisionResult(
@@ -58,6 +61,7 @@ class LearningPlanDecisionValidatorTest {
     @Test
     void shouldUseL2WhenSelectionOutOfCandidates() {
         LearningPlanDecisionValidationResult result = validator.validateAndFallback(
+            sampleContext(),
             sampleLearnerState(),
             sampleCandidateSet(),
             new LlmPlanDecisionResult(
@@ -80,6 +84,7 @@ class LearningPlanDecisionValidatorTest {
     @Test
     void shouldUseL3WhenContextInsufficient() {
         LearningPlanDecisionValidationResult result = validator.validateAndFallback(
+            sampleContext(),
             sampleLearnerState(),
             new PlanCandidateSet(List.of(), List.of(), List.of(), List.of()),
             null,
@@ -123,6 +128,14 @@ class LearningPlanDecisionValidatorTest {
                 new ActionTemplate("UNDERSTANDING", "补齐关键理解", "解释边界", "讲清例子", "AI切换解释角度", 8),
                 new ActionTemplate("TRAINING", "做定向训练", "验证回补", "做短练", "AI归因", 10)
             )
+        );
+    }
+
+    private LearningPlanPlanningContext sampleContext() {
+        return new LearningPlanPlanningContext(
+            1L, "goal-1", "diag-1", "course-1", "chapter-1", "goal", null,
+            List.of(), List.of(), List.of(), List.of(), "summary", PlanAdjustments.defaults(),
+            null, null, null, null, null, null, null, null, null, null, null
         );
     }
 

@@ -8,6 +8,7 @@ import com.pandanav.learning.api.dto.plan.LearningPlanPreviewResponse;
 import com.pandanav.learning.application.command.AdjustLearningPlanCommand;
 import com.pandanav.learning.application.command.ConfirmLearningPlanCommand;
 import com.pandanav.learning.application.command.PreviewLearningPlanCommand;
+import com.pandanav.learning.application.service.PlanInstanceService;
 import com.pandanav.learning.domain.enums.LearningPlanStatus;
 import com.pandanav.learning.domain.enums.MotivationRisk;
 import com.pandanav.learning.domain.enums.CurrentBlockType;
@@ -143,7 +144,8 @@ class LearningPlanServiceTest {
             new LearnerEvidenceAggregator(),
             mock(LearningPlanMetricsLogger.class),
             new PersonalizedPreviewViewAssembler(new PreviewDisplayCodeMapper(), new ConceptDisplayTitleMapper()),
-            new PreviewDisplayCodeMapper()
+            new PreviewDisplayCodeMapper(),
+            mock(PlanInstanceService.class)
         );
 
         AdjustLearningPlanResponse response = service.adjust(new AdjustLearningPlanCommand(
@@ -220,7 +222,8 @@ class LearningPlanServiceTest {
             new LearnerEvidenceAggregator(),
             mock(LearningPlanMetricsLogger.class),
             new PersonalizedPreviewViewAssembler(new PreviewDisplayCodeMapper(), new ConceptDisplayTitleMapper()),
-            new PreviewDisplayCodeMapper()
+            new PreviewDisplayCodeMapper(),
+            mock(PlanInstanceService.class)
         );
 
         ConfirmLearningPlanResponse response = service.confirm(new ConfirmLearningPlanCommand(99L, 1L));
@@ -250,7 +253,8 @@ class LearningPlanServiceTest {
             new LearnerEvidenceAggregator(),
             mock(LearningPlanMetricsLogger.class),
             new PersonalizedPreviewViewAssembler(new PreviewDisplayCodeMapper(), new ConceptDisplayTitleMapper()),
-            new PreviewDisplayCodeMapper()
+            new PreviewDisplayCodeMapper(),
+            mock(PlanInstanceService.class)
         );
     }
 
