@@ -50,7 +50,7 @@ public class DiagnosisResponseAssembler {
             metadata,
             learnerSnapshot,
             diagnosisStrategy,
-            questionRationales == null ? List.of() : questionRationales,
+            questionRationales,
             personalizationMeta
         );
     }

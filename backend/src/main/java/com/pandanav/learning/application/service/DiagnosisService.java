@@ -212,18 +212,7 @@ public class DiagnosisService {
         DiagnosisSession saved = diagnosisSessionRepository.save(diagnosisSession);
 
         DiagnosisExplanationDto diagnosisExplanation = buildCreatePhaseExplanation(goalText, topic);
-        List<String> samplingFocuses = List.of("基础起点", "学习目标", "时间投入");
-        DiagnosisDecisionHintsDto decisionHints = new DiagnosisDecisionHintsDto(samplingFocuses);
-        LearnerSnapshotDto learnerSnapshotDto = new LearnerSnapshotDto(
-            "完成下方题目后，系统会据此生成你的学习画像并推荐学习路径。",
-            List.of(),
-            List.of()
-        );
-        DiagnosisStrategyDto diagnosisStrategyDto = new DiagnosisStrategyDto(
-            "PROFILE_SAMPLING",
-            "先了解你的起点，再生成个性化规划",
-            samplingFocuses
-        );
+        DiagnosisDecisionHintsDto decisionHints = new DiagnosisDecisionHintsDto(List.of("基础", "目标", "时间"));
         return diagnosisResponseAssembler.assemble(
             saved.getId(),
             session.getId(),
@@ -235,10 +224,10 @@ public class DiagnosisService {
             decisionHints,
             sourceMeta(false, List.of(), "RULE"),
             new DiagnosisMetadataDto(questions.size(), null, null),
-            learnerSnapshotDto,
-            diagnosisStrategyDto,
-            List.of(),
-            new PersonalizationMetaDto(null, List.of("goalText", "chapterId"), "STRUCTURED_TEMPLATE")
+            null,
+            new DiagnosisStrategyDto("PROFILE_SAMPLING", "先了解你的起点，再为你规划", List.of("基础", "目标", "时间")),
+            null,
+            null
         );
     }
 
@@ -431,14 +420,14 @@ public class DiagnosisService {
     }
 
     private DiagnosisExplanationDto buildCreatePhaseExplanation(String goalText, String topic) {
-        String why = "这组问题会先判断你的基础起点、主要卡点、学习目标和时间节奏。";
+        String why = "这几道题用来了解你的基础、卡点和时间，方便后面给你搭一条更贴合的路线。";
         List<String> whatWillBeInferred = new ArrayList<>();
-        if (topic != null && !topic.isBlank() && (goalText == null || goalText.isBlank())) {
-            whatWillBeInferred.add("本轮诊断先采样你在「" + topic + "」中的整体起点，规划阶段会再结合你的学习目标做细化入口推荐。");
-        } else if (topic != null && !topic.isBlank() && goalText != null && !goalText.isBlank()) {
-            whatWillBeInferred.add("先评估整体基础，再结合本次学习目标（如「" + goalText + "」）细化规划入口。");
+        if (goalText != null && !goalText.isBlank()) {
+            whatWillBeInferred.add("会结合你这次的目标（" + goalText + "）来定从哪里切入、先讲什么。");
+        } else if (topic != null && !topic.isBlank()) {
+            whatWillBeInferred.add("会结合「" + topic + "」的掌握情况，帮你定一个合适的起点。");
         }
-        String how = "系统不会直接给你一条固定路线，而是会根据你的回答决定从哪里开始、先讲什么、第一步多大颗粒度更合适。";
+        String how = "根据你的选择决定第一步学什么、节奏多快，而不是给一条固定路线。";
         return new DiagnosisExplanationDto(why, whatWillBeInferred, how);
     }
 

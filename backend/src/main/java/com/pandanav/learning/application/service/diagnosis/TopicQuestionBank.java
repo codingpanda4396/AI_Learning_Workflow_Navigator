@@ -57,6 +57,20 @@ public interface TopicQuestionBank {
     String topicOperationTitleWithGoal(String goalText, String topicTitle);
 
     /**
+     * 主题题 3（学习侧重）：优先围绕目标自然表述；goalText 为空时用通用句。
+     */
+    default String topicFocusTitle(String goalText, String topicTitle) {
+        return (goalText != null && !goalText.isBlank())
+            ? topicFocusTitleWithGoal(goalText.trim(), topicTitle != null ? topicTitle.trim() : "当前主题")
+            : topicFocusTitleWithGoal("", topicTitle != null ? topicTitle.trim() : "当前主题");
+    }
+
+    /**
+     * 带目标的主题题 3 标题（原理 vs 动手）。
+     */
+    String topicFocusTitleWithGoal(String goalText, String topicTitle);
+
+    /**
      * 是否支持该主题（仅影响标题是否用通用模板，选项始终用 ContractCatalog 的 TOPIC_CORE/TOPIC_OPERATION）。
      */
     boolean supportsTopic(String topicTitle);
