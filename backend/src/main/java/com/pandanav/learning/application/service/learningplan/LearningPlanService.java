@@ -97,6 +97,8 @@ public class LearningPlanService {
     private final LearnerSignalInterpreter learnerSignalInterpreter;
     private final LearnerEvidenceAggregator learnerEvidenceAggregator;
     private final LearningPlanMetricsLogger learningPlanMetricsLogger;
+    private final PersonalizedPreviewViewAssembler personalizedPreviewViewAssembler;
+    private final PreviewDisplayCodeMapper previewDisplayCodeMapper;
 
     public LearningPlanService(
         PlanningContextAssembler planningContextAssembler,
@@ -111,7 +113,9 @@ public class LearningPlanService {
         LearnerStateInterpreter learnerStateInterpreter,
         LearnerSignalInterpreter learnerSignalInterpreter,
         LearnerEvidenceAggregator learnerEvidenceAggregator,
-        LearningPlanMetricsLogger learningPlanMetricsLogger
+        LearningPlanMetricsLogger learningPlanMetricsLogger,
+        PersonalizedPreviewViewAssembler personalizedPreviewViewAssembler,
+        PreviewDisplayCodeMapper previewDisplayCodeMapper
     ) {
         this.planningContextAssembler = planningContextAssembler;
         this.learningPlanOrchestrator = learningPlanOrchestrator;
@@ -126,6 +130,8 @@ public class LearningPlanService {
         this.learnerSignalInterpreter = learnerSignalInterpreter;
         this.learnerEvidenceAggregator = learnerEvidenceAggregator;
         this.learningPlanMetricsLogger = learningPlanMetricsLogger;
+        this.personalizedPreviewViewAssembler = personalizedPreviewViewAssembler;
+        this.previewDisplayCodeMapper = previewDisplayCodeMapper;
     }
 
     public LearningPlanPreviewResponse preview(PreviewLearningPlanCommand command) {
@@ -408,6 +414,13 @@ public class LearningPlanService {
             evidenceSummary == null ? explanations.recommendedEntryReason() : evidenceSummary.whyThisStep(),
             profileDrivenReasoning
         );
+        PersonalizedPreviewViewAssembler.PersonalizedPreviewView displayView = personalizedPreviewViewAssembler.assemble(
+            context,
+            preview,
+            whyThisStep,
+            profileDrivenReasoning,
+            evidenceSummary == null ? "完成这一步后，你会更容易进入后续训练并减少回退。" : evidenceSummary.expectedGain()
+        );
         String finalStrategyCode = resolveFinalStrategyCode(summary, explanations);
         return new LearningPlanPreviewResponse(
             String.valueOf(plan.getId()),
@@ -449,6 +462,10 @@ public class LearningPlanService {
                 ? "已进入正式学习流程，系统会直接把你带到第一步任务。"
                 : "确认后系统会创建正式计划，并带你进入第一步任务。",
             explanations.explanationGenerated(),
+            displayView.personalizedSummary(),
+            displayView.currentTaskCard(),
+            displayView.personalizedReasons(),
+            displayView.explanationPanel(),
             plan.getCreatedAt() == null ? OffsetDateTime.now() : plan.getCreatedAt(),
             TraceContext.traceId()
         );
@@ -503,13 +520,13 @@ public class LearningPlanService {
         String supportPriority = readSnapshotValue(context, true, "supportPriority");
         String timeBudget = readSnapshotValue(context, false, "timeBudget");
         if (!learningPreference.isBlank()) {
-            result.add("画像显示学习偏好为「" + learningPreference + "」，本轮策略已按该偏好排序。");
+            result.add("你更适合「" + previewDisplayCodeMapper.learningPreference(learningPreference) + "」，本轮已按这个方式安排。");
         }
         if (!supportPriority.isBlank()) {
             result.add("画像显示当前支持优先级为「" + supportPriority + "」，因此优先安排对应补齐动作。");
         }
         if (result.size() < 2 && !timeBudget.isBlank()) {
-            result.add("画像约束中的时间预算为「" + timeBudget + "」，当前节奏已做匹配。");
+            result.add("你当前可投入「" + previewDisplayCodeMapper.timeBudget(timeBudget) + "」，当前节奏已做匹配。");
         }
         return result.stream().limit(2).toList();
     }

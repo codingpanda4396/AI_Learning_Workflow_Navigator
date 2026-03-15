@@ -91,6 +91,10 @@ class LearningPlanServiceTest {
         assertEquals(3, response.nextActions().size());
         assertNotNull(response.adjustments());
         assertNotNull(response.startGuide());
+        assertNotNull(response.personalizedSummary());
+        assertNotNull(response.currentTaskCard());
+        assertNotNull(response.personalizedReasons());
+        assertNotNull(response.explanationPanel());
         assertNotNull(response.traceId());
     }
 
@@ -137,7 +141,9 @@ class LearningPlanServiceTest {
             new DefaultLearnerStateInterpreter(),
             new DefaultLearnerSignalInterpreter(),
             new LearnerEvidenceAggregator(),
-            mock(LearningPlanMetricsLogger.class)
+            mock(LearningPlanMetricsLogger.class),
+            new PersonalizedPreviewViewAssembler(new PreviewDisplayCodeMapper(), new ConceptDisplayTitleMapper()),
+            new PreviewDisplayCodeMapper()
         );
 
         AdjustLearningPlanResponse response = service.adjust(new AdjustLearningPlanCommand(
@@ -212,7 +218,9 @@ class LearningPlanServiceTest {
             new DefaultLearnerStateInterpreter(),
             new DefaultLearnerSignalInterpreter(),
             new LearnerEvidenceAggregator(),
-            mock(LearningPlanMetricsLogger.class)
+            mock(LearningPlanMetricsLogger.class),
+            new PersonalizedPreviewViewAssembler(new PreviewDisplayCodeMapper(), new ConceptDisplayTitleMapper()),
+            new PreviewDisplayCodeMapper()
         );
 
         ConfirmLearningPlanResponse response = service.confirm(new ConfirmLearningPlanCommand(99L, 1L));
@@ -240,7 +248,9 @@ class LearningPlanServiceTest {
             new DefaultLearnerStateInterpreter(),
             new DefaultLearnerSignalInterpreter(),
             new LearnerEvidenceAggregator(),
-            mock(LearningPlanMetricsLogger.class)
+            mock(LearningPlanMetricsLogger.class),
+            new PersonalizedPreviewViewAssembler(new PreviewDisplayCodeMapper(), new ConceptDisplayTitleMapper()),
+            new PreviewDisplayCodeMapper()
         );
     }
 

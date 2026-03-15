@@ -65,7 +65,9 @@ class LearningPlanControllerTest {
             .andExpect(jsonPath("$.metadata.strategy").value("TEMPLATE_ONLY"))
             .andExpect(jsonPath("$.data.recommendedEntry.title").value("tree basics"))
             .andExpect(jsonPath("$.data.recommendedStrategy.code").value("FOUNDATION_FIRST"))
-            .andExpect(jsonPath("$.data.nextActions[0]").value("建立整体框架"));
+            .andExpect(jsonPath("$.data.nextActions[0]").value("建立整体框架"))
+            .andExpect(jsonPath("$.data.personalizedSummary.title").value("你已经接触过树结构，但基础还不稳定"))
+            .andExpect(jsonPath("$.data.currentTaskCard.tasks[0]").value("写出树结构的核心结构定义"));
     }
 
     @Test
@@ -139,6 +141,31 @@ class LearningPlanControllerTest {
             new LearningPlanAdjustmentsDto("STANDARD", "LEARN_THEN_PRACTICE", true),
             "确认后系统会创建正式计划，并带你进入第一步任务。",
             false,
+            new LearningPlanPreviewResponse.PersonalizedSummaryResponse(
+                "你已经接触过树结构，但基础还不稳定",
+                "考虑到你更适合先理解概念再练习，系统先安排一个短任务，帮助你快速进入状态。",
+                List.of("准备考试或测验", "每周 4-6 小时", "先理解概念再练习")
+            ),
+            new LearningPlanPreviewResponse.CurrentTaskCardResponse(
+                "理解树结构的基本结构",
+                8,
+                "先建立对树结构关键结构与基本连接方式的直观认识。",
+                List.of("写出树结构的核心结构定义", "完成一次最小可运行示例", "用两组输入验证结果"),
+                List.of("理解树结构的关键结构", "掌握最基本的实现步骤", "能独立完成基础样例")
+            ),
+            new LearningPlanPreviewResponse.PersonalizedReasonsResponse(
+                List.of("你当前目标是准备考试或测验，先稳住树结构基础会更高效。"),
+                List.of("树结构基础结构是后续插入、删除与综合应用的共同前提。")
+            ),
+            new LearningPlanPreviewResponse.ExplanationPanelResponse(
+                List.of(
+                    new LearningPlanPreviewResponse.LearnerProfileItemResponse("当前基础", "学过相关内容，但基础还不稳定"),
+                    new LearningPlanPreviewResponse.LearnerProfileItemResponse("学习目标", "准备考试或测验"),
+                    new LearningPlanPreviewResponse.LearnerProfileItemResponse("学习方式", "先理解概念再练习"),
+                    new LearningPlanPreviewResponse.LearnerProfileItemResponse("时间节奏", "每周 4-6 小时")
+                ),
+                "系统先安排一个低门槛练习，帮助你快速进入状态。"
+            ),
             OffsetDateTime.parse("2026-03-14T10:00:00+08:00"),
             "trace-1"
         );

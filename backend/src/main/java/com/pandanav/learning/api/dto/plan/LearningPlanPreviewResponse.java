@@ -28,6 +28,10 @@ public record LearningPlanPreviewResponse(
     LearningPlanAdjustmentsDto adjustments,
     String startGuide,
     Boolean explanationGenerated,
+    PersonalizedSummaryResponse personalizedSummary,
+    CurrentTaskCardResponse currentTaskCard,
+    PersonalizedReasonsResponse personalizedReasons,
+    ExplanationPanelResponse explanationPanel,
     OffsetDateTime generatedAt,
     String traceId
 ) {
@@ -56,6 +60,40 @@ public record LearningPlanPreviewResponse(
         String code,
         String label,
         String notRecommendedReason
+    ) {
+    }
+
+    public record PersonalizedSummaryResponse(
+        String title,
+        String description,
+        List<String> tags
+    ) {
+    }
+
+    public record CurrentTaskCardResponse(
+        String title,
+        Integer estimatedMinutes,
+        String goal,
+        List<String> tasks,
+        List<String> completionGains
+    ) {
+    }
+
+    public record PersonalizedReasonsResponse(
+        List<String> whyRecommended,
+        List<String> whyThisStepFirst
+    ) {
+    }
+
+    public record ExplanationPanelResponse(
+        List<LearnerProfileItemResponse> learnerProfile,
+        String systemDecision
+    ) {
+    }
+
+    public record LearnerProfileItemResponse(
+        String label,
+        String value
     ) {
     }
 }
