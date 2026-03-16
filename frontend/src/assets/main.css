@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #0891B2;
+  --color-primary-light: #22D3EE;
+  --color-accent: #22C55E;
+  --color-background: #ECFEFF;
+  --color-text: #164E63;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Fira Sans', sans-serif;
+  background: var(--color-background);
+  color: var(--color-text);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(at 40% 20%, rgba(8, 145, 178, 0.1) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(34, 211, 238, 0.15) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(8, 145, 178, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, rgba(34, 197, 94, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(34, 211, 238, 0.1) 0px, transparent 50%);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Fira Code', monospace;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.btn-primary {
+  @apply px-6 py-3 bg-primary text-white font-medium rounded-xl
+         transition-all duration-200 cursor-pointer
+         hover:bg-primary-dark hover:shadow-lg
+         focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-offset-2;
+}
+
+.btn-secondary {
+  @apply px-6 py-3 bg-white text-primary border-2 border-primary font-medium rounded-xl
+         transition-all duration-200 cursor-pointer
+         hover:bg-primary hover:text-white
+         focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-offset-2;
+}
+
+.input-field {
+  @apply w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl
+         focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent
+         placeholder-gray-400 transition-all duration-200;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.4s ease-out forwards;
+}
+
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
