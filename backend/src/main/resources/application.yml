@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: learning-workflow-navigator-backend
+
+server:
+  port: 8080
+
+# CORS will be configured in code for /api
