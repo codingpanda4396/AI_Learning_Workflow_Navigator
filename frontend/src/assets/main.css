@@ -133,9 +133,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .option-clay.selected {
-  @apply bg-primary text-white;
-  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.1);
-  border-color: var(--color-primary);
+  background: linear-gradient(145deg, #6366F1, #4F46E5);
+  color: #ffffff;
+  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.15), 2px 2px 6px rgba(79, 70, 229, 0.3);
+  border-color: #4F46E5;
+}
+
+.option-clay.selected:hover {
+  transform: translateX(8px);
+  border-color: #818CF8;
 }
 
 /* Tag Button */

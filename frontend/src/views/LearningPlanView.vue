@@ -58,15 +58,15 @@
           </h3>
 
           <div class="grid md:grid-cols-2 gap-4">
-            <div class="p-4 bg-primary/5 rounded-xl">
-              <p class="text-sm text-gray-500 mb-1">📋 推荐策略</p>
-              <p class="font-heading font-semibold text-lg text-gray-800">
+            <div class="p-5 bg-white rounded-xl border-2 border-primary/30 shadow-sm">
+              <p class="text-sm font-bold text-indigo-700 mb-2">📋 推荐策略</p>
+              <p class="font-heading font-bold text-2xl text-gray-950">
                 {{ planData.recommendedStrategy?.label || '-' }}
               </p>
             </div>
-            <div class="p-4 bg-primary/5 rounded-xl">
-              <p class="text-sm text-gray-500 mb-1">💭 推荐理由</p>
-              <p class="font-body text-gray-700 text-sm">
+            <div class="p-5 bg-white rounded-xl border-2 border-primary/30 shadow-sm">
+              <p class="text-sm font-bold text-indigo-700 mb-2">💭 推荐理由</p>
+              <p class="font-body text-gray-900 text-base leading-relaxed">
                 {{ planData.recommendedStrategy?.reason || '-' }}
               </p>
             </div>
@@ -157,11 +157,11 @@
             <span class="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center text-sm">🎯</span>
             本次达成标准
           </h3>
-          <div class="p-4 bg-accent/10 rounded-xl border-l-4 border-accent">
-            <ul class="space-y-2">
-              <li v-for="(criteria, idx) in planData.successCriteria" :key="idx" class="flex items-start gap-2">
-                <span class="text-accent">✓</span>
-                <span class="text-gray-700">{{ criteria }}</span>
+          <div class="p-5 bg-white rounded-xl border-2 border-accent/30 shadow-sm">
+            <ul class="space-y-3">
+              <li v-for="(criteria, idx) in planData.successCriteria" :key="idx" class="flex items-start gap-3">
+                <span class="w-6 h-6 bg-accent text-white rounded-full flex items-center justify-center text-sm flex-shrink-0">✓</span>
+                <span class="text-gray-800 font-medium">{{ criteria }}</span>
               </li>
             </ul>
           </div>
