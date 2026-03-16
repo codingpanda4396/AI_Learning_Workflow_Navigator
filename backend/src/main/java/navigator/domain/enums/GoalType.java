@@ -1,0 +1,9 @@
+package navigator.domain.enums;
+
+public enum GoalType {
+    LEARN_NEW_CONCEPT,
+    REVIEW_FOR_EXAM,
+    FIX_SPECIFIC_BLOCKER,
+    PRACTICE_ENHANCEMENT,
+    BUILD_SYSTEMATIC_UNDERSTANDING
+}
