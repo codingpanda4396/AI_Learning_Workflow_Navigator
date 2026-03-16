@@ -11,6 +11,14 @@ import navigator.domain.model.LearningPlanPreview;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskExecutionRecord;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.entity.SessionTaskEntity;
+import navigator.infrastructure.persistence.entity.TaskCompletionEntity;
+import navigator.infrastructure.persistence.entity.TaskInteractionEntity;
+import navigator.infrastructure.persistence.repository.LearningSessionRepository;
+import navigator.infrastructure.persistence.repository.SessionTaskRepository;
+import navigator.infrastructure.persistence.repository.TaskCompletionRepository;
+import navigator.infrastructure.persistence.repository.TaskInteractionRepository;
+import navigator.infrastructure.persistence.serde.JsonSerde;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,11 +29,28 @@ public class ExecutionApplicationService {
     private final InMemoryStore store;
     private final SessionStateGuard sessionStateGuard;
     private final TaskProgressGuard taskProgressGuard;
+    private final SessionTaskRepository sessionTaskRepository;
+    private final TaskInteractionRepository taskInteractionRepository;
+    private final TaskCompletionRepository taskCompletionRepository;
+    private final LearningSessionRepository learningSessionRepository;
+    private final JsonSerde jsonSerde;
 
-    public ExecutionApplicationService(InMemoryStore store, SessionStateGuard sessionStateGuard, TaskProgressGuard taskProgressGuard) {
+    public ExecutionApplicationService(InMemoryStore store,
+                                       SessionStateGuard sessionStateGuard,
+                                       TaskProgressGuard taskProgressGuard,
+                                       SessionTaskRepository sessionTaskRepository,
+                                       TaskInteractionRepository taskInteractionRepository,
+                                       TaskCompletionRepository taskCompletionRepository,
+                                       LearningSessionRepository learningSessionRepository,
+                                       JsonSerde jsonSerde) {
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
         this.taskProgressGuard = taskProgressGuard;
+        this.sessionTaskRepository = sessionTaskRepository;
+        this.taskInteractionRepository = taskInteractionRepository;
+        this.taskCompletionRepository = taskCompletionRepository;
+        this.learningSessionRepository = learningSessionRepository;
+        this.jsonSerde = jsonSerde;
     }
 
     public CurrentTaskData getCurrentTask(String sessionId) {
@@ -65,7 +90,17 @@ public class ExecutionApplicationService {
     }
 
     public TaskInteractionData recordInteraction(String taskId, navigator.api.dto.TaskInteractionRequest request) {
-        // Sprint 0: 仅接受，不做复杂统计
+        String sessionId = request.getSessionId();
+        Long sessionDbId = extractNumericId(sessionId);
+        Long taskDbId = extractNumericId(taskId);
+        TaskInteractionEntity entity = new TaskInteractionEntity();
+        entity.setSessionId(sessionDbId);
+        entity.setTaskId(taskDbId);
+        entity.setInteractionType(request.getInteractionType() != null ? request.getInteractionType() : "GENERIC");
+        entity.setUserInput(request.getContentSummary());
+        entity.setAssistantOutputSummary(null);
+        entity.setExtractedSignalsJson(jsonSerde.toJson(request.getBehaviorSignals()));
+        taskInteractionRepository.save(entity);
         return TaskInteractionData.builder()
                 .taskId(taskId)
                 .accepted(true)
@@ -91,6 +126,19 @@ public class ExecutionApplicationService {
                 .learnerReflection(request.getLearnerReflection())
                 .build();
         store.getOrCreateTaskRecords(request.getSessionId()).add(record);
+        // 写入 task_completion 表
+        Long sessionDbId = extractNumericId(sessionId);
+        Long taskDbId = extractNumericId(taskId);
+        TaskCompletionEntity completionEntity = new TaskCompletionEntity();
+        completionEntity.setSessionId(sessionDbId);
+        completionEntity.setTaskId(taskDbId);
+        completionEntity.setCompletionInputJson(jsonSerde.toJson(request));
+        completionEntity.setCompletionStatus(record.getCompletionStatus());
+        completionEntity.setQualityLevel(null);
+        completionEntity.setDetectedGapTagsJson(jsonSerde.toJson(record.getDetectedIssueTags()));
+        completionEntity.setRiskTagsJson(null);
+        completionEntity.setNextActionHintsJson(null);
+        taskCompletionRepository.save(completionEntity);
         int nextIndex = state.getCurrentTaskIndex() + 1;
         state.setCurrentTaskIndex(nextIndex);
         boolean nextAvailable = nextIndex < state.getTaskSequence().size();
@@ -109,6 +157,21 @@ public class ExecutionApplicationService {
                 .nextTaskId(nextTaskId)
                 .sessionProgress(progress)
                 .build();
+    }
+
+    private Long extractNumericId(String id) {
+        if (id == null) {
+            return null;
+        }
+        String digits = id.replaceAll("\\D+", "");
+        if (digits.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private TaskBlueprint resolveBlueprint(String planId, String taskId) {

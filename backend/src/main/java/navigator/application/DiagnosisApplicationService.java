@@ -10,8 +10,14 @@ import navigator.domain.enums.DiagnosisSessionStatus;
 import navigator.domain.model.DiagnosisQuestion;
 import navigator.domain.model.DiagnosisSubmission;
 import navigator.domain.model.GoalContextSnapshot;
+import navigator.domain.model.LearnerProfileSnapshot;
 import navigator.domain.model.StructuredLearningGoal;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.repository.DiagnosisAnswerRepository;
+import navigator.infrastructure.persistence.repository.DiagnosisSessionRepository;
+import navigator.infrastructure.persistence.repository.LearnerProfileSnapshotRepository;
+import navigator.infrastructure.persistence.repository.LearningSessionRepository;
+import navigator.infrastructure.persistence.serde.JsonSerde;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,13 +29,28 @@ public class DiagnosisApplicationService {
     private final EntityLookupGuard entityLookupGuard;
     private final DiagnosisRuleEngine diagnosisRuleEngine;
     private final DiagnosisEvidenceBuilder diagnosisEvidenceBuilder;
+    private final DiagnosisSessionRepository diagnosisSessionRepository;
+    private final LearningSessionRepository learningSessionRepository;
+    private final JsonSerde jsonSerde;
 
-    public DiagnosisApplicationService(InMemoryStore store, EntityLookupGuard entityLookupGuard,
-                                      DiagnosisRuleEngine diagnosisRuleEngine, DiagnosisEvidenceBuilder diagnosisEvidenceBuilder) {
+    public DiagnosisApplicationService(InMemoryStore store,
+                                       EntityLookupGuard entityLookupGuard,
+                                       DiagnosisRuleEngine diagnosisRuleEngine,
+                                       DiagnosisEvidenceBuilder diagnosisEvidenceBuilder,
+                                       DiagnosisSessionRepository diagnosisSessionRepository,
+                                       LearningSessionRepository learningSessionRepository,
+                                       DiagnosisAnswerRepository diagnosisAnswerRepository,
+                                       LearnerProfileSnapshotRepository learnerProfileSnapshotRepository,
+                                       JsonSerde jsonSerde) {
         this.store = store;
         this.entityLookupGuard = entityLookupGuard;
         this.diagnosisRuleEngine = diagnosisRuleEngine;
         this.diagnosisEvidenceBuilder = diagnosisEvidenceBuilder;
+        this.diagnosisSessionRepository = diagnosisSessionRepository;
+        this.learningSessionRepository = learningSessionRepository;
+        this.diagnosisAnswerRepository = diagnosisAnswerRepository;
+        this.learnerProfileSnapshotRepository = learnerProfileSnapshotRepository;
+        this.jsonSerde = jsonSerde;
     }
 
     public DiagnosisSessionData createSession(String goalId) {
@@ -38,6 +59,18 @@ public class DiagnosisApplicationService {
         String diagnosisId = FixedSampleData.DIAGNOSIS_ID;
         store.getDiagnosisSessionStatuses().put(diagnosisId, DiagnosisSessionStatus.READY.name());
         store.getDiagnosisToGoal().put(diagnosisId, goalId);
+        Long goalDbId = extractNumericId(goalId);
+        Long sessionDbId = extractNumericId(FixedSampleData.SESSION_ID);
+        Long diagnosisDbId = extractNumericId(diagnosisId);
+        // 初始化 learning_session 与 diagnosis_session 到 DB
+        learningSessionRepository.createInitialSession(sessionDbId, goalDbId, diagnosisDbId);
+        String questionsJson = jsonSerde.toJson(questions);
+        diagnosisSessionRepository.saveNew(diagnosisDbId,
+                sessionDbId,
+                goalDbId,
+                DiagnosisSessionStatus.READY.name(),
+                "STRUCTURED",
+                questionsJson);
         return DiagnosisSessionData.builder()
                 .diagnosisId(diagnosisId)
                 .sessionId(FixedSampleData.SESSION_ID)
@@ -65,10 +98,70 @@ public class DiagnosisApplicationService {
         store.getLearnerProfiles().put(diagnosisId, profile);
         store.getDiagnosisEvidenceSummaries().put(diagnosisId, evidence);
         store.getDiagnosisSessionStatuses().put(diagnosisId, DiagnosisSessionStatus.COMPLETED.name());
+        // 持久化标准化答案与 LearnerProfile 快照，并推进状态
+        persistSubmissionToDb(diagnosisId, submission, profile, evidence);
         return SubmitDiagnosisData.builder()
                 .diagnosisId(diagnosisId)
                 .learnerProfileSnapshot(profile)
                 .diagnosisEvidenceSummary(evidence)
                 .build();
+    }
+
+    private void persistSubmissionToDb(String diagnosisId,
+                                       DiagnosisSubmission submission,
+                                       LearnerProfileSnapshot profile,
+                                       navigator.domain.model.DiagnosisEvidenceSummary evidence) {
+        Long diagnosisDbId = extractNumericId(diagnosisId);
+        Long sessionDbId = extractNumericId(FixedSampleData.SESSION_ID);
+        if (diagnosisDbId == null || submission == null) {
+            return;
+        }
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        // 1) 写入每题答案
+        if (submission.getAnswers() != null && !submission.getAnswers().isEmpty()) {
+            diagnosisAnswerRepository.saveAnswers(diagnosisDbId, submission.getAnswers());
+        }
+        // 2) 写入 LearnerProfileSnapshot
+        if (profile != null) {
+            learnerProfileSnapshotRepository.saveProfile(
+                    diagnosisDbId,
+                    sessionDbId,
+                    profile,
+                    evidence
+            );
+        }
+        // 3) 推进 diagnosis_session 与 learning_session 状态
+        diagnosisSessionRepository.markCompleted(diagnosisDbId, DiagnosisSessionStatus.READY);
+        learningSessionRepository.markDiagnosisCompleted(sessionDbId);
+    }
+
+    private navigator.domain.model.GoalContextSnapshot goalContextFromStore(String diagnosisId) {
+        String goalId = store.getDiagnosisToGoal().get(diagnosisId);
+        if (goalId == null) {
+            return null;
+        }
+        return store.getGoalContextSnapshots().get(goalId);
+    }
+
+    private String goalContextPlanningMode(GoalContextSnapshot snapshot) {
+        if (snapshot == null || snapshot.getPlanningMode() == null) {
+            return null;
+        }
+        return snapshot.getPlanningMode().name();
+    }
+
+    private Long extractNumericId(String id) {
+        if (id == null) {
+            return null;
+        }
+        String digits = id.replaceAll("\\D+", "");
+        if (digits.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 }

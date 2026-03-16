@@ -4,6 +4,8 @@ import navigator.api.BusinessErrorCode;
 import navigator.api.BusinessException;
 import navigator.domain.enums.DiagnosisSessionStatus;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.repository.DiagnosisSessionRepository;
+import navigator.infrastructure.persistence.repository.LearningGoalRepository;
 import org.springframework.stereotype.Component;
 
 /**
@@ -14,19 +16,52 @@ public class EntityLookupGuard {
 
     private final InMemoryStore store;
 
-    public EntityLookupGuard(InMemoryStore store) {
+    private final LearningGoalRepository learningGoalRepository;
+    private final DiagnosisSessionRepository diagnosisSessionRepository;
+
+    public EntityLookupGuard(InMemoryStore store,
+                             LearningGoalRepository learningGoalRepository,
+                             DiagnosisSessionRepository diagnosisSessionRepository) {
         this.store = store;
+        this.learningGoalRepository = learningGoalRepository;
+        this.diagnosisSessionRepository = diagnosisSessionRepository;
     }
 
     public void requireGoal(String goalId) {
-        if (goalId == null || !store.getGoals().containsKey(goalId)) {
+        boolean existsInMemory = goalId != null && store.getGoals().containsKey(goalId);
+        boolean existsInDb = false;
+        if (goalId != null) {
+            String digits = goalId.replaceAll("\\D+", "");
+            if (!digits.isEmpty()) {
+                try {
+                    Long dbId = Long.parseLong(digits);
+                    existsInDb = learningGoalRepository.exists(dbId);
+                } catch (NumberFormatException ignored) {
+                    existsInDb = false;
+                }
+            }
+        }
+        if (!existsInMemory && !existsInDb) {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "goal not found: " + goalId);
         }
     }
 
     /** 诊断会话已创建（存在状态记录）即视为存在。 */
     public void requireDiagnosisSession(String diagnosisId) {
-        if (diagnosisId == null || !store.getDiagnosisSessionStatuses().containsKey(diagnosisId)) {
+        boolean existsInMemory = diagnosisId != null && store.getDiagnosisSessionStatuses().containsKey(diagnosisId);
+        boolean existsInDb = false;
+        if (diagnosisId != null) {
+            String digits = diagnosisId.replaceAll("\\D+", "");
+            if (!digits.isEmpty()) {
+                try {
+                    Long dbId = Long.parseLong(digits);
+                    existsInDb = diagnosisSessionRepository.findById(dbId) != null;
+                } catch (NumberFormatException ignored) {
+                    existsInDb = false;
+                }
+            }
+        }
+        if (!existsInMemory && !existsInDb) {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "diagnosis session not found: " + diagnosisId);
         }
     }

@@ -18,6 +18,12 @@ import navigator.domain.model.RecommendedEntry;
 import navigator.domain.model.RecommendedStrategy;
 import navigator.domain.model.TaskBlueprint;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.entity.LearningPlanEntity;
+import navigator.infrastructure.persistence.entity.SessionTaskEntity;
+import navigator.infrastructure.persistence.repository.LearningPlanRepository;
+import navigator.infrastructure.persistence.repository.LearningSessionRepository;
+import navigator.infrastructure.persistence.repository.SessionTaskRepository;
+import navigator.infrastructure.persistence.serde.JsonSerde;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -33,10 +39,22 @@ public class PlanningApplicationService {
     private final PlanStrategySelector planStrategySelector;
     private final RecommendedEntryBuilder recommendedEntryBuilder;
     private final PlanTemplateFactory planTemplateFactory;
+    private final LearningPlanRepository learningPlanRepository;
+    private final SessionTaskRepository sessionTaskRepository;
+    private final LearningSessionRepository learningSessionRepository;
+    private final JsonSerde jsonSerde;
 
-    public PlanningApplicationService(InMemoryStore store, EntityLookupGuard entityLookupGuard, SessionStateGuard sessionStateGuard,
-                                      PlanningContextAssembler planningContextAssembler, PlanStrategySelector planStrategySelector,
-                                      RecommendedEntryBuilder recommendedEntryBuilder, PlanTemplateFactory planTemplateFactory) {
+    public PlanningApplicationService(InMemoryStore store,
+                                      EntityLookupGuard entityLookupGuard,
+                                      SessionStateGuard sessionStateGuard,
+                                      PlanningContextAssembler planningContextAssembler,
+                                      PlanStrategySelector planStrategySelector,
+                                      RecommendedEntryBuilder recommendedEntryBuilder,
+                                      PlanTemplateFactory planTemplateFactory,
+                                      LearningPlanRepository learningPlanRepository,
+                                      SessionTaskRepository sessionTaskRepository,
+                                      LearningSessionRepository learningSessionRepository,
+                                      JsonSerde jsonSerde) {
         this.store = store;
         this.entityLookupGuard = entityLookupGuard;
         this.sessionStateGuard = sessionStateGuard;
@@ -44,6 +62,10 @@ public class PlanningApplicationService {
         this.planStrategySelector = planStrategySelector;
         this.recommendedEntryBuilder = recommendedEntryBuilder;
         this.planTemplateFactory = planTemplateFactory;
+        this.learningPlanRepository = learningPlanRepository;
+        this.sessionTaskRepository = sessionTaskRepository;
+        this.learningSessionRepository = learningSessionRepository;
+        this.jsonSerde = jsonSerde;
     }
 
     public PlanPreviewData preview(String goalId, String diagnosisId) {
@@ -79,6 +101,8 @@ public class PlanningApplicationService {
                 .build();
         store.getPlanPreviews().put(FixedSampleData.PLAN_ID, preview);
         store.getPlanStatuses().put(FixedSampleData.PLAN_ID, PlanStatus.PREVIEW_READY);
+        // 持久化 learning_plan 预览快照
+        persistPreviewToDb(goalId, diagnosisId, strategy, preview);
         String goalSummary = ctx.getGoal() != null && ctx.getGoal().getNormalizedGoalText() != null ? ctx.getGoal().getNormalizedGoalText() : "学习目标";
         return PlanPreviewData.builder()
                 .planId(FixedSampleData.PLAN_ID)
@@ -143,6 +167,12 @@ public class PlanningApplicationService {
             throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not in preview state");
         }
         store.getPlanStatuses().put(planId, PlanStatus.COMMITTED);
+        // CAS 风格推进 DB 中的 plan 状态
+        Long planDbId = extractNumericId(planId);
+        boolean committed = learningPlanRepository.compareAndCommit(planDbId, PlanStatus.PREVIEW_READY);
+        if (!committed) {
+            throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not in preview state");
+        }
         LearningPlanPreview preview = store.getPlanPreviews().get(planId);
         List<String> taskSequence = preview.getTasks() != null
                 ? preview.getTasks().stream().map(TaskBlueprint::getTaskId).collect(Collectors.toList())
@@ -157,6 +187,8 @@ public class PlanningApplicationService {
         state.setCurrentTaskIndex(0);
         state.setStatus("IN_PROGRESS");
         store.getSessions().put(FixedSampleData.SESSION_ID, state);
+        // 物化任务到 session_task 表，并更新 learning_session
+        materializeTasksToDb(planDbId, taskSequence);
         String currentTaskId = taskSequence.isEmpty() ? null : taskSequence.get(0);
         return CommitPlanData.builder()
                 .sessionId(FixedSampleData.SESSION_ID)
@@ -165,5 +197,81 @@ public class PlanningApplicationService {
                 .currentTaskId(currentTaskId)
                 .status("IN_PROGRESS")
                 .build();
+    }
+
+    private void persistPreviewToDb(String goalId,
+                                    String diagnosisId,
+                                    String strategy,
+                                    LearningPlanPreview preview) {
+        Long planDbId = extractNumericId(preview.getPlanId());
+        Long goalDbId = extractNumericId(goalId);
+        Long sessionDbId = extractNumericId(FixedSampleData.SESSION_ID);
+        Long diagnosisDbId = extractNumericId(diagnosisId);
+        if (sessionDbId == null || goalDbId == null || diagnosisDbId == null) {
+            return;
+        }
+        LearningPlanEntity entity = new LearningPlanEntity();
+        entity.setId(planDbId);
+        entity.setSessionId(sessionDbId);
+        entity.setGoalId(goalDbId);
+        entity.setDiagnosisSessionId(diagnosisDbId);
+        entity.setStatus(PlanStatus.PREVIEW_READY.name());
+        entity.setStrategyCode(strategy);
+        entity.setRecommendedEntryJson(jsonSerde.toJson(preview.getRecommendedEntry()));
+        entity.setPlanSnapshotJson(jsonSerde.toJson(preview));
+        entity.setSuccessCriteriaJson(jsonSerde.toJson(preview.getSuccessCriteria()));
+        entity.setRisksJson(jsonSerde.toJson(preview.getRisks()));
+        entity.setKeyEvidenceJson(jsonSerde.toJson(preview.getKeyEvidence()));
+        learningPlanRepository.savePreview(entity);
+    }
+
+    private void materializeTasksToDb(Long planDbId, java.util.List<String> taskSequence) {
+        Long sessionDbId = extractNumericId(FixedSampleData.SESSION_ID);
+        LearningPlanPreview preview = store.getPlanPreviews().get(FixedSampleData.PLAN_ID);
+        if (sessionDbId == null || planDbId == null || preview == null || preview.getTasks() == null) {
+            return;
+        }
+        java.util.Map<String, TaskBlueprint> blueprintById = preview.getTasks().stream()
+                .collect(java.util.stream.Collectors.toMap(TaskBlueprint::getTaskId, t -> t));
+        java.util.List<SessionTaskEntity> entities = new java.util.ArrayList<>();
+        for (int i = 0; i < taskSequence.size(); i++) {
+            String taskId = taskSequence.get(i);
+            TaskBlueprint blueprint = blueprintById.get(taskId);
+            if (blueprint == null) {
+                continue;
+            }
+            SessionTaskEntity entity = new SessionTaskEntity();
+            entity.setSessionId(sessionDbId);
+            entity.setPlanId(planDbId);
+            entity.setStageCode("STAGE_" + (i + 1));
+            entity.setTaskCode(taskId);
+            entity.setTaskType(blueprint.getTaskType() != null ? blueprint.getTaskType().name() : "UNKNOWN");
+            entity.setOrderIndex(i);
+            entity.setTitle(blueprint.getTitle());
+            entity.setObjective(blueprint.getGoal());
+            entity.setTaskSnapshotJson(jsonSerde.toJson(blueprint));
+            entity.setCompletionCriteriaJson(jsonSerde.toJson(blueprint.getCompletionCriteria()));
+            entity.setEstimatedMinutes(blueprint.getEstimatedMinutes());
+            entity.setStatus(i == 0 ? "CURRENT" : "PENDING");
+            entities.add(entity);
+        }
+        sessionTaskRepository.saveAll(entities);
+        // learning_session 中写入 planId、current_task_id、total_task_count 等，由后续阶段细化
+        learningSessionRepository.markDiagnosisCompleted(sessionDbId);
+    }
+
+    private Long extractNumericId(String id) {
+        if (id == null) {
+            return null;
+        }
+        String digits = id.replaceAll("\\D+", "");
+        if (digits.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 }
