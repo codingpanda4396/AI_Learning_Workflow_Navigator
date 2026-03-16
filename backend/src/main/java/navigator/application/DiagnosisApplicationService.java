@@ -31,6 +31,8 @@ public class DiagnosisApplicationService {
     private final DiagnosisEvidenceBuilder diagnosisEvidenceBuilder;
     private final DiagnosisSessionRepository diagnosisSessionRepository;
     private final LearningSessionRepository learningSessionRepository;
+    private final DiagnosisAnswerRepository diagnosisAnswerRepository;
+    private final LearnerProfileSnapshotRepository learnerProfileSnapshotRepository;
     private final JsonSerde jsonSerde;
 
     public DiagnosisApplicationService(InMemoryStore store,
