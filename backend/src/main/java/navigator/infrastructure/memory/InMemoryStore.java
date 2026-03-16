@@ -1,5 +1,6 @@
 package navigator.infrastructure.memory;
 
+import navigator.domain.enums.PlanStatus;
 import navigator.domain.model.*;
 import org.springframework.stereotype.Component;
 
@@ -9,7 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Sprint 0 内存存储，单例式使用。后续可替换为真实 Repository。
+ * Sprint 0 内存存储，单例式使用。Sprint 1 增加诊断会话状态与计划状态。
  */
 @Component
 public class InMemoryStore {
@@ -21,6 +22,13 @@ public class InMemoryStore {
     private final Map<String, LearningPlanPreview> planPreviews = new ConcurrentHashMap<>();
     private final Map<String, LearningSessionState> sessions = new ConcurrentHashMap<>();
     private final Map<String, List<TaskExecutionRecord>> sessionTaskRecords = new ConcurrentHashMap<>();
+
+    /** Sprint 1: diagnosisId -> status (READY, COMPLETED) */
+    private final Map<String, String> diagnosisSessionStatuses = new ConcurrentHashMap<>();
+    /** Sprint 1: diagnosisId -> goalId (for submit to load goal context) */
+    private final Map<String, String> diagnosisToGoal = new ConcurrentHashMap<>();
+    /** Sprint 1: planId -> PlanStatus */
+    private final Map<String, PlanStatus> planStatuses = new ConcurrentHashMap<>();
 
     public Map<String, StructuredLearningGoal> getGoals() {
         return goals;
@@ -52,6 +60,18 @@ public class InMemoryStore {
 
     public List<TaskExecutionRecord> getOrCreateTaskRecords(String sessionId) {
         return sessionTaskRecords.computeIfAbsent(sessionId, k -> new ArrayList<>());
+    }
+
+    public Map<String, String> getDiagnosisSessionStatuses() {
+        return diagnosisSessionStatuses;
+    }
+
+    public Map<String, String> getDiagnosisToGoal() {
+        return diagnosisToGoal;
+    }
+
+    public Map<String, PlanStatus> getPlanStatuses() {
+        return planStatuses;
     }
 
     /**

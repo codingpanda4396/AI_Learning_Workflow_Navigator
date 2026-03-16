@@ -1,0 +1,17 @@
+package navigator.api;
+
+/**
+ * Sprint 1 业务错误码，用于状态机与非法路径校验。
+ */
+public enum BusinessErrorCode {
+    RESOURCE_NOT_FOUND,
+    DIAGNOSIS_NOT_COMPLETED,
+    PLAN_NOT_COMMITTED,
+    TASK_NOT_CURRENT,
+    TASK_ALREADY_COMPLETED,
+    SESSION_NOT_COMPLETED,
+    SESSION_ALREADY_COMPLETED,
+    DIAGNOSIS_ALREADY_COMPLETED,
+    PLAN_ALREADY_COMMITTED,
+    INVALID_ARGUMENT
+}

@@ -1,6 +1,8 @@
 package navigator.application;
 
 import navigator.api.dto.CreateGoalData;
+import navigator.application.goal.GoalContextDeriver;
+import navigator.application.goal.GoalRuleEngine;
 import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearningGoalInput;
 import navigator.domain.model.StructuredLearningGoal;
@@ -11,19 +13,23 @@ import org.springframework.stereotype.Service;
 public class GoalApplicationService {
 
     private final InMemoryStore store;
+    private final GoalRuleEngine goalRuleEngine;
+    private final GoalContextDeriver goalContextDeriver;
 
-    public GoalApplicationService(InMemoryStore store) {
+    public GoalApplicationService(InMemoryStore store, GoalRuleEngine goalRuleEngine, GoalContextDeriver goalContextDeriver) {
         this.store = store;
+        this.goalRuleEngine = goalRuleEngine;
+        this.goalContextDeriver = goalContextDeriver;
     }
 
     public CreateGoalData createGoal(LearningGoalInput input) {
-        String rawText = input.getRawGoalText() != null ? input.getRawGoalText() : "我想搞懂链表";
-        StructuredLearningGoal goal = FixedSampleData.structuredGoal(rawText);
-        GoalContextSnapshot snapshot = FixedSampleData.goalContextSnapshot();
-        store.getGoals().put(FixedSampleData.GOAL_ID, goal);
-        store.getGoalContextSnapshots().put(FixedSampleData.GOAL_ID, snapshot);
+        StructuredLearningGoal goal = goalRuleEngine.derive(input);
+        GoalContextSnapshot snapshot = goalContextDeriver.derive(goal);
+        String goalId = FixedSampleData.GOAL_ID;
+        store.getGoals().put(goalId, goal);
+        store.getGoalContextSnapshots().put(goalId, snapshot);
         return CreateGoalData.builder()
-                .goalId(FixedSampleData.GOAL_ID)
+                .goalId(goalId)
                 .structuredGoal(goal)
                 .goalContextSnapshot(snapshot)
                 .build();

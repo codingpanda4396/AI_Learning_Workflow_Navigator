@@ -41,6 +41,13 @@ public class GlobalResponse<T> {
         return new GlobalResponse<>(ResponseCode.INTERNAL_ERROR.name(), message, null);
     }
 
+    /**
+     * Sprint 1: 业务错误响应，code 为 BusinessErrorCode 名称。
+     */
+    public static <T> GlobalResponse<T> businessError(BusinessErrorCode code, String message) {
+        return new GlobalResponse<>(code.name(), message != null ? message : code.name(), null);
+    }
+
     public String getCode() {
         return code;
     }

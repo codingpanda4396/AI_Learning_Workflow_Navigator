@@ -3,8 +3,11 @@ package navigator.application;
 import navigator.api.dto.CompleteTaskData;
 import navigator.api.dto.CurrentTaskData;
 import navigator.api.dto.TaskInteractionData;
+import navigator.application.guard.SessionStateGuard;
+import navigator.application.guard.TaskProgressGuard;
 import navigator.domain.enums.LearningSessionStatus;
 import navigator.domain.enums.TaskCompletionStatus;
+import navigator.domain.model.LearningPlanPreview;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskExecutionRecord;
 import navigator.infrastructure.memory.InMemoryStore;
@@ -16,14 +19,19 @@ import java.util.List;
 public class ExecutionApplicationService {
 
     private final InMemoryStore store;
+    private final SessionStateGuard sessionStateGuard;
+    private final TaskProgressGuard taskProgressGuard;
 
-    public ExecutionApplicationService(InMemoryStore store) {
+    public ExecutionApplicationService(InMemoryStore store, SessionStateGuard sessionStateGuard, TaskProgressGuard taskProgressGuard) {
         this.store = store;
+        this.sessionStateGuard = sessionStateGuard;
+        this.taskProgressGuard = taskProgressGuard;
     }
 
     public CurrentTaskData getCurrentTask(String sessionId) {
+        sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
-        if (state == null || state.getTaskSequence() == null) {
+        if (state.getTaskSequence() == null) {
             return null;
         }
         int idx = state.getCurrentTaskIndex();
@@ -32,17 +40,14 @@ public class ExecutionApplicationService {
             return null;
         }
         String taskId = seq.get(idx);
-        TaskBlueprint blueprint = FixedSampleData.taskBlueprints().stream()
-                .filter(t -> t.getTaskId().equals(taskId))
-                .findFirst()
-                .orElse(null);
+        TaskBlueprint blueprint = resolveBlueprint(state.getPlanId(), taskId);
         if (blueprint == null) return null;
         CurrentTaskData.CurrentTaskItem item = CurrentTaskData.CurrentTaskItem.builder()
                 .taskId(blueprint.getTaskId())
                 .title(blueprint.getTitle())
                 .taskType(blueprint.getTaskType().name())
                 .goal(blueprint.getGoal())
-                .whyThisTask(FixedSampleData.whyThisTask(taskId))
+                .whyThisTask(blueprint.getPromptScaffold() != null ? blueprint.getPromptScaffold() : FixedSampleData.whyThisTask(taskId))
                 .estimatedMinutes(blueprint.getEstimatedMinutes())
                 .promptScaffold(blueprint.getPromptScaffold())
                 .completionCriteria(blueprint.getCompletionCriteria())
@@ -68,14 +73,14 @@ public class ExecutionApplicationService {
     }
 
     public CompleteTaskData completeTask(String taskId, navigator.api.dto.CompleteTaskRequest request) {
-        InMemoryStore.LearningSessionState state = store.getSessions().get(request.getSessionId());
-        if (state == null) return null;
+        String sessionId = request.getSessionId();
+        taskProgressGuard.requireTaskCanComplete(sessionId, taskId);
+        InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
+        TaskBlueprint blueprint = resolveBlueprint(state.getPlanId(), taskId);
+        String taskTypeName = blueprint != null && blueprint.getTaskType() != null ? blueprint.getTaskType().name() : "CONCEPT_EXPLAIN";
         TaskExecutionRecord record = TaskExecutionRecord.builder()
                 .taskId(taskId)
-                .taskType(state.getTaskSequence().indexOf(taskId) >= 0 ? FixedSampleData.taskBlueprints().stream()
-                        .filter(t -> t.getTaskId().equals(taskId))
-                        .findFirst()
-                        .map(t -> t.getTaskType().name()).orElse("CONCEPT_EXPLAIN") : "CONCEPT_EXPLAIN")
+                .taskType(taskTypeName)
                 .completionStatus(request.getCompletionStatus() != null ? request.getCompletionStatus().name() : TaskCompletionStatus.COMPLETED.name())
                 .durationMinutes(request.getDurationMinutes())
                 .interactionCount(request.getInteractionCount())
@@ -104,5 +109,21 @@ public class ExecutionApplicationService {
                 .nextTaskId(nextTaskId)
                 .sessionProgress(progress)
                 .build();
+    }
+
+    private TaskBlueprint resolveBlueprint(String planId, String taskId) {
+        if (planId != null) {
+            LearningPlanPreview plan = store.getPlanPreviews().get(planId);
+            if (plan != null && plan.getTasks() != null) {
+                return plan.getTasks().stream()
+                        .filter(t -> t.getTaskId().equals(taskId))
+                        .findFirst()
+                        .orElse(null);
+            }
+        }
+        return FixedSampleData.taskBlueprints().stream()
+                .filter(t -> t.getTaskId().equals(taskId))
+                .findFirst()
+                .orElse(null);
     }
 }
