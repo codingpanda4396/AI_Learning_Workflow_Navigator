@@ -1,140 +1,160 @@
 <template>
-  <div class="min-h-screen py-8 px-4">
-    <div class="max-w-3xl mx-auto">
+  <div class="min-h-screen py-8 px-4 relative overflow-hidden">
+    <!-- Floating Background -->
+    <div class="fixed inset-0 pointer-events-none">
+      <div class="absolute top-20 left-20 w-28 h-28 bg-accent/10 rounded-full floating"></div>
+      <div class="absolute top-1/3 right-20 w-24 h-24 bg-primary/10 rounded-full floating floating-delay-1"></div>
+      <div class="absolute bottom-1/4 right-1/3 w-20 h-20 bg-primary-light/10 rounded-full floating floating-delay-2"></div>
+    </div>
+
+    <div class="max-w-3xl mx-auto relative z-10">
       <!-- Header -->
       <div class="text-center mb-8 animate-fade-in">
-        <h1 class="text-2xl font-heading font-bold text-primary-dark mb-2">
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-accent to-green-400 rounded-2xl shadow-float mb-4">
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <h1 class="text-3xl font-heading font-bold gradient-text mb-2">
           学习报告
         </h1>
-        <p class="text-gray-600 text-sm">
-          恭喜完成本次学习！让我们一起看看你的收获
+        <p class="text-lg text-primary/70">
+          恭喜完成本次学习！🎉
         </p>
       </div>
 
       <!-- Loading State -->
-      <div v-if="loading" class="glass-card p-8 text-center animate-fade-in">
-        <svg class="animate-spin h-10 w-10 mx-auto text-primary" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p class="mt-4 text-gray-600">生成报告中...</p>
+      <div v-if="loading" class="clay-card p-12 text-center animate-fade-in">
+        <div class="relative w-24 h-24 mx-auto mb-6">
+          <div class="absolute inset-0 bg-accent/20 rounded-full animate-ping"></div>
+          <div class="relative w-full h-full bg-gradient-to-br from-accent to-green-400 rounded-full flex items-center justify-center">
+            <svg class="animate-spin h-10 w-10 text-white" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l5-5-5-5v4a10 10 0 00-10 10h2z"></path>
+            </svg>
+          </div>
+        </div>
+        <p class="text-xl font-heading text-primary-dark">生成报告中...</p>
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="glass-card p-8 text-center">
-        <p class="text-red-600 mb-4">{{ error }}</p>
-        <button @click="loadReport" class="btn-secondary">
-          重试
-        </button>
+      <div v-else-if="error" class="clay-card p-8 text-center">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <p class="text-red-600 mb-4 text-lg">{{ error }}</p>
+        <button @click="loadReport" class="btn-clay text-primary">🔄 点击重试</button>
       </div>
 
       <!-- Report Content -->
       <div v-else-if="reportData" class="space-y-6">
         <!-- Result Summary -->
-        <div class="glass-card p-6 animate-fade-in">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-12 h-12 bg-accent rounded-xl flex items-center justify-center">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="clay-card p-6 animate-fade-in hover-lift">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-16 h-16 bg-gradient-to-br from-accent to-green-400 rounded-2xl flex items-center justify-center shadow-float">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
               </svg>
             </div>
             <div>
-              <h3 class="text-lg font-heading font-semibold text-gray-800">
-                {{ reportData.resultStatus === 'COMPLETED' ? '学习完成' : '部分完成' }}
+              <h3 class="text-2xl font-heading font-bold text-gray-800">
+                {{ reportData.resultStatus === 'COMPLETED' ? '学习完成！🎉' : '部分完成' }}
               </h3>
-              <p class="text-sm text-gray-500">
+              <p class="text-gray-500">
                 {{ formatCompletedProgress(reportData.completedProgress) }}
               </p>
             </div>
           </div>
 
           <div class="p-4 bg-gray-50 rounded-xl">
-            <p class="text-sm text-gray-600">
+            <p class="text-gray-600">
               {{ reportData.goalReview || '本次学习目标已达成' }}
             </p>
           </div>
         </div>
 
         <!-- Key Gains -->
-        <div class="glass-card p-6 animate-fade-in stagger-1">
-          <h3 class="text-lg font-heading font-semibold text-primary-dark mb-4">
+        <div class="clay-card p-6 animate-fade-in stagger-1 hover-lift">
+          <h3 class="text-xl font-heading font-semibold text-primary-dark mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">💡</span>
             关键收获
           </h3>
-          <div class="p-4 bg-white/60 rounded-xl">
-            <p class="text-sm text-gray-700 whitespace-pre-line">
+          <div class="p-4 bg-primary/5 rounded-xl">
+            <p class="text-gray-700 whitespace-pre-line">
               {{ reportData.summaryText || '暂无总结' }}
             </p>
           </div>
         </div>
 
         <!-- Evidence Summary -->
-        <div v-if="reportData.evidenceSummary?.length" class="glass-card p-6 animate-fade-in stagger-2">
-          <h3 class="text-lg font-heading font-semibold text-primary-dark mb-4">
+        <div v-if="reportData.evidenceSummary?.length" class="clay-card p-6 animate-fade-in stagger-2 hover-lift">
+          <h3 class="text-xl font-heading font-semibold text-primary-dark mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-primary-light/20 rounded-lg flex items-center justify-center">📊</span>
             证据与反馈
           </h3>
-          <div class="p-4 bg-white/60 rounded-xl">
-            <ul class="text-sm text-gray-700 space-y-2">
-              <li v-for="(evidence, idx) in reportData.evidenceSummary" :key="idx">
-                • {{ evidence }}
+          <div class="p-4 bg-primary/5 rounded-xl">
+            <ul class="space-y-2">
+              <li v-for="(evidence, idx) in reportData.evidenceSummary" :key="idx" class="flex items-start gap-2">
+                <span class="text-primary">•</span>
+                <span class="text-gray-700">{{ evidence }}</span>
               </li>
             </ul>
           </div>
         </div>
 
         <!-- Unresolved Issues -->
-        <div v-if="reportData.unresolvedIssues?.length" class="glass-card p-6 animate-fade-in stagger-3">
-          <h3 class="text-lg font-heading font-semibold text-amber-700 mb-4">
+        <div v-if="reportData.unresolvedIssues?.length" class="clay-card p-6 animate-fade-in stagger-3 hover-lift">
+          <h3 class="text-xl font-heading font-semibold text-amber-700 mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">⚠️</span>
             待改进项
           </h3>
-          <div class="space-y-2">
+          <div class="space-y-3">
             <div
               v-for="(issue, idx) in reportData.unresolvedIssues"
               :key="idx"
-              class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3"
+              class="p-3 bg-amber-50 rounded-xl flex items-start gap-3"
             >
-              <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-              </svg>
-              <p class="text-sm text-amber-700">{{ issue }}</p>
+              <span class="text-amber-500">•</span>
+              <p class="text-amber-700">{{ issue }}</p>
             </div>
           </div>
         </div>
 
         <!-- Next Action Section -->
-        <div class="glass-card p-6 animate-fade-in stagger-4">
-          <h3 class="text-lg font-heading font-semibold text-primary-dark mb-4">
+        <div class="clay-card p-6 animate-fade-in stagger-4">
+          <h3 class="text-xl font-heading font-semibold text-primary-dark mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">🚀</span>
             下一步建议
           </h3>
 
           <!-- If next action already in report -->
           <div v-if="reportData.nextAction && !showNextAction" class="space-y-4">
-            <div class="p-4 bg-gradient-to-r from-primary/10 to-primary-light/10 rounded-xl border border-primary/20">
-              <p class="text-sm font-medium text-primary-dark mb-2">
-                推荐方向：{{ reportData.nextAction.actionType }}
+            <div class="p-4 bg-gradient-to-r from-primary/10 to-accent/10 rounded-xl border-2 border-primary/20">
+              <p class="font-heading font-medium text-primary-dark mb-2">
+                📍 推荐方向：{{ reportData.nextAction.actionType }}
               </p>
-              <p class="text-sm text-gray-700">
+              <p class="text-gray-700">
                 {{ reportData.nextAction.reason }}
               </p>
             </div>
 
-            <div v-if="reportData.nextAction.nextEntryPoint" class="p-4 bg-white/60 rounded-xl">
-              <p class="text-sm text-gray-600">
-                <span class="font-medium">建议入口：</span>
+            <div v-if="reportData.nextAction.nextEntryPoint" class="p-4 bg-gray-50 rounded-xl">
+              <p class="text-gray-600">
+                <span class="font-medium">💡 建议入口：</span>
                 {{ reportData.nextAction.nextEntryPoint }}
               </p>
             </div>
 
-            <div v-if="reportData.nextAction.requiresReplan" class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <p class="text-sm text-amber-700">
-                需要重新规划学习路径
+            <div v-if="reportData.nextAction.requiresReplan" class="p-4 bg-amber-50 rounded-xl border-l-4 border-amber-400">
+              <p class="text-amber-700">
+                ⚠️ 需要重新规划学习路径
               </p>
             </div>
 
-            <button
-              @click="startNewSession"
-              class="w-full btn-primary flex items-center justify-center gap-2"
-            >
-              <span>开始新一轮学习</span>
+            <button @click="startNewSession" class="btn-primary-clay w-full text-lg flex items-center justify-center gap-2">
+              <span>🚀 开始新一轮学习</span>
             </button>
           </div>
 
@@ -144,54 +164,50 @@
               @click="requestNextAction"
               :disabled="requesting"
               :class="[
-                'w-full btn-primary flex items-center justify-center gap-2',
+                'btn-primary-clay w-full text-lg flex items-center justify-center gap-2',
                 requesting && 'opacity-50 cursor-not-allowed'
               ]"
             >
-              <svg v-if="requesting" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+              <svg v-if="requesting" class="animate-spin h-6 w-6" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l5-5-5-5v4a10 10 0 00-10 10h2z"></path>
               </svg>
-              <span>{{ requesting ? '分析中...' : '获取下一步建议' }}</span>
+              <span>{{ requesting ? '分析中...' : '✨ 获取下一步建议' }}</span>
             </button>
           </div>
 
           <!-- Display next action after API call -->
           <div v-else class="space-y-4">
-            <div class="p-4 bg-gradient-to-r from-primary/10 to-primary-light/10 rounded-xl border border-primary/20">
-              <p class="text-sm font-medium text-primary-dark mb-2">
-                推荐方向：{{ nextActionData.actionType }}
+            <div class="p-4 bg-gradient-to-r from-primary/10 to-accent/10 rounded-xl border-2 border-primary/20">
+              <p class="font-heading font-medium text-primary-dark mb-2">
+                📍 推荐方向：{{ nextActionData.actionType }}
               </p>
-              <p class="text-sm text-gray-700">
+              <p class="text-gray-700">
                 {{ nextActionData.reason }}
               </p>
             </div>
 
-            <div v-if="nextActionData.nextEntryPoint" class="p-4 bg-white/60 rounded-xl">
-              <p class="text-sm text-gray-600">
-                <span class="font-medium">建议入口：</span>
+            <div v-if="nextActionData.nextEntryPoint" class="p-4 bg-gray-50 rounded-xl">
+              <p class="text-gray-600">
+                <span class="font-medium">💡 建议入口：</span>
                 {{ nextActionData.nextEntryPoint }}
               </p>
             </div>
 
-            <div v-if="nextActionData.requiresReplan" class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <p class="text-sm text-amber-700">
-                需要重新规划学习路径
+            <div v-if="nextActionData.requiresReplan" class="p-4 bg-amber-50 rounded-xl border-l-4 border-amber-400">
+              <p class="text-amber-700">
+                ⚠️ 需要重新规划学习路径
               </p>
             </div>
 
-            <button
-              @click="startNewSession"
-              class="w-full btn-primary flex items-center justify-center gap-2"
-            >
-              <span>开始新一轮学习</span>
+            <button @click="startNewSession" class="btn-primary-clay w-full text-lg flex items-center justify-center gap-2">
+              <span>🚀 开始新一轮学习</span>
             </button>
           </div>
         </div>
 
-        <!-- Error Message -->
-        <div v-if="error" class="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-          {{ error }}
+        <div v-if="error" class="p-4 bg-red-100 border-2 border-red-300 rounded-xl text-red-600 text-sm">
+          ⚠️ {{ error }}
         </div>
       </div>
     </div>
@@ -236,7 +252,6 @@ async function loadReport() {
     if (data.code === 'OK') {
       reportData.value = data.data.learningReport
       store.setReport(data.data)
-      // Check if nextAction is already in the report
       if (reportData.value.nextAction) {
         showNextAction.value = true
         nextActionData.value = reportData.value.nextAction
@@ -256,7 +271,6 @@ async function requestNextAction() {
   error.value = ''
 
   try {
-    // Use actionType from report if available, otherwise default
     const actionType = reportData.value?.nextAction?.actionType || 'CONTINUE'
 
     const response = await sessionApi.requestNextAction(store.sessionId, actionType)

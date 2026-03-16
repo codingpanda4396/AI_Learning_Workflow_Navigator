@@ -1,13 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&family=Comic+Neue:wght@300;400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --color-primary: #0891B2;
-  --color-primary-light: #22D3EE;
+  --color-primary: #4F46E5;
+  --color-primary-light: #818CF8;
   --color-accent: #22C55E;
-  --color-background: #ECFEFF;
-  --color-text: #164E63;
+  --color-background: #EEF2FF;
+  --color-text: #312E81;
 }
 
 * {
@@ -17,65 +19,169 @@
 }
 
 body {
-  font-family: 'Fira Sans', sans-serif;
+  font-family: 'Comic Neue', sans-serif;
   background: var(--color-background);
   color: var(--color-text);
   min-height: 100vh;
   background-image:
-    radial-gradient(at 40% 20%, rgba(8, 145, 178, 0.1) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, rgba(34, 211, 238, 0.15) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, rgba(8, 145, 178, 0.08) 0px, transparent 50%),
-    radial-gradient(at 80% 50%, rgba(34, 197, 94, 0.08) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(34, 211, 238, 0.1) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(129, 140, 248, 0.2) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(79, 70, 229, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(34, 197, 94, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(129, 140, 248, 0.15) 0px, transparent 50%);
+  background-attachment: fixed;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Fira Code', monospace;
+  font-family: 'Baloo 2', cursive;
 }
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+/* Claymorphism Card */
+.clay-card {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    8px 8px 16px rgba(0, 0, 0, 0.1),
+    -8px -8px 16px rgba(255, 255, 255, 0.8),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.clay-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow:
+    12px 12px 24px rgba(79, 70, 229, 0.15),
+    -12px -12px 24px rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(79, 70, 229, 0.1);
+}
+
+/* Clay Button */
+.btn-clay {
+  @apply px-6 py-3 font-heading font-semibold rounded-xl transition-all duration-300 cursor-pointer;
+  background: linear-gradient(145deg, #ffffff, #e6e6e6);
+  box-shadow:
+    6px 6px 12px rgba(0, 0, 0, 0.1),
+    -6px -6px 12px rgba(255, 255, 255, 0.8);
+  border: 2px solid transparent;
+}
+
+.btn-clay:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    8px 8px 16px rgba(0, 0, 0, 0.15),
+    -8px -8px 16px rgba(255, 255, 255, 0.9);
+}
+
+.btn-clay:active {
+  transform: translateY(0);
+  box-shadow:
+    4px 4px 8px rgba(0, 0, 0, 0.1),
+    -4px -4px 8px rgba(255, 255, 255, 0.7);
+}
+
+.btn-primary-clay {
+  @apply px-8 py-4 bg-primary text-white font-heading font-bold rounded-2xl;
+  box-shadow:
+    0 8px 0 #3730A3,
+    0 12px 20px rgba(79, 70, 229, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-primary-clay:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 0 #3730A3,
+    0 16px 28px rgba(79, 70, 229, 0.5);
+}
+
+.btn-primary-clay:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 4px 0 #3730A3,
+    0 6px 12px rgba(79, 70, 229, 0.3);
+}
+
+/* Input Field */
+.input-clay {
+  @apply w-full px-5 py-4 bg-white rounded-xl border-2 border-transparent;
+  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.8);
   transition: all 0.3s ease;
 }
 
-.glass-card:hover {
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
+.input-clay:focus {
+  @apply border-primary-light outline-none;
+  box-shadow:
+    inset 4px 4px 8px rgba(79, 70, 229, 0.1),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.9),
+    0 0 0 4px rgba(79, 70, 229, 0.1);
 }
 
-.btn-primary {
-  @apply px-6 py-3 bg-primary text-white font-medium rounded-xl
-         transition-all duration-200 cursor-pointer
-         hover:bg-primary-dark hover:shadow-lg
-         focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-offset-2;
+/* Option Button */
+.option-clay {
+  @apply w-full p-4 rounded-xl text-left font-body transition-all duration-200 cursor-pointer;
+  background: linear-gradient(145deg, #ffffff, #f0f0f0);
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.08), -4px -4px 8px rgba(255, 255, 255, 0.8);
+  border: 2px solid transparent;
 }
 
-.btn-secondary {
-  @apply px-6 py-3 bg-white text-primary border-2 border-primary font-medium rounded-xl
-         transition-all duration-200 cursor-pointer
-         hover:bg-primary hover:text-white
-         focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-offset-2;
+.option-clay:hover {
+  transform: translateX(8px);
+  border-color: var(--color-primary-light);
+  box-shadow: 6px 6px 12px rgba(79, 70, 229, 0.15), -6px -6px 12px rgba(255, 255, 255, 0.9);
 }
 
-.input-field {
-  @apply w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl
-         focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent
-         placeholder-gray-400 transition-all duration-200;
+.option-clay.selected {
+  @apply bg-primary text-white;
+  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-primary);
 }
 
+/* Tag Button */
+.tag-clay {
+  @apply px-4 py-2 rounded-full font-body text-sm transition-all duration-200 cursor-pointer;
+  background: linear-gradient(145deg, #ffffff, #f0f0f0);
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.08), -3px -3px 6px rgba(255, 255, 255, 0.8);
+  border: 2px solid transparent;
+}
+
+.tag-clay:hover {
+  transform: scale(1.05);
+}
+
+.tag-clay.selected {
+  @apply bg-primary-light text-white;
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Progress Bar */
+.progress-clay {
+  @apply h-3 bg-gray-200 rounded-full overflow-hidden;
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-clay-fill {
+  @apply h-full rounded-full transition-all duration-500 ease-out;
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-light) 50%, var(--color-accent) 100%);
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+}
+
+/* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-20px); }
+  from { opacity: 0; transform: translateX(-30px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.8); }
+  70% { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 .animate-fade-in {
@@ -86,8 +192,65 @@ h1, h2, h3, h4, h5, h6 {
   animation: slideIn 0.4s ease-out forwards;
 }
 
+.animate-pop-in {
+  animation: popIn 0.3s ease-out forwards;
+}
+
 .stagger-1 { animation-delay: 0.1s; }
 .stagger-2 { animation-delay: 0.2s; }
 .stagger-3 { animation-delay: 0.3s; }
 .stagger-4 { animation-delay: 0.4s; }
 .stagger-5 { animation-delay: 0.5s; }
+
+/* Floating Elements */
+.floating {
+  animation: float 4s ease-in-out infinite;
+}
+
+.floating-delay-1 { animation-delay: 0.5s; }
+.floating-delay-2 { animation-delay: 1s; }
+.floating-delay-3 { animation-delay: 1.5s; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(2deg); }
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, #4F46E5 0%, #818CF8 50%, #22C55E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow Effect */
+.glow-primary {
+  box-shadow: 0 0 20px rgba(79, 70, 229, 0.4);
+}
+
+.glow-accent {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+}
+
+/* Card hover lift */
+.hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(79, 70, 229, 0.2);
+}
+
+/* Shimmer loading */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
