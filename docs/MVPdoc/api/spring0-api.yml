@@ -1,0 +1,1200 @@
+openapi: 3.0.3
+info:
+  title: AI Learning Workflow Navigator - Sprint 0 API
+  version: 1.0.0
+  description: |
+    Sprint 0 闭环接口文档：
+    目标输入 -> 用户诊断 -> 学习规划 -> 任务执行 -> 学习报告 -> Next Action
+
+servers:
+  - url: http://localhost:8080
+    description: Local Dev
+
+tags:
+  - name: Goal
+  - name: Diagnosis
+  - name: Learning Plan
+  - name: Session
+  - name: Task
+
+paths:
+  /api/goals:
+    post:
+      tags: [Goal]
+      summary: 创建学习目标
+      operationId: createGoal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LearningGoalInput'
+            example:
+              rawGoalText: 我想搞懂链表
+              timeBudget: WITHIN_30_MIN
+              selfReportedLevel: BASIC
+              preferenceTags:
+                - CONCEPT_FIRST
+                - STEP_BY_STEP
+              goalTypeHint: LEARN_NEW_CONCEPT
+              subjectHint: 数据结构
+              topicHints:
+                - 链表
+              sourceContext: 408复习
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateGoalResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/diagnosis/sessions:
+    post:
+      tags: [Diagnosis]
+      summary: 创建诊断会话
+      operationId: createDiagnosisSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDiagnosisSessionRequest'
+            example:
+              goalId: goal_001
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateDiagnosisSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/diagnosis/submissions:
+    post:
+      tags: [Diagnosis]
+      summary: 提交诊断答案
+      operationId: submitDiagnosis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiagnosisSubmissionRequest'
+            example:
+              diagnosisId: diag_001
+              answers:
+                - questionId: q_foundation
+                  selectedOptions:
+                    - BASIC
+                - questionId: q_gap
+                  selectedOptions:
+                    - CONCEPT_GAP
+      responses:
+        '200':
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosisSubmissionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/learning-plans/preview:
+    post:
+      tags: [Learning Plan]
+      summary: 生成学习计划预览
+      operationId: previewLearningPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanPreviewRequest'
+            example:
+              goalId: goal_001
+              diagnosisId: diag_001
+      responses:
+        '200':
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanPreviewResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/learning-plans/commit:
+    post:
+      tags: [Learning Plan]
+      summary: 确认学习计划
+      operationId: commitLearningPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanCommitRequest'
+            example:
+              planId: plan_001
+      responses:
+        '200':
+          description: 确认成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanCommitResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/sessions/{sessionId}/current-task:
+    get:
+      tags: [Session]
+      summary: 获取当前任务
+      operationId: getCurrentTask
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: learn_session_001
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetCurrentTaskResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/sessions/{sessionId}/report:
+    get:
+      tags: [Session]
+      summary: 获取学习报告
+      operationId: getLearningReport
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: learn_session_001
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLearningReportResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/sessions/{sessionId}/next-action:
+    post:
+      tags: [Session]
+      summary: 确认下一步动作
+      operationId: confirmNextAction
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: learn_session_001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NextActionRequest'
+            example:
+              actionType: REINFORCE
+      responses:
+        '200':
+          description: 确认成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NextActionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/tasks/{taskId}/interactions:
+    post:
+      tags: [Task]
+      summary: 记录任务交互行为
+      operationId: recordTaskInteraction
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: task_001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskInteractionRequest'
+            example:
+              sessionId: learn_session_001
+              interactionType: USER_TUTOR_MESSAGE
+              interactionCountDelta: 1
+              userSummarySubmitted: false
+              behaviorSignals:
+                - ASKED_FOR_EXAMPLE
+              detectedIssueTags:
+                - CONCEPT_CONFUSION
+              contentSummary: 用户要求举一个两节点链表示例
+      responses:
+        '200':
+          description: 记录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskInteractionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/tasks/{taskId}/complete:
+    post:
+      tags: [Task]
+      summary: 完成当前任务
+      operationId: completeTask
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: task_001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCompleteRequest'
+            example:
+              sessionId: learn_session_001
+              completionStatus: COMPLETED
+              durationMinutes: 9
+              interactionCount: 3
+              userSummarySubmitted: true
+              microPracticeResult: NOT_APPLICABLE
+              detectedIssueTags: []
+              behaviorSignals:
+                - USED_OWN_WORDS
+                - ASKED_FOR_EXAMPLE
+              learnerReflection: 我现在知道链表不是连续存储，节点之间靠指针连接。
+      responses:
+        '200':
+          description: 完成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskCompleteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+components:
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: BAD_REQUEST
+            message: goalId is required
+            data: null
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: NOT_FOUND
+            message: resource not found
+            data: null
+    Conflict:
+      description: 状态冲突
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: CONFLICT
+            message: plan already committed
+            data: null
+
+  schemas:
+    GlobalResponseBase:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [OK, BAD_REQUEST, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
+        message:
+          type: string
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              nullable: true
+
+    CreateGoalResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/CreateGoalData'
+
+    CreateDiagnosisSessionResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/CreateDiagnosisSessionData'
+
+    DiagnosisSubmissionResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/DiagnosisSubmissionData'
+
+    PlanPreviewResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/LearningPlanPreview'
+
+    PlanCommitResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PlanCommitData'
+
+    GetCurrentTaskResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/GetCurrentTaskData'
+
+    TaskInteractionResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/TaskInteractionData'
+
+    TaskCompleteResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/TaskCompleteData'
+
+    GetLearningReportResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/GetLearningReportData'
+
+    NextActionResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/NextActionResponseData'
+
+    GoalType:
+      type: string
+      enum:
+        - LEARN_NEW_CONCEPT
+        - REVIEW_FOR_EXAM
+        - FIX_SPECIFIC_BLOCKER
+        - PRACTICE_ENHANCEMENT
+        - BUILD_SYSTEMATIC_UNDERSTANDING
+
+    TimeBudget:
+      type: string
+      enum:
+        - WITHIN_15_MIN
+        - WITHIN_30_MIN
+        - WITHIN_60_MIN
+        - MULTI_DAY
+        - LONG_TERM
+
+    SelfReportedLevel:
+      type: string
+      enum:
+        - BEGINNER
+        - BASIC
+        - PARTIAL_UNDERSTANDING
+        - CAN_EXPLAIN_BUT_NOT_APPLY
+        - SOLID_BUT_WANT_IMPROVE
+
+    PreferenceTag:
+      type: string
+      enum:
+        - CONCEPT_FIRST
+        - EXAMPLE_FIRST
+        - PRACTICE_FIRST
+        - STEP_BY_STEP
+        - FAST_TRACK
+        - FRAMEWORK_FIRST
+
+    PlanningMode:
+      type: string
+      enum:
+        - STEADY_FOUNDATION
+        - CONCEPT_CLARIFICATION
+        - PRACTICE_DRIVEN
+        - EXAM_CRASH
+        - SYSTEMATIC_BUILD
+        - LOCAL_REPAIR
+
+    EntryGranularity:
+      type: string
+      enum:
+        - MICRO
+        - SMALL
+        - MEDIUM
+
+    FoundationLevel:
+      type: string
+      enum:
+        - BEGINNER
+        - BASIC
+        - INTERMEDIATE
+        - SOLID
+
+    ConfidenceLevel:
+      type: string
+      enum:
+        - LOW
+        - MEDIUM
+        - HIGH
+
+    RecommendedStrategyCode:
+      type: string
+      enum:
+        - REBUILD_FOUNDATION
+        - CLARIFY_CORE_CONCEPT
+        - PRACTICE_WITH_SCAFFOLD
+        - COMPRESSED_REVIEW
+        - PATCH_PREREQUISITE
+        - PROGRESSIVE_SYSTEMATIC
+
+    TaskType:
+      type: string
+      enum:
+        - CONCEPT_EXPLAIN
+        - COMPARE_AND_CONNECT
+        - GUIDED_EXAMPLE
+        - SELF_EXPLANATION
+        - MICRO_PRACTICE
+        - CHECKPOINT_REVIEW
+
+    TaskCompletionStatus:
+      type: string
+      enum:
+        - NOT_STARTED
+        - IN_PROGRESS
+        - COMPLETED
+        - SKIPPED
+        - BLOCKED
+
+    ResultStatus:
+      type: string
+      enum:
+        - ACHIEVED
+        - PARTIALLY_ACHIEVED
+        - NOT_ACHIEVED
+
+    NextActionType:
+      type: string
+      enum:
+        - CONTINUE
+        - REINFORCE
+        - REMEDIATE_PREREQUISITE
+        - REDUCE_GRANULARITY
+        - CHANGE_STRATEGY
+
+    DiagnosisSessionStatus:
+      type: string
+      enum:
+        - READY
+        - COMPLETED
+
+    PlanStatus:
+      type: string
+      enum:
+        - PREVIEW_READY
+        - COMMITTED
+
+    LearningSessionStatus:
+      type: string
+      enum:
+        - IN_PROGRESS
+        - COMPLETED
+
+    LearningGoalInput:
+      type: object
+      required:
+        - rawGoalText
+        - timeBudget
+        - selfReportedLevel
+      properties:
+        rawGoalText:
+          type: string
+        timeBudget:
+          $ref: '#/components/schemas/TimeBudget'
+        selfReportedLevel:
+          $ref: '#/components/schemas/SelfReportedLevel'
+        preferenceTags:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreferenceTag'
+        goalTypeHint:
+          $ref: '#/components/schemas/GoalType'
+        subjectHint:
+          type: string
+        topicHints:
+          type: array
+          items:
+            type: string
+        sourceContext:
+          type: string
+
+    StructuredLearningGoal:
+      type: object
+      properties:
+        rawGoalText:
+          type: string
+        normalizedGoalText:
+          type: string
+        goalType:
+          $ref: '#/components/schemas/GoalType'
+        subject:
+          type: string
+        topicScopeType:
+          type: string
+        topics:
+          type: array
+          items:
+            type: string
+        intentDescription:
+          type: string
+        timeBudget:
+          $ref: '#/components/schemas/TimeBudget'
+        urgencyLevel:
+          type: string
+        expectedDepth:
+          type: string
+        selfReportedLevel:
+          $ref: '#/components/schemas/SelfReportedLevel'
+        preferenceTags:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreferenceTag'
+        constraints:
+          type: array
+          items:
+            type: string
+        sourceContext:
+          type: string
+
+    GoalContextSnapshot:
+      type: object
+      properties:
+        requiresDiagnosis:
+          type: boolean
+        planningMode:
+          $ref: '#/components/schemas/PlanningMode'
+        entryGranularity:
+          $ref: '#/components/schemas/EntryGranularity'
+        strategyHints:
+          type: array
+          items:
+            type: string
+        riskTags:
+          type: array
+          items:
+            type: string
+        explanationFocus:
+          type: array
+          items:
+            type: string
+        createdFrom:
+          type: string
+        version:
+          type: integer
+          format: int32
+
+    CreateGoalData:
+      type: object
+      properties:
+        goalId:
+          type: string
+        structuredGoal:
+          $ref: '#/components/schemas/StructuredLearningGoal'
+        goalContextSnapshot:
+          $ref: '#/components/schemas/GoalContextSnapshot'
+
+    CreateDiagnosisSessionRequest:
+      type: object
+      required: [goalId]
+      properties:
+        goalId:
+          type: string
+
+    DiagnosisOption:
+      type: object
+      properties:
+        code:
+          type: string
+        label:
+          type: string
+        order:
+          type: integer
+          format: int32
+
+    DiagnosisQuestion:
+      type: object
+      properties:
+        questionId:
+          type: string
+        dimension:
+          type: string
+        type:
+          type: string
+        required:
+          type: boolean
+        title:
+          type: string
+        description:
+          type: string
+        whyAsking:
+          type: string
+        impactsPlanning:
+          type: array
+          items:
+            type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisOption'
+
+    CreateDiagnosisSessionData:
+      type: object
+      properties:
+        diagnosisId:
+          type: string
+        sessionId:
+          type: string
+        status:
+          $ref: '#/components/schemas/DiagnosisSessionStatus'
+        generationMode:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisQuestion'
+
+    DiagnosisAnswer:
+      type: object
+      required: [questionId]
+      properties:
+        questionId:
+          type: string
+        selectedOptions:
+          type: array
+          items:
+            type: string
+        textAnswer:
+          type: string
+
+    DiagnosisSubmissionRequest:
+      type: object
+      required:
+        - diagnosisId
+        - answers
+      properties:
+        diagnosisId:
+          type: string
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisAnswer'
+
+    LearnerProfileSnapshot:
+      type: object
+      properties:
+        diagnosisId:
+          type: string
+        foundationLevel:
+          $ref: '#/components/schemas/FoundationLevel'
+        confidenceLevel:
+          $ref: '#/components/schemas/ConfidenceLevel'
+        comprehensionPattern:
+          type: string
+        executionPattern:
+          type: string
+        blockerTags:
+          type: array
+          items:
+            type: string
+        riskTags:
+          type: array
+          items:
+            type: string
+        suggestedEntryStrategy:
+          type: string
+        suggestedGranularity:
+          type: string
+        suggestedFeedbackFrequency:
+          type: string
+        planningHints:
+          type: array
+          items:
+            type: string
+
+    DiagnosisEvidenceSummary:
+      type: object
+      properties:
+        summary:
+          type: string
+        keyEvidence:
+          type: array
+          items:
+            type: string
+        primaryGapType:
+          type: string
+        primaryRiskTags:
+          type: array
+          items:
+            type: string
+        explanationPoints:
+          type: array
+          items:
+            type: string
+
+    DiagnosisSubmissionData:
+      type: object
+      properties:
+        diagnosisId:
+          type: string
+        learnerProfileSnapshot:
+          $ref: '#/components/schemas/LearnerProfileSnapshot'
+        diagnosisEvidenceSummary:
+          $ref: '#/components/schemas/DiagnosisEvidenceSummary'
+
+    PlanPreviewRequest:
+      type: object
+      required:
+        - goalId
+        - diagnosisId
+      properties:
+        goalId:
+          type: string
+        diagnosisId:
+          type: string
+
+    RecommendedEntry:
+      type: object
+      properties:
+        conceptId:
+          type: string
+        title:
+          type: string
+        estimatedMinutes:
+          type: integer
+          format: int32
+        reason:
+          type: string
+
+    RecommendedStrategy:
+      type: object
+      properties:
+        code:
+          $ref: '#/components/schemas/RecommendedStrategyCode'
+        label:
+          type: string
+        reason:
+          type: string
+
+    PlanStage:
+      type: object
+      properties:
+        stageCode:
+          type: string
+        title:
+          type: string
+        objective:
+          type: string
+        estimatedMinutes:
+          type: integer
+          format: int32
+
+    TaskBlueprint:
+      type: object
+      properties:
+        taskId:
+          type: string
+        title:
+          type: string
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+        goal:
+          type: string
+        estimatedMinutes:
+          type: integer
+          format: int32
+        promptScaffold:
+          type: string
+        completionCriteria:
+          type: array
+          items:
+            type: string
+        evidenceToCollect:
+          type: array
+          items:
+            type: string
+        fallbackAction:
+          type: string
+
+    LearningPlanPreview:
+      type: object
+      properties:
+        planId:
+          type: string
+        status:
+          $ref: '#/components/schemas/PlanStatus'
+        previewOnly:
+          type: boolean
+        committed:
+          type: boolean
+        goal:
+          type: string
+        recommendedEntry:
+          $ref: '#/components/schemas/RecommendedEntry'
+        recommendedStrategy:
+          $ref: '#/components/schemas/RecommendedStrategy'
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanStage'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskBlueprint'
+        successCriteria:
+          type: array
+          items:
+            type: string
+        keyEvidence:
+          type: array
+          items:
+            type: string
+        risks:
+          type: array
+          items:
+            type: string
+
+    PlanCommitRequest:
+      type: object
+      required: [planId]
+      properties:
+        planId:
+          type: string
+
+    PlanCommitData:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        planId:
+          type: string
+        taskSequence:
+          type: array
+          items:
+            type: string
+        currentTaskId:
+          type: string
+        status:
+          $ref: '#/components/schemas/LearningSessionStatus'
+
+    CurrentTask:
+      type: object
+      properties:
+        taskId:
+          type: string
+        title:
+          type: string
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+        goal:
+          type: string
+        whyThisTask:
+          type: string
+        estimatedMinutes:
+          type: integer
+          format: int32
+        promptScaffold:
+          type: string
+        completionCriteria:
+          type: array
+          items:
+            type: string
+        fallbackAction:
+          type: string
+
+    SessionProgress:
+      type: object
+      properties:
+        currentIndex:
+          type: integer
+          format: int32
+        totalTasks:
+          type: integer
+          format: int32
+
+    GetCurrentTaskData:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        currentTask:
+          $ref: '#/components/schemas/CurrentTask'
+        progress:
+          $ref: '#/components/schemas/SessionProgress'
+
+    TaskInteractionRequest:
+      type: object
+      required:
+        - sessionId
+        - interactionType
+      properties:
+        sessionId:
+          type: string
+        interactionType:
+          type: string
+        interactionCountDelta:
+          type: integer
+          format: int32
+        userSummarySubmitted:
+          type: boolean
+        behaviorSignals:
+          type: array
+          items:
+            type: string
+        detectedIssueTags:
+          type: array
+          items:
+            type: string
+        contentSummary:
+          type: string
+
+    TaskInteractionData:
+      type: object
+      properties:
+        taskId:
+          type: string
+        accepted:
+          type: boolean
+
+    TaskCompleteRequest:
+      type: object
+      required:
+        - sessionId
+        - completionStatus
+      properties:
+        sessionId:
+          type: string
+        completionStatus:
+          $ref: '#/components/schemas/TaskCompletionStatus'
+        durationMinutes:
+          type: integer
+          format: int32
+        interactionCount:
+          type: integer
+          format: int32
+        userSummarySubmitted:
+          type: boolean
+        microPracticeResult:
+          type: string
+        detectedIssueTags:
+          type: array
+          items:
+            type: string
+        behaviorSignals:
+          type: array
+          items:
+            type: string
+        learnerReflection:
+          type: string
+
+    TaskExecutionRecord:
+      type: object
+      properties:
+        taskId:
+          type: string
+        taskType:
+          type: string
+        completionStatus:
+          type: string
+        durationMinutes:
+          type: integer
+          format: int32
+        interactionCount:
+          type: integer
+          format: int32
+        userSummarySubmitted:
+          type: boolean
+        microPracticeResult:
+          type: string
+        detectedIssueTags:
+          type: array
+          items:
+            type: string
+        behaviorSignals:
+          type: array
+          items:
+            type: string
+        learnerReflection:
+          type: string
+
+    TaskCompleteData:
+      type: object
+      properties:
+        taskExecutionRecord:
+          $ref: '#/components/schemas/TaskExecutionRecord'
+        nextTaskAvailable:
+          type: boolean
+        nextTaskId:
+          type: string
+          nullable: true
+        sessionProgress:
+          type: object
+          properties:
+            completedTasks:
+              type: integer
+              format: int32
+            totalTasks:
+              type: integer
+              format: int32
+
+    NextActionDecision:
+      type: object
+      properties:
+        actionType:
+          $ref: '#/components/schemas/NextActionType'
+        reason:
+          type: string
+        nextEntryPoint:
+          type: string
+        adjustmentSignals:
+          type: array
+          items:
+            type: string
+        requiresReplan:
+          type: boolean
+
+    LearningReport:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        resultStatus:
+          $ref: '#/components/schemas/ResultStatus'
+        goalReview:
+          type: string
+        completedProgress:
+          type: array
+          items:
+            type: string
+        unresolvedIssues:
+          type: array
+          items:
+            type: string
+        evidenceSummary:
+          type: array
+          items:
+            type: string
+        summaryText:
+          type: string
+        nextAction:
+          $ref: '#/components/schemas/NextActionDecision'
+
+    GetLearningReportData:
+      type: object
+      properties:
+        learningReport:
+          $ref: '#/components/schemas/LearningReport'
+        nextActionDecision:
+          $ref: '#/components/schemas/NextActionDecision'
+
+    NextActionRequest:
+      type: object
+      required: [actionType]
+      properties:
+        actionType:
+          $ref: '#/components/schemas/NextActionType'
+
+    NextActionResponseData:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        acceptedAction:
+          $ref: '#/components/schemas/NextActionType'
+        requiresReplan:
+          type: boolean
+        nextHint:
+          type: string
