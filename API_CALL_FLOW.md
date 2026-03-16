@@ -102,3 +102,23 @@
 - 报告页：仅需 `sessionId` 拉报告与提交 next-action
 
 可使用前端路由参数、全局状态或本地存储保存上述 id，保证刷新或跳转后仍可继续主链路。
+
+---
+
+## Sprint 1 补充：业务错误码与状态校验
+
+自 Sprint 1 起，失败响应可能返回以下业务码（`code` 字段），HTTP 状态对应 404/400/409：
+
+| code | HTTP | 场景 |
+|------|------|------|
+| RESOURCE_NOT_FOUND | 404 | goalId/diagnosisId/planId/sessionId/taskId 不存在 |
+| DIAGNOSIS_NOT_COMPLETED | 409 | 诊断未提交答案即调 preview |
+| PLAN_NOT_COMMITTED | 409 | 未 commit 即调 current-task（若 session 已存在但 plan 未 commit） |
+| TASK_NOT_CURRENT | 409 | 完成非当前任务 |
+| TASK_ALREADY_COMPLETED | 409 | 重复完成同一任务 |
+| SESSION_NOT_COMPLETED | 409 | session 未完成即调 report |
+| DIAGNOSIS_ALREADY_COMPLETED | 409 | 重复提交诊断答案 |
+| PLAN_ALREADY_COMMITTED | 409 | 重复 commit 同一 plan |
+| INVALID_ARGUMENT | 400 | 参数缺失或非法 |
+
+**验证场景**：考前快复习 / 新概念入门 / 系统学习 408 三组不同输入会得到不同 goalType、planningMode、recommendedStrategy；非法调用会返回上表对应 code。
