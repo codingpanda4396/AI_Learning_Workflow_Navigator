@@ -3,6 +3,7 @@ package navigator.application.goal;
 import navigator.domain.enums.GoalType;
 import navigator.domain.enums.SelfReportedLevel;
 import navigator.domain.enums.TimeBudget;
+import navigator.domain.enums.UrgencyLevel;
 import navigator.domain.model.LearningGoalInput;
 import navigator.domain.model.StructuredLearningGoal;
 import org.springframework.stereotype.Component;
@@ -33,8 +34,9 @@ public class GoalRuleEngine {
         GoalType goalType = deriveGoalType(input, raw);
         String subject = deriveSubject(input, raw);
         String topicScopeType = deriveTopicScopeType(input, raw, topics);
-        String urgencyLevel = deriveUrgencyLevel(input, raw);
+        UrgencyLevel urgencyLevel = deriveUrgencyLevel(input, raw);
         String expectedDepth = deriveExpectedDepth(goalType, input);
+        String priorityModule = derivePriorityModule(input, topics);
         String normalizedGoalText = buildNormalizedGoalText(goalType, topics);
         String intentDescription = buildIntentDescription(goalType, topicScopeType, topics);
 
@@ -53,6 +55,7 @@ public class GoalRuleEngine {
                 .preferenceTags(input.getPreferenceTags())
                 .constraints(List.of())
                 .sourceContext(input.getSourceContext())
+                .priorityModule(priorityModule)
                 .build();
     }
 
@@ -84,22 +87,29 @@ public class GoalRuleEngine {
         return "SINGLE_TOPIC";
     }
 
-    private String deriveUrgencyLevel(LearningGoalInput input, String raw) {
-        if (URGENT_KEYWORDS.matcher(raw).find()) return "HIGH";
+    private UrgencyLevel deriveUrgencyLevel(LearningGoalInput input, String raw) {
+        if (URGENT_KEYWORDS.matcher(raw).find()) return UrgencyLevel.HIGH;
         TimeBudget budget = input.getTimeBudget();
-        if (budget == null) return "MEDIUM";
+        if (budget == null) return UrgencyLevel.MEDIUM;
         switch (budget) {
             case WITHIN_15_MIN:
             case WITHIN_30_MIN:
-                return "HIGH";
+                return UrgencyLevel.HIGH;
             case WITHIN_60_MIN:
             case MULTI_DAY:
-                return "MEDIUM";
+                return UrgencyLevel.MEDIUM;
             case LONG_TERM:
-                return "LOW";
+                return UrgencyLevel.LOW;
             default:
-                return "MEDIUM";
+                return UrgencyLevel.MEDIUM;
         }
+    }
+
+    private String derivePriorityModule(LearningGoalInput input, List<String> topics) {
+        if (input.getPriorityModule() != null && !input.getPriorityModule().isBlank()) {
+            return input.getPriorityModule();
+        }
+        return (topics != null && !topics.isEmpty()) ? topics.get(0) : null;
     }
 
     private String deriveExpectedDepth(GoalType goalType, LearningGoalInput input) {

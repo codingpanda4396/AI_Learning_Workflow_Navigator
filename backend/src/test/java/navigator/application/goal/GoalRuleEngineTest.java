@@ -3,6 +3,7 @@ package navigator.application.goal;
 import navigator.domain.enums.GoalType;
 import navigator.domain.enums.SelfReportedLevel;
 import navigator.domain.enums.TimeBudget;
+import navigator.domain.enums.UrgencyLevel;
 import navigator.domain.model.LearningGoalInput;
 import navigator.domain.model.StructuredLearningGoal;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class GoalRuleEngineTest {
         StructuredLearningGoal goal = engine.derive(input);
         assertThat(goal.getGoalType()).isEqualTo(GoalType.REVIEW_FOR_EXAM);
         assertThat(goal.getTopicScopeType()).isEqualTo("MULTI_TOPIC");
-        assertThat(goal.getUrgencyLevel()).isEqualTo("HIGH");
+        assertThat(goal.getUrgencyLevel()).isEqualTo(UrgencyLevel.HIGH);
         assertThat(goal.getTopics()).containsAnyOf("栈", "队列");
     }
 

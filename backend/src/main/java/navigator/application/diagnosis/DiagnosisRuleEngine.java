@@ -1,8 +1,11 @@
 package navigator.application.diagnosis;
 
-import navigator.domain.enums.FoundationLevel;
 import navigator.domain.enums.ConfidenceLevel;
-import navigator.domain.enums.GoalType;
+import navigator.domain.enums.ExecutionStability;
+import navigator.domain.enums.FoundationLevel;
+import navigator.domain.enums.LearningPreference;
+import navigator.domain.enums.TimeBudget;
+import navigator.domain.enums.UrgencyLevel;
 import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearnerProfileSnapshot;
 import navigator.domain.model.StructuredLearningGoal;
@@ -12,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Sprint 1: answers + goalContext -> LearnerProfileSnapshot（foundation/gap 映射 + 组合矩阵）。
+ * Sprint 2.5: answers + goal + goalContext -> LearnerProfileSnapshot V2（6 维收敛）。
  */
 @Component
 public class DiagnosisRuleEngine {
@@ -29,27 +32,50 @@ public class DiagnosisRuleEngine {
             GoalContextSnapshot goalContext) {
         FoundationResult foundation = mapFoundation(normalized.getFoundationCode());
         String primaryGap = mapGap(normalized.getGapCodes() != null && !normalized.getGapCodes().isEmpty() ? normalized.getGapCodes().get(0) : null);
-        String secondaryGap = normalized.getGapCodes() != null && normalized.getGapCodes().size() > 1 ? mapGap(normalized.getGapCodes().get(1)) : null;
+        List<String> blockerTags = primaryGap != null ? List.of(primaryGap) : List.of();
 
-        String entryStrategy = deriveEntryStrategy(goal, foundation, primaryGap);
-        String granularity = deriveGranularity(goal, foundation, primaryGap);
-        String feedbackFreq = deriveFeedbackMode(goal, foundation, primaryGap);
+        ExecutionStability executionStability = deriveExecutionStability(foundation, primaryGap);
+        TimeBudget timeBudgetLevel = goal != null ? goal.getTimeBudget() : null;
+        LearningPreference learningPreference = deriveLearningPreference(goal);
+        UrgencyLevel urgencyLevel = goal != null ? goal.getUrgencyLevel() : null;
         List<String> riskTags = deriveRiskTags(goalContext, foundation, primaryGap);
-        List<String> planningHints = List.of("根据诊断与目标生成");
 
         return LearnerProfileSnapshot.builder()
                 .diagnosisId(diagnosisId)
                 .foundationLevel(foundation.level)
-                .confidenceLevel(foundation.confidenceLevel)
-                .comprehensionPattern(foundation.level.name())
-                .executionPattern(primaryGap != null ? primaryGap : "GENERAL")
-                .blockerTags(primaryGap != null ? List.of(primaryGap) : List.of())
+                .executionStability(executionStability)
+                .timeBudgetLevel(timeBudgetLevel)
+                .learningPreference(learningPreference)
+                .blockingPoint(primaryGap)
+                .urgencyLevel(urgencyLevel)
+                .blockerTags(blockerTags)
                 .riskTags(riskTags)
-                .suggestedEntryStrategy(entryStrategy)
-                .suggestedGranularity(granularity)
-                .suggestedFeedbackFrequency(feedbackFreq)
-                .planningHints(planningHints)
                 .build();
+    }
+
+    private ExecutionStability deriveExecutionStability(FoundationResult foundation, String primaryGap) {
+        boolean unstableGap = "CONCEPT_GAP".equals(primaryGap) || "RELATIONSHIP_GAP".equals(primaryGap);
+        boolean lowConfidence = foundation.confidenceLevel == ConfidenceLevel.LOW;
+        if (foundation.level == FoundationLevel.BEGINNER || (unstableGap && lowConfidence)) {
+            return ExecutionStability.UNSTABLE;
+        }
+        if (unstableGap || lowConfidence) {
+            return ExecutionStability.MODERATE;
+        }
+        return ExecutionStability.STABLE;
+    }
+
+    private LearningPreference deriveLearningPreference(StructuredLearningGoal goal) {
+        if (goal == null || goal.getPreferenceTags() == null || goal.getPreferenceTags().isEmpty()) {
+            return LearningPreference.BALANCED;
+        }
+        var tags = goal.getPreferenceTags();
+        if (tags.contains(navigator.domain.enums.PreferenceTag.PRACTICE_FIRST)) return LearningPreference.PRACTICE_FIRST;
+        if (tags.contains(navigator.domain.enums.PreferenceTag.EXAMPLE_FIRST)) return LearningPreference.EXAMPLE_FIRST;
+        if (tags.contains(navigator.domain.enums.PreferenceTag.FRAMEWORK_FIRST)) return LearningPreference.FRAMEWORK_FIRST;
+        if (tags.contains(navigator.domain.enums.PreferenceTag.STEP_BY_STEP)) return LearningPreference.STEP_BY_STEP;
+        if (tags.contains(navigator.domain.enums.PreferenceTag.CONCEPT_FIRST)) return LearningPreference.CONCEPT_FIRST;
+        return LearningPreference.BALANCED;
     }
 
     private FoundationResult mapFoundation(String code) {
@@ -87,53 +113,6 @@ public class DiagnosisRuleEngine {
         if ("STRUCTURE_GAP".equals(u)) return "RELATIONSHIP_GAP";
         if ("APPLICATION_GAP".equals(u)) return "PROCEDURE_GAP";
         return u;
-    }
-
-    private String deriveEntryStrategy(StructuredLearningGoal goal, FoundationResult foundation, String primaryGap) {
-        GoalType goalType = goal != null ? goal.getGoalType() : null;
-        String scope = goal != null ? goal.getTopicScopeType() : null;
-        boolean chapterOrCourse = "CHAPTER".equals(scope) || "COURSE".equals(scope);
-
-        if (goalType == GoalType.REVIEW_FOR_EXAM && isProcedureOrQuestionTypeGap(primaryGap) && foundation.level != FoundationLevel.BEGINNER) {
-            return "CORE_CONTRAST_FIRST";
-        }
-        if (foundation.level == FoundationLevel.BEGINNER || foundation.prerequisiteGap) {
-            return "PREREQUISITE_FIRST";
-        }
-        if (goalType == GoalType.BUILD_SYSTEMATIC_UNDERSTANDING || (chapterOrCourse && "RELATIONSHIP_GAP".equals(primaryGap))) {
-            return "FRAMEWORK_THEN_FILL";
-        }
-        if (goalType == GoalType.PRACTICE_ENHANCEMENT || isProcedureOrQuestionTypeGap(primaryGap)) {
-            return "EXAMPLE_TO_PRACTICE";
-        }
-        if (goalType == GoalType.FIX_SPECIFIC_BLOCKER && "SINGLE_TOPIC".equals(scope)) {
-            return "BLOCKER_FIRST";
-        }
-        return "CONCEPT_FIRST";
-    }
-
-    private boolean isProcedureOrQuestionTypeGap(String gap) {
-        return "QUESTION_TYPE_RECOGNITION_GAP".equals(gap) || "PROCEDURE_GAP".equals(gap);
-    }
-
-    private String deriveGranularity(StructuredLearningGoal goal, FoundationResult foundation, String primaryGap) {
-        if (foundation.level == FoundationLevel.BEGINNER || foundation.prerequisiteGap) return "SMALL";
-        if (goal != null && ("CHAPTER".equals(goal.getTopicScopeType()) || "COURSE".equals(goal.getTopicScopeType()))) return "NORMAL";
-        return "SMALL";
-    }
-
-    private String deriveFeedbackMode(StructuredLearningGoal goal, FoundationResult foundation, String primaryGap) {
-        if (goal != null && goal.getGoalType() == GoalType.REVIEW_FOR_EXAM && isProcedureOrQuestionTypeGap(primaryGap) && foundation.level != FoundationLevel.BEGINNER) {
-            return "FREQUENT_CHECKPOINT";
-        }
-        if (foundation.level == FoundationLevel.BEGINNER || foundation.prerequisiteGap) return "FREQUENT_CHECKPOINT";
-        if (goal != null && (goal.getGoalType() == GoalType.BUILD_SYSTEMATIC_UNDERSTANDING || "CHAPTER".equals(goal.getTopicScopeType()) || "COURSE".equals(goal.getTopicScopeType()))) {
-            return "STAGE_CHECKPOINT";
-        }
-        if (goal != null && (goal.getGoalType() == GoalType.PRACTICE_ENHANCEMENT || isProcedureOrQuestionTypeGap(primaryGap))) {
-            return "FREQUENT_CHECKPOINT";
-        }
-        return "NORMAL_CHECKPOINT";
     }
 
     private List<String> deriveRiskTags(GoalContextSnapshot goalContext, FoundationResult foundation, String primaryGap) {

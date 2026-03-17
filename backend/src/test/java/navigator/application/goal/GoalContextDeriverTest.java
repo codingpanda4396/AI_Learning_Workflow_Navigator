@@ -3,6 +3,7 @@ package navigator.application.goal;
 import navigator.domain.enums.GoalType;
 import navigator.domain.enums.PlanningMode;
 import navigator.domain.enums.SelfReportedLevel;
+import navigator.domain.enums.UrgencyLevel;
 import navigator.domain.enums.TimeBudget;
 import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.StructuredLearningGoal;
@@ -20,7 +21,7 @@ class GoalContextDeriverTest {
     void fastTrackForExamReviewHighUrgency() {
         StructuredLearningGoal goal = StructuredLearningGoal.builder()
                 .goalType(GoalType.REVIEW_FOR_EXAM)
-                .urgencyLevel("HIGH")
+                .urgencyLevel(UrgencyLevel.HIGH)
                 .topicScopeType("SINGLE_TOPIC")
                 .selfReportedLevel(SelfReportedLevel.BASIC)
                 .build();

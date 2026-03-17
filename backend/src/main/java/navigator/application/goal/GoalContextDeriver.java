@@ -4,6 +4,7 @@ import navigator.domain.enums.EntryGranularity;
 import navigator.domain.enums.PlanningMode;
 import navigator.domain.enums.PreferenceTag;
 import navigator.domain.enums.SelfReportedLevel;
+import navigator.domain.enums.UrgencyLevel;
 import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.StructuredLearningGoal;
 import navigator.domain.enums.TimeBudget;
@@ -52,7 +53,7 @@ public class GoalContextDeriver {
     }
 
     private PlanningMode derivePlanningMode(StructuredLearningGoal goal) {
-        boolean highUrgency = "HIGH".equals(goal.getUrgencyLevel());
+        boolean highUrgency = UrgencyLevel.HIGH == goal.getUrgencyLevel();
         String scope = goal.getTopicScopeType();
         boolean chapterOrCourse = "CHAPTER".equals(scope) || "COURSE".equals(scope);
         boolean systematicGoal = goal.getGoalType() == GoalType.BUILD_SYSTEMATIC_UNDERSTANDING;

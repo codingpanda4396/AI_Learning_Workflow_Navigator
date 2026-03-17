@@ -36,10 +36,19 @@ public class GoalApplicationService {
     public CreateGoalData createGoal(LearningGoalInput input) {
         StructuredLearningGoal goal = goalRuleEngine.derive(input);
         GoalContextSnapshot snapshot = goalContextDeriver.derive(goal);
-        String goalId = FixedSampleData.GOAL_ID;
+        LearningGoalEntity entity = buildEntity(input, goal, snapshot);
+        learningGoalRepository.saveNew(entity);
+        Long dbId = entity.getId();
+        if (dbId == null) {
+            return CreateGoalData.builder()
+                    .goalId(FixedSampleData.GOAL_ID)
+                    .structuredGoal(goal)
+                    .goalContextSnapshot(snapshot)
+                    .build();
+        }
+        String goalId = "goal_" + dbId;
         store.getGoals().put(goalId, goal);
         store.getGoalContextSnapshots().put(goalId, snapshot);
-        persistGoalToDb(goalId, input, goal, snapshot);
         return CreateGoalData.builder()
                 .goalId(goalId)
                 .structuredGoal(goal)
@@ -47,16 +56,10 @@ public class GoalApplicationService {
                 .build();
     }
 
-    private void persistGoalToDb(String goalId,
-                                 LearningGoalInput input,
-                                 StructuredLearningGoal goal,
-                                 GoalContextSnapshot snapshot) {
-        Long dbId = extractNumericId(goalId);
-        if (dbId == null) {
-            return;
-        }
+    private LearningGoalEntity buildEntity(LearningGoalInput input,
+                                          StructuredLearningGoal goal,
+                                          GoalContextSnapshot snapshot) {
         LearningGoalEntity entity = new LearningGoalEntity();
-        entity.setId(dbId);
         entity.setRawGoalText(input != null ? input.getRawGoalText() : goal != null ? goal.getRawGoalText() : null);
         entity.setTimeBudget(input != null && input.getTimeBudget() != null ? input.getTimeBudget().name() : null);
         entity.setSelfReportedLevel(input != null && input.getSelfReportedLevel() != null ? input.getSelfReportedLevel().name() : null);
@@ -69,21 +72,6 @@ public class GoalApplicationService {
         entity.setGoalContextJson(jsonSerde.toJson(snapshot));
         entity.setCreatedAt(java.time.LocalDateTime.now());
         entity.setUpdatedAt(entity.getCreatedAt());
-        learningGoalRepository.saveNew(entity);
-    }
-
-    private Long extractNumericId(String id) {
-        if (id == null) {
-            return null;
-        }
-        String digits = id.replaceAll("\\D+", "");
-        if (digits.isEmpty()) {
-            return null;
-        }
-        try {
-            return Long.parseLong(digits);
-        } catch (NumberFormatException ex) {
-            return null;
-        }
+        return entity;
     }
 }
