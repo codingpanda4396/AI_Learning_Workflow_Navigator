@@ -36,19 +36,19 @@ public class RecommendedEntryBuilder {
         String title;
         String reason;
         switch (strategy) {
-            case PlanStrategySelector.FOUNDATION_REBUILD:
+            case PlanStrategySelector.FOUNDATION_PATCH:
                 title = "先理解 " + topicStr + " 的定义、组成与最小示例";
                 reason = "当前主要问题是前置基础不稳，直接进入复杂应用容易断层";
                 break;
-            case PlanStrategySelector.COMPRESSED_REVIEW:
+            case PlanStrategySelector.SPRINT_CORRECTION:
                 title = topics.size() >= 2 ? "先对比 " + topics.get(0) + "/" + topics.get(1) + " 的核心差异与典型题入口" : "先对比核心差异与典型题入口";
                 reason = "时间紧，优先解决最容易影响做题判断的关键区别";
                 break;
-            case PlanStrategySelector.PRACTICE_DRIVEN:
+            case PlanStrategySelector.DRILL_STRENGTHEN:
                 title = "先做 1 个带讲解的典型例题：" + topicStr;
                 reason = "当前阻塞更偏题型识别/步骤执行，例题驱动更高效";
                 break;
-            case PlanStrategySelector.SYSTEMATIC_PROGRESSIVE:
+            case PlanStrategySelector.FRAMEWORK_BUILD:
                 title = "先建立 " + subjectOrTopic + " 的知识框架与主题关系图";
                 reason = "你的目标范围较大，先有全局框架再推进局部内容更稳";
                 break;
