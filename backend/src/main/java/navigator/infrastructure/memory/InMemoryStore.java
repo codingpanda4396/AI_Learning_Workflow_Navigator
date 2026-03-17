@@ -27,6 +27,8 @@ public class InMemoryStore {
     private final Map<String, String> diagnosisSessionStatuses = new ConcurrentHashMap<>();
     /** Sprint 1: diagnosisId -> goalId (for submit to load goal context) */
     private final Map<String, String> diagnosisToGoal = new ConcurrentHashMap<>();
+    /** diagnosisId -> sessionId (for planning to resolve session from diagnosis) */
+    private final Map<String, String> diagnosisToSession = new ConcurrentHashMap<>();
     /** Sprint 1: planId -> PlanStatus */
     private final Map<String, PlanStatus> planStatuses = new ConcurrentHashMap<>();
 
@@ -68,6 +70,10 @@ public class InMemoryStore {
 
     public Map<String, String> getDiagnosisToGoal() {
         return diagnosisToGoal;
+    }
+
+    public Map<String, String> getDiagnosisToSession() {
+        return diagnosisToSession;
     }
 
     public Map<String, PlanStatus> getPlanStatuses() {

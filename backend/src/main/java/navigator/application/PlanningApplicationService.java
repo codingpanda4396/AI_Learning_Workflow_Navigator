@@ -71,11 +71,15 @@ public class PlanningApplicationService {
     public PlanPreviewData preview(String goalId, String diagnosisId) {
         entityLookupGuard.requireGoal(goalId);
         sessionStateGuard.requireDiagnosisCompletedForPreview(diagnosisId);
+        String sessionIdStr = store.getDiagnosisToSession().get(diagnosisId);
+        if (sessionIdStr == null) {
+            throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found for diagnosis: " + diagnosisId);
+        }
         PlanningContext ctx = planningContextAssembler.assemble(goalId, diagnosisId);
         String strategy = planStrategySelector.select(ctx);
         String topicLabel = ctx.getGoal() != null && ctx.getGoal().getTopics() != null && !ctx.getGoal().getTopics().isEmpty()
                 ? String.join("、", ctx.getGoal().getTopics()) : "当前主题";
-        PlanTemplateFactory.StagesAndTasks stagesAndTasks = planTemplateFactory.build(strategy, FixedSampleData.PLAN_ID, topicLabel);
+        PlanTemplateFactory.StagesAndTasks stagesAndTasks = planTemplateFactory.build(strategy, "plan_pending", topicLabel);
         RecommendedEntry entry = recommendedEntryBuilder.build(strategy, ctx);
         RecommendedStrategy recommendedStrategy = toRecommendedStrategy(strategy);
         List<String> successCriteria = stagesAndTasks.tasks.stream()
@@ -88,7 +92,7 @@ public class PlanningApplicationService {
         List<String> risks = planTemplateFactory.risks(ctx, strategy);
 
         var preview = LearningPlanPreview.builder()
-                .planId(FixedSampleData.PLAN_ID)
+                .planId(null)
                 .goalId(goalId)
                 .recommendedEntry(entry)
                 .recommendedStrategy(recommendedStrategy)
@@ -99,13 +103,16 @@ public class PlanningApplicationService {
                 .risks(risks)
                 .previewOnly(true)
                 .build();
-        store.getPlanPreviews().put(FixedSampleData.PLAN_ID, preview);
-        store.getPlanStatuses().put(FixedSampleData.PLAN_ID, PlanStatus.PREVIEW_READY);
-        // 持久化 learning_plan 预览快照
-        persistPreviewToDb(goalId, diagnosisId, strategy, preview);
+        String planId = persistPreviewToDb(goalId, diagnosisId, sessionIdStr, strategy, preview);
+        if (planId == null) {
+            throw new BusinessException(BusinessErrorCode.INTERNAL_ERROR, "failed to persist plan preview");
+        }
+        preview.setPlanId(planId);
+        store.getPlanPreviews().put(planId, preview);
+        store.getPlanStatuses().put(planId, PlanStatus.PREVIEW_READY);
         String goalSummary = ctx.getGoal() != null && ctx.getGoal().getNormalizedGoalText() != null ? ctx.getGoal().getNormalizedGoalText() : "学习目标";
         return PlanPreviewData.builder()
-                .planId(FixedSampleData.PLAN_ID)
+                .planId(planId)
                 .status(PlanStatus.PREVIEW_READY.name())
                 .previewOnly(true)
                 .committed(false)
@@ -167,12 +174,17 @@ public class PlanningApplicationService {
             throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not in preview state");
         }
         store.getPlanStatuses().put(planId, PlanStatus.COMMITTED);
-        // CAS 风格推进 DB 中的 plan 状态
         Long planDbId = extractNumericId(planId);
         boolean committed = learningPlanRepository.compareAndCommit(planDbId, PlanStatus.PREVIEW_READY);
         if (!committed) {
             throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not in preview state");
         }
+        LearningPlanEntity planEntity = learningPlanRepository.findById(planDbId);
+        if (planEntity == null) {
+            throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "plan not found: " + planId);
+        }
+        Long sessionDbId = planEntity.getSessionId();
+        String sessionId = "learn_session_" + sessionDbId;
         LearningPlanPreview preview = store.getPlanPreviews().get(planId);
         List<String> taskSequence = preview.getTasks() != null
                 ? preview.getTasks().stream().map(TaskBlueprint::getTaskId).collect(Collectors.toList())
@@ -181,17 +193,16 @@ public class PlanningApplicationService {
             taskSequence = List.of(FixedSampleData.TASK_001, FixedSampleData.TASK_002, FixedSampleData.TASK_003);
         }
         var state = new InMemoryStore.LearningSessionState();
-        state.setSessionId(FixedSampleData.SESSION_ID);
+        state.setSessionId(sessionId);
         state.setPlanId(planId);
         state.setTaskSequence(taskSequence);
         state.setCurrentTaskIndex(0);
         state.setStatus("IN_PROGRESS");
-        store.getSessions().put(FixedSampleData.SESSION_ID, state);
-        // 物化任务到 session_task 表，并更新 learning_session
-        materializeTasksToDb(planDbId, taskSequence);
+        store.getSessions().put(sessionId, state);
+        materializeTasksToDb(sessionDbId, planDbId, taskSequence);
         String currentTaskId = taskSequence.isEmpty() ? null : taskSequence.get(0);
         return CommitPlanData.builder()
-                .sessionId(FixedSampleData.SESSION_ID)
+                .sessionId(sessionId)
                 .planId(planId)
                 .taskSequence(state.getTaskSequence())
                 .currentTaskId(currentTaskId)
@@ -199,19 +210,18 @@ public class PlanningApplicationService {
                 .build();
     }
 
-    private void persistPreviewToDb(String goalId,
-                                    String diagnosisId,
-                                    String strategy,
-                                    LearningPlanPreview preview) {
-        Long planDbId = extractNumericId(preview.getPlanId());
+    private String persistPreviewToDb(String goalId,
+                                     String diagnosisId,
+                                     String sessionIdStr,
+                                     String strategy,
+                                     LearningPlanPreview preview) {
         Long goalDbId = extractNumericId(goalId);
-        Long sessionDbId = extractNumericId(FixedSampleData.SESSION_ID);
+        Long sessionDbId = extractNumericId(sessionIdStr);
         Long diagnosisDbId = extractNumericId(diagnosisId);
         if (sessionDbId == null || goalDbId == null || diagnosisDbId == null) {
-            return;
+            return null;
         }
         LearningPlanEntity entity = new LearningPlanEntity();
-        entity.setId(planDbId);
         entity.setSessionId(sessionDbId);
         entity.setGoalId(goalDbId);
         entity.setDiagnosisSessionId(diagnosisDbId);
@@ -222,12 +232,13 @@ public class PlanningApplicationService {
         entity.setSuccessCriteriaJson(jsonSerde.toJson(preview.getSuccessCriteria()));
         entity.setRisksJson(jsonSerde.toJson(preview.getRisks()));
         entity.setKeyEvidenceJson(jsonSerde.toJson(preview.getKeyEvidence()));
-        learningPlanRepository.savePreview(entity);
+        LearningPlanEntity saved = learningPlanRepository.savePreview(entity);
+        return saved != null && saved.getId() != null ? "plan_" + saved.getId() : null;
     }
 
-    private void materializeTasksToDb(Long planDbId, java.util.List<String> taskSequence) {
-        Long sessionDbId = extractNumericId(FixedSampleData.SESSION_ID);
-        LearningPlanPreview preview = store.getPlanPreviews().get(FixedSampleData.PLAN_ID);
+    private void materializeTasksToDb(Long sessionDbId, Long planDbId, java.util.List<String> taskSequence) {
+        String planId = "plan_" + planDbId;
+        LearningPlanPreview preview = store.getPlanPreviews().get(planId);
         if (sessionDbId == null || planDbId == null || preview == null || preview.getTasks() == null) {
             return;
         }
@@ -256,8 +267,8 @@ public class PlanningApplicationService {
             entities.add(entity);
         }
         sessionTaskRepository.saveAll(entities);
-        // learning_session 中写入 planId、current_task_id、total_task_count 等，由后续阶段细化
-        learningSessionRepository.markDiagnosisCompleted(sessionDbId);
+        learningSessionRepository.updatePlanId(sessionDbId, planDbId);
+        learningSessionRepository.markPlanCommitted(sessionDbId, taskSequence.size());
     }
 
     private Long extractNumericId(String id) {

@@ -49,5 +49,17 @@ public class SessionTaskRepositoryImpl implements SessionTaskRepository {
                         .orderByAsc("order_index")
         );
     }
+
+    @Override
+    public SessionTaskEntity findBySessionIdAndTaskCode(Long sessionId, String taskCode) {
+        if (sessionId == null || taskCode == null) {
+            return null;
+        }
+        return mapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SessionTaskEntity>()
+                        .eq("session_id", sessionId)
+                        .eq("task_code", taskCode)
+        );
+    }
 }
 

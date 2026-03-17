@@ -18,18 +18,16 @@ public class DiagnosisSessionRepositoryImpl implements DiagnosisSessionRepositor
     }
 
     @Override
-    public void saveNew(Long diagnosisSessionId,
-                        Long sessionId,
-                        Long goalId,
-                        String status,
-                        String generationMode,
-                        String questionsJson) {
-        if (diagnosisSessionId == null || sessionId == null || goalId == null) {
-            return;
+    public DiagnosisSessionEntity saveNew(Long sessionId,
+                                         Long goalId,
+                                         String status,
+                                         String generationMode,
+                                         String questionsJson) {
+        if (sessionId == null || goalId == null) {
+            return null;
         }
         LocalDateTime now = LocalDateTime.now();
         DiagnosisSessionEntity entity = new DiagnosisSessionEntity();
-        entity.setId(diagnosisSessionId);
         entity.setSessionId(sessionId);
         entity.setGoalId(goalId);
         entity.setStatus(status != null ? status : DiagnosisSessionStatus.READY.name());
@@ -39,6 +37,7 @@ public class DiagnosisSessionRepositoryImpl implements DiagnosisSessionRepositor
         entity.setCompletedAt(null);
         entity.setCreatedAt(now);
         mapper.insert(entity);
+        return entity;
     }
 
     @Override

@@ -1,5 +1,6 @@
 package navigator.api.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -21,72 +22,88 @@ class Sprint2ReportAndNextActionIntegrationTest {
 
     @Autowired
     private MockMvc mvc;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     void fullLinkWithReportAndNextAction() throws Exception {
         String goalBody = """
                 {"rawGoalText":"我想搞懂链表","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC","preferenceTags":["CONCEPT_FIRST","STEP_BY_STEP"]}
                 """;
-        mvc.perform(post("/api/goals").contentType(MediaType.APPLICATION_JSON).content(goalBody))
+        String goalResp = mvc.perform(post("/api/goals").contentType(MediaType.APPLICATION_JSON).content(goalBody))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.structuredGoal.goalType").value("LEARN_NEW_CONCEPT"));
+                .andExpect(jsonPath("$.data.structuredGoal.goalType").value("LEARN_NEW_CONCEPT"))
+                .andReturn().getResponse().getContentAsString();
+        String goalId = objectMapper.readTree(goalResp).get("data").get("goalId").asText();
 
-        mvc.perform(post("/api/diagnosis/sessions")
+        String diagResp = mvc.perform(post("/api/diagnosis/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"goalId\":\"goal_001\"}"))
+                        .content("{\"goalId\":\"" + goalId + "\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("READY"));
+                .andExpect(jsonPath("$.data.status").value("READY"))
+                .andReturn().getResponse().getContentAsString();
+        String diagnosisId = objectMapper.readTree(diagResp).get("data").get("diagnosisId").asText();
 
         String submitBody = """
-                {"diagnosisId":"diag_001","answers":[{"questionId":"q_foundation","selectedOptions":["BASIC"]},{"questionId":"q_gap","selectedOptions":["CONCEPT_GAP"]}]}
-                """;
+                {"diagnosisId":"%s","answers":[{"questionId":"q_foundation","selectedOptions":["BASIC"]},{"questionId":"q_gap","selectedOptions":["CONCEPT_GAP"]}]}
+                """.formatted(diagnosisId);
         mvc.perform(post("/api/diagnosis/submissions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(submitBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.learnerProfileSnapshot").exists());
 
-        mvc.perform(post("/api/learning-plans/preview")
+        String previewResp = mvc.perform(post("/api/learning-plans/preview")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"goalId\":\"goal_001\",\"diagnosisId\":\"diag_001\"}"))
+                        .content("{\"goalId\":\"" + goalId + "\",\"diagnosisId\":\"" + diagnosisId + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PREVIEW_READY"))
-                .andExpect(jsonPath("$.data.tasks").isArray());
+                .andExpect(jsonPath("$.data.tasks").isArray())
+                .andReturn().getResponse().getContentAsString();
+        String planId = objectMapper.readTree(previewResp).get("data").get("planId").asText();
 
-        mvc.perform(post("/api/learning-plans/commit")
+        String commitResp = mvc.perform(post("/api/learning-plans/commit")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"planId\":\"plan_001\"}"))
+                        .content("{\"planId\":\"" + planId + "\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sessionId").value("learn_session_001"));
+                .andExpect(jsonPath("$.data.sessionId").exists())
+                .andReturn().getResponse().getContentAsString();
+        String sessionId = objectMapper.readTree(commitResp).get("data").get("sessionId").asText();
+        String currentTaskId = objectMapper.readTree(commitResp).get("data").get("currentTaskId").asText();
 
-        // 获取当前任务
-        mvc.perform(get("/api/sessions/learn_session_001/current-task"))
+        mvc.perform(get("/api/sessions/" + sessionId + "/current-task"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.currentTask.taskId").exists());
 
-        // 完成当前任务（使用固定样例中的 task_001）
         String completeBody = """
-                {"sessionId":"learn_session_001","completionStatus":"COMPLETED","durationMinutes":10,"interactionCount":3,"userSummarySubmitted":true,"detectedIssueTags":["CONCEPT_GAP"]}
-                """;
-        mvc.perform(post("/api/tasks/task_001/complete")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(completeBody))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.taskExecutionRecord.taskId").value("task_001"));
+                {"sessionId":"%s","completionStatus":"COMPLETED","durationMinutes":10,"interactionCount":3,"userSummarySubmitted":true,"detectedIssueTags":["CONCEPT_GAP"]}
+                """.formatted(sessionId);
+        String taskToComplete = currentTaskId;
+        while (taskToComplete != null && !taskToComplete.isEmpty()) {
+            String completeResp = mvc.perform(post("/api/tasks/" + taskToComplete + "/complete")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(completeBody))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            var dataNode = objectMapper.readTree(completeResp).get("data");
+            boolean nextAvailable = dataNode.path("nextTaskAvailable").asBoolean(false);
+            taskToComplete = nextAvailable ? dataNode.path("nextTaskId").asText(null) : null;
+            if (taskToComplete != null && taskToComplete.isEmpty()) {
+                taskToComplete = null;
+            }
+        }
 
-        // 已完成至少一个任务后获取报告
-        mvc.perform(get("/api/sessions/learn_session_001/report"))
+        mvc.perform(get("/api/sessions/" + sessionId + "/report"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.learningReport.sessionId").value("learn_session_001"))
+                .andExpect(jsonPath("$.data.learningReport.sessionId").value(sessionId))
                 .andExpect(jsonPath("$.data.learningReport.completedProgress[0]").exists())
                 .andExpect(jsonPath("$.data.nextActionDecision.actionType").exists());
 
-        // 确认 next-action
-        mvc.perform(post("/api/sessions/learn_session_001/next-action")
+        mvc.perform(post("/api/sessions/" + sessionId + "/next-action")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"actionType\":\"REINFORCE\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sessionId").value("learn_session_001"))
+                .andExpect(jsonPath("$.data.sessionId").value(sessionId))
                 .andExpect(jsonPath("$.data.acceptedAction").value("REINFORCE"))
                 .andExpect(jsonPath("$.data.nextHint").exists());
     }

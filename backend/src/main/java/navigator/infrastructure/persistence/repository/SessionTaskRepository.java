@@ -9,5 +9,7 @@ public interface SessionTaskRepository {
     void saveAll(List<SessionTaskEntity> tasks);
 
     List<SessionTaskEntity> findBySessionId(Long sessionId);
+
+    SessionTaskEntity findBySessionIdAndTaskCode(Long sessionId, String taskCode);
 }
 

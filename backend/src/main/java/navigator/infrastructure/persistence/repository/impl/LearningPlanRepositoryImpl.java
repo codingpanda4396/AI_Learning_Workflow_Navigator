@@ -1,6 +1,5 @@
 package navigator.infrastructure.persistence.repository.impl;
 
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import navigator.domain.enums.PlanStatus;
 import navigator.infrastructure.persistence.entity.LearningPlanEntity;
 import navigator.infrastructure.persistence.mapper.LearningPlanMapper;
@@ -19,24 +18,25 @@ public class LearningPlanRepositoryImpl implements LearningPlanRepository {
     }
 
     @Override
-    public void savePreview(LearningPlanEntity entity) {
+    public LearningPlanEntity savePreview(LearningPlanEntity entity) {
         if (entity == null) {
-            return;
-        }
-        if (entity.getId() == null) {
-            entity.setId(IdWorker.getId());
+            return null;
         }
         LocalDateTime now = LocalDateTime.now();
         if (entity.getCreatedAt() == null) {
             entity.setCreatedAt(now);
         }
         entity.setUpdatedAt(now);
-        // upsert by id
-        if (mapper.selectById(entity.getId()) == null) {
-            mapper.insert(entity);
-        } else {
+        LearningPlanEntity existing = findBySessionId(entity.getSessionId());
+        if (existing != null) {
+            entity.setId(existing.getId());
+            entity.setCreatedAt(existing.getCreatedAt());
             mapper.updateById(entity);
+            return entity;
         }
+        entity.setId(null);
+        mapper.insert(entity);
+        return entity;
     }
 
     @Override

@@ -5,7 +5,7 @@ import navigator.infrastructure.persistence.entity.LearningPlanEntity;
 
 public interface LearningPlanRepository {
 
-    void savePreview(LearningPlanEntity entity);
+    LearningPlanEntity savePreview(LearningPlanEntity entity);
 
     LearningPlanEntity findById(Long id);
 

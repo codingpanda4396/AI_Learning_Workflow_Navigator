@@ -5,12 +5,14 @@ import navigator.infrastructure.persistence.entity.DiagnosisSessionEntity;
 
 public interface DiagnosisSessionRepository {
 
-    void saveNew(Long diagnosisSessionId,
-                 Long sessionId,
-                 Long goalId,
-                 String status,
-                 String generationMode,
-                 String questionsJson);
+    /**
+     * Creates a new diagnosis session with DB-generated id. Returns the entity with id populated.
+     */
+    DiagnosisSessionEntity saveNew(Long sessionId,
+                                  Long goalId,
+                                  String status,
+                                  String generationMode,
+                                  String questionsJson);
 
     DiagnosisSessionEntity findById(Long diagnosisSessionId);
 

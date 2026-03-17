@@ -40,34 +40,44 @@ class Sprint1IntegrationTest {
         store.getSessionTaskRecords().clear();
         store.getDiagnosisSessionStatuses().clear();
         store.getDiagnosisToGoal().clear();
+        store.getDiagnosisToSession().clear();
     }
 
     @Test
     void fullLinkUnderstandingList() throws Exception {
         String goalBody = "{\"rawGoalText\":\"我想搞懂链表\",\"timeBudget\":\"WITHIN_30_MIN\",\"selfReportedLevel\":\"BASIC\",\"preferenceTags\":[\"CONCEPT_FIRST\",\"STEP_BY_STEP\"]}";
-        mvc.perform(post("/api/goals").contentType(MediaType.APPLICATION_JSON).content(goalBody))
+        String goalResp = mvc.perform(post("/api/goals").contentType(MediaType.APPLICATION_JSON).content(goalBody))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.structuredGoal.goalType").value("LEARN_NEW_CONCEPT"));
+                .andExpect(jsonPath("$.data.structuredGoal.goalType").value("LEARN_NEW_CONCEPT"))
+                .andReturn().getResponse().getContentAsString();
+        String goalId = objectMapper.readTree(goalResp).get("data").get("goalId").asText();
 
-        mvc.perform(post("/api/diagnosis/sessions").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"goal_001\"}"))
+        String diagResp = mvc.perform(post("/api/diagnosis/sessions").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"" + goalId + "\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("READY"));
+                .andExpect(jsonPath("$.data.status").value("READY"))
+                .andReturn().getResponse().getContentAsString();
+        String diagnosisId = objectMapper.readTree(diagResp).get("data").get("diagnosisId").asText();
 
-        String submitBody = "{\"diagnosisId\":\"diag_001\",\"answers\":[{\"questionId\":\"q_foundation\",\"selectedOptions\":[\"BASIC\"]},{\"questionId\":\"q_gap\",\"selectedOptions\":[\"CONCEPT_GAP\"]}]}";
+        String submitBody = "{\"diagnosisId\":\"" + diagnosisId + "\",\"answers\":[{\"questionId\":\"q_foundation\",\"selectedOptions\":[\"BASIC\"]},{\"questionId\":\"q_gap\",\"selectedOptions\":[\"CONCEPT_GAP\"]}]}";
         mvc.perform(post("/api/diagnosis/submissions").contentType(MediaType.APPLICATION_JSON).content(submitBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.learnerProfileSnapshot").exists());
 
-        mvc.perform(post("/api/learning-plans/preview").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"goal_001\",\"diagnosisId\":\"diag_001\"}"))
+        String previewResp = mvc.perform(post("/api/learning-plans/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"goalId\":\"" + goalId + "\",\"diagnosisId\":\"" + diagnosisId + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PREVIEW_READY"))
-                .andExpect(jsonPath("$.data.tasks").isArray());
+                .andExpect(jsonPath("$.data.tasks").isArray())
+                .andReturn().getResponse().getContentAsString();
+        String planId = objectMapper.readTree(previewResp).get("data").get("planId").asText();
 
-        mvc.perform(post("/api/learning-plans/commit").contentType(MediaType.APPLICATION_JSON).content("{\"planId\":\"plan_001\"}"))
+        String commitResp = mvc.perform(post("/api/learning-plans/commit").contentType(MediaType.APPLICATION_JSON).content("{\"planId\":\"" + planId + "\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sessionId").exists());
+                .andExpect(jsonPath("$.data.sessionId").exists())
+                .andReturn().getResponse().getContentAsString();
+        String sessionId = objectMapper.readTree(commitResp).get("data").get("sessionId").asText();
 
-        mvc.perform(get("/api/sessions/learn_session_001/current-task"))
+        mvc.perform(get("/api/sessions/" + sessionId + "/current-task"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.currentTask").exists());
     }
@@ -75,9 +85,11 @@ class Sprint1IntegrationTest {
     @Test
     void previewWithoutDiagnosisCompletedReturns409() throws Exception {
         String goalBody = "{\"rawGoalText\":\"我想搞懂链表\",\"timeBudget\":\"MULTI_DAY\",\"selfReportedLevel\":\"BEGINNER\"}";
-        mvc.perform(post("/api/goals").contentType(MediaType.APPLICATION_JSON).content(goalBody)).andExpect(status().isOk());
-        mvc.perform(post("/api/diagnosis/sessions").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"goal_001\"}")).andExpect(status().isOk());
-        mvc.perform(post("/api/learning-plans/preview").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"goal_001\",\"diagnosisId\":\"diag_001\"}"))
+        String goalResp = mvc.perform(post("/api/goals").contentType(MediaType.APPLICATION_JSON).content(goalBody)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String goalId = objectMapper.readTree(goalResp).get("data").get("goalId").asText();
+        String diagResp = mvc.perform(post("/api/diagnosis/sessions").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"" + goalId + "\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String diagnosisId = objectMapper.readTree(diagResp).get("data").get("diagnosisId").asText();
+        mvc.perform(post("/api/learning-plans/preview").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"" + goalId + "\",\"diagnosisId\":\"" + diagnosisId + "\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("DIAGNOSIS_NOT_COMPLETED"));
     }
@@ -85,12 +97,15 @@ class Sprint1IntegrationTest {
     @Test
     void currentTaskWithoutCommitReturns404BecauseNoSessionYet() throws Exception {
         String goalBody = "{\"rawGoalText\":\"我想搞懂链表\",\"timeBudget\":\"WITHIN_30_MIN\",\"selfReportedLevel\":\"BASIC\"}";
-        mvc.perform(post("/api/goals").contentType(MediaType.APPLICATION_JSON).content(goalBody)).andExpect(status().isOk());
-        mvc.perform(post("/api/diagnosis/sessions").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"goal_001\"}")).andExpect(status().isOk());
-        String submitBody = "{\"diagnosisId\":\"diag_001\",\"answers\":[{\"questionId\":\"q_foundation\",\"selectedOptions\":[\"BASIC\"]},{\"questionId\":\"q_gap\",\"selectedOptions\":[\"CONCEPT_GAP\"]}]}";
+        String goalResp = mvc.perform(post("/api/goals").contentType(MediaType.APPLICATION_JSON).content(goalBody)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String goalId = objectMapper.readTree(goalResp).get("data").get("goalId").asText();
+        String diagResp = mvc.perform(post("/api/diagnosis/sessions").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"" + goalId + "\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String diagnosisId = objectMapper.readTree(diagResp).get("data").get("diagnosisId").asText();
+        String submitBody = "{\"diagnosisId\":\"" + diagnosisId + "\",\"answers\":[{\"questionId\":\"q_foundation\",\"selectedOptions\":[\"BASIC\"]},{\"questionId\":\"q_gap\",\"selectedOptions\":[\"CONCEPT_GAP\"]}]}";
         mvc.perform(post("/api/diagnosis/submissions").contentType(MediaType.APPLICATION_JSON).content(submitBody)).andExpect(status().isOk());
-        mvc.perform(post("/api/learning-plans/preview").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"goal_001\",\"diagnosisId\":\"diag_001\"}")).andExpect(status().isOk());
-        mvc.perform(get("/api/sessions/learn_session_001/current-task"))
+        mvc.perform(post("/api/learning-plans/preview").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"" + goalId + "\",\"diagnosisId\":\"" + diagnosisId + "\"}")).andExpect(status().isOk());
+        String sessionId = objectMapper.readTree(diagResp).get("data").get("sessionId").asText();
+        mvc.perform(get("/api/sessions/" + sessionId + "/current-task"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
     }

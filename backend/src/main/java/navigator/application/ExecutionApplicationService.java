@@ -96,7 +96,10 @@ public class ExecutionApplicationService {
     public TaskInteractionData recordInteraction(String taskId, navigator.api.dto.TaskInteractionRequest request) {
         String sessionId = request.getSessionId();
         Long sessionDbId = extractNumericId(sessionId);
-        Long taskDbId = extractNumericId(taskId);
+        Long taskDbId = resolveSessionTaskId(sessionDbId, taskId);
+        if (taskDbId == null) {
+            taskDbId = extractNumericId(taskId);
+        }
         TaskInteractionEntity entity = new TaskInteractionEntity();
         entity.setSessionId(sessionDbId);
         entity.setTaskId(taskDbId);
@@ -130,9 +133,11 @@ public class ExecutionApplicationService {
                 .learnerReflection(request.getLearnerReflection())
                 .build();
         store.getOrCreateTaskRecords(request.getSessionId()).add(record);
-        // 写入 task_completion 表
         Long sessionDbId = extractNumericId(sessionId);
-        Long taskDbId = extractNumericId(taskId);
+        Long taskDbId = resolveSessionTaskId(sessionDbId, taskId);
+        if (taskDbId == null) {
+            taskDbId = extractNumericId(taskId);
+        }
         TaskCompletionEntity completionEntity = new TaskCompletionEntity();
         completionEntity.setSessionId(sessionDbId);
         completionEntity.setTaskId(taskDbId);
@@ -161,6 +166,14 @@ public class ExecutionApplicationService {
                 .nextTaskId(nextTaskId)
                 .sessionProgress(progress)
                 .build();
+    }
+
+    private Long resolveSessionTaskId(Long sessionDbId, String taskCode) {
+        if (sessionDbId == null || taskCode == null) {
+            return null;
+        }
+        var sessionTask = sessionTaskRepository.findBySessionIdAndTaskCode(sessionDbId, taskCode);
+        return sessionTask != null ? sessionTask.getId() : null;
     }
 
     private Long extractNumericId(String id) {

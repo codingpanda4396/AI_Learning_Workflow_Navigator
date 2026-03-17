@@ -13,6 +13,8 @@ import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearnerProfileSnapshot;
 import navigator.domain.model.StructuredLearningGoal;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.entity.DiagnosisSessionEntity;
+import navigator.infrastructure.persistence.entity.LearningSessionEntity;
 import navigator.infrastructure.persistence.repository.DiagnosisAnswerRepository;
 import navigator.infrastructure.persistence.repository.DiagnosisSessionRepository;
 import navigator.infrastructure.persistence.repository.LearnerProfileSnapshotRepository;
@@ -58,24 +60,34 @@ public class DiagnosisApplicationService {
     public DiagnosisSessionData createSession(String goalId) {
         entityLookupGuard.requireGoal(goalId);
         List<DiagnosisQuestion> questions = FixedSampleData.diagnosisQuestions();
-        String diagnosisId = FixedSampleData.DIAGNOSIS_ID;
-        store.getDiagnosisSessionStatuses().put(diagnosisId, DiagnosisSessionStatus.READY.name());
-        store.getDiagnosisToGoal().put(diagnosisId, goalId);
         Long goalDbId = extractNumericId(goalId);
-        Long sessionDbId = extractNumericId(FixedSampleData.SESSION_ID);
-        Long diagnosisDbId = extractNumericId(diagnosisId);
-        // 初始化 learning_session 与 diagnosis_session 到 DB
-        learningSessionRepository.createInitialSession(sessionDbId, goalDbId, diagnosisDbId);
+        if (goalDbId == null) {
+            throw new navigator.api.BusinessException(navigator.api.BusinessErrorCode.INVALID_ARGUMENT, "invalid goalId: " + goalId);
+        }
+        LearningSessionEntity sessionEntity = learningSessionRepository.createInitialSession(goalDbId);
+        if (sessionEntity == null || sessionEntity.getId() == null) {
+            throw new navigator.api.BusinessException(navigator.api.BusinessErrorCode.INTERNAL_ERROR, "failed to create learning session");
+        }
+        Long sessionDbId = sessionEntity.getId();
         String questionsJson = jsonSerde.toJson(questions);
-        diagnosisSessionRepository.saveNew(diagnosisDbId,
+        DiagnosisSessionEntity diagEntity = diagnosisSessionRepository.saveNew(
                 sessionDbId,
                 goalDbId,
                 DiagnosisSessionStatus.READY.name(),
                 "STRUCTURED",
                 questionsJson);
+        if (diagEntity == null || diagEntity.getId() == null) {
+            throw new navigator.api.BusinessException(navigator.api.BusinessErrorCode.INTERNAL_ERROR, "failed to create diagnosis session");
+        }
+        learningSessionRepository.updateDiagnosisSessionId(sessionDbId, diagEntity.getId());
+        String diagnosisId = "diag_" + diagEntity.getId();
+        String sessionId = "learn_session_" + sessionDbId;
+        store.getDiagnosisSessionStatuses().put(diagnosisId, DiagnosisSessionStatus.READY.name());
+        store.getDiagnosisToGoal().put(diagnosisId, goalId);
+        store.getDiagnosisToSession().put(diagnosisId, sessionId);
         return DiagnosisSessionData.builder()
                 .diagnosisId(diagnosisId)
-                .sessionId(FixedSampleData.SESSION_ID)
+                .sessionId(sessionId)
                 .status(DiagnosisSessionStatus.READY.name())
                 .generationMode("STRUCTURED")
                 .questions(questions)
@@ -114,7 +126,8 @@ public class DiagnosisApplicationService {
                                        LearnerProfileSnapshot profile,
                                        navigator.domain.model.DiagnosisEvidenceSummary evidence) {
         Long diagnosisDbId = extractNumericId(diagnosisId);
-        Long sessionDbId = extractNumericId(FixedSampleData.SESSION_ID);
+        String sessionIdStr = store.getDiagnosisToSession().get(diagnosisId);
+        Long sessionDbId = extractNumericId(sessionIdStr);
         if (diagnosisDbId == null || submission == null) {
             return;
         }
