@@ -1,10 +1,12 @@
 package navigator.infrastructure.persistence.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
+@TableName("task_completion")
 public class TaskCompletionEntity {
     private Long id;
     private Long sessionId;

@@ -16,7 +16,7 @@ public class LearningGoalRepositoryImpl implements LearningGoalRepository {
 
     @Override
     public void saveNew(LearningGoalEntity entity) {
-        if (entity == null || entity.getId() == null) {
+        if (entity == null) {
             return;
         }
         mapper.insert(entity);

@@ -37,9 +37,9 @@ public class LearnerProfileSnapshotRepositoryImpl implements LearnerProfileSnaps
         entity.setSessionId(sessionId);
         entity.setProfileJson(jsonSerde.toJson(profile));
         entity.setPlanningMode(null); // 规划模式目前由上游 GoalContextSnapshot 控制，这里暂不重复存储
-        entity.setEntryStrategy(profile.getSuggestedEntryStrategy());
-        entity.setEntryGranularity(profile.getSuggestedGranularity());
-        entity.setFeedbackMode(profile.getSuggestedFeedbackFrequency());
+        entity.setEntryStrategy(null); // V2 已收敛，由 profileJson 内 learningPreference 等表达
+        entity.setEntryGranularity(null);
+        entity.setFeedbackMode(null);
         entity.setRiskTagsJson(jsonSerde.toJson(profile.getRiskTags()));
         entity.setKeyEvidenceJson(evidenceSummary != null ? jsonSerde.toJson(evidenceSummary.getKeyEvidence()) : null);
         entity.setCreatedAt(now);

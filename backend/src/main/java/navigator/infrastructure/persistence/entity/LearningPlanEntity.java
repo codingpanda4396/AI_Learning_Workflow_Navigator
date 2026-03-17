@@ -1,10 +1,12 @@
 package navigator.infrastructure.persistence.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
+@TableName("learning_plan")
 public class LearningPlanEntity {
     private Long id;
     private Long sessionId;
