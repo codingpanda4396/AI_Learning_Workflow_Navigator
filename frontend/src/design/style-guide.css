@@ -1,0 +1,19 @@
+/* Design system - imports from main style.css */
+:root {
+  --color-primary: #4F46E5;
+  --color-primary-hover: #4338CA;
+  --color-secondary: #6366F1;
+  --color-background: #F8FAFC;
+  --color-card-bg: #FFFFFF;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-border: #E2E8F0;
+  --color-success: #059669;
+  --color-warning: #D97706;
+  --color-error: #DC2626;
+  --radius-card: 16px;
+  --radius-input: 12px;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.08);
+  --spacing-page: 24px;
+  --spacing-card: 20px;
+}
