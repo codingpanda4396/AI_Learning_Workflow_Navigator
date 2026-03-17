@@ -25,9 +25,12 @@ public class CurrentTaskData {
         private String taskType;
         private String goal;
         private String whyThisTask;
+        private String taskMethod;
+        private String recommendedPromptTemplate;
         private Integer estimatedMinutes;
         private String promptScaffold;
         private java.util.List<String> completionCriteria;
+        private java.util.List<String> selfEvaluationQuestions;
         private String fallbackAction;
     }
 

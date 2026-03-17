@@ -61,7 +61,12 @@
             </p>
           </div>
 
-          <div v-if="currentTask.completionCriteria?.length" class="p-4 bg-accent/10 rounded-xl border-l-4 border-accent">
+          <div v-if="currentTask.taskMethod" class="p-4 bg-primary/5 rounded-xl mb-4 border-l-4 border-primary/30">
+            <p class="font-heading font-medium text-primary-dark mb-2">📖 学习方法</p>
+            <p class="text-sm text-gray-700">{{ currentTask.taskMethod }}</p>
+          </div>
+
+          <div v-if="currentTask.completionCriteria?.length" class="p-4 bg-accent/10 rounded-xl border-l-4 border-accent mb-4">
             <p class="font-heading font-medium text-accent-dark mb-2">🎯 完成标准</p>
             <ul class="space-y-1">
               <li v-for="(criteria, idx) in currentTask.completionCriteria" :key="idx" class="flex items-start gap-2 text-sm text-gray-700">
@@ -70,16 +75,26 @@
               </li>
             </ul>
           </div>
+
+          <div v-if="currentTask.selfEvaluationQuestions?.length" class="p-4 bg-amber-50 rounded-xl border-l-4 border-amber-400 mb-4">
+            <p class="font-heading font-medium text-amber-800 mb-2">🔄 自评问题</p>
+            <ul class="space-y-1">
+              <li v-for="(q, idx) in currentTask.selfEvaluationQuestions" :key="idx" class="flex items-start gap-2 text-sm text-gray-700">
+                <span class="text-amber-600">?</span>
+                {{ q }}
+              </li>
+            </ul>
+          </div>
         </div>
 
-        <!-- Prompt Scaffold -->
-        <div v-if="currentTask.promptScaffold" class="clay-card p-6 animate-fade-in stagger-2 hover-lift">
+        <!-- Recommended Prompt Template -->
+        <div v-if="currentTask.recommendedPromptTemplate || currentTask.promptScaffold" class="clay-card p-6 animate-fade-in stagger-2 hover-lift">
           <h3 class="text-xl font-heading font-semibold text-primary-dark mb-4 flex items-center gap-2">
             <span class="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">💡</span>
-            提问框架
+            推荐提问模板
           </h3>
           <div class="p-4 bg-primary/5 rounded-xl border border-primary/20">
-            <pre class="text-sm text-gray-700 whitespace-pre-wrap font-body">{{ currentTask.promptScaffold }}</pre>
+            <pre class="text-sm text-gray-700 whitespace-pre-wrap font-body">{{ currentTask.recommendedPromptTemplate || currentTask.promptScaffold }}</pre>
           </div>
         </div>
 

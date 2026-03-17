@@ -32,6 +32,7 @@ public class GoalController {
                 .subjectHint(request.getSubjectHint())
                 .topicHints(request.getTopicHints())
                 .sourceContext(request.getSourceContext())
+                .priorityModule(request.getPriorityModule())
                 .build();
         CreateGoalData data = goalService.createGoal(input);
         return GlobalResponse.ok(data);

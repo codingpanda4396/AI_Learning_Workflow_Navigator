@@ -90,6 +90,19 @@
             </div>
           </div>
 
+          <!-- Priority Module (optional) -->
+          <div class="space-y-3">
+            <label class="block text-lg font-heading font-medium text-gray-700">
+              🎯 优先模块/主题（可选）
+            </label>
+            <input
+              v-model="form.priorityModule"
+              type="text"
+              class="input-clay"
+              placeholder="例如：链表、栈"
+            />
+          </div>
+
           <!-- Preference Tags -->
           <div class="space-y-3">
             <label class="block text-lg font-heading font-medium text-gray-700">
@@ -175,7 +188,8 @@ const form = ref({
   rawGoalText: '',
   timeBudget: '',
   selfReportedLevel: '',
-  preferenceTags: []
+  preferenceTags: [],
+  priorityModule: ''
 })
 
 const loading = ref(false)

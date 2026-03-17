@@ -24,4 +24,6 @@ public class CreateGoalRequest {
     private String subjectHint;
     private List<String> topicHints;
     private String sourceContext;
+    /** 优先模块/主题，可选 */
+    private String priorityModule;
 }
