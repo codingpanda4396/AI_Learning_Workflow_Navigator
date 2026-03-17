@@ -67,15 +67,19 @@ public class ExecutionApplicationService {
         String taskId = seq.get(idx);
         TaskBlueprint blueprint = resolveBlueprint(state.getPlanId(), taskId);
         if (blueprint == null) return null;
+        String promptTemplate = blueprint.getRecommendedPromptTemplate() != null ? blueprint.getRecommendedPromptTemplate() : blueprint.getPromptScaffold();
         CurrentTaskData.CurrentTaskItem item = CurrentTaskData.CurrentTaskItem.builder()
                 .taskId(blueprint.getTaskId())
                 .title(blueprint.getTitle())
                 .taskType(blueprint.getTaskType().name())
                 .goal(blueprint.getGoal())
-                .whyThisTask(blueprint.getPromptScaffold() != null ? blueprint.getPromptScaffold() : FixedSampleData.whyThisTask(taskId))
+                .whyThisTask(promptTemplate != null ? promptTemplate : FixedSampleData.whyThisTask(taskId))
+                .taskMethod(blueprint.getTaskMethod())
+                .recommendedPromptTemplate(promptTemplate)
                 .estimatedMinutes(blueprint.getEstimatedMinutes())
                 .promptScaffold(blueprint.getPromptScaffold())
                 .completionCriteria(blueprint.getCompletionCriteria())
+                .selfEvaluationQuestions(blueprint.getSelfEvaluationQuestions())
                 .fallbackAction(blueprint.getFallbackAction())
                 .build();
         CurrentTaskData.ProgressItem progress = CurrentTaskData.ProgressItem.builder()

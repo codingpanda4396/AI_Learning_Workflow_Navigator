@@ -2,21 +2,22 @@ package navigator.application.planning;
 
 import navigator.domain.enums.FoundationLevel;
 import navigator.domain.enums.GoalType;
+import navigator.domain.enums.UrgencyLevel;
 import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearnerProfileSnapshot;
 import navigator.domain.model.StructuredLearningGoal;
 import org.springframework.stereotype.Component;
 
 /**
- * Sprint 1: 按文档优先级选择策略（字符串常量），调用方再映射为 RecommendedStrategyCode。
+ * Sprint 2.5: 规则矩阵选择策略，输出 RecommendedStrategyCode 对应的字符串。
  */
 @Component
 public class PlanStrategySelector {
 
-    public static final String SYSTEMATIC_PROGRESSIVE = "SYSTEMATIC_PROGRESSIVE";
-    public static final String FOUNDATION_REBUILD = "FOUNDATION_REBUILD";
-    public static final String COMPRESSED_REVIEW = "COMPRESSED_REVIEW";
-    public static final String PRACTICE_DRIVEN = "PRACTICE_DRIVEN";
+    public static final String FOUNDATION_PATCH = "FOUNDATION_PATCH";
+    public static final String FRAMEWORK_BUILD = "FRAMEWORK_BUILD";
+    public static final String DRILL_STRENGTHEN = "DRILL_STRENGTHEN";
+    public static final String SPRINT_CORRECTION = "SPRINT_CORRECTION";
     public static final String LOCAL_REPAIR = "LOCAL_REPAIR";
     public static final String CONCEPT_CLARIFICATION = "CONCEPT_CLARIFICATION";
 
@@ -34,12 +35,12 @@ public class PlanStrategySelector {
         boolean beginner = profile != null && profile.getFoundationLevel() == FoundationLevel.BEGINNER;
         String primaryGap = profile != null && profile.getBlockerTags() != null && !profile.getBlockerTags().isEmpty() ? profile.getBlockerTags().get(0) : null;
         boolean procedureOrQuestionGap = "QUESTION_TYPE_RECOGNITION_GAP".equals(primaryGap) || "PROCEDURE_GAP".equals(primaryGap);
-        boolean highUrgency = "HIGH".equals(goal.getUrgencyLevel());
+        boolean highUrgency = UrgencyLevel.HIGH == goal.getUrgencyLevel();
 
-        if (chapterOrCourse || systematicGoal) return SYSTEMATIC_PROGRESSIVE;
-        if (beginner || prerequisiteGap) return FOUNDATION_REBUILD;
-        if (goal.getGoalType() == GoalType.REVIEW_FOR_EXAM && highUrgency && !beginner) return COMPRESSED_REVIEW;
-        if (procedureOrQuestionGap || goal.getGoalType() == GoalType.PRACTICE_ENHANCEMENT) return PRACTICE_DRIVEN;
+        if (chapterOrCourse || systematicGoal) return FRAMEWORK_BUILD;
+        if (beginner || prerequisiteGap) return FOUNDATION_PATCH;
+        if (goal.getGoalType() == GoalType.REVIEW_FOR_EXAM && highUrgency && !beginner) return SPRINT_CORRECTION;
+        if (procedureOrQuestionGap || goal.getGoalType() == GoalType.PRACTICE_ENHANCEMENT) return DRILL_STRENGTHEN;
         if (goal.getGoalType() == GoalType.FIX_SPECIFIC_BLOCKER && "SINGLE_TOPIC".equals(scope)) return LOCAL_REPAIR;
         return CONCEPT_CLARIFICATION;
     }

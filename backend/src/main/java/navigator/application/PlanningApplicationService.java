@@ -124,29 +124,29 @@ public class PlanningApplicationService {
         RecommendedStrategyCode code;
         String label;
         switch (strategy) {
-            case PlanStrategySelector.SYSTEMATIC_PROGRESSIVE:
-                code = RecommendedStrategyCode.PROGRESSIVE_SYSTEMATIC;
-                label = "系统渐进";
+            case PlanStrategySelector.FRAMEWORK_BUILD:
+                code = RecommendedStrategyCode.FRAMEWORK_BUILD;
+                label = "框架搭建";
                 break;
-            case PlanStrategySelector.FOUNDATION_REBUILD:
-                code = RecommendedStrategyCode.REBUILD_FOUNDATION;
-                label = "前置重建";
+            case PlanStrategySelector.FOUNDATION_PATCH:
+                code = RecommendedStrategyCode.FOUNDATION_PATCH;
+                label = "基础修补";
                 break;
-            case PlanStrategySelector.COMPRESSED_REVIEW:
-                code = RecommendedStrategyCode.COMPRESSED_REVIEW;
-                label = "压缩复习";
+            case PlanStrategySelector.SPRINT_CORRECTION:
+                code = RecommendedStrategyCode.SPRINT_CORRECTION;
+                label = "冲刺纠偏";
                 break;
-            case PlanStrategySelector.PRACTICE_DRIVEN:
-                code = RecommendedStrategyCode.PRACTICE_WITH_SCAFFOLD;
-                label = "练习驱动";
+            case PlanStrategySelector.DRILL_STRENGTHEN:
+                code = RecommendedStrategyCode.DRILL_STRENGTHEN;
+                label = "刷题强化";
                 break;
             case PlanStrategySelector.LOCAL_REPAIR:
-                code = RecommendedStrategyCode.PATCH_PREREQUISITE;
+                code = RecommendedStrategyCode.LOCAL_REPAIR;
                 label = "局部修补";
                 break;
             case PlanStrategySelector.CONCEPT_CLARIFICATION:
             default:
-                code = RecommendedStrategyCode.CLARIFY_CORE_CONCEPT;
+                code = RecommendedStrategyCode.CONCEPT_CLARIFICATION;
                 label = "概念澄清";
                 break;
         }

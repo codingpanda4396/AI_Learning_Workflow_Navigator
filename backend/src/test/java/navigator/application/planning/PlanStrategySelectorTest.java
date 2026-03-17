@@ -2,6 +2,7 @@ package navigator.application.planning;
 
 import navigator.domain.enums.FoundationLevel;
 import navigator.domain.enums.GoalType;
+import navigator.domain.enums.UrgencyLevel;
 import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearnerProfileSnapshot;
 import navigator.domain.model.StructuredLearningGoal;
@@ -9,7 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static navigator.application.planning.PlanStrategySelector.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PlanStrategySelectorTest {
@@ -22,7 +22,7 @@ class PlanStrategySelectorTest {
                 .goal(StructuredLearningGoal.builder().goalType(GoalType.BUILD_SYSTEMATIC_UNDERSTANDING).topicScopeType("COURSE").build())
                 .learnerProfileSnapshot(LearnerProfileSnapshot.builder().foundationLevel(FoundationLevel.BASIC).build())
                 .build();
-        assertThat(selector.select(ctx)).isEqualTo(SYSTEMATIC_PROGRESSIVE);
+        assertThat(selector.select(ctx)).isEqualTo(PlanStrategySelector.FRAMEWORK_BUILD);
     }
 
     @Test
@@ -31,15 +31,33 @@ class PlanStrategySelectorTest {
                 .goal(StructuredLearningGoal.builder().goalType(GoalType.LEARN_NEW_CONCEPT).topicScopeType("SINGLE_TOPIC").build())
                 .learnerProfileSnapshot(LearnerProfileSnapshot.builder().foundationLevel(FoundationLevel.BEGINNER).riskTags(List.of("PREREQUISITE_GAP")).build())
                 .build();
-        assertThat(selector.select(ctx)).isEqualTo(FOUNDATION_REBUILD);
+        assertThat(selector.select(ctx)).isEqualTo(PlanStrategySelector.FOUNDATION_PATCH);
     }
 
     @Test
     void compressedReviewForExamHighUrgency() {
         PlanningContext ctx = PlanningContext.builder()
-                .goal(StructuredLearningGoal.builder().goalType(GoalType.REVIEW_FOR_EXAM).urgencyLevel("HIGH").topicScopeType("SINGLE_TOPIC").build())
+                .goal(StructuredLearningGoal.builder().goalType(GoalType.REVIEW_FOR_EXAM).urgencyLevel(UrgencyLevel.HIGH).topicScopeType("SINGLE_TOPIC").build())
                 .learnerProfileSnapshot(LearnerProfileSnapshot.builder().foundationLevel(FoundationLevel.BASIC).blockerTags(List.of("QUESTION_TYPE_RECOGNITION_GAP")).build())
                 .build();
-        assertThat(selector.select(ctx)).isEqualTo(COMPRESSED_REVIEW);
+        assertThat(selector.select(ctx)).isEqualTo(PlanStrategySelector.SPRINT_CORRECTION);
+    }
+
+    @Test
+    void localRepairForBlockerSingleTopic() {
+        PlanningContext ctx = PlanningContext.builder()
+                .goal(StructuredLearningGoal.builder().goalType(GoalType.FIX_SPECIFIC_BLOCKER).topicScopeType("SINGLE_TOPIC").build())
+                .learnerProfileSnapshot(LearnerProfileSnapshot.builder().foundationLevel(FoundationLevel.BASIC).blockerTags(List.of("CONCEPT_GAP")).build())
+                .build();
+        assertThat(selector.select(ctx)).isEqualTo(PlanStrategySelector.LOCAL_REPAIR);
+    }
+
+    @Test
+    void conceptClarificationFallback() {
+        PlanningContext ctx = PlanningContext.builder()
+                .goal(StructuredLearningGoal.builder().goalType(GoalType.LEARN_NEW_CONCEPT).topicScopeType("SINGLE_TOPIC").build())
+                .learnerProfileSnapshot(LearnerProfileSnapshot.builder().foundationLevel(FoundationLevel.BASIC).blockerTags(List.of()).build())
+                .build();
+        assertThat(selector.select(ctx)).isEqualTo(PlanStrategySelector.CONCEPT_CLARIFICATION);
     }
 }

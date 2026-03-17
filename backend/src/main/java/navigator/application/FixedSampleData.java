@@ -28,7 +28,7 @@ public final class FixedSampleData {
                 .topics(List.of("链表"))
                 .intentDescription("用户希望理解链表概念，并具备后续进入基本操作学习的准备")
                 .timeBudget(TimeBudget.WITHIN_30_MIN)
-                .urgencyLevel("MEDIUM")
+                .urgencyLevel(UrgencyLevel.MEDIUM)
                 .expectedDepth("UNDERSTAND_AND_BASIC_USE")
                 .selfReportedLevel(SelfReportedLevel.BASIC)
                 .preferenceTags(List.of(PreferenceTag.CONCEPT_FIRST, PreferenceTag.STEP_BY_STEP))
@@ -90,18 +90,13 @@ public final class FixedSampleData {
         return LearnerProfileSnapshot.builder()
                 .diagnosisId(DIAGNOSIS_ID)
                 .foundationLevel(FoundationLevel.BASIC)
-                .confidenceLevel(ConfidenceLevel.MEDIUM)
-                .comprehensionPattern("CONCEPT_KNOWN_BUT_UNSTABLE")
-                .executionPattern("NEEDS_GUIDED_PROGRESS")
+                .executionStability(ExecutionStability.MODERATE)
+                .timeBudgetLevel(TimeBudget.WITHIN_30_MIN)
+                .learningPreference(LearningPreference.CONCEPT_FIRST)
+                .blockingPoint("CONCEPT_GAP")
+                .urgencyLevel(UrgencyLevel.MEDIUM)
                 .blockerTags(List.of("CONCEPT_GAP"))
                 .riskTags(List.of("SHALLOW_UNDERSTANDING_RISK"))
-                .suggestedEntryStrategy("START_FROM_CORE_DEFINITION")
-                .suggestedGranularity("SMALL")
-                .suggestedFeedbackFrequency("EACH_TASK")
-                .planningHints(List.of(
-                        "先建立链表节点与指针关系",
-                        "先做概念解释，再进入简单例子"
-                ))
                 .build();
     }
 
@@ -132,7 +127,7 @@ public final class FixedSampleData {
 
     public static RecommendedStrategy recommendedStrategy() {
         return RecommendedStrategy.builder()
-                .code(RecommendedStrategyCode.CLARIFY_CORE_CONCEPT)
+                .code(RecommendedStrategyCode.CONCEPT_CLARIFICATION)
                 .label("先澄清核心概念，再做轻量练习")
                 .reason("适合基础不稳但已有接触的用户。")
                 .build();
@@ -152,33 +147,42 @@ public final class FixedSampleData {
                         .title("理解链表的基本结构")
                         .taskType(TaskType.CONCEPT_EXPLAIN)
                         .goal("用自己的话说清链表由什么组成")
-                        .estimatedMinutes(8)
+                        .taskMethod("先请 AI 解释定义和关键特征，再用自己的话复述确认理解")
+                        .recommendedPromptTemplate("请用简明语言解释【主题】的定义和 1～2 个关键特征，并举一个最小例子。")
                         .promptScaffold("请先解释什么是链表、节点、指针，它们之间是什么关系，并给一个最小例子。")
                         .completionCriteria(List.of("能说出节点和指针的作用", "能描述节点之间如何连接"))
                         .evidenceToCollect(List.of("interactionCount", "userSummarySubmitted"))
+                        .selfEvaluationQuestions(List.of("我能用自己的话说出定义吗？", "我能举出至少一个例子吗？"))
                         .fallbackAction("如果还是混乱，要求导师只用一个两节点例子重新解释")
+                        .estimatedMinutes(8)
                         .build(),
                 TaskBlueprint.builder()
                         .taskId(TASK_002)
                         .title("对比链表与顺序表")
                         .taskType(TaskType.COMPARE_AND_CONNECT)
                         .goal("理解链表与数组在存储方式上的核心区别")
-                        .estimatedMinutes(7)
+                        .taskMethod("请 AI 列出要点，自己整理成对比表或关系图")
+                        .recommendedPromptTemplate("请从存储结构、插入删除、访问特点等角度对比【主题 A】和【主题 B】的核心区别。")
                         .promptScaffold("请从存储结构、插入删除、访问方式三个角度对比链表和数组。")
                         .completionCriteria(List.of("至少说出两点区别", "能解释为什么链表不要求连续存储"))
                         .evidenceToCollect(List.of("interactionCount", "userSummarySubmitted"))
+                        .selfEvaluationQuestions(List.of("我能说出至少 2 个区别/联系吗？", "遇到易混场景我能区分吗？"))
                         .fallbackAction("如果无法比较，先只比较是否连续存储这一点")
+                        .estimatedMinutes(7)
                         .build(),
                 TaskBlueprint.builder()
                         .taskId(TASK_003)
                         .title("完成一个最小自我解释")
                         .taskType(TaskType.SELF_EXPLANATION)
                         .goal("用自己的话完整解释链表")
-                        .estimatedMinutes(5)
+                        .taskMethod("不看原文，用自己的话讲出来，再对照检查遗漏")
+                        .recommendedPromptTemplate("请先不要讲，让我用自己的话解释【主题】，讲完后你再指出遗漏或误解。")
                         .promptScaffold("请你不用术语堆砌，像讲给同学一样解释链表是什么。")
                         .completionCriteria(List.of("解释中包含节点、指针、连接关系", "表达连贯，不只是复述定义"))
                         .evidenceToCollect(List.of("userSummarySubmitted", "learnerReflection"))
+                        .selfEvaluationQuestions(List.of("我的解释是否完整？", "有没有依赖原文才能说出的部分？"))
                         .fallbackAction("先给一句模板开头，再让用户补全")
+                        .estimatedMinutes(5)
                         .build()
         );
     }
@@ -192,9 +196,12 @@ public final class FixedSampleData {
                         .title(t.getTitle())
                         .taskType(t.getTaskType())
                         .goal(t.getGoal())
-                        .estimatedMinutes(t.getEstimatedMinutes())
+                        .taskMethod(t.getTaskMethod())
+                        .recommendedPromptTemplate(t.getRecommendedPromptTemplate())
                         .promptScaffold(t.getPromptScaffold())
                         .completionCriteria(t.getCompletionCriteria())
+                        .selfEvaluationQuestions(t.getSelfEvaluationQuestions())
+                        .estimatedMinutes(t.getEstimatedMinutes())
                         .fallbackAction(t.getFallbackAction())
                         .build();
             }

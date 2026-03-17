@@ -17,13 +17,13 @@ public class PlanTemplateFactory {
     public StagesAndTasks build(String strategy, String planId, String topicLabel) {
         if (topicLabel == null) topicLabel = "当前主题";
         switch (strategy) {
-            case PlanStrategySelector.FOUNDATION_REBUILD:
+            case PlanStrategySelector.FOUNDATION_PATCH:
                 return foundationRebuild(planId, topicLabel);
-            case PlanStrategySelector.COMPRESSED_REVIEW:
+            case PlanStrategySelector.SPRINT_CORRECTION:
                 return compressedReview(planId, topicLabel);
-            case PlanStrategySelector.PRACTICE_DRIVEN:
+            case PlanStrategySelector.DRILL_STRENGTHEN:
                 return practiceDriven(planId, topicLabel);
-            case PlanStrategySelector.SYSTEMATIC_PROGRESSIVE:
+            case PlanStrategySelector.FRAMEWORK_BUILD:
                 return systematicProgressive(planId, topicLabel);
             case PlanStrategySelector.LOCAL_REPAIR:
                 return localRepair(planId, topicLabel);
@@ -61,13 +61,13 @@ public class PlanTemplateFactory {
             list.addAll(ctx.getLearnerProfileSnapshot().getRiskTags());
         }
         switch (strategy) {
-            case PlanStrategySelector.FOUNDATION_REBUILD:
+            case PlanStrategySelector.FOUNDATION_PATCH:
                 list.add("PREREQUISITE_GAP");
                 break;
-            case PlanStrategySelector.COMPRESSED_REVIEW:
+            case PlanStrategySelector.SPRINT_CORRECTION:
                 list.add("SHALLOW_UNDERSTANDING_RISK");
                 break;
-            case PlanStrategySelector.SYSTEMATIC_PROGRESSIVE:
+            case PlanStrategySelector.FRAMEWORK_BUILD:
                 list.add("GOAL_TOO_BROAD");
                 break;
             default:
@@ -82,7 +82,7 @@ public class PlanTemplateFactory {
             list.add("当前目标是 " + (ctx.getGoal().getGoalType() != null ? ctx.getGoal().getGoalType().name() : "未指定") + "，主题范围为 " + (ctx.getGoal().getTopicScopeType() != null ? ctx.getGoal().getTopicScopeType() : "未指定"));
         }
         if (ctx.getGoal() != null && ctx.getGoal().getTimeBudget() != null) {
-            list.add("当前时间预算为 " + ctx.getGoal().getTimeBudget().name() + "，紧迫程度为 " + (ctx.getGoal().getUrgencyLevel() != null ? ctx.getGoal().getUrgencyLevel() : "MEDIUM"));
+            list.add("当前时间预算为 " + ctx.getGoal().getTimeBudget().name() + "，紧迫程度为 " + (ctx.getGoal().getUrgencyLevel() != null ? ctx.getGoal().getUrgencyLevel().name() : "MEDIUM"));
         }
         if (ctx.getLearnerProfileSnapshot() != null && ctx.getLearnerProfileSnapshot().getFoundationLevel() != null) {
             list.add("当前基础判断为 " + ctx.getLearnerProfileSnapshot().getFoundationLevel().name());
@@ -197,11 +197,50 @@ public class PlanTemplateFactory {
                 .title(title)
                 .taskType(type)
                 .goal(title)
-                .estimatedMinutes(minutes)
-                .promptScaffold("请完成本任务目标。")
+                .taskMethod(taskMethodForType(type))
+                .recommendedPromptTemplate(promptTemplateForType(type))
+                .promptScaffold(promptTemplateForType(type))
                 .completionCriteria(successCriteriaForTaskType(type))
                 .evidenceToCollect(List.of("interactionCount", "userSummarySubmitted"))
+                .selfEvaluationQuestions(selfEvaluationForType(type))
                 .fallbackAction("如遇困难可请求更小步拆解")
+                .estimatedMinutes(minutes)
                 .build();
+    }
+
+    private String taskMethodForType(TaskType type) {
+        return switch (type) {
+            case CONCEPT_EXPLAIN -> "先请 AI 解释定义和关键特征，再用自己的话复述确认理解";
+            case COMPARE_AND_CONNECT -> "请 AI 列出要点，自己整理成对比表或关系图";
+            case GUIDED_EXAMPLE -> "跟着 AI 的步骤走一遍例子，重点理解每一步为什么这样做";
+            case SELF_EXPLANATION -> "不看原文，用自己的话讲出来，再对照检查遗漏";
+            case MICRO_PRACTICE -> "先明确题型/入口，再做 1～2 个小问，做完解释理由";
+            case CHECKPOINT_REVIEW -> "对照完成标准逐条检查，有缺口就补";
+            default -> "围绕任务目标与 AI 对话，按完成标准自检";
+        };
+    }
+
+    private String promptTemplateForType(TaskType type) {
+        return switch (type) {
+            case CONCEPT_EXPLAIN -> "请用简明语言解释【主题】的定义和 1～2 个关键特征，并举一个最小例子。";
+            case COMPARE_AND_CONNECT -> "请从存储方式、插入删除、访问特点等角度对比【主题 A】和【主题 B】的核心区别。";
+            case GUIDED_EXAMPLE -> "请用一道典型题，按步骤演示如何判断题型、选用方法、写出关键代码/式子。";
+            case SELF_EXPLANATION -> "请先不要讲，让我用自己的话解释【主题】，讲完后你再指出遗漏或误解。";
+            case MICRO_PRACTICE -> "请给 1～2 道与【主题】相关的小题，我做完后请你帮我检查思路。";
+            case CHECKPOINT_REVIEW -> "请帮我检查：1) 定义是否清楚 2) 与易混概念能否区分 3) 能否做一道最小题。";
+            default -> "请完成本任务目标。";
+        };
+    }
+
+    private List<String> selfEvaluationForType(TaskType type) {
+        return switch (type) {
+            case CONCEPT_EXPLAIN -> List.of("我能用自己的话说出定义吗？", "我能举出至少一个例子吗？");
+            case COMPARE_AND_CONNECT -> List.of("我能说出至少 2 个区别/联系吗？", "遇到易混场景我能区分吗？");
+            case GUIDED_EXAMPLE -> List.of("我能否讲清每一步在做什么？", "换一道类似题我能独立开始吗？");
+            case SELF_EXPLANATION -> List.of("我的解释是否完整？", "有没有依赖原文才能说出的部分？");
+            case MICRO_PRACTICE -> List.of("我能否说明为什么这样做？", "类似题我能举一反三吗？");
+            case CHECKPOINT_REVIEW -> List.of("所有检查点都通过了吗？", "还有哪一块不够稳？");
+            default -> List.of("完成本任务目标了吗？");
+        };
     }
 }
