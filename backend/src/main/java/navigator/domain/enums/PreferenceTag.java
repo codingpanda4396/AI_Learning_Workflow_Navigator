@@ -6,5 +6,6 @@ public enum PreferenceTag {
     PRACTICE_FIRST,
     STEP_BY_STEP,
     FAST_TRACK,
-    FRAMEWORK_FIRST
+    FRAMEWORK_FIRST,
+    CORE_CONTRAST_FIRST
 }

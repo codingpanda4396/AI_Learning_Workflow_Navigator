@@ -10,5 +10,6 @@ public enum LearningPreference {
     PRACTICE_FIRST,
     STEP_BY_STEP,
     FRAMEWORK_FIRST,
+    CORE_CONTRAST_FIRST,
     BALANCED
 }

@@ -15,7 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Sprint 2.5: answers + goal + goalContext -> LearnerProfileSnapshot V2（6 维收敛）。
+ * answers + goal + goalContext -> LearnerProfileSnapshot（6 维收敛）。
+ * 支持 GOAL_SITUATION, FOUNDATION, GAP, WEAKNESS_SCOPE, PREFERENCE, EXECUTION_RISK。
  */
 @Component
 public class DiagnosisRuleEngine {
@@ -25,20 +26,25 @@ public class DiagnosisRuleEngine {
             "QUESTION_TYPE_RECOGNITION_GAP", "EXPRESSION_GAP"
     );
 
+    private static final List<String> EXECUTION_RISK_CODES = List.of(
+            "TIME_PRESSURE", "COGNITIVE_OVERLOAD_RISK", "OVERCONFIDENCE_RISK",
+            "CONTINUITY_RISK", "LOW_RISK"
+    );
+
     public LearnerProfileSnapshot buildProfile(
             String diagnosisId,
             DiagnosisAnswerNormalizer.NormalizedAnswers normalized,
             StructuredLearningGoal goal,
             GoalContextSnapshot goalContext) {
         FoundationResult foundation = mapFoundation(normalized.getFoundationCode());
-        String primaryGap = mapGap(normalized.getGapCodes() != null && !normalized.getGapCodes().isEmpty() ? normalized.getGapCodes().get(0) : null);
+        String primaryGap = mapGap(normalized.getGapCode());
         List<String> blockerTags = primaryGap != null ? List.of(primaryGap) : List.of();
 
-        ExecutionStability executionStability = deriveExecutionStability(foundation, primaryGap);
+        ExecutionStability executionStability = deriveExecutionStability(foundation, primaryGap, normalized.getExecutionRiskCode());
         TimeBudget timeBudgetLevel = goal != null ? goal.getTimeBudget() : null;
-        LearningPreference learningPreference = deriveLearningPreference(goal);
+        LearningPreference learningPreference = deriveLearningPreference(normalized.getPreferenceCode(), goal);
         UrgencyLevel urgencyLevel = goal != null ? goal.getUrgencyLevel() : null;
-        List<String> riskTags = deriveRiskTags(goalContext, foundation, primaryGap);
+        List<String> riskTags = deriveRiskTags(goalContext, foundation, primaryGap, normalized.getExecutionRiskCode());
 
         return LearnerProfileSnapshot.builder()
                 .diagnosisId(diagnosisId)
@@ -53,11 +59,17 @@ public class DiagnosisRuleEngine {
                 .build();
     }
 
-    private ExecutionStability deriveExecutionStability(FoundationResult foundation, String primaryGap) {
+    private ExecutionStability deriveExecutionStability(FoundationResult foundation, String primaryGap, String executionRiskCode) {
         boolean unstableGap = "CONCEPT_GAP".equals(primaryGap) || "RELATIONSHIP_GAP".equals(primaryGap);
         boolean lowConfidence = foundation.confidenceLevel == ConfidenceLevel.LOW;
         if (foundation.level == FoundationLevel.BEGINNER || (unstableGap && lowConfidence)) {
             return ExecutionStability.UNSTABLE;
+        }
+        if ("CONTINUITY_RISK".equals(executionRiskCode)) {
+            return ExecutionStability.UNSTABLE;
+        }
+        if ("TIME_PRESSURE".equals(executionRiskCode) || "COGNITIVE_OVERLOAD_RISK".equals(executionRiskCode)) {
+            return ExecutionStability.MODERATE;
         }
         if (unstableGap || lowConfidence) {
             return ExecutionStability.MODERATE;
@@ -65,7 +77,13 @@ public class DiagnosisRuleEngine {
         return ExecutionStability.STABLE;
     }
 
-    private LearningPreference deriveLearningPreference(StructuredLearningGoal goal) {
+    private LearningPreference deriveLearningPreference(String preferenceCode, StructuredLearningGoal goal) {
+        if (preferenceCode != null && !preferenceCode.isBlank()) {
+            LearningPreference fromDiagnosis = mapPreference(preferenceCode);
+            if (fromDiagnosis != null) {
+                return fromDiagnosis;
+            }
+        }
         if (goal == null || goal.getPreferenceTags() == null || goal.getPreferenceTags().isEmpty()) {
             return LearningPreference.BALANCED;
         }
@@ -73,9 +91,22 @@ public class DiagnosisRuleEngine {
         if (tags.contains(navigator.domain.enums.PreferenceTag.PRACTICE_FIRST)) return LearningPreference.PRACTICE_FIRST;
         if (tags.contains(navigator.domain.enums.PreferenceTag.EXAMPLE_FIRST)) return LearningPreference.EXAMPLE_FIRST;
         if (tags.contains(navigator.domain.enums.PreferenceTag.FRAMEWORK_FIRST)) return LearningPreference.FRAMEWORK_FIRST;
+        if (tags.contains(navigator.domain.enums.PreferenceTag.CORE_CONTRAST_FIRST)) return LearningPreference.CORE_CONTRAST_FIRST;
         if (tags.contains(navigator.domain.enums.PreferenceTag.STEP_BY_STEP)) return LearningPreference.STEP_BY_STEP;
         if (tags.contains(navigator.domain.enums.PreferenceTag.CONCEPT_FIRST)) return LearningPreference.CONCEPT_FIRST;
         return LearningPreference.BALANCED;
+    }
+
+    private LearningPreference mapPreference(String code) {
+        if (code == null || code.isBlank()) return null;
+        return switch (code.toUpperCase()) {
+            case "CONCEPT_FIRST" -> LearningPreference.CONCEPT_FIRST;
+            case "EXAMPLE_FIRST" -> LearningPreference.EXAMPLE_FIRST;
+            case "PRACTICE_FIRST" -> LearningPreference.PRACTICE_FIRST;
+            case "FRAMEWORK_FIRST" -> LearningPreference.FRAMEWORK_FIRST;
+            case "CORE_CONTRAST_FIRST" -> LearningPreference.CORE_CONTRAST_FIRST;
+            default -> null;
+        };
     }
 
     private FoundationResult mapFoundation(String code) {
@@ -87,12 +118,18 @@ public class DiagnosisRuleEngine {
                 return new FoundationResult(FoundationLevel.BEGINNER, true, ConfidenceLevel.LOW);
             case "LEARNED_BUT_FORGOTTEN":
                 return new FoundationResult(FoundationLevel.BASIC, true, ConfidenceLevel.LOW);
+            case "BASIC_BUT_FRAGILE":
+                return new FoundationResult(FoundationLevel.BASIC, false, ConfidenceLevel.LOW);
             case "BASIC":
                 return new FoundationResult(FoundationLevel.BASIC, false, ConfidenceLevel.LOW);
-            case "PROFICIENT":
+            case "CAN_EXPLAIN_BUT_NOT_STABLE":
                 return new FoundationResult(FoundationLevel.INTERMEDIATE, false, ConfidenceLevel.MEDIUM);
             case "CAN_EXPLAIN_BUT_NOT_APPLY":
                 return new FoundationResult(FoundationLevel.INTERMEDIATE, false, ConfidenceLevel.MEDIUM);
+            case "PROFICIENT":
+                return new FoundationResult(FoundationLevel.INTERMEDIATE, false, ConfidenceLevel.MEDIUM);
+            case "SOLID_WITH_LOCAL_GAPS":
+                return new FoundationResult(FoundationLevel.SOLID, false, ConfidenceLevel.HIGH);
             case "ADVANCED":
             case "SOLID":
                 return new FoundationResult(FoundationLevel.SOLID, false, ConfidenceLevel.HIGH);
@@ -115,7 +152,7 @@ public class DiagnosisRuleEngine {
         return u;
     }
 
-    private List<String> deriveRiskTags(GoalContextSnapshot goalContext, FoundationResult foundation, String primaryGap) {
+    private List<String> deriveRiskTags(GoalContextSnapshot goalContext, FoundationResult foundation, String primaryGap, String executionRiskCode) {
         List<String> tags = new ArrayList<>();
         if (goalContext != null && goalContext.getRiskTags() != null && goalContext.getRiskTags().contains("TIME_PRESSURE")) {
             tags.add("TIME_PRESSURE");
@@ -128,6 +165,11 @@ public class DiagnosisRuleEngine {
         }
         if (goalContext != null && goalContext.getRiskTags() != null && goalContext.getRiskTags().stream().anyMatch(r -> r.contains("TIME")) && ("CONCEPT_GAP".equals(primaryGap) || "RELATIONSHIP_GAP".equals(primaryGap))) {
             tags.add("SHALLOW_UNDERSTANDING_RISK");
+        }
+        if (executionRiskCode != null && !executionRiskCode.isBlank() && !"LOW_RISK".equals(executionRiskCode) && EXECUTION_RISK_CODES.contains(executionRiskCode)) {
+            if (!tags.contains(executionRiskCode)) {
+                tags.add(executionRiskCode);
+            }
         }
         return tags.isEmpty() ? List.of() : tags;
     }

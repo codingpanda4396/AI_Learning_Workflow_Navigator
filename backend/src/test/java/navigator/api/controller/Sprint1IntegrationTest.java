@@ -55,10 +55,20 @@ class Sprint1IntegrationTest {
         String diagResp = mvc.perform(post("/api/diagnosis/sessions").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"" + goalId + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("READY"))
+                .andExpect(jsonPath("$.data.questions.length()").value(6))
+                .andExpect(jsonPath("$.data.questions[0].questionId").value("q_goal_outcome"))
+                .andExpect(jsonPath("$.data.questions[1].questionId").value("q_foundation_state"))
                 .andReturn().getResponse().getContentAsString();
         String diagnosisId = objectMapper.readTree(diagResp).get("data").get("diagnosisId").asText();
 
-        String submitBody = "{\"diagnosisId\":\"" + diagnosisId + "\",\"answers\":[{\"questionId\":\"q_foundation\",\"selectedOptions\":[\"BASIC\"]},{\"questionId\":\"q_gap\",\"selectedOptions\":[\"CONCEPT_GAP\"]}]}";
+        String submitBody = "{\"diagnosisId\":\"" + diagnosisId + "\",\"answers\":["
+                + "{\"questionId\":\"q_goal_outcome\",\"selectedOptions\":[\"BUILD_FRAMEWORK\"]},"
+                + "{\"questionId\":\"q_foundation_state\",\"selectedOptions\":[\"BASIC_BUT_FRAGILE\"]},"
+                + "{\"questionId\":\"q_primary_gap\",\"selectedOptions\":[\"CONCEPT_GAP\"]},"
+                + "{\"questionId\":\"q_scope_of_problem\",\"selectedOptions\":[\"MULTI_POINT\"]},"
+                + "{\"questionId\":\"q_preferred_entry_mode\",\"selectedOptions\":[\"CONCEPT_FIRST\"]},"
+                + "{\"questionId\":\"q_execution_risk\",\"selectedOptions\":[\"LOW_RISK\"]}"
+                + "]}";
         mvc.perform(post("/api/diagnosis/submissions").contentType(MediaType.APPLICATION_JSON).content(submitBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.learnerProfileSnapshot").exists());
@@ -101,7 +111,14 @@ class Sprint1IntegrationTest {
         String goalId = objectMapper.readTree(goalResp).get("data").get("goalId").asText();
         String diagResp = mvc.perform(post("/api/diagnosis/sessions").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"" + goalId + "\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         String diagnosisId = objectMapper.readTree(diagResp).get("data").get("diagnosisId").asText();
-        String submitBody = "{\"diagnosisId\":\"" + diagnosisId + "\",\"answers\":[{\"questionId\":\"q_foundation\",\"selectedOptions\":[\"BASIC\"]},{\"questionId\":\"q_gap\",\"selectedOptions\":[\"CONCEPT_GAP\"]}]}";
+        String submitBody = "{\"diagnosisId\":\"" + diagnosisId + "\",\"answers\":["
+                + "{\"questionId\":\"q_goal_outcome\",\"selectedOptions\":[\"BUILD_FRAMEWORK\"]},"
+                + "{\"questionId\":\"q_foundation_state\",\"selectedOptions\":[\"BASIC_BUT_FRAGILE\"]},"
+                + "{\"questionId\":\"q_primary_gap\",\"selectedOptions\":[\"CONCEPT_GAP\"]},"
+                + "{\"questionId\":\"q_scope_of_problem\",\"selectedOptions\":[\"MULTI_POINT\"]},"
+                + "{\"questionId\":\"q_preferred_entry_mode\",\"selectedOptions\":[\"CONCEPT_FIRST\"]},"
+                + "{\"questionId\":\"q_execution_risk\",\"selectedOptions\":[\"LOW_RISK\"]}"
+                + "]}";
         mvc.perform(post("/api/diagnosis/submissions").contentType(MediaType.APPLICATION_JSON).content(submitBody)).andExpect(status().isOk());
         mvc.perform(post("/api/learning-plans/preview").contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"" + goalId + "\",\"diagnosisId\":\"" + diagnosisId + "\"}")).andExpect(status().isOk());
         String sessionId = objectMapper.readTree(diagResp).get("data").get("sessionId").asText();

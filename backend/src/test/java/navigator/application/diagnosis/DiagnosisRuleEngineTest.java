@@ -21,7 +21,7 @@ class DiagnosisRuleEngineTest {
 
     @Test
     void beginnerWithConceptGap_producesUnstableAndFoundationBeginner() {
-        var normalized = new DiagnosisAnswerNormalizer.NormalizedAnswers("BEGINNER", List.of("CONCEPT_GAP"));
+        var normalized = new DiagnosisAnswerNormalizer.NormalizedAnswers(null, "BEGINNER", "CONCEPT_GAP", null, null, null);
         StructuredLearningGoal goal = StructuredLearningGoal.builder()
                 .timeBudget(TimeBudget.WITHIN_30_MIN)
                 .urgencyLevel(UrgencyLevel.MEDIUM)
@@ -43,7 +43,7 @@ class DiagnosisRuleEngineTest {
 
     @Test
     void basicWithProcedureGap_producesModerateStability() {
-        var normalized = new DiagnosisAnswerNormalizer.NormalizedAnswers("BASIC", List.of("PROCEDURE_GAP"));
+        var normalized = new DiagnosisAnswerNormalizer.NormalizedAnswers(null, "BASIC", "PROCEDURE_GAP", null, null, null);
         StructuredLearningGoal goal = StructuredLearningGoal.builder()
                 .timeBudget(TimeBudget.MULTI_DAY)
                 .urgencyLevel(UrgencyLevel.MEDIUM)
@@ -60,7 +60,7 @@ class DiagnosisRuleEngineTest {
 
     @Test
     void proficientWithNoGap_producesStableAndBalanced() {
-        var normalized = new DiagnosisAnswerNormalizer.NormalizedAnswers("PROFICIENT", List.of());
+        var normalized = new DiagnosisAnswerNormalizer.NormalizedAnswers(null, "PROFICIENT", null, null, null, null);
         StructuredLearningGoal goal = StructuredLearningGoal.builder()
                 .timeBudget(TimeBudget.LONG_TERM)
                 .urgencyLevel(UrgencyLevel.LOW)
@@ -78,11 +78,25 @@ class DiagnosisRuleEngineTest {
 
     @Test
     void nullGoal_stillProducesProfile() {
-        var normalized = new DiagnosisAnswerNormalizer.NormalizedAnswers("BASIC", List.of("CONCEPT_GAP"));
+        var normalized = new DiagnosisAnswerNormalizer.NormalizedAnswers(null, "BASIC", "CONCEPT_GAP", null, null, null);
         LearnerProfileSnapshot profile = engine.buildProfile("diag_4", normalized, null, null);
 
         assertThat(profile.getTimeBudgetLevel()).isNull();
         assertThat(profile.getUrgencyLevel()).isNull();
         assertThat(profile.getLearningPreference()).isEqualTo(LearningPreference.BALANCED);
+    }
+
+    @Test
+    void preferenceFromDiagnosis_overridesGoalPreference() {
+        var normalized = new DiagnosisAnswerNormalizer.NormalizedAnswers(null, "BASIC", "CONCEPT_GAP", null, "CORE_CONTRAST_FIRST", null);
+        StructuredLearningGoal goal = StructuredLearningGoal.builder()
+                .timeBudget(TimeBudget.WITHIN_30_MIN)
+                .urgencyLevel(UrgencyLevel.MEDIUM)
+                .preferenceTags(List.of(PreferenceTag.CONCEPT_FIRST))
+                .build();
+
+        LearnerProfileSnapshot profile = engine.buildProfile("diag_5", normalized, goal, null);
+
+        assertThat(profile.getLearningPreference()).isEqualTo(LearningPreference.CORE_CONTRAST_FIRST);
     }
 }

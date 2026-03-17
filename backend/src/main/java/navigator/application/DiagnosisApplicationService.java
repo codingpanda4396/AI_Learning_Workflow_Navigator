@@ -4,6 +4,7 @@ import navigator.api.dto.DiagnosisSessionData;
 import navigator.api.dto.SubmitDiagnosisData;
 import navigator.application.diagnosis.DiagnosisAnswerNormalizer;
 import navigator.application.diagnosis.DiagnosisEvidenceBuilder;
+import navigator.application.diagnosis.DiagnosisQuestionBank;
 import navigator.application.diagnosis.DiagnosisRuleEngine;
 import navigator.application.guard.EntityLookupGuard;
 import navigator.domain.enums.DiagnosisSessionStatus;
@@ -59,7 +60,9 @@ public class DiagnosisApplicationService {
 
     public DiagnosisSessionData createSession(String goalId) {
         entityLookupGuard.requireGoal(goalId);
-        List<DiagnosisQuestion> questions = FixedSampleData.diagnosisQuestions();
+        StructuredLearningGoal goal = store.getGoals().get(goalId);
+        GoalContextSnapshot goalContext = store.getGoalContextSnapshots().get(goalId);
+        List<DiagnosisQuestion> questions = DiagnosisQuestionBank.fixedSixQuestions(goal, goalContext);
         Long goalDbId = extractNumericId(goalId);
         if (goalDbId == null) {
             throw new navigator.api.BusinessException(navigator.api.BusinessErrorCode.INVALID_ARGUMENT, "invalid goalId: " + goalId);

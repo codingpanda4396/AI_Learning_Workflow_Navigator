@@ -51,41 +51,6 @@ public final class FixedSampleData {
                 .build();
     }
 
-    public static List<DiagnosisQuestion> diagnosisQuestions() {
-        return List.of(
-                DiagnosisQuestion.builder()
-                        .questionId("q_foundation")
-                        .dimension("FOUNDATION")
-                        .type("SINGLE_CHOICE")
-                        .required(true)
-                        .title("你对链表基础掌握更接近哪种状态？")
-                        .description("这会影响系统从概念讲解还是操作练习开始。")
-                        .whyAsking("判断你是否需要先补基础概念。")
-                        .impactsPlanning(List.of("ENTRY_STRATEGY", "ENTRY_GRANULARITY"))
-                        .options(List.of(
-                                DiagnosisOption.builder().code("BEGINNER").label("刚开始接触").order(1).build(),
-                                DiagnosisOption.builder().code("BASIC").label("学过但不太熟").order(2).build(),
-                                DiagnosisOption.builder().code("PROFICIENT").label("概念基本知道").order(3).build()
-                        ))
-                        .build(),
-                DiagnosisQuestion.builder()
-                        .questionId("q_gap")
-                        .dimension("GAP")
-                        .type("SINGLE_CHOICE")
-                        .required(true)
-                        .title("你现在最卡的是哪一类问题？")
-                        .description("系统会据此决定是先讲概念、结构还是例题。")
-                        .whyAsking("识别当前最主要的学习缺口。")
-                        .impactsPlanning(List.of("RECOMMENDED_STRATEGY"))
-                        .options(List.of(
-                                DiagnosisOption.builder().code("CONCEPT_GAP").label("概念本身不清楚").order(1).build(),
-                                DiagnosisOption.builder().code("STRUCTURE_GAP").label("结构关系容易混").order(2).build(),
-                                DiagnosisOption.builder().code("APPLICATION_GAP").label("会概念但不会做题").order(3).build()
-                        ))
-                        .build()
-        );
-    }
-
     public static LearnerProfileSnapshot learnerProfileSnapshot() {
         return LearnerProfileSnapshot.builder()
                 .diagnosisId(DIAGNOSIS_ID)

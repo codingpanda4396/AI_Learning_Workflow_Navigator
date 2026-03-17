@@ -45,7 +45,7 @@ class Sprint2ReportAndNextActionIntegrationTest {
         String diagnosisId = objectMapper.readTree(diagResp).get("data").get("diagnosisId").asText();
 
         String submitBody = """
-                {"diagnosisId":"%s","answers":[{"questionId":"q_foundation","selectedOptions":["BASIC"]},{"questionId":"q_gap","selectedOptions":["CONCEPT_GAP"]}]}
+                {"diagnosisId":"%s","answers":[{"questionId":"q_goal_outcome","selectedOptions":["BUILD_FRAMEWORK"]},{"questionId":"q_foundation_state","selectedOptions":["BASIC_BUT_FRAGILE"]},{"questionId":"q_primary_gap","selectedOptions":["CONCEPT_GAP"]},{"questionId":"q_scope_of_problem","selectedOptions":["MULTI_POINT"]},{"questionId":"q_preferred_entry_mode","selectedOptions":["CONCEPT_FIRST"]},{"questionId":"q_execution_risk","selectedOptions":["LOW_RISK"]}]}
                 """.formatted(diagnosisId);
         mvc.perform(post("/api/diagnosis/submissions")
                         .contentType(MediaType.APPLICATION_JSON)
