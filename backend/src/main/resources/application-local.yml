@@ -1,0 +1,14 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+navigator:
+  llm:
+    enabled: true
+    # 注意：当前网关会自动拼接 /v1/chat/completions，因此这里不要写到 .../compatible-mode/v1
+    baseUrl: https://dashscope.aliyuncs.com/compatible-mode
+    apiKey: ${NAVIGATOR_LLM_API_KEY:sk-632cf870688143a8afde59259c20501d}
+    model: qwen3.5-plus
+    timeoutMs: 8000
+

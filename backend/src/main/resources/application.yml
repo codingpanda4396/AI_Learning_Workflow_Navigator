@@ -23,7 +23,7 @@ server:
 
 navigator:
   llm:
-    enabled: false
+    enabled: ${NAVIGATOR_LLM_ENABLED:false}
     baseUrl: ${NAVIGATOR_LLM_BASE_URL:https://api.openai.com}
     apiKey: ${NAVIGATOR_LLM_API_KEY:}
     model: ${NAVIGATOR_LLM_MODEL:gpt-4.1-mini}
