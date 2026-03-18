@@ -2,11 +2,15 @@ spring:
   application:
     name: learning-workflow-navigator-backend
 
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
   datasource:
-    url: jdbc:postgresql://8.145.55.7:5432/ai_learning_workflow_navigator
+    # 默认不要连共享远端库；需要时通过环境变量覆盖
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ai_learning_workflow_navigator}
     driver-class-name: org.postgresql.Driver
-    username: postgres
-    password: 439695
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
 
   flyway:
     enabled: true

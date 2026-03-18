@@ -3,6 +3,16 @@ spring:
     activate:
       on-profile: local
 
+  datasource:
+    # 本地开发默认仍连当前共享开发库（便于开箱即用）；如需本地库/其它库用环境变量覆盖
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://8.145.55.7:5432/ai_learning_workflow_navigator}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:439695}
+
+  flyway:
+    # local 环境避免被历史 checksum 阻断；远端/CI 环境建议保持默认 true
+    validate-on-migrate: false
+
 navigator:
   llm:
     enabled: true
