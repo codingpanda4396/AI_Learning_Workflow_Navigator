@@ -253,6 +253,18 @@ export interface TaskScaffoldResponse {
   completionSignals?: string[]
   antiPatterns?: string[]
   currentExecutionState: string
+  executionSnapshot?: {
+    currentState: string
+    exploreTurnCount: number
+    checkpointQuestion?: string
+    canComplete: boolean
+  }
+  recentMessages?: {
+    role: 'USER' | 'ASSISTANT' | 'SYSTEM'
+    content: string
+    detectedAction?: string
+    createdAt?: string
+  }[]
 }
 
 export interface TaskMessageResponse {

@@ -393,6 +393,14 @@ function actionLabel(code: string) {
   return actionLabels[code] ?? code
 }
 
+function isUiChatMessage(m: {
+  role: 'USER' | 'ASSISTANT' | 'SYSTEM'
+  content: string
+  detectedAction?: string
+}) : m is { role: 'USER' | 'ASSISTANT'; content: string; detectedAction?: string } {
+  return m.role === 'USER' || m.role === 'ASSISTANT'
+}
+
 async function fetchTask() {
   if (!store.sessionId) return
   loading.value = true
@@ -421,12 +429,19 @@ async function loadScaffold(taskId: string) {
     const s = await getTaskScaffold(taskId, store.sessionId)
     scaffold.value = s
     legacyComplete.value = false
-    taskState.value = s.currentExecutionState || 'ORIENT'
-    exploreRoundCount.value = 0
-    chatTurns.value = []
+    taskState.value =
+      s.executionSnapshot?.currentState || s.currentExecutionState || 'ORIENT'
+    exploreRoundCount.value = s.executionSnapshot?.exploreTurnCount || 0
+    checkpointQuestion.value = s.executionSnapshot?.checkpointQuestion || ''
+    chatTurns.value = (s.recentMessages || [])
+      .filter(isUiChatMessage)
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+        detectedAction: m.detectedAction || undefined,
+      }))
     selfExplainInput.value = ''
     checkpointAnswer.value = ''
-    checkpointQuestion.value = ''
   } catch {
     scaffold.value = null
     legacyComplete.value = true
