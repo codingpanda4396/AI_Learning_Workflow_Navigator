@@ -6,9 +6,12 @@ import navigator.application.guard.SessionStateGuard;
 import navigator.application.report.SessionEvidenceAggregator;
 import navigator.domain.enums.NextActionType;
 import navigator.domain.enums.ResultStatus;
+import navigator.application.task.LearningMethodProfileAggregator;
 import navigator.domain.model.ExecutionEvidenceSummary;
+import navigator.domain.model.LearningMethodProfile;
 import navigator.domain.model.LearningReport;
 import navigator.domain.model.NextActionDecision;
+import navigator.infrastructure.memory.InMemoryStore;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,11 +19,14 @@ public class ReportApplicationService {
 
     private final SessionStateGuard sessionStateGuard;
     private final SessionEvidenceAggregator evidenceAggregator;
+    private final InMemoryStore store;
 
     public ReportApplicationService(SessionStateGuard sessionStateGuard,
-                                    SessionEvidenceAggregator evidenceAggregator) {
+                                    SessionEvidenceAggregator evidenceAggregator,
+                                    InMemoryStore store) {
         this.sessionStateGuard = sessionStateGuard;
         this.evidenceAggregator = evidenceAggregator;
+        this.store = store;
     }
 
     public ReportData getReport(String sessionId) {
@@ -29,7 +35,9 @@ public class ReportApplicationService {
         SessionEvidenceAggregator.AggregatedSessionEvidence aggregated = evidenceAggregator.aggregate(sessionDbId);
         ExecutionEvidenceSummary execution = aggregated.execution();
 
-        LearningReport report = buildLearningReport(sessionId, aggregated, execution);
+        java.util.List<LearningMethodProfile> methodTasks = store.getSessionMethodProfiles().getOrDefault(sessionId, java.util.List.of());
+        LearningMethodProfile methodRollup = LearningMethodProfileAggregator.aggregateSession(sessionId, methodTasks);
+        LearningReport report = buildLearningReport(sessionId, aggregated, execution, methodRollup);
         NextActionDecision decision = report.getNextAction();
         return ReportData.builder()
                 .learningReport(report)
@@ -66,7 +74,8 @@ public class ReportApplicationService {
 
     private LearningReport buildLearningReport(String sessionId,
                                                SessionEvidenceAggregator.AggregatedSessionEvidence aggregated,
-                                               ExecutionEvidenceSummary execution) {
+                                               ExecutionEvidenceSummary execution,
+                                               LearningMethodProfile methodRollup) {
         int totalTasks = execution.getTotalTasks() != null ? execution.getTotalTasks() : 0;
         int completedTasks = execution.getCompletedTasks() != null ? execution.getCompletedTasks() : 0;
 
@@ -101,7 +110,7 @@ public class ReportApplicationService {
             summaryText = "本轮完成度较低，建议先集中解决当前链路中的关键薄弱点。";
         }
 
-        NextActionDecision nextAction = buildNextActionDecision(execution);
+        NextActionDecision nextAction = buildNextActionDecision(execution, methodRollup);
 
         return LearningReport.builder()
                 .sessionId(sessionId)
@@ -112,21 +121,24 @@ public class ReportApplicationService {
                 .evidenceSummary(evidenceSummary)
                 .summaryText(summaryText)
                 .nextAction(nextAction)
+                .learningMethodProfile(methodRollup)
                 .build();
     }
 
-    private NextActionDecision buildNextActionDecision(ExecutionEvidenceSummary execution) {
+    private NextActionDecision buildNextActionDecision(ExecutionEvidenceSummary execution,
+                                                       LearningMethodProfile methodRollup) {
         int totalTasks = execution.getTotalTasks() != null ? execution.getTotalTasks() : 0;
         int completedTasks = execution.getCompletedTasks() != null ? execution.getCompletedTasks() : 0;
         boolean hasGap = execution.getAggregatedIssueTags() != null
                 && !execution.getAggregatedIssueTags().isEmpty();
+        boolean methodWeak = methodRollup != null && "LOW".equals(methodRollup.getQuestioningQuality());
 
         NextActionType actionType;
         boolean requiresReplan;
         String reason;
         String nextEntryPoint;
 
-        if (!hasGap && totalTasks > 0 && completedTasks >= totalTasks) {
+        if (!hasGap && totalTasks > 0 && completedTasks >= totalTasks && !methodWeak) {
             actionType = NextActionType.CONTINUE;
             requiresReplan = false;
             reason = "任务完成度高且未检测到明显缺口，可以继续推进新的目标。";
@@ -136,6 +148,11 @@ public class ReportApplicationService {
             requiresReplan = false;
             reason = "存在概念或练习层面的薄弱点，更适合在当前目标上做巩固。";
             nextEntryPoint = "围绕未掌握要点安排一轮针对性巩固任务。";
+        } else if (methodWeak && completedTasks >= totalTasks) {
+            actionType = NextActionType.CHANGE_STRATEGY;
+            requiresReplan = false;
+            reason = "任务虽完成，但提问与探索偏少，建议下一轮改用更结构化的问法（举例/对比/自解释）。";
+            nextEntryPoint = "在新任务中优先使用推荐问法模板。";
         } else {
             actionType = NextActionType.CHANGE_STRATEGY;
             requiresReplan = true;

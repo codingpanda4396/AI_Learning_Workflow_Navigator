@@ -2,6 +2,8 @@ package navigator.application.guard;
 
 import navigator.api.BusinessErrorCode;
 import navigator.api.BusinessException;
+import navigator.application.task.TaskExecutionRuntime;
+import navigator.domain.enums.TaskExecutionState;
 import navigator.domain.model.TaskExecutionRecord;
 import navigator.infrastructure.memory.InMemoryStore;
 import org.springframework.stereotype.Component;
@@ -40,6 +42,12 @@ public class TaskProgressGuard {
         boolean alreadyCompleted = records.stream().anyMatch(r -> taskId.equals(r.getTaskId()));
         if (alreadyCompleted) {
             throw new BusinessException(BusinessErrorCode.TASK_ALREADY_COMPLETED, "task already completed");
+        }
+        String rtKey = InMemoryStore.taskRuntimeKey(sessionId, taskId);
+        TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(rtKey);
+        if (rt != null && rt.getState() != TaskExecutionState.PASS) {
+            throw new BusinessException(BusinessErrorCode.TASK_EXECUTION_NOT_READY_FOR_COMPLETE,
+                    "已启用任务脚手架流程，请先完成探索、自我解释与微检查直至通过");
         }
     }
 }

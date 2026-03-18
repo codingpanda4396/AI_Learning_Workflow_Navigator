@@ -15,5 +15,9 @@ public enum BusinessErrorCode {
     PLAN_ALREADY_COMMITTED,
     INVALID_ARGUMENT,
     INVALID_REQUEST,
-    INTERNAL_ERROR
+    INTERNAL_ERROR,
+    /** 已启用任务脚手架流程但未到达 PASS，不允许 complete */
+    TASK_EXECUTION_NOT_READY_FOR_COMPLETE,
+    /** 当前执行态不允许该操作 */
+    INVALID_TASK_EXECUTION_STATE
 }

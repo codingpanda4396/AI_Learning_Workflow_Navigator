@@ -41,6 +41,8 @@ class Sprint1IntegrationTest {
         store.getDiagnosisSessionStatuses().clear();
         store.getDiagnosisToGoal().clear();
         store.getDiagnosisToSession().clear();
+        store.getTaskExecutionRuntimes().clear();
+        store.getSessionMethodProfiles().clear();
     }
 
     @Test

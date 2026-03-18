@@ -1,5 +1,6 @@
 package navigator.infrastructure.memory;
 
+import navigator.application.task.TaskExecutionRuntime;
 import navigator.domain.enums.PlanStatus;
 import navigator.domain.model.*;
 import org.springframework.stereotype.Component;
@@ -31,6 +32,10 @@ public class InMemoryStore {
     private final Map<String, String> diagnosisToSession = new ConcurrentHashMap<>();
     /** Sprint 1: planId -> PlanStatus */
     private final Map<String, PlanStatus> planStatuses = new ConcurrentHashMap<>();
+    /** Sprint 3: sessionId|taskId -> 任务执行运行时（仅在使用脚手架/消息流时创建） */
+    private final Map<String, TaskExecutionRuntime> taskExecutionRuntimes = new ConcurrentHashMap<>();
+    /** Sprint 3: sessionId -> 每任务完成时沉淀的学习方法画像 */
+    private final Map<String, List<LearningMethodProfile>> sessionMethodProfiles = new ConcurrentHashMap<>();
 
     public Map<String, StructuredLearningGoal> getGoals() {
         return goals;
@@ -78,6 +83,18 @@ public class InMemoryStore {
 
     public Map<String, PlanStatus> getPlanStatuses() {
         return planStatuses;
+    }
+
+    public Map<String, TaskExecutionRuntime> getTaskExecutionRuntimes() {
+        return taskExecutionRuntimes;
+    }
+
+    public Map<String, List<LearningMethodProfile>> getSessionMethodProfiles() {
+        return sessionMethodProfiles;
+    }
+
+    public static String taskRuntimeKey(String sessionId, String taskId) {
+        return sessionId + "|" + taskId;
     }
 
     /**

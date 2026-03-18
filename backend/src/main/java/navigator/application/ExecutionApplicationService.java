@@ -8,6 +8,9 @@ import navigator.application.guard.TaskProgressGuard;
 import navigator.domain.enums.LearningSessionStatus;
 import navigator.domain.enums.TaskCompletionStatus;
 import navigator.domain.model.LearningPlanPreview;
+import navigator.application.task.LearningMethodProfileAggregator;
+import navigator.application.task.TaskExecutionRuntime;
+import navigator.domain.model.LearningMethodProfile;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskExecutionRecord;
 import navigator.infrastructure.memory.InMemoryStore;
@@ -21,6 +24,7 @@ import navigator.infrastructure.persistence.repository.TaskInteractionRepository
 import navigator.infrastructure.persistence.serde.JsonSerde;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -132,6 +136,12 @@ public class ExecutionApplicationService {
                 .behaviorSignals(request.getBehaviorSignals())
                 .learnerReflection(request.getLearnerReflection())
                 .build();
+        String rtKey = InMemoryStore.taskRuntimeKey(sessionId, taskId);
+        TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(rtKey);
+        if (rt != null) {
+            LearningMethodProfile profile = LearningMethodProfileAggregator.aggregate(sessionId, taskId, rt);
+            store.getSessionMethodProfiles().computeIfAbsent(sessionId, k -> new ArrayList<>()).add(profile);
+        }
         store.getOrCreateTaskRecords(request.getSessionId()).add(record);
         Long sessionDbId = extractNumericId(sessionId);
         Long taskDbId = resolveSessionTaskId(sessionDbId, taskId);

@@ -21,4 +21,6 @@ public class LearningReport {
     private List<String> evidenceSummary;
     private String summaryText;
     private NextActionDecision nextAction;
+    /** 会话级学习方法汇总（Sprint 3） */
+    private LearningMethodProfile learningMethodProfile;
 }
