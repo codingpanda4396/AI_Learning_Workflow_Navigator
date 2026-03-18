@@ -14,16 +14,27 @@ import java.util.List;
 @Component
 public class TaskTutorOrchestrator {
 
-    private final LlmGateway llmGateway;
+    private final MockLlmGateway mockLlmGateway;
+    private final OpenAiCompatibleLlmGateway openAiCompatibleLlmGateway;
+    private final LlmProperties llmProperties;
 
-    public TaskTutorOrchestrator(LlmGateway llmGateway) {
-        this.llmGateway = llmGateway;
+    public TaskTutorOrchestrator(MockLlmGateway mockLlmGateway,
+                                 OpenAiCompatibleLlmGateway openAiCompatibleLlmGateway,
+                                 LlmProperties llmProperties) {
+        this.mockLlmGateway = mockLlmGateway;
+        this.openAiCompatibleLlmGateway = openAiCompatibleLlmGateway;
+        this.llmProperties = llmProperties;
     }
 
     public TutorTurnResult exploreTurn(TaskExecutionRuntime rt, TaskBlueprint bp, String userInput, LearningActionType action) {
         String goal = bp.getGoal() != null ? bp.getGoal() : "";
-        String system = "EXPLORE 态：可解释、可举最小例、可引导追问；禁止展开整章；任务目标：" + goal;
-        String reply = llmGateway.generateReply(system, userInput);
+        String system = "PHASE=EXECUTION/EXPLORE\n" +
+                "GOAL=" + goal + "\n" +
+                "BOUNDARY=explain_with_min_example,ask_guiding_questions,no_long_lecture\n" +
+                "OUTPUT=plain_text";
+        LlmCall call = callLlm(system, userInput);
+        String reply = call.reply;
+        String fallbackMode = call.fallbackMode;
         List<String> prompts = new ArrayList<>();
         if (rt.getScaffold() != null && rt.getScaffold().getRecommendedFollowupTemplates() != null) {
             prompts.addAll(rt.getScaffold().getRecommendedFollowupTemplates());
@@ -35,20 +46,25 @@ public class TaskTutorOrchestrator {
         if (action == LearningActionType.SEEK_DIRECT_ANSWER) {
             reply = "直接给答案不利于形成自己的理解。请先试着用一句话说出你卡住的点，我们再从最小例子切入。";
             recommend = "KEEP";
+            fallbackMode = "TEMPLATE";
         }
         if (action == LearningActionType.OFF_TOPIC) {
             reply = "我们先回到当前任务：" + truncate(goal, 60) + "。你可以从上面的推荐问法里选一句开始。";
+            fallbackMode = "TEMPLATE";
         }
-        return new TutorTurnResult(reply, prompts, recommend, "NONE");
+        return new TutorTurnResult(reply, prompts, recommend, fallbackMode);
     }
 
     public TutorTurnResult remedialTurn(TaskBlueprint bp, String userInput) {
-        String system = "REMEDIAL：只做最小纠偏，给一个小台阶，不要求长文";
+        String system = "PHASE=EXECUTION/REMEDIAL\n" +
+                "BOUNDARY=minimal_correction,one_small_step,no_long_text\n" +
+                "OUTPUT=plain_text";
+        LlmCall call = callLlm(system, userInput);
         return new TutorTurnResult(
-                llmGateway.generateReply(system, userInput),
+                call.reply,
                 List.of("请再用自己的话复述刚才的纠偏点"),
                 "KEEP",
-                "NONE");
+                call.fallbackMode);
     }
 
     private static String truncate(String s, int n) {
@@ -62,4 +78,18 @@ public class TaskTutorOrchestrator {
             String stateRecommendation,
             String fallbackMode
     ) {}
+
+    private record LlmCall(String reply, String fallbackMode) {
+    }
+
+    private LlmCall callLlm(String system, String userInput) {
+        if (llmProperties != null && llmProperties.isEnabled()) {
+            try {
+                return new LlmCall(openAiCompatibleLlmGateway.generateReply(system, userInput), "NONE");
+            } catch (Exception ex) {
+                return new LlmCall(mockLlmGateway.generateReply(system, userInput), "MOCK");
+            }
+        }
+        return new LlmCall(mockLlmGateway.generateReply(system, userInput), "MOCK");
+    }
 }

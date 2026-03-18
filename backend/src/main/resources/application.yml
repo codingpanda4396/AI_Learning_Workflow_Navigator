@@ -20,3 +20,11 @@ server:
   port: 8080
 
 # CORS will be configured in code for /api
+
+navigator:
+  llm:
+    enabled: false
+    baseUrl: ${NAVIGATOR_LLM_BASE_URL:https://api.openai.com}
+    apiKey: ${NAVIGATOR_LLM_API_KEY:}
+    model: ${NAVIGATOR_LLM_MODEL:gpt-4.1-mini}
+    timeoutMs: ${NAVIGATOR_LLM_TIMEOUT_MS:8000}

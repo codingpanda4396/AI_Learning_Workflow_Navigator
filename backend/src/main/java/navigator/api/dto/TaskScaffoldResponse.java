@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -23,4 +24,35 @@ public class TaskScaffoldResponse {
     private List<String> completionSignals;
     private List<String> antiPatterns;
     private String currentExecutionState;
+
+    /**
+     * Sprint 3.1: 执行态恢复所需的最小快照（向后兼容新增字段）。
+     */
+    private ExecutionSnapshot executionSnapshot;
+    /**
+     * Sprint 3.1: 最近对话/事件记录（用于刷新恢复 UI）。
+     */
+    private List<RecentMessageItem> recentMessages;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExecutionSnapshot {
+        private String currentState;
+        private int exploreTurnCount;
+        private String checkpointQuestion;
+        private boolean canComplete;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RecentMessageItem {
+        private String role; // USER / ASSISTANT / SYSTEM
+        private String content;
+        private String detectedAction;
+        private LocalDateTime createdAt;
+    }
 }

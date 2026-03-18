@@ -17,6 +17,9 @@ import navigator.domain.model.LearningPlanPreview;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskScaffold;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.entity.TaskMessageEntity;
+import navigator.infrastructure.persistence.entity.TaskCheckpointResultEntity;
+import navigator.infrastructure.persistence.repository.TaskCheckpointResultRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -29,17 +32,23 @@ public class TaskExecutionFlowService {
     private final EntityLookupGuard entityLookupGuard;
     private final LearningActionDetector actionDetector;
     private final TaskTutorOrchestrator tutorOrchestrator;
+    private final TaskExecutionPersistenceService persistenceService;
+    private final TaskCheckpointResultRepository checkpointResultRepository;
 
     public TaskExecutionFlowService(InMemoryStore store,
                                     SessionStateGuard sessionStateGuard,
                                     EntityLookupGuard entityLookupGuard,
                                     LearningActionDetector actionDetector,
-                                    TaskTutorOrchestrator tutorOrchestrator) {
+                                    TaskTutorOrchestrator tutorOrchestrator,
+                                    TaskExecutionPersistenceService persistenceService,
+                                    TaskCheckpointResultRepository checkpointResultRepository) {
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
         this.entityLookupGuard = entityLookupGuard;
         this.actionDetector = actionDetector;
         this.tutorOrchestrator = tutorOrchestrator;
+        this.persistenceService = persistenceService;
+        this.checkpointResultRepository = checkpointResultRepository;
     }
 
     public TaskScaffoldResponse getScaffold(String sessionId, String taskId) {
@@ -50,16 +59,29 @@ public class TaskExecutionFlowService {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "task blueprint not found");
         }
         String key = InMemoryStore.taskRuntimeKey(sessionId, taskId);
-        TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().computeIfAbsent(key, k -> new TaskExecutionRuntime());
+        TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(key);
+        if (rt == null) {
+            rt = persistenceService.loadRuntime(sessionId, taskId);
+            if (rt != null) {
+                store.getTaskExecutionRuntimes().put(key, rt);
+            } else {
+                rt = new TaskExecutionRuntime();
+                store.getTaskExecutionRuntimes().put(key, rt);
+            }
+        }
         if (rt.getScaffold() == null) {
             TaskScaffold scaffold = TaskScaffoldFactory.build(sessionId, bp);
+            if (scaffold.getScaffoldId() == null || scaffold.getScaffoldId().isBlank()) {
+                scaffold.setScaffoldId(TaskExecutionRuntime.newScaffoldId());
+            }
             scaffold.setCurrentExecutionState(TaskExecutionState.ORIENT.name());
             rt.setScaffold(scaffold);
-            rt.transitionTo(TaskExecutionState.ORIENT, "scaffold_loaded");
+            transition(sessionId, taskId, rt, TaskExecutionState.ORIENT, "scaffold_loaded");
         } else {
             rt.getScaffold().setCurrentExecutionState(rt.getState().name());
         }
-        return toScaffoldResponse(rt);
+        persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
+        return toScaffoldResponse(sessionId, taskId, rt);
     }
 
     public TaskMessageResponse postMessage(String taskId, String sessionId, String content) {
@@ -67,31 +89,50 @@ public class TaskExecutionFlowService {
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
         TaskBlueprint bp = requireBlueprint(sessionId, taskId);
         String key = InMemoryStore.taskRuntimeKey(sessionId, taskId);
-        TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().computeIfAbsent(key, k -> new TaskExecutionRuntime());
+        TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(key);
+        if (rt == null) {
+            rt = persistenceService.loadRuntime(sessionId, taskId);
+            if (rt != null) {
+                store.getTaskExecutionRuntimes().put(key, rt);
+            } else {
+                rt = new TaskExecutionRuntime();
+                store.getTaskExecutionRuntimes().put(key, rt);
+            }
+        }
         if (rt.getScaffold() == null) {
             TaskScaffold scaffold = TaskScaffoldFactory.build(sessionId, bp);
+            scaffold.setCurrentExecutionState(TaskExecutionState.ORIENT.name());
             rt.setScaffold(scaffold);
-            rt.transitionTo(TaskExecutionState.ORIENT, "lazy_scaffold");
+            if (scaffold.getScaffoldId() == null || scaffold.getScaffoldId().isBlank()) {
+                scaffold.setScaffoldId(TaskExecutionRuntime.newScaffoldId());
+            }
+            transition(sessionId, taskId, rt, TaskExecutionState.ORIENT, "lazy_scaffold");
         }
         LearningActionType action = actionDetector.detect(content);
         rt.recordAction(action);
 
         TaskExecutionState st = rt.getState();
         if (st == TaskExecutionState.ORIENT || st == TaskExecutionState.INIT) {
-            rt.transitionTo(TaskExecutionState.EXPLORE, "first_user_message");
+            transition(sessionId, taskId, rt, TaskExecutionState.EXPLORE, "first_user_message");
         } else if (st == TaskExecutionState.REMEDIAL) {
-            rt.transitionTo(TaskExecutionState.EXPLORE, "remedial_continue");
+            transition(sessionId, taskId, rt, TaskExecutionState.EXPLORE, "remedial_continue");
         } else if (st != TaskExecutionState.EXPLORE) {
             throw new BusinessException(BusinessErrorCode.INVALID_TASK_EXECUTION_STATE,
                     "当前阶段请使用自我解释或微检查接口，状态=" + st);
         }
 
+        TaskExecutionState stateBefore = rt.getState();
         rt.setExploreTurnCount(rt.getExploreTurnCount() + 1);
+        persistenceService.appendMessage(sessionId, taskId, "USER", content,
+                action != null ? action.name() : null, stateBefore, stateBefore, "NONE");
         TaskTutorOrchestrator.TutorTurnResult turn = tutorOrchestrator.exploreTurn(rt, bp, content, action);
+        persistenceService.appendMessage(sessionId, taskId, "ASSISTANT", turn.assistantReply(),
+                null, stateBefore, rt.getState(), turn.fallbackMode());
+        persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         rt.getScaffold().setCurrentExecutionState(rt.getState().name());
         return TaskMessageResponse.builder()
                 .assistantReply(turn.assistantReply())
-                .detectedAction(action.name())
+                .detectedAction(action != null ? action.name() : "GENERIC")
                 .taskState(rt.getState().name())
                 .nextSuggestedPrompts(turn.suggestedNextPrompts())
                 .fallbackMode(turn.fallbackMode())
@@ -105,7 +146,11 @@ public class TaskExecutionFlowService {
         String key = InMemoryStore.taskRuntimeKey(sessionId, taskId);
         TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(key);
         if (rt == null) {
-            throw new BusinessException(BusinessErrorCode.INVALID_TASK_EXECUTION_STATE, "请先加载脚手架或发送探索消息");
+            rt = persistenceService.loadRuntime(sessionId, taskId);
+            if (rt == null) {
+                throw new BusinessException(BusinessErrorCode.INVALID_TASK_EXECUTION_STATE, "请先加载脚手架或发送探索消息");
+            }
+            store.getTaskExecutionRuntimes().put(key, rt);
         }
         TaskExecutionState st = rt.getState();
         if (st != TaskExecutionState.EXPLORE && st != TaskExecutionState.REMEDIAL) {
@@ -119,12 +164,15 @@ public class TaskExecutionFlowService {
                     "请先完成至少 " + minExplore + " 轮探索对话");
         }
         rt.recordAction(LearningActionType.SELF_EXPLANATION);
-        rt.transitionTo(TaskExecutionState.SELF_EXPLAIN, "user_self_explain");
+        transition(sessionId, taskId, rt, TaskExecutionState.SELF_EXPLAIN, "user_self_explain");
         String goal = bp.getGoal() != null ? bp.getGoal() : bp.getTitle();
         if (content != null && content.trim().length() >= 35) {
             rt.setSelfExplanationEvaluation("ACCEPTABLE");
             rt.setCheckpointQuestion("请用一两句话概括本任务的核心要点（任务：" + truncate(goal, 50) + "）");
-            rt.transitionTo(TaskExecutionState.CHECK, "self_explain_ok");
+            transition(sessionId, taskId, rt, TaskExecutionState.CHECK, "self_explain_ok");
+            persistenceService.appendMessage(sessionId, taskId, "SYSTEM",
+                    "SELF_EXPLAIN evaluation=ACCEPTABLE", null, TaskExecutionState.SELF_EXPLAIN, TaskExecutionState.CHECK, "NONE");
+            persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
             return SelfExplanationResponse.builder()
                     .evaluation("ACCEPTABLE")
                     .missingPoints(List.of())
@@ -134,7 +182,10 @@ public class TaskExecutionFlowService {
                     .build();
         }
         rt.setSelfExplanationEvaluation("WEAK");
-        rt.transitionTo(TaskExecutionState.REMEDIAL, "self_explain_too_short");
+        transition(sessionId, taskId, rt, TaskExecutionState.REMEDIAL, "self_explain_too_short");
+        persistenceService.appendMessage(sessionId, taskId, "SYSTEM",
+                "SELF_EXPLAIN evaluation=WEAK", null, TaskExecutionState.SELF_EXPLAIN, TaskExecutionState.REMEDIAL, "NONE");
+        persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         return SelfExplanationResponse.builder()
                 .evaluation("WEAK")
                 .missingPoints(List.of("解释偏短，请结合任务目标补充关键概念或步骤"))
@@ -149,12 +200,21 @@ public class TaskExecutionFlowService {
         String key = InMemoryStore.taskRuntimeKey(sessionId, taskId);
         TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(key);
         if (rt == null || rt.getState() != TaskExecutionState.CHECK) {
-            throw new BusinessException(BusinessErrorCode.INVALID_TASK_EXECUTION_STATE, "当前不在微检查阶段");
+            rt = persistenceService.loadRuntime(sessionId, taskId);
+            if (rt == null || rt.getState() != TaskExecutionState.CHECK) {
+                throw new BusinessException(BusinessErrorCode.INVALID_TASK_EXECUTION_STATE, "当前不在微检查阶段");
+            }
+            store.getTaskExecutionRuntimes().put(key, rt);
         }
         rt.recordAction(LearningActionType.ANSWER_CHECK);
         if (answer != null && answer.trim().length() >= 12) {
-            rt.transitionTo(TaskExecutionState.PASS, "checkpoint_pass");
+            transition(sessionId, taskId, rt, TaskExecutionState.PASS, "checkpoint_pass");
             rt.getScaffold().setCurrentExecutionState(TaskExecutionState.PASS.name());
+            checkpointResultRepository.save(toCheckpointEntity(sessionId, taskId, rt.getCheckpointQuestion(), answer,
+                    "PASS", "回答覆盖基本要点，可标记任务完成", null));
+            persistenceService.appendMessage(sessionId, taskId, "SYSTEM", "CHECKPOINT result=PASS",
+                    null, TaskExecutionState.CHECK, TaskExecutionState.PASS, "NONE");
+            persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
             return CheckpointResponse.builder()
                     .result("PASS")
                     .reason("回答覆盖基本要点，可标记任务完成")
@@ -162,8 +222,13 @@ public class TaskExecutionFlowService {
                     .taskState(TaskExecutionState.PASS.name())
                     .build();
         }
-        rt.transitionTo(TaskExecutionState.REMEDIAL, "checkpoint_fail");
+        transition(sessionId, taskId, rt, TaskExecutionState.REMEDIAL, "checkpoint_fail");
         rt.getScaffold().setCurrentExecutionState(TaskExecutionState.REMEDIAL.name());
+        checkpointResultRepository.save(toCheckpointEntity(sessionId, taskId, rt.getCheckpointQuestion(), answer,
+                "FAIL", "回答过短或未触及核心，建议回到探索再试", "请再看一遍任务目标，用一句话说出最关键的术语或关系"));
+        persistenceService.appendMessage(sessionId, taskId, "SYSTEM", "CHECKPOINT result=FAIL",
+                null, TaskExecutionState.CHECK, TaskExecutionState.REMEDIAL, "NONE");
+        persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         return CheckpointResponse.builder()
                 .result("FAIL")
                 .reason("回答过短或未触及核心，建议回到探索再试")
@@ -175,14 +240,15 @@ public class TaskExecutionFlowService {
     public String getCheckpointQuestion(String sessionId, String taskId) {
         String key = InMemoryStore.taskRuntimeKey(sessionId, taskId);
         TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(key);
-        if (rt == null || rt.getCheckpointQuestion() == null) {
-            return null;
+        if (rt == null) {
+            rt = persistenceService.loadRuntime(sessionId, taskId);
         }
-        return rt.getCheckpointQuestion();
+        return rt != null ? rt.getCheckpointQuestion() : null;
     }
 
-    private TaskScaffoldResponse toScaffoldResponse(TaskExecutionRuntime rt) {
+    private TaskScaffoldResponse toScaffoldResponse(String sessionId, String taskId, TaskExecutionRuntime rt) {
         var s = rt.getScaffold();
+        List<TaskMessageEntity> recent = persistenceService.findRecentMessagesAscending(sessionId, taskId, 20);
         return TaskScaffoldResponse.builder()
                 .taskId(s.getTaskId())
                 .taskType(s.getTaskType())
@@ -195,6 +261,18 @@ public class TaskExecutionFlowService {
                 .completionSignals(s.getCompletionSignals())
                 .antiPatterns(s.getAntiPatterns())
                 .currentExecutionState(rt.getState().name())
+                .executionSnapshot(TaskScaffoldResponse.ExecutionSnapshot.builder()
+                        .currentState(rt.getState().name())
+                        .exploreTurnCount(rt.getExploreTurnCount())
+                        .checkpointQuestion(rt.getCheckpointQuestion())
+                        .canComplete(rt.getState() == TaskExecutionState.PASS)
+                        .build())
+                .recentMessages(recent.stream().map(m -> TaskScaffoldResponse.RecentMessageItem.builder()
+                        .role(m.getRole())
+                        .content(m.getContent())
+                        .detectedAction(m.getDetectedAction())
+                        .createdAt(m.getCreatedAt())
+                        .build()).toList())
                 .build();
     }
 
@@ -226,5 +304,28 @@ public class TaskExecutionFlowService {
     private static String truncate(String s, int n) {
         if (s == null) return "";
         return s.length() <= n ? s : s.substring(0, n) + "…";
+    }
+
+    private void transition(String sessionId, String taskId, TaskExecutionRuntime rt, TaskExecutionState to, String reason) {
+        TaskExecutionState from = rt.getState();
+        if (from == to) {
+            return;
+        }
+        rt.transitionTo(to, reason);
+        persistenceService.appendTransition(sessionId, taskId, from, to, reason);
+    }
+
+    private TaskCheckpointResultEntity toCheckpointEntity(String sessionId, String taskId, String question, String answer,
+                                                          String result, String reason, String remedial) {
+        TaskCheckpointResultEntity e = new TaskCheckpointResultEntity();
+        e.setSessionKey(sessionId);
+        e.setTaskCode(taskId);
+        e.setQuestion(question != null ? question : "");
+        e.setAnswer(answer);
+        e.setResult(result);
+        e.setReason(reason);
+        e.setSuggestedRemedialAction(remedial);
+        e.setCreatedAt(java.time.LocalDateTime.now());
+        return e;
     }
 }

@@ -5,22 +5,22 @@ import navigator.api.dto.CurrentTaskData;
 import navigator.api.dto.TaskInteractionData;
 import navigator.application.guard.SessionStateGuard;
 import navigator.application.guard.TaskProgressGuard;
+import navigator.application.task.TaskExecutionEventIngestService;
 import navigator.domain.enums.LearningSessionStatus;
 import navigator.domain.enums.TaskCompletionStatus;
 import navigator.domain.model.LearningPlanPreview;
 import navigator.application.task.LearningMethodProfileAggregator;
+import navigator.application.task.TaskExecutionPersistenceService;
 import navigator.application.task.TaskExecutionRuntime;
 import navigator.domain.model.LearningMethodProfile;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskExecutionRecord;
 import navigator.infrastructure.memory.InMemoryStore;
-import navigator.infrastructure.persistence.entity.SessionTaskEntity;
 import navigator.infrastructure.persistence.entity.TaskCompletionEntity;
-import navigator.infrastructure.persistence.entity.TaskInteractionEntity;
-import navigator.infrastructure.persistence.repository.LearningSessionRepository;
+import navigator.infrastructure.persistence.entity.TaskMethodProfileEntity;
 import navigator.infrastructure.persistence.repository.SessionTaskRepository;
 import navigator.infrastructure.persistence.repository.TaskCompletionRepository;
-import navigator.infrastructure.persistence.repository.TaskInteractionRepository;
+import navigator.infrastructure.persistence.repository.TaskMethodProfileRepository;
 import navigator.infrastructure.persistence.serde.JsonSerde;
 import org.springframework.stereotype.Service;
 
@@ -34,26 +34,29 @@ public class ExecutionApplicationService {
     private final SessionStateGuard sessionStateGuard;
     private final TaskProgressGuard taskProgressGuard;
     private final SessionTaskRepository sessionTaskRepository;
-    private final TaskInteractionRepository taskInteractionRepository;
     private final TaskCompletionRepository taskCompletionRepository;
-    private final LearningSessionRepository learningSessionRepository;
+    private final TaskMethodProfileRepository taskMethodProfileRepository;
+    private final TaskExecutionPersistenceService taskExecutionPersistenceService;
+    private final TaskExecutionEventIngestService taskExecutionEventIngestService;
     private final JsonSerde jsonSerde;
 
     public ExecutionApplicationService(InMemoryStore store,
                                        SessionStateGuard sessionStateGuard,
                                        TaskProgressGuard taskProgressGuard,
                                        SessionTaskRepository sessionTaskRepository,
-                                       TaskInteractionRepository taskInteractionRepository,
                                        TaskCompletionRepository taskCompletionRepository,
-                                       LearningSessionRepository learningSessionRepository,
+                                       TaskMethodProfileRepository taskMethodProfileRepository,
+                                       TaskExecutionPersistenceService taskExecutionPersistenceService,
+                                       TaskExecutionEventIngestService taskExecutionEventIngestService,
                                        JsonSerde jsonSerde) {
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
         this.taskProgressGuard = taskProgressGuard;
         this.sessionTaskRepository = sessionTaskRepository;
-        this.taskInteractionRepository = taskInteractionRepository;
         this.taskCompletionRepository = taskCompletionRepository;
-        this.learningSessionRepository = learningSessionRepository;
+        this.taskMethodProfileRepository = taskMethodProfileRepository;
+        this.taskExecutionPersistenceService = taskExecutionPersistenceService;
+        this.taskExecutionEventIngestService = taskExecutionEventIngestService;
         this.jsonSerde = jsonSerde;
     }
 
@@ -98,24 +101,7 @@ public class ExecutionApplicationService {
     }
 
     public TaskInteractionData recordInteraction(String taskId, navigator.api.dto.TaskInteractionRequest request) {
-        String sessionId = request.getSessionId();
-        Long sessionDbId = extractNumericId(sessionId);
-        Long taskDbId = resolveSessionTaskId(sessionDbId, taskId);
-        if (taskDbId == null) {
-            taskDbId = extractNumericId(taskId);
-        }
-        TaskInteractionEntity entity = new TaskInteractionEntity();
-        entity.setSessionId(sessionDbId);
-        entity.setTaskId(taskDbId);
-        entity.setInteractionType(request.getInteractionType() != null ? request.getInteractionType() : "GENERIC");
-        entity.setUserInput(request.getContentSummary());
-        entity.setAssistantOutputSummary(null);
-        entity.setExtractedSignalsJson(jsonSerde.toJson(request.getBehaviorSignals()));
-        taskInteractionRepository.save(entity);
-        return TaskInteractionData.builder()
-                .taskId(taskId)
-                .accepted(true)
-                .build();
+        return taskExecutionEventIngestService.ingestLegacyInteraction(taskId, request);
     }
 
     public CompleteTaskData completeTask(String taskId, navigator.api.dto.CompleteTaskRequest request) {
@@ -138,9 +124,18 @@ public class ExecutionApplicationService {
                 .build();
         String rtKey = InMemoryStore.taskRuntimeKey(sessionId, taskId);
         TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(rtKey);
+        if (rt == null) {
+            rt = taskExecutionPersistenceService.loadRuntime(sessionId, taskId);
+        }
         if (rt != null) {
             LearningMethodProfile profile = LearningMethodProfileAggregator.aggregate(sessionId, taskId, rt);
             store.getSessionMethodProfiles().computeIfAbsent(sessionId, k -> new ArrayList<>()).add(profile);
+            TaskMethodProfileEntity e = new TaskMethodProfileEntity();
+            e.setSessionKey(sessionId);
+            e.setTaskCode(taskId);
+            e.setProfileJson(jsonSerde.toJson(profile));
+            e.setCreatedAt(java.time.LocalDateTime.now());
+            taskMethodProfileRepository.save(e);
         }
         store.getOrCreateTaskRecords(request.getSessionId()).add(record);
         Long sessionDbId = extractNumericId(sessionId);

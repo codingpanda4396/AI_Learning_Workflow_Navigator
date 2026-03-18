@@ -12,6 +12,8 @@ import navigator.domain.model.LearningMethodProfile;
 import navigator.domain.model.LearningReport;
 import navigator.domain.model.NextActionDecision;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.repository.TaskMethodProfileRepository;
+import navigator.infrastructure.persistence.serde.JsonSerde;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,13 +22,19 @@ public class ReportApplicationService {
     private final SessionStateGuard sessionStateGuard;
     private final SessionEvidenceAggregator evidenceAggregator;
     private final InMemoryStore store;
+    private final TaskMethodProfileRepository taskMethodProfileRepository;
+    private final JsonSerde jsonSerde;
 
     public ReportApplicationService(SessionStateGuard sessionStateGuard,
                                     SessionEvidenceAggregator evidenceAggregator,
-                                    InMemoryStore store) {
+                                    InMemoryStore store,
+                                    TaskMethodProfileRepository taskMethodProfileRepository,
+                                    JsonSerde jsonSerde) {
         this.sessionStateGuard = sessionStateGuard;
         this.evidenceAggregator = evidenceAggregator;
         this.store = store;
+        this.taskMethodProfileRepository = taskMethodProfileRepository;
+        this.jsonSerde = jsonSerde;
     }
 
     public ReportData getReport(String sessionId) {
@@ -35,7 +43,7 @@ public class ReportApplicationService {
         SessionEvidenceAggregator.AggregatedSessionEvidence aggregated = evidenceAggregator.aggregate(sessionDbId);
         ExecutionEvidenceSummary execution = aggregated.execution();
 
-        java.util.List<LearningMethodProfile> methodTasks = store.getSessionMethodProfiles().getOrDefault(sessionId, java.util.List.of());
+        java.util.List<LearningMethodProfile> methodTasks = loadMethodProfiles(sessionId);
         LearningMethodProfile methodRollup = LearningMethodProfileAggregator.aggregateSession(sessionId, methodTasks);
         LearningReport report = buildLearningReport(sessionId, aggregated, execution, methodRollup);
         NextActionDecision decision = report.getNextAction();
@@ -186,5 +194,24 @@ public class ReportApplicationService {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private java.util.List<LearningMethodProfile> loadMethodProfiles(String sessionId) {
+        try {
+            java.util.List<navigator.infrastructure.persistence.entity.TaskMethodProfileEntity> rows =
+                    taskMethodProfileRepository.findBySessionKey(sessionId);
+            if (rows != null && !rows.isEmpty()) {
+                java.util.List<LearningMethodProfile> list = new java.util.ArrayList<>();
+                for (var r : rows) {
+                    LearningMethodProfile p = jsonSerde.fromJson(r.getProfileJson(), LearningMethodProfile.class);
+                    if (p != null) {
+                        list.add(p);
+                    }
+                }
+                return list;
+            }
+        } catch (Exception ignored) {
+        }
+        return store.getSessionMethodProfiles().getOrDefault(sessionId, java.util.List.of());
     }
 }
