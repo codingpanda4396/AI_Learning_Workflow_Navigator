@@ -58,6 +58,54 @@
           <p class="text-text-primary">{{ report.summaryText }}</p>
         </FormCard>
 
+        <FormCard
+          v-if="report.learningMethodProfile && report.learningMethodProfile.questioningQuality !== 'UNKNOWN'"
+        >
+          <SectionHeader>学习方法表现</SectionHeader>
+          <p class="mb-3 text-sm text-text-secondary">
+            基于任务内的提问、自我解释与微检查等行为汇总。
+          </p>
+          <ul class="space-y-2 text-sm text-text-primary">
+            <li>
+              <span class="text-text-secondary">提问质量：</span>
+              {{ methodQualityLabel(report.learningMethodProfile.questioningQuality) }}
+            </li>
+            <li>
+              <span class="text-text-secondary">自我解释：</span>
+              {{
+                report.learningMethodProfile.selfExplanationPerformed
+                  ? report.learningMethodProfile.selfExplanationQuality || '已提交'
+                  : '未检测到'
+              }}
+            </li>
+            <li>
+              <span class="text-text-secondary">微检查：</span>
+              {{
+                report.learningMethodProfile.checkPassed === true
+                  ? '通过'
+                  : report.learningMethodProfile.checkPassed === false
+                    ? '部分未通过'
+                    : '—'
+              }}
+            </li>
+            <li v-if="report.learningMethodProfile.positiveSignals?.length">
+              <span class="text-text-secondary">正向信号：</span>
+              {{ report.learningMethodProfile.positiveSignals.join('；') }}
+            </li>
+            <li
+              v-if="report.learningMethodProfile.antiPatternObserved?.length"
+              class="text-amber-800"
+            >
+              <span class="text-text-secondary">需注意：</span>
+              {{ report.learningMethodProfile.antiPatternObserved.join('；') }}
+            </li>
+            <li v-if="report.learningMethodProfile.nextMethodAdvice?.length">
+              <span class="text-text-secondary">下一轮建议：</span>
+              {{ report.learningMethodProfile.nextMethodAdvice.join(' ') }}
+            </li>
+          </ul>
+        </FormCard>
+
         <FormCard v-if="nextAction">
           <SectionHeader>下一步建议</SectionHeader>
           <p class="font-medium text-primary">
@@ -156,6 +204,13 @@ const selectedAction = ref<NextActionTypeType | ''>('')
 const nextAction = computed<NextActionDecision | null>(
   () => store.nextActionDecision ?? report.value?.nextAction ?? null
 )
+
+function methodQualityLabel(q?: string) {
+  if (q === 'GOOD') return '较好'
+  if (q === 'BASIC') return '一般'
+  if (q === 'LOW') return '偏少'
+  return q ?? '—'
+}
 
 async function fetchReport() {
   if (!store.sessionId) return

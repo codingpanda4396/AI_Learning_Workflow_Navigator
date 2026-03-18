@@ -241,6 +241,43 @@ export interface CompleteTaskData {
   sessionProgress?: SessionProgressItem
 }
 
+export interface TaskScaffoldResponse {
+  taskId: string
+  taskType: string
+  learningObjective: string
+  whyThisTask?: string
+  recommendedAskTemplates?: string[]
+  recommendedFollowupTemplates?: string[]
+  selfCheckTemplates?: string[]
+  fallbackHints?: string[]
+  completionSignals?: string[]
+  antiPatterns?: string[]
+  currentExecutionState: string
+}
+
+export interface TaskMessageResponse {
+  assistantReply: string
+  detectedAction: string
+  taskState: string
+  nextSuggestedPrompts?: string[]
+  fallbackMode?: string
+}
+
+export interface SelfExplanationResponse {
+  evaluation: string
+  missingPoints?: string[]
+  nextAction?: string
+  taskState: string
+  checkpointQuestion?: string
+}
+
+export interface CheckpointResponse {
+  result: string
+  reason?: string
+  suggestedRemedialAction?: string | null
+  taskState: string
+}
+
 // --- 5. 报告与 Next Action ---
 export interface NextActionDecision {
   actionType: NextActionTypeType
@@ -248,6 +285,19 @@ export interface NextActionDecision {
   nextEntryPoint?: string
   adjustmentSignals?: string[]
   requiresReplan: boolean
+}
+
+export interface LearningMethodProfile {
+  sessionId?: string
+  taskId?: string
+  questioningQuality?: string
+  selfExplanationPerformed?: boolean
+  selfExplanationQuality?: string
+  checkPassed?: boolean
+  antiPatternObserved?: string[]
+  positiveSignals?: string[]
+  dominantActionTypes?: string[]
+  nextMethodAdvice?: string[]
 }
 
 export interface LearningReport {
@@ -259,6 +309,7 @@ export interface LearningReport {
   evidenceSummary?: string[]
   summaryText?: string
   nextAction?: NextActionDecision
+  learningMethodProfile?: LearningMethodProfile
 }
 
 export interface ReportData {
