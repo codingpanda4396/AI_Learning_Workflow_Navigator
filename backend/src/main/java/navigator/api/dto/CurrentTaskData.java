@@ -32,6 +32,10 @@ public class CurrentTaskData {
         private java.util.List<String> completionCriteria;
         private java.util.List<String> selfEvaluationQuestions;
         private String fallbackAction;
+        /** 来自 ExecutableTaskSpec.evaluationRubric 的摘要 */
+        private String evaluationRubricSummary;
+        /** 来自 ExecutableTaskSpec.scaffoldPolicy 的摘要 */
+        private String scaffoldPolicySummary;
     }
 
     @Data

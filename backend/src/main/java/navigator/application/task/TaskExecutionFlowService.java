@@ -17,6 +17,7 @@ import navigator.domain.model.LearningPlanPreview;
 import navigator.domain.model.LearnerStrategyProfile;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskScaffold;
+import navigator.domain.model.ExecutableTaskSpec;
 import navigator.domain.model.TutorTurnResult;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.entity.TaskMessageEntity;
@@ -36,6 +37,8 @@ public class TaskExecutionFlowService {
     private final TaskTutorOrchestrator tutorOrchestrator;
     private final TaskExecutionPersistenceService persistenceService;
     private final TaskCheckpointResultRepository checkpointResultRepository;
+    private final TaskExecutionContextAssembler contextAssembler;
+    private final CompletionEvaluator completionEvaluator;
 
     public TaskExecutionFlowService(InMemoryStore store,
                                     SessionStateGuard sessionStateGuard,
@@ -43,7 +46,9 @@ public class TaskExecutionFlowService {
                                     LearningActionDetector actionDetector,
                                     TaskTutorOrchestrator tutorOrchestrator,
                                     TaskExecutionPersistenceService persistenceService,
-                                    TaskCheckpointResultRepository checkpointResultRepository) {
+                                    TaskCheckpointResultRepository checkpointResultRepository,
+                                    TaskExecutionContextAssembler contextAssembler,
+                                    CompletionEvaluator completionEvaluator) {
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
         this.entityLookupGuard = entityLookupGuard;
@@ -51,6 +56,8 @@ public class TaskExecutionFlowService {
         this.tutorOrchestrator = tutorOrchestrator;
         this.persistenceService = persistenceService;
         this.checkpointResultRepository = checkpointResultRepository;
+        this.contextAssembler = contextAssembler;
+        this.completionEvaluator = completionEvaluator;
     }
 
     public TaskScaffoldResponse getScaffold(String sessionId, String taskId) {
@@ -127,7 +134,8 @@ public class TaskExecutionFlowService {
         rt.setExploreTurnCount(rt.getExploreTurnCount() + 1);
         persistenceService.appendMessage(sessionId, taskId, "USER", content,
                 action != null ? action.name() : null, stateBefore, stateBefore, "NONE");
-        TutorTurnResult turn = tutorOrchestrator.exploreTurn(rt, bp, content, action);
+        TaskExecutionContext ctx = contextAssembler.assemble(sessionId, taskId);
+        TutorTurnResult turn = tutorOrchestrator.exploreTurn(ctx, rt, content, action);
         persistenceService.appendMessage(sessionId, taskId, "ASSISTANT", turn.getAssistantReply(),
                 null, stateBefore, rt.getState(), turn.getFallbackMode());
         persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
@@ -167,8 +175,11 @@ public class TaskExecutionFlowService {
         }
         rt.recordAction(LearningActionType.SELF_EXPLANATION);
         transition(sessionId, taskId, rt, TaskExecutionState.SELF_EXPLAIN, "user_self_explain");
+        TaskExecutionContext ctx = contextAssembler.assemble(sessionId, taskId);
+        ExecutableTaskSpec spec = ctx != null ? ctx.getExecutableTaskSpec() : null;
+        EvaluationResult eval = completionEvaluator.evaluateSelfExplanation(rt, spec, content);
         String goal = bp.getGoal() != null ? bp.getGoal() : bp.getTitle();
-        if (content != null && content.trim().length() >= 35) {
+        if (eval.isPass()) {
             rt.setSelfExplanationEvaluation("ACCEPTABLE");
             rt.setCheckpointQuestion("请用一两句话概括本任务的核心要点（任务：" + truncate(goal, 50) + "）");
             transition(sessionId, taskId, rt, TaskExecutionState.CHECK, "self_explain_ok");
@@ -184,13 +195,16 @@ public class TaskExecutionFlowService {
                     .build();
         }
         rt.setSelfExplanationEvaluation("WEAK");
-        transition(sessionId, taskId, rt, TaskExecutionState.REMEDIAL, "self_explain_too_short");
+        transition(sessionId, taskId, rt, TaskExecutionState.REMEDIAL, "self_explain_fail");
+        List<String> missingPoints = eval.getMissingDimensions() != null && !eval.getMissingDimensions().isEmpty()
+                ? eval.getMissingDimensions().stream().map(d -> "缺少：" + d).toList()
+                : List.of("解释偏短，请结合任务目标补充关键概念或步骤");
         persistenceService.appendMessage(sessionId, taskId, "SYSTEM",
                 "SELF_EXPLAIN evaluation=WEAK", null, TaskExecutionState.SELF_EXPLAIN, TaskExecutionState.REMEDIAL, "NONE");
         persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         return SelfExplanationResponse.builder()
                 .evaluation("WEAK")
-                .missingPoints(List.of("解释偏短，请结合任务目标补充关键概念或步骤"))
+                .missingPoints(missingPoints)
                 .nextAction("REMEDIAL")
                 .taskState(TaskExecutionState.REMEDIAL.name())
                 .build();
@@ -209,32 +223,38 @@ public class TaskExecutionFlowService {
             store.getTaskExecutionRuntimes().put(key, rt);
         }
         rt.recordAction(LearningActionType.ANSWER_CHECK);
-        if (answer != null && answer.trim().length() >= 12) {
+        TaskExecutionContext ctx = contextAssembler.assemble(sessionId, taskId);
+        ExecutableTaskSpec spec = ctx != null ? ctx.getExecutableTaskSpec() : null;
+        EvaluationResult eval = completionEvaluator.evaluateCheckpoint(rt, spec, answer);
+        if (eval.isPass()) {
             transition(sessionId, taskId, rt, TaskExecutionState.PASS, "checkpoint_pass");
             rt.getScaffold().setCurrentExecutionState(TaskExecutionState.PASS.name());
             checkpointResultRepository.save(toCheckpointEntity(sessionId, taskId, rt.getCheckpointQuestion(), answer,
-                    "PASS", "回答覆盖基本要点，可标记任务完成", null));
+                    "PASS", eval.getReason() != null ? eval.getReason() : "回答覆盖基本要点，可标记任务完成", null));
             persistenceService.appendMessage(sessionId, taskId, "SYSTEM", "CHECKPOINT result=PASS",
                     null, TaskExecutionState.CHECK, TaskExecutionState.PASS, "NONE");
             persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
             return CheckpointResponse.builder()
                     .result("PASS")
-                    .reason("回答覆盖基本要点，可标记任务完成")
+                    .reason(eval.getReason() != null ? eval.getReason() : "回答覆盖基本要点，可标记任务完成")
                     .suggestedRemedialAction(null)
                     .taskState(TaskExecutionState.PASS.name())
                     .build();
         }
         transition(sessionId, taskId, rt, TaskExecutionState.REMEDIAL, "checkpoint_fail");
         rt.getScaffold().setCurrentExecutionState(TaskExecutionState.REMEDIAL.name());
+        String remedialHint = eval.getMissingDimensions() != null && !eval.getMissingDimensions().isEmpty()
+                ? "请补充：" + String.join("、", eval.getMissingDimensions())
+                : "请再看一遍任务目标，用一句话说出最关键的术语或关系";
         checkpointResultRepository.save(toCheckpointEntity(sessionId, taskId, rt.getCheckpointQuestion(), answer,
-                "FAIL", "回答过短或未触及核心，建议回到探索再试", "请再看一遍任务目标，用一句话说出最关键的术语或关系"));
+                "FAIL", eval.getReason() != null ? eval.getReason() : "回答过短或未触及核心，建议回到探索再试", remedialHint));
         persistenceService.appendMessage(sessionId, taskId, "SYSTEM", "CHECKPOINT result=FAIL",
                 null, TaskExecutionState.CHECK, TaskExecutionState.REMEDIAL, "NONE");
         persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         return CheckpointResponse.builder()
                 .result("FAIL")
-                .reason("回答过短或未触及核心，建议回到探索再试")
-                .suggestedRemedialAction("请再看一遍任务目标，用一句话说出最关键的术语或关系")
+                .reason(eval.getReason() != null ? eval.getReason() : "回答过短或未触及核心，建议回到探索再试")
+                .suggestedRemedialAction(remedialHint)
                 .taskState(TaskExecutionState.REMEDIAL.name())
                 .build();
     }

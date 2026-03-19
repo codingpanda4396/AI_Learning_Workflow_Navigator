@@ -49,4 +49,18 @@ class GoalContextDeriverTest {
         GoalContextSnapshot ctx = deriver.derive(goal);
         assertThat(ctx.getPlanningMode()).isEqualTo(PlanningMode.SYSTEMATIC_BUILD);
     }
+
+    @Test
+    void structuredGoalAndExplanationFocusPopulated() {
+        StructuredLearningGoal goal = StructuredLearningGoal.builder()
+                .goalType(GoalType.LEARN_NEW_CONCEPT)
+                .topics(List.of("链表", "指针"))
+                .timeBudget(TimeBudget.WITHIN_15_MIN)
+                .build();
+        GoalContextSnapshot ctx = deriver.derive(goal);
+        assertThat(ctx.getStructuredGoal()).isSameAs(goal);
+        assertThat(ctx.getExplanationFocus()).isNotEmpty();
+        assertThat(ctx.getExplanationFocus()).anyMatch(s -> s.contains("链表"));
+        assertThat(ctx.getExplanationFocus()).anyMatch(s -> s.contains("精简解释"));
+    }
 }

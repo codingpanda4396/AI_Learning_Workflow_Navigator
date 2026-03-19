@@ -8,6 +8,7 @@ import navigator.application.guard.TaskProgressGuard;
 import navigator.application.task.TaskExecutionEventIngestService;
 import navigator.domain.enums.LearningSessionStatus;
 import navigator.domain.enums.TaskCompletionStatus;
+import navigator.domain.model.ExecutableTaskSpec;
 import navigator.domain.model.LearningPlanPreview;
 import navigator.application.task.LearningMethodProfileAggregator;
 import navigator.application.task.TaskExecutionPersistenceService;
@@ -15,6 +16,7 @@ import navigator.application.task.TaskExecutionRuntime;
 import navigator.domain.model.LearningMethodProfile;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskExecutionRecord;
+import navigator.domain.model.ExecutableTaskSpec;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.entity.TaskCompletionEntity;
 import navigator.infrastructure.persistence.entity.TaskMethodProfileEntity;
@@ -74,6 +76,7 @@ public class ExecutionApplicationService {
         String taskId = seq.get(idx);
         TaskBlueprint blueprint = resolveBlueprint(state.getPlanId(), taskId);
         if (blueprint == null) return null;
+        ExecutableTaskSpec spec = store.getExecutableTaskSpecs().get(InMemoryStore.taskRuntimeKey(sessionId, taskId));
         String promptTemplate = blueprint.getRecommendedPromptTemplate() != null ? blueprint.getRecommendedPromptTemplate() : blueprint.getPromptScaffold();
         CurrentTaskData.CurrentTaskItem item = CurrentTaskData.CurrentTaskItem.builder()
                 .taskId(blueprint.getTaskId())
@@ -85,9 +88,11 @@ public class ExecutionApplicationService {
                 .recommendedPromptTemplate(promptTemplate)
                 .estimatedMinutes(blueprint.getEstimatedMinutes())
                 .promptScaffold(blueprint.getPromptScaffold())
-                .completionCriteria(blueprint.getCompletionCriteria())
+                .completionCriteria(spec != null && spec.getCompletionCriteria() != null ? spec.getCompletionCriteria() : blueprint.getCompletionCriteria())
                 .selfEvaluationQuestions(blueprint.getSelfEvaluationQuestions())
                 .fallbackAction(blueprint.getFallbackAction())
+                .evaluationRubricSummary(spec != null && spec.getEvaluationRubric() != null ? rubricSummary(spec.getEvaluationRubric()) : null)
+                .scaffoldPolicySummary(spec != null && spec.getScaffoldPolicy() != null ? scaffoldPolicySummary(spec.getScaffoldPolicy()) : null)
                 .build();
         CurrentTaskData.ProgressItem progress = CurrentTaskData.ProgressItem.builder()
                 .currentIndex(idx + 1)
@@ -194,6 +199,21 @@ public class ExecutionApplicationService {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private static String rubricSummary(ExecutableTaskSpec.EvaluationRubric rubric) {
+        if (rubric == null || rubric.getDimensions() == null) return null;
+        String dims = rubric.getDimensions().entrySet().stream()
+                .map(e -> e.getKey() + ":" + e.getValue())
+                .collect(java.util.stream.Collectors.joining("; "));
+        return (dims.isEmpty() ? "" : dims)
+                + (rubric.getPassThreshold() != null ? " (通过:" + rubric.getPassThreshold() + ")" : "");
+    }
+
+    private static String scaffoldPolicySummary(ExecutableTaskSpec.ScaffoldPolicy policy) {
+        if (policy == null) return null;
+        return "探索轮次≤" + (policy.getMaxExploreTurns() != null ? policy.getMaxExploreTurns() : 3)
+                + ", 补救轮次≤" + (policy.getMaxRemedialTurns() != null ? policy.getMaxRemedialTurns() : 2);
     }
 
     private TaskBlueprint resolveBlueprint(String planId, String taskId) {

@@ -39,17 +39,43 @@ public class GoalContextDeriver {
         List<String> riskTags = deriveRiskTags(goal);
         List<String> strategyHints = deriveStrategyHints(goal);
 
+        List<String> explanationFocus = deriveExplanationFocus(goal);
         return GoalContextSnapshot.builder()
-                .structuredGoal(null)
+                .structuredGoal(goal)
                 .requiresDiagnosis(true)
                 .planningMode(planningMode)
                 .entryGranularity(entryGranularity)
                 .strategyHints(strategyHints)
                 .riskTags(riskTags)
-                .explanationFocus(List.of("根据目标与时间预算生成"))
+                .explanationFocus(explanationFocus)
                 .createdFrom("USER_INPUT_V1")
                 .version(1)
                 .build();
+    }
+
+    private List<String> deriveExplanationFocus(StructuredLearningGoal goal) {
+        List<String> focus = new ArrayList<>();
+        if (goal.getTopics() != null && !goal.getTopics().isEmpty()) {
+            focus.add("聚焦主题：" + String.join("、", goal.getTopics()));
+        }
+        if (goal.getGoalType() != null) {
+            focus.add(goalTypeToFocusHint(goal.getGoalType()));
+        }
+        if (goal.getTimeBudget() == TimeBudget.WITHIN_15_MIN || goal.getTimeBudget() == TimeBudget.WITHIN_30_MIN) {
+            focus.add("精简解释，优先最小例子");
+        }
+        return focus.isEmpty() ? List.of("根据目标与时间预算生成") : focus;
+    }
+
+    private String goalTypeToFocusHint(GoalType type) {
+        return switch (type) {
+            case LEARN_NEW_CONCEPT -> "定义+1个关键特征";
+            case REVIEW_FOR_EXAM -> "核心对比与典型题入口";
+            case FIX_SPECIFIC_BLOCKER -> "卡点定位与定点修补";
+            case PRACTICE_ENHANCEMENT -> "题型识别与微练习";
+            case BUILD_SYSTEMATIC_UNDERSTANDING -> "框架搭建与局部填充";
+            default -> "围绕任务目标展开";
+        };
     }
 
     private PlanningMode derivePlanningMode(StructuredLearningGoal goal) {

@@ -1,11 +1,13 @@
 package navigator.application.planning;
 
 import navigator.domain.enums.TaskType;
+import navigator.domain.model.LearnerStrategyProfile;
 import navigator.domain.model.PlanStage;
 import navigator.domain.model.TaskBlueprint;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -14,23 +16,60 @@ import java.util.List;
 @Component
 public class PlanTemplateFactory {
 
-    public StagesAndTasks build(String strategy, String planId, String topicLabel) {
+    private final TimeBudgetEnforcer timeBudgetEnforcer;
+
+    public PlanTemplateFactory(TimeBudgetEnforcer timeBudgetEnforcer) {
+        this.timeBudgetEnforcer = timeBudgetEnforcer;
+    }
+
+    /**
+     * 构建 stages + tasks，若 ctx 含 LearnerStrategyProfile 则按 preferredTaskTypes 调整任务顺序；
+     * 若含 TimeBudgetConstraint 则按时间预算压缩。
+     */
+    public StagesAndTasks build(String strategy, String planId, String topicLabel, PlanningContext ctx) {
         if (topicLabel == null) topicLabel = "当前主题";
+        StagesAndTasks result;
         switch (strategy) {
             case PlanStrategySelector.FOUNDATION_PATCH:
-                return foundationRebuild(planId, topicLabel);
+                result = foundationRebuild(planId, topicLabel);
+                break;
             case PlanStrategySelector.SPRINT_CORRECTION:
-                return compressedReview(planId, topicLabel);
+                result = compressedReview(planId, topicLabel);
+                break;
             case PlanStrategySelector.DRILL_STRENGTHEN:
-                return practiceDriven(planId, topicLabel);
+                result = practiceDriven(planId, topicLabel);
+                break;
             case PlanStrategySelector.FRAMEWORK_BUILD:
-                return systematicProgressive(planId, topicLabel);
+                result = systematicProgressive(planId, topicLabel);
+                break;
             case PlanStrategySelector.LOCAL_REPAIR:
-                return localRepair(planId, topicLabel);
+                result = localRepair(planId, topicLabel);
+                break;
             case PlanStrategySelector.CONCEPT_CLARIFICATION:
             default:
-                return conceptClarification(planId, topicLabel);
+                result = conceptClarification(planId, topicLabel);
+                break;
         }
+        if (ctx != null) {
+            result = adjustTaskMix(result, ctx.getLearnerStrategyProfile());
+            if (ctx.getTimeBudgetConstraint() != null) {
+                result = timeBudgetEnforcer.applyConstraint(result, ctx.getTimeBudgetConstraint());
+            }
+        }
+        return result;
+    }
+
+    private StagesAndTasks adjustTaskMix(StagesAndTasks original, LearnerStrategyProfile profile) {
+        if (profile == null || profile.getPreferredTaskTypes() == null || profile.getPreferredTaskTypes().isEmpty()) {
+            return original;
+        }
+        List<TaskType> preferred = profile.getPreferredTaskTypes();
+        List<TaskBlueprint> sorted = new ArrayList<>(original.tasks);
+        sorted.sort(Comparator.comparingInt(t -> {
+            int idx = preferred.indexOf(t.getTaskType());
+            return idx >= 0 ? idx : Integer.MAX_VALUE;
+        }));
+        return new StagesAndTasks(original.stages, sorted);
     }
 
     public List<String> successCriteriaForTaskType(TaskType type) {

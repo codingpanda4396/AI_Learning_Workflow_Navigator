@@ -1,9 +1,11 @@
 package navigator.application.llm;
 
+import navigator.application.task.TaskExecutionContext;
 import navigator.application.task.TaskExecutionRuntime;
+import navigator.domain.enums.FeedbackStyle;
 import navigator.domain.enums.LearningActionType;
-import navigator.domain.model.TaskBlueprint;
-import navigator.domain.model.TutorTurnResult;
+import navigator.domain.enums.TimeBudget;
+import navigator.domain.model.*;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -27,15 +29,20 @@ public class TaskTutorOrchestrator {
         this.llmProperties = llmProperties;
     }
 
-    public TutorTurnResult exploreTurn(TaskExecutionRuntime rt, TaskBlueprint bp, String userInput, LearningActionType action) {
-        String goal = bp.getGoal() != null ? bp.getGoal() : "";
-        String completion = bp.getCompletionCriteria() != null && !bp.getCompletionCriteria().isEmpty()
-                ? String.join(" | ", bp.getCompletionCriteria().stream().limit(5).toList())
-                : "";
+    public TutorTurnResult exploreTurn(TaskExecutionContext ctx, TaskExecutionRuntime rt, String userInput, LearningActionType action) {
+        String goal = resolveGoal(ctx);
+        String completion = resolveCompletionCriteria(ctx);
+        String boundary = resolveBoundary(ctx);
+        String focus = resolveExplanationFocus(ctx);
+        String topics = resolveTopics(ctx);
+        String timeConstraint = resolveTimeConstraint(ctx);
         String system = "PHASE=EXECUTION/EXPLORE\n" +
                 "GOAL=" + goal + "\n" +
                 (completion.isBlank() ? "" : ("COMPLETION_CRITERIA=" + completion + "\n")) +
-                "BOUNDARY=explain_with_min_example,ask_guiding_questions,no_long_lecture\n" +
+                (focus.isBlank() ? "" : ("EXPLANATION_FOCUS=" + focus + "\n")) +
+                (topics.isBlank() ? "" : ("TOPICS=" + topics + "\n")) +
+                (timeConstraint.isBlank() ? "" : ("TIME_CONSTRAINT=" + timeConstraint + "\n")) +
+                "BOUNDARY=" + boundary + "\n" +
                 "OUTPUT=plain_text";
         LlmCall call = callLlm(system, userInput);
         String reply = call.reply;
@@ -62,6 +69,59 @@ public class TaskTutorOrchestrator {
                 .evidenceExtracts(List.of())
                 .fallbackMode(fallbackMode)
                 .build();
+    }
+
+    private String resolveGoal(TaskExecutionContext ctx) {
+        if (ctx == null) return "";
+        if (ctx.getExecutableTaskSpec() != null && ctx.getExecutableTaskSpec().getTitle() != null) {
+            return ctx.getExecutableTaskSpec().getTitle();
+        }
+        if (ctx.getStructuredGoal() != null && ctx.getStructuredGoal().getTopics() != null && !ctx.getStructuredGoal().getTopics().isEmpty()) {
+            return String.join("、", ctx.getStructuredGoal().getTopics());
+        }
+        return "";
+    }
+
+    private String resolveCompletionCriteria(TaskExecutionContext ctx) {
+        if (ctx != null && ctx.getExecutableTaskSpec() != null && ctx.getExecutableTaskSpec().getCompletionCriteria() != null
+                && !ctx.getExecutableTaskSpec().getCompletionCriteria().isEmpty()) {
+            return String.join(" | ", ctx.getExecutableTaskSpec().getCompletionCriteria().stream().limit(5).toList());
+        }
+        return "";
+    }
+
+    private String resolveBoundary(TaskExecutionContext ctx) {
+        FeedbackStyle style = ctx != null && ctx.getLearnerStrategyProfile() != null
+                ? ctx.getLearnerStrategyProfile().getFeedbackStyle() : null;
+        if (style == FeedbackStyle.DIRECT) {
+            return "brief_answer,one_concept,no_long_lecture";
+        }
+        return "explain_with_min_example,ask_guiding_questions,no_long_lecture";
+    }
+
+    private String resolveExplanationFocus(TaskExecutionContext ctx) {
+        if (ctx == null || ctx.getGoalContextSnapshot() == null || ctx.getGoalContextSnapshot().getExplanationFocus() == null) {
+            return "";
+        }
+        return String.join("; ", ctx.getGoalContextSnapshot().getExplanationFocus());
+    }
+
+    private String resolveTopics(TaskExecutionContext ctx) {
+        if (ctx == null || ctx.getStructuredGoal() == null || ctx.getStructuredGoal().getTopics() == null) {
+            return "";
+        }
+        return String.join("、", ctx.getStructuredGoal().getTopics());
+    }
+
+    private String resolveTimeConstraint(TaskExecutionContext ctx) {
+        if (ctx == null || ctx.getStructuredGoal() == null || ctx.getStructuredGoal().getTimeBudget() == null) {
+            return "";
+        }
+        TimeBudget budget = ctx.getStructuredGoal().getTimeBudget();
+        if (budget == TimeBudget.WITHIN_15_MIN || budget == TimeBudget.WITHIN_30_MIN) {
+            return "精简解释，优先最小例子";
+        }
+        return "";
     }
 
     public TutorTurnResult remedialTurn(TaskBlueprint bp, String userInput) {

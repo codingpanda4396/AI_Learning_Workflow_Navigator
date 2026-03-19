@@ -13,10 +13,13 @@ import navigator.application.planning.PlanningContextAssembler;
 import navigator.application.planning.RecommendedEntryBuilder;
 import navigator.domain.enums.PlanStatus;
 import navigator.domain.enums.RecommendedStrategyCode;
+import navigator.domain.model.ExecutableTaskSpec;
 import navigator.domain.model.LearningPlanPreview;
 import navigator.domain.model.RecommendedEntry;
 import navigator.domain.model.RecommendedStrategy;
 import navigator.domain.model.TaskBlueprint;
+import navigator.domain.model.TimeBudgetConstraint;
+import navigator.application.task.TaskSpecFromBlueprintConverter;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.entity.LearningPlanEntity;
 import navigator.infrastructure.persistence.entity.SessionTaskEntity;
@@ -43,6 +46,7 @@ public class PlanningApplicationService {
     private final SessionTaskRepository sessionTaskRepository;
     private final LearningSessionRepository learningSessionRepository;
     private final JsonSerde jsonSerde;
+    private final TaskSpecFromBlueprintConverter taskSpecConverter;
 
     public PlanningApplicationService(InMemoryStore store,
                                       EntityLookupGuard entityLookupGuard,
@@ -54,7 +58,8 @@ public class PlanningApplicationService {
                                       LearningPlanRepository learningPlanRepository,
                                       SessionTaskRepository sessionTaskRepository,
                                       LearningSessionRepository learningSessionRepository,
-                                      JsonSerde jsonSerde) {
+                                      JsonSerde jsonSerde,
+                                      TaskSpecFromBlueprintConverter taskSpecConverter) {
         this.store = store;
         this.entityLookupGuard = entityLookupGuard;
         this.sessionStateGuard = sessionStateGuard;
@@ -66,6 +71,7 @@ public class PlanningApplicationService {
         this.sessionTaskRepository = sessionTaskRepository;
         this.learningSessionRepository = learningSessionRepository;
         this.jsonSerde = jsonSerde;
+        this.taskSpecConverter = taskSpecConverter;
     }
 
     public PlanPreviewData preview(String goalId, String diagnosisId) {
@@ -79,7 +85,7 @@ public class PlanningApplicationService {
         String strategy = planStrategySelector.select(ctx);
         String topicLabel = ctx.getGoal() != null && ctx.getGoal().getTopics() != null && !ctx.getGoal().getTopics().isEmpty()
                 ? String.join("、", ctx.getGoal().getTopics()) : "当前主题";
-        PlanTemplateFactory.StagesAndTasks stagesAndTasks = planTemplateFactory.build(strategy, "plan_pending", topicLabel);
+        PlanTemplateFactory.StagesAndTasks stagesAndTasks = planTemplateFactory.build(strategy, "plan_pending", topicLabel, ctx);
         RecommendedEntry entry = recommendedEntryBuilder.build(strategy, ctx);
         RecommendedStrategy recommendedStrategy = toRecommendedStrategy(strategy);
         List<String> successCriteria = stagesAndTasks.tasks.stream()
@@ -200,6 +206,7 @@ public class PlanningApplicationService {
         state.setStatus("IN_PROGRESS");
         store.getSessions().put(sessionId, state);
         materializeTasksToDb(sessionDbId, planDbId, taskSequence);
+        materializeExecutableTaskSpecs(sessionId, planEntity, preview, taskSequence);
         String currentTaskId = taskSequence.isEmpty() ? null : taskSequence.get(0);
         return CommitPlanData.builder()
                 .sessionId(sessionId)
@@ -269,6 +276,37 @@ public class PlanningApplicationService {
         sessionTaskRepository.saveAll(entities);
         learningSessionRepository.updatePlanId(sessionDbId, planDbId);
         learningSessionRepository.markPlanCommitted(sessionDbId, taskSequence.size());
+    }
+
+    private void materializeExecutableTaskSpecs(String sessionId, LearningPlanEntity planEntity,
+                                                LearningPlanPreview preview, List<String> taskSequence) {
+        if (preview == null || preview.getTasks() == null) {
+            return;
+        }
+        String goalId = "goal_" + planEntity.getGoalId();
+        String diagnosisId = store.getDiagnosisToSession().entrySet().stream()
+                .filter(e -> sessionId.equals(e.getValue()))
+                .map(java.util.Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
+        if (diagnosisId == null) {
+            diagnosisId = "diagnosis_" + planEntity.getDiagnosisSessionId();
+        }
+        PlanningContext ctx = planningContextAssembler.assemble(goalId, diagnosisId);
+        var learnerStrategyProfile = ctx.getLearnerStrategyProfile();
+        TimeBudgetConstraint timeBudgetConstraint = ctx.getTimeBudgetConstraint();
+        var blueprintById = preview.getTasks().stream()
+                .collect(Collectors.toMap(TaskBlueprint::getTaskId, t -> t));
+        for (String taskId : taskSequence) {
+            TaskBlueprint bp = blueprintById.get(taskId);
+            if (bp == null) {
+                continue;
+            }
+            ExecutableTaskSpec spec = taskSpecConverter.convert(bp, learnerStrategyProfile, timeBudgetConstraint);
+            if (spec != null) {
+                store.getExecutableTaskSpecs().put(InMemoryStore.taskRuntimeKey(sessionId, taskId), spec);
+            }
+        }
     }
 
     private Long extractNumericId(String id) {

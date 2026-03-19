@@ -94,5 +94,25 @@ public class ExecutableTaskSpec {
         SOFT,
         HARD
     }
+
+    /** 默认 timebox 策略：短时间预算为 HARD，否则 SOFT */
+    public static TimeBoxPolicy defaultTimeBoxPolicy(navigator.domain.enums.TimeBudget budget) {
+        if (budget == null) return TimeBoxPolicy.SOFT;
+        return (budget == navigator.domain.enums.TimeBudget.WITHIN_15_MIN
+                || budget == navigator.domain.enums.TimeBudget.WITHIN_30_MIN)
+                ? TimeBoxPolicy.HARD : TimeBoxPolicy.SOFT;
+    }
+
+    /** 默认 scaffold 策略 */
+    public static ScaffoldPolicy defaultScaffoldPolicy() {
+        return ScaffoldPolicy.builder()
+                .enableOrient(true)
+                .enableExplore(true)
+                .enableSelfExplain(true)
+                .enableCheckpoint(true)
+                .maxExploreTurns(3)
+                .maxRemedialTurns(2)
+                .build();
+    }
 }
 

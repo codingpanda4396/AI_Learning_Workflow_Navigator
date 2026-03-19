@@ -38,6 +38,8 @@ public class InMemoryStore {
     private final Map<String, TaskExecutionRuntime> taskExecutionRuntimes = new ConcurrentHashMap<>();
     /** Sprint 3: sessionId -> 每任务完成时沉淀的学习方法画像 */
     private final Map<String, List<LearningMethodProfile>> sessionMethodProfiles = new ConcurrentHashMap<>();
+    /** Sprint 3: sessionId|taskId -> ExecutableTaskSpec（commit 时 materialize） */
+    private final Map<String, ExecutableTaskSpec> executableTaskSpecs = new ConcurrentHashMap<>();
 
     public Map<String, StructuredLearningGoal> getGoals() {
         return goals;
@@ -97,6 +99,10 @@ public class InMemoryStore {
 
     public Map<String, List<LearningMethodProfile>> getSessionMethodProfiles() {
         return sessionMethodProfiles;
+    }
+
+    public Map<String, ExecutableTaskSpec> getExecutableTaskSpecs() {
+        return executableTaskSpecs;
     }
 
     public static String taskRuntimeKey(String sessionId, String taskId) {

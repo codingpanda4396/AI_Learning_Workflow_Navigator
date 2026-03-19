@@ -1,5 +1,6 @@
 package navigator.application.task;
 
+import navigator.domain.enums.FeedbackStyle;
 import navigator.domain.enums.ScaffoldIntensity;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.LearnerStrategyProfile;
@@ -49,11 +50,14 @@ public final class TaskScaffoldFactory {
         if (completion.isEmpty()) {
             completion.add("能独立复述本任务的核心要点");
         }
-        List<String> anti = List.of(
+        List<String> anti = new ArrayList<>(List.of(
                 "不要让导师一次性讲完整章",
                 "不要只复制定义而不举例",
                 "不要跳过自我复述直接要答案"
-        );
+        ));
+        if (strategyProfile != null && strategyProfile.getFeedbackStyle() == FeedbackStyle.DIRECT) {
+            anti.add("不要期待导师反复追问，可主动精简提问");
+        }
 
         int suggestedExploreTurns = 2;
         int suggestedCheckpointCount = 1;

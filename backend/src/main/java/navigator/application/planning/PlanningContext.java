@@ -5,6 +5,7 @@ import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearnerProfileSnapshot;
 import navigator.domain.model.LearnerStrategyProfile;
 import navigator.domain.model.StructuredLearningGoal;
+import navigator.domain.model.TimeBudgetConstraint;
 
 import lombok.Builder;
 import lombok.Data;
@@ -20,4 +21,5 @@ public class PlanningContext {
     private LearnerProfileSnapshot learnerProfileSnapshot;
     private LearnerStrategyProfile learnerStrategyProfile;
     private DiagnosisEvidenceSummary diagnosisEvidenceSummary;
+    private TimeBudgetConstraint timeBudgetConstraint;
 }
