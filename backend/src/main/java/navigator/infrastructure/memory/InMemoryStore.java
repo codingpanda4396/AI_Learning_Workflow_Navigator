@@ -19,6 +19,8 @@ public class InMemoryStore {
     private final Map<String, StructuredLearningGoal> goals = new ConcurrentHashMap<>();
     private final Map<String, GoalContextSnapshot> goalContextSnapshots = new ConcurrentHashMap<>();
     private final Map<String, LearnerProfileSnapshot> learnerProfiles = new ConcurrentHashMap<>();
+    /** diagnosisId -> LearnerStrategyProfile */
+    private final Map<String, LearnerStrategyProfile> learnerStrategyProfiles = new ConcurrentHashMap<>();
     private final Map<String, DiagnosisEvidenceSummary> diagnosisEvidenceSummaries = new ConcurrentHashMap<>();
     private final Map<String, LearningPlanPreview> planPreviews = new ConcurrentHashMap<>();
     private final Map<String, LearningSessionState> sessions = new ConcurrentHashMap<>();
@@ -47,6 +49,10 @@ public class InMemoryStore {
 
     public Map<String, LearnerProfileSnapshot> getLearnerProfiles() {
         return learnerProfiles;
+    }
+
+    public Map<String, LearnerStrategyProfile> getLearnerStrategyProfiles() {
+        return learnerStrategyProfiles;
     }
 
     public Map<String, DiagnosisEvidenceSummary> getDiagnosisEvidenceSummaries() {

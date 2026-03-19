@@ -3,6 +3,7 @@ package navigator.application.planning;
 import navigator.domain.model.DiagnosisEvidenceSummary;
 import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearnerProfileSnapshot;
+import navigator.domain.model.LearnerStrategyProfile;
 import navigator.domain.model.StructuredLearningGoal;
 
 import lombok.Builder;
@@ -17,5 +18,6 @@ public class PlanningContext {
     private StructuredLearningGoal goal;
     private GoalContextSnapshot goalContextSnapshot;
     private LearnerProfileSnapshot learnerProfileSnapshot;
+    private LearnerStrategyProfile learnerStrategyProfile;
     private DiagnosisEvidenceSummary diagnosisEvidenceSummary;
 }

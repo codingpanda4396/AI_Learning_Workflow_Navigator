@@ -14,8 +14,10 @@ import navigator.application.llm.TaskTutorOrchestrator;
 import navigator.domain.enums.LearningActionType;
 import navigator.domain.enums.TaskExecutionState;
 import navigator.domain.model.LearningPlanPreview;
+import navigator.domain.model.LearnerStrategyProfile;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskScaffold;
+import navigator.domain.model.TutorTurnResult;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.entity.TaskMessageEntity;
 import navigator.infrastructure.persistence.entity.TaskCheckpointResultEntity;
@@ -70,7 +72,7 @@ public class TaskExecutionFlowService {
             }
         }
         if (rt.getScaffold() == null) {
-            TaskScaffold scaffold = TaskScaffoldFactory.build(sessionId, bp);
+            TaskScaffold scaffold = TaskScaffoldFactory.build(sessionId, bp, resolveStrategyProfile(sessionId));
             if (scaffold.getScaffoldId() == null || scaffold.getScaffoldId().isBlank()) {
                 scaffold.setScaffoldId(TaskExecutionRuntime.newScaffoldId());
             }
@@ -100,7 +102,7 @@ public class TaskExecutionFlowService {
             }
         }
         if (rt.getScaffold() == null) {
-            TaskScaffold scaffold = TaskScaffoldFactory.build(sessionId, bp);
+            TaskScaffold scaffold = TaskScaffoldFactory.build(sessionId, bp, resolveStrategyProfile(sessionId));
             scaffold.setCurrentExecutionState(TaskExecutionState.ORIENT.name());
             rt.setScaffold(scaffold);
             if (scaffold.getScaffoldId() == null || scaffold.getScaffoldId().isBlank()) {
@@ -125,17 +127,17 @@ public class TaskExecutionFlowService {
         rt.setExploreTurnCount(rt.getExploreTurnCount() + 1);
         persistenceService.appendMessage(sessionId, taskId, "USER", content,
                 action != null ? action.name() : null, stateBefore, stateBefore, "NONE");
-        TaskTutorOrchestrator.TutorTurnResult turn = tutorOrchestrator.exploreTurn(rt, bp, content, action);
-        persistenceService.appendMessage(sessionId, taskId, "ASSISTANT", turn.assistantReply(),
-                null, stateBefore, rt.getState(), turn.fallbackMode());
+        TutorTurnResult turn = tutorOrchestrator.exploreTurn(rt, bp, content, action);
+        persistenceService.appendMessage(sessionId, taskId, "ASSISTANT", turn.getAssistantReply(),
+                null, stateBefore, rt.getState(), turn.getFallbackMode());
         persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         rt.getScaffold().setCurrentExecutionState(rt.getState().name());
         return TaskMessageResponse.builder()
-                .assistantReply(turn.assistantReply())
+                .assistantReply(turn.getAssistantReply())
                 .detectedAction(action != null ? action.name() : "GENERIC")
                 .taskState(rt.getState().name())
-                .nextSuggestedPrompts(turn.suggestedNextPrompts())
-                .fallbackMode(turn.fallbackMode())
+                .nextSuggestedPrompts(turn.getSuggestedFollowups())
+                .fallbackMode(turn.getFallbackMode())
                 .build();
     }
 
@@ -299,6 +301,19 @@ public class TaskExecutionFlowService {
                 .filter(t -> t.getTaskId().equals(taskId))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private LearnerStrategyProfile resolveStrategyProfile(String sessionId) {
+        if (sessionId == null) {
+            return null;
+        }
+        // diagnosisId -> sessionId 的映射已在 createSession 时写入 store；执行期反向查找即可（数据量小）。
+        String diagnosisId = store.getDiagnosisToSession().entrySet().stream()
+                .filter(e -> sessionId.equals(e.getValue()))
+                .map(java.util.Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
+        return diagnosisId != null ? store.getLearnerStrategyProfiles().get(diagnosisId) : null;
     }
 
     private static String truncate(String s, int n) {

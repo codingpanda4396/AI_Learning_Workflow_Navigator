@@ -6,12 +6,14 @@ import navigator.application.diagnosis.DiagnosisAnswerNormalizer;
 import navigator.application.diagnosis.DiagnosisEvidenceBuilder;
 import navigator.application.diagnosis.DiagnosisQuestionBank;
 import navigator.application.diagnosis.DiagnosisRuleEngine;
+import navigator.application.diagnosis.LearnerStrategyProfileDeriver;
 import navigator.application.guard.EntityLookupGuard;
 import navigator.domain.enums.DiagnosisSessionStatus;
 import navigator.domain.model.DiagnosisQuestion;
 import navigator.domain.model.DiagnosisSubmission;
 import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearnerProfileSnapshot;
+import navigator.domain.model.LearnerStrategyProfile;
 import navigator.domain.model.StructuredLearningGoal;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.entity.DiagnosisSessionEntity;
@@ -32,6 +34,7 @@ public class DiagnosisApplicationService {
     private final EntityLookupGuard entityLookupGuard;
     private final DiagnosisRuleEngine diagnosisRuleEngine;
     private final DiagnosisEvidenceBuilder diagnosisEvidenceBuilder;
+    private final LearnerStrategyProfileDeriver learnerStrategyProfileDeriver;
     private final DiagnosisSessionRepository diagnosisSessionRepository;
     private final LearningSessionRepository learningSessionRepository;
     private final DiagnosisAnswerRepository diagnosisAnswerRepository;
@@ -42,6 +45,7 @@ public class DiagnosisApplicationService {
                                        EntityLookupGuard entityLookupGuard,
                                        DiagnosisRuleEngine diagnosisRuleEngine,
                                        DiagnosisEvidenceBuilder diagnosisEvidenceBuilder,
+                                       LearnerStrategyProfileDeriver learnerStrategyProfileDeriver,
                                        DiagnosisSessionRepository diagnosisSessionRepository,
                                        LearningSessionRepository learningSessionRepository,
                                        DiagnosisAnswerRepository diagnosisAnswerRepository,
@@ -51,6 +55,7 @@ public class DiagnosisApplicationService {
         this.entityLookupGuard = entityLookupGuard;
         this.diagnosisRuleEngine = diagnosisRuleEngine;
         this.diagnosisEvidenceBuilder = diagnosisEvidenceBuilder;
+        this.learnerStrategyProfileDeriver = learnerStrategyProfileDeriver;
         this.diagnosisSessionRepository = diagnosisSessionRepository;
         this.learningSessionRepository = learningSessionRepository;
         this.diagnosisAnswerRepository = diagnosisAnswerRepository;
@@ -112,7 +117,9 @@ public class DiagnosisApplicationService {
         String primaryGap = profile.getBlockerTags() != null && !profile.getBlockerTags().isEmpty()
                 ? profile.getBlockerTags().get(0) : null;
         var evidence = diagnosisEvidenceBuilder.build(profile, goal, goalContext, primaryGap);
+        LearnerStrategyProfile strategyProfile = learnerStrategyProfileDeriver.derive(diagnosisId, profile, goal, goalContext);
         store.getLearnerProfiles().put(diagnosisId, profile);
+        store.getLearnerStrategyProfiles().put(diagnosisId, strategyProfile);
         store.getDiagnosisEvidenceSummaries().put(diagnosisId, evidence);
         store.getDiagnosisSessionStatuses().put(diagnosisId, DiagnosisSessionStatus.COMPLETED.name());
         // 持久化标准化答案与 LearnerProfile 快照，并推进状态
@@ -120,6 +127,7 @@ public class DiagnosisApplicationService {
         return SubmitDiagnosisData.builder()
                 .diagnosisId(diagnosisId)
                 .learnerProfileSnapshot(profile)
+                .learnerStrategyProfile(strategyProfile)
                 .diagnosisEvidenceSummary(evidence)
                 .build();
     }
@@ -134,7 +142,6 @@ public class DiagnosisApplicationService {
         if (diagnosisDbId == null || submission == null) {
             return;
         }
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
         // 1) 写入每题答案
         if (submission.getAnswers() != null && !submission.getAnswers().isEmpty()) {
             diagnosisAnswerRepository.saveAnswers(diagnosisDbId, submission.getAnswers());
@@ -151,21 +158,6 @@ public class DiagnosisApplicationService {
         // 3) 推进 diagnosis_session 与 learning_session 状态
         diagnosisSessionRepository.markCompleted(diagnosisDbId, DiagnosisSessionStatus.READY);
         learningSessionRepository.markDiagnosisCompleted(sessionDbId);
-    }
-
-    private navigator.domain.model.GoalContextSnapshot goalContextFromStore(String diagnosisId) {
-        String goalId = store.getDiagnosisToGoal().get(diagnosisId);
-        if (goalId == null) {
-            return null;
-        }
-        return store.getGoalContextSnapshots().get(goalId);
-    }
-
-    private String goalContextPlanningMode(GoalContextSnapshot snapshot) {
-        if (snapshot == null || snapshot.getPlanningMode() == null) {
-            return null;
-        }
-        return snapshot.getPlanningMode().name();
     }
 
     private Long extractNumericId(String id) {

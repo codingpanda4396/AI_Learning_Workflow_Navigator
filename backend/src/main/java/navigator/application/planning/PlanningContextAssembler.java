@@ -3,6 +3,7 @@ package navigator.application.planning;
 import navigator.domain.model.DiagnosisEvidenceSummary;
 import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearnerProfileSnapshot;
+import navigator.domain.model.LearnerStrategyProfile;
 import navigator.domain.model.StructuredLearningGoal;
 import navigator.infrastructure.memory.InMemoryStore;
 import org.springframework.stereotype.Component;
@@ -23,11 +24,13 @@ public class PlanningContextAssembler {
         StructuredLearningGoal goal = store.getGoals().get(goalId);
         GoalContextSnapshot goalContextSnapshot = store.getGoalContextSnapshots().get(goalId);
         LearnerProfileSnapshot learnerProfileSnapshot = store.getLearnerProfiles().get(diagnosisId);
+        LearnerStrategyProfile learnerStrategyProfile = store.getLearnerStrategyProfiles().get(diagnosisId);
         DiagnosisEvidenceSummary diagnosisEvidenceSummary = store.getDiagnosisEvidenceSummaries().get(diagnosisId);
         return PlanningContext.builder()
                 .goal(goal)
                 .goalContextSnapshot(goalContextSnapshot)
                 .learnerProfileSnapshot(learnerProfileSnapshot)
+                .learnerStrategyProfile(learnerStrategyProfile)
                 .diagnosisEvidenceSummary(diagnosisEvidenceSummary)
                 .build();
     }

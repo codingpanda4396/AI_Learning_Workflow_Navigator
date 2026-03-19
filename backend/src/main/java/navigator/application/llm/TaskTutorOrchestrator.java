@@ -3,6 +3,7 @@ package navigator.application.llm;
 import navigator.application.task.TaskExecutionRuntime;
 import navigator.domain.enums.LearningActionType;
 import navigator.domain.model.TaskBlueprint;
+import navigator.domain.model.TutorTurnResult;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -28,8 +29,12 @@ public class TaskTutorOrchestrator {
 
     public TutorTurnResult exploreTurn(TaskExecutionRuntime rt, TaskBlueprint bp, String userInput, LearningActionType action) {
         String goal = bp.getGoal() != null ? bp.getGoal() : "";
+        String completion = bp.getCompletionCriteria() != null && !bp.getCompletionCriteria().isEmpty()
+                ? String.join(" | ", bp.getCompletionCriteria().stream().limit(5).toList())
+                : "";
         String system = "PHASE=EXECUTION/EXPLORE\n" +
                 "GOAL=" + goal + "\n" +
+                (completion.isBlank() ? "" : ("COMPLETION_CRITERIA=" + completion + "\n")) +
                 "BOUNDARY=explain_with_min_example,ask_guiding_questions,no_long_lecture\n" +
                 "OUTPUT=plain_text";
         LlmCall call = callLlm(system, userInput);
@@ -40,19 +45,23 @@ public class TaskTutorOrchestrator {
             prompts.addAll(rt.getScaffold().getRecommendedFollowupTemplates());
         }
         prompts.add("我这样理解对吗：……");
-        String recommend = rt.getExploreTurnCount() >= (rt.getScaffold() != null && rt.getScaffold().getSuggestedExploreTurns() != null
-                ? rt.getScaffold().getSuggestedExploreTurns() - 1 : 1)
-                ? "MOVE_TO_SELF_EXPLAIN" : "KEEP";
         if (action == LearningActionType.SEEK_DIRECT_ANSWER) {
             reply = "直接给答案不利于形成自己的理解。请先试着用一句话说出你卡住的点，我们再从最小例子切入。";
-            recommend = "KEEP";
             fallbackMode = "TEMPLATE";
         }
         if (action == LearningActionType.OFF_TOPIC) {
             reply = "我们先回到当前任务：" + truncate(goal, 60) + "。你可以从上面的推荐问法里选一句开始。";
             fallbackMode = "TEMPLATE";
         }
-        return new TutorTurnResult(reply, prompts, recommend, fallbackMode);
+        return TutorTurnResult.builder()
+                .assistantReply(reply)
+                .detectedAction(action)
+                .semanticSummary(userInput != null ? truncate(userInput.trim(), 120) : null)
+                .suggestedFollowups(prompts)
+                .explanationDraft(null)
+                .evidenceExtracts(List.of())
+                .fallbackMode(fallbackMode)
+                .build();
     }
 
     public TutorTurnResult remedialTurn(TaskBlueprint bp, String userInput) {
@@ -60,24 +69,21 @@ public class TaskTutorOrchestrator {
                 "BOUNDARY=minimal_correction,one_small_step,no_long_text\n" +
                 "OUTPUT=plain_text";
         LlmCall call = callLlm(system, userInput);
-        return new TutorTurnResult(
-                call.reply,
-                List.of("请再用自己的话复述刚才的纠偏点"),
-                "KEEP",
-                call.fallbackMode);
+        return TutorTurnResult.builder()
+                .assistantReply(call.reply)
+                .detectedAction(null)
+                .semanticSummary(userInput != null ? truncate(userInput.trim(), 120) : null)
+                .suggestedFollowups(List.of("请再用自己的话复述刚才的纠偏点"))
+                .explanationDraft(null)
+                .evidenceExtracts(List.of())
+                .fallbackMode(call.fallbackMode)
+                .build();
     }
 
     private static String truncate(String s, int n) {
         if (s == null) return "";
         return s.length() <= n ? s : s.substring(0, n) + "…";
     }
-
-    public record TutorTurnResult(
-            String assistantReply,
-            List<String> suggestedNextPrompts,
-            String stateRecommendation,
-            String fallbackMode
-    ) {}
 
     private record LlmCall(String reply, String fallbackMode) {
     }

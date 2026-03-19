@@ -1,6 +1,8 @@
 package navigator.application.task;
 
+import navigator.domain.enums.ScaffoldIntensity;
 import navigator.domain.model.TaskBlueprint;
+import navigator.domain.model.LearnerStrategyProfile;
 import navigator.domain.model.TaskScaffold;
 
 import java.time.LocalDateTime;
@@ -15,6 +17,10 @@ public final class TaskScaffoldFactory {
     private TaskScaffoldFactory() {}
 
     public static TaskScaffold build(String sessionId, TaskBlueprint bp) {
+        return build(sessionId, bp, null);
+    }
+
+    public static TaskScaffold build(String sessionId, TaskBlueprint bp, LearnerStrategyProfile strategyProfile) {
         String goal = bp.getGoal() != null ? bp.getGoal() : bp.getTitle();
         String prompt = bp.getRecommendedPromptTemplate() != null
                 ? bp.getRecommendedPromptTemplate()
@@ -48,6 +54,20 @@ public final class TaskScaffoldFactory {
                 "不要只复制定义而不举例",
                 "不要跳过自我复述直接要答案"
         );
+
+        int suggestedExploreTurns = 2;
+        int suggestedCheckpointCount = 1;
+        if (strategyProfile != null && strategyProfile.getScaffoldIntensity() != null) {
+            ScaffoldIntensity intensity = strategyProfile.getScaffoldIntensity();
+            if (intensity == ScaffoldIntensity.LIGHT) {
+                suggestedExploreTurns = 1;
+                suggestedCheckpointCount = 1;
+            } else if (intensity == ScaffoldIntensity.STRICT) {
+                suggestedExploreTurns = 3;
+                suggestedCheckpointCount = 2;
+            }
+        }
+
         return TaskScaffold.builder()
                 .scaffoldId(TaskExecutionRuntime.newScaffoldId())
                 .taskId(bp.getTaskId())
@@ -62,8 +82,8 @@ public final class TaskScaffoldFactory {
                 .completionSignals(completion)
                 .antiPatterns(anti)
                 .currentExecutionState("ORIENT")
-                .suggestedExploreTurns(2)
-                .suggestedCheckpointCount(1)
+                .suggestedExploreTurns(suggestedExploreTurns)
+                .suggestedCheckpointCount(suggestedCheckpointCount)
                 .createdAt(LocalDateTime.now())
                 .build();
     }
