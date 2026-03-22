@@ -4,15 +4,15 @@
     <main class="mx-auto max-w-2xl px-6 py-8">
       <div class="mb-8">
         <h1 class="text-2xl font-bold text-text-primary md:text-3xl">
-          开启你的学习导航
+          先说好你要学什么
         </h1>
         <p class="mt-2 text-text-secondary">
-          系统将基于你的目标生成个性化学习路径，请填写以下信息。
+          填完这几项，系统会基于你的输入直接给出<strong class="font-medium text-text-primary">第一步学习动作</strong>，并带你往下走。
         </p>
       </div>
 
       <FormCard>
-        <form class="space-y-5" @submit.prevent="onSubmit">
+        <form class="space-y-6" @submit.prevent="onSubmit">
           <div>
             <label class="mb-1.5 block text-sm font-medium text-text-primary">
               学习目标 <span class="text-red-500">*</span>
@@ -47,7 +47,7 @@
 
           <div>
             <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              自评基础
+              当前基础
             </label>
             <select
               v-model="form.selfReportedLevel"
@@ -55,7 +55,7 @@
             >
               <option value="">请选择</option>
               <option
-                v-for="(label, val) in selfReportedLevelLabels"
+                v-for="(label, val) in goalPageLevelLabels"
                 :key="val"
                 :value="val"
               >
@@ -65,53 +65,35 @@
           </div>
 
           <div>
-            <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              目标类型
-            </label>
-            <select
-              v-model="form.goalTypeHint"
-              class="w-full rounded-input border border-border px-4 py-2.5 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">请选择</option>
-              <option
-                v-for="(label, val) in goalTypeLabels"
-                :key="val"
-                :value="val"
-              >
-                {{ label }}
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              学习偏好（可多选）
-            </label>
-            <div class="flex flex-wrap gap-2">
+            <p class="mb-2 text-sm font-medium text-text-primary">
+              你现在更希望先？
+            </p>
+            <div class="space-y-2">
               <label
-                v-for="(label, val) in preferenceTagLabels"
-                :key="val"
-                class="inline-flex cursor-pointer items-center gap-2 rounded-input border px-3 py-2 text-sm transition-colors"
+                v-for="opt in entryPreferenceOptions"
+                :key="opt.value"
+                class="flex cursor-pointer items-center gap-3 rounded-input border p-3 text-sm transition-colors"
                 :class="
-                  form.preferenceTags.includes(val as PreferenceTagType)
-                    ? 'border-primary bg-primary/5 text-primary'
+                  form.entryPreference === opt.value
+                    ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
                 "
               >
                 <input
-                  v-model="form.preferenceTags"
-                  type="checkbox"
-                  :value="val"
-                  class="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  v-model="form.entryPreference"
+                  type="radio"
+                  name="entryPreference"
+                  :value="opt.value"
+                  class="h-4 w-4 border-border text-primary focus:ring-primary"
                 />
-                {{ label }}
+                <span class="text-text-primary">{{ opt.label }}</span>
               </label>
             </div>
           </div>
 
           <div>
             <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              学科/课程
+              学科/课程（可选）
             </label>
             <input
               v-model="form.subjectHint"
@@ -123,7 +105,7 @@
 
           <div>
             <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              知识点（逗号分隔）
+              知识点（可选，逗号或顿号分隔）
             </label>
             <input
               v-model="topicHintsStr"
@@ -133,9 +115,9 @@
             />
           </div>
 
-          <div class="flex justify-end gap-3 pt-4">
-            <PrimaryButton :loading="loading" type="submit">
-              开始 AI 诊断
+          <div class="flex justify-end gap-3 pt-2">
+            <PrimaryButton :loading="loading" @click="onSubmit">
+              生成学习诊断
             </PrimaryButton>
           </div>
         </form>
@@ -155,30 +137,34 @@ import { useWorkflowStore } from '@/stores/workflow'
 import { createGoal } from '@/api/goals'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
-import {
-  timeBudgetLabels,
-  selfReportedLevelLabels,
-  goalTypeLabels,
-  preferenceTagLabels,
-} from '@/types/labels'
-import type {
-  PreferenceTagType,
-  TimeBudgetType,
-  SelfReportedLevelType,
-  GoalTypeType,
-} from '@/types/enums'
+import { timeBudgetLabels } from '@/types/labels'
+import { PreferenceTag } from '@/types/enums'
+import type { TimeBudgetType, SelfReportedLevelType, PreferenceTagType } from '@/types/enums'
 import type { CreateGoalRequest } from '@/types/dto'
 
 const router = useRouter()
 const store = useWorkflowStore()
+
+/** 目标页专用口语化基础文案（仍传后端既有 SelfReportedLevel 枚举值） */
+const goalPageLevelLabels: Record<string, string> = {
+  BEGINNER: '几乎零基础，刚开始接触',
+  BASIC: '知道一点，但很不熟',
+  PARTIAL_UNDERSTANDING: '学过一些，中间容易断档',
+  CAN_EXPLAIN_BUT_NOT_APPLY: '概念大概懂，一做题就懵',
+  SOLID_BUT_WANT_IMPROVE: '整体还行，想再稳一点',
+}
+
+const entryPreferenceOptions: { value: PreferenceTagType; label: string }[] = [
+  { value: PreferenceTag.CONCEPT_FIRST, label: '先理解原理' },
+  { value: PreferenceTag.PRACTICE_FIRST, label: '先学会做题' },
+]
 
 const loading = ref(false)
 const form = ref({
   rawGoalText: '',
   timeBudget: '' as string,
   selfReportedLevel: '' as string,
-  goalTypeHint: '' as string,
-  preferenceTags: [] as PreferenceTagType[],
+  entryPreference: PreferenceTag.CONCEPT_FIRST as PreferenceTagType,
   subjectHint: '',
   topicHints: [] as string[],
   sourceContext: '',
@@ -204,9 +190,10 @@ async function onSubmit() {
     const payload: CreateGoalRequest = {
       rawGoalText: form.value.rawGoalText.trim(),
       timeBudget: (form.value.timeBudget || undefined) as TimeBudgetType | undefined,
-      selfReportedLevel: (form.value.selfReportedLevel || undefined) as SelfReportedLevelType | undefined,
-      preferenceTags: form.value.preferenceTags?.length ? form.value.preferenceTags : undefined,
-      goalTypeHint: (form.value.goalTypeHint || undefined) as GoalTypeType | undefined,
+      selfReportedLevel: (form.value.selfReportedLevel || undefined) as
+        | SelfReportedLevelType
+        | undefined,
+      preferenceTags: [form.value.entryPreference],
       subjectHint: form.value.subjectHint || undefined,
       topicHints: form.value.topicHints?.length ? form.value.topicHints : undefined,
       sourceContext: form.value.sourceContext || undefined,

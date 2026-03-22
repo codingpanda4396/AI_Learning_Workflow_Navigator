@@ -1,7 +1,7 @@
 <template>
   <PageContainer>
     <AppTopBar current="task" />
-    <main class="mx-auto max-w-3xl px-6 py-8">
+    <main class="mx-auto max-w-2xl px-6 py-8">
       <LoadingState v-if="loading && !task" message="加载任务中..." />
       <ErrorState v-else-if="error" :message="error">
         <template #action>
@@ -19,279 +19,363 @@
         </template>
       </EmptyState>
 
-      <div v-else-if="task" class="space-y-6">
-        <div class="flex items-center justify-between">
-          <h1 class="text-2xl font-bold text-text-primary">
-            {{ task.title }}
-          </h1>
-          <StatusBadge
-            v-if="progress"
-            :label="`${progress.currentIndex} / ${progress.totalTasks}`"
-          />
-        </div>
-
-        <!-- 执行阶段条 -->
-        <div
-          v-if="scaffold"
-          class="flex flex-wrap gap-2 rounded-card border border-border bg-gray-50 p-3 text-sm"
-        >
-          <span class="font-medium text-text-secondary">当前阶段：</span>
-          <span
-            v-for="step in executionSteps"
-            :key="step.key"
-            class="rounded-full px-2 py-0.5"
-            :class="
-              step.key === taskStateHighlight
-                ? 'bg-primary text-white'
-                : 'bg-white text-text-secondary ring-1 ring-border'
-            "
-          >
-            {{ step.label }}
-          </span>
-        </div>
-
-        <FormCard>
-          <SectionHeader>任务目标</SectionHeader>
-          <p class="text-text-primary">{{ task.goal }}</p>
-        </FormCard>
-
-        <!-- 脚手架区 -->
-        <FormCard v-if="scaffold">
-          <SectionHeader>学习脚手架</SectionHeader>
-          <p v-if="scaffold.whyThisTask" class="mb-3 text-sm text-text-secondary">
-            {{ scaffold.whyThisTask }}
-          </p>
-          <p class="mb-2 text-sm font-medium text-text-primary">推荐起手问法</p>
-          <div class="mb-4 flex flex-wrap gap-2">
-            <button
-              v-for="(t, i) in scaffold.recommendedAskTemplates"
-              :key="'a' + i"
-              type="button"
-              class="rounded-input border border-primary/40 bg-primary/5 px-3 py-1.5 text-left text-sm text-primary hover:bg-primary/10"
-              @click="messageInput = t"
-            >
-              {{ t }}
-            </button>
-          </div>
-          <p class="mb-2 text-sm font-medium text-text-primary">追问与自检</p>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="(t, i) in [
-                ...(scaffold.recommendedFollowupTemplates || []),
-                ...(scaffold.selfCheckTemplates || []).slice(0, 2),
-              ]"
-              :key="'f' + i"
-              type="button"
-              class="rounded-input border border-border px-3 py-1 text-sm text-text-secondary hover:border-primary/50"
-              @click="messageInput = t"
-            >
-              {{ t.length > 36 ? t.slice(0, 36) + '…' : t }}
-            </button>
-          </div>
-          <div
-            v-if="scaffold.fallbackHints?.length"
-            class="mt-3 rounded bg-amber-50 p-2 text-xs text-amber-900"
-          >
-            <span class="font-medium">卡住时：</span>
-            {{ scaffold.fallbackHints[0] }}
-          </div>
-        </FormCard>
-
-        <!-- 导师对话区 -->
-        <FormCard v-if="scaffold">
-          <SectionHeader>探索对话</SectionHeader>
-          <p class="mb-3 text-xs text-text-secondary">
-            至少完成 2 轮提问后再提交自我解释。系统会识别你的学习动作（如举例、对比）。
-          </p>
-          <div
-            class="mb-4 max-h-72 space-y-3 overflow-y-auto rounded border border-border bg-gray-50/80 p-3"
-          >
-            <div
-              v-for="(m, idx) in chatTurns"
-              :key="idx"
-              class="text-sm"
-              :class="
-                m.role === 'USER' ? 'text-right text-text-primary' : 'text-left text-text-secondary'
-              "
-            >
-              <span
-                class="inline-block max-w-[90%] rounded-lg px-3 py-2"
-                :class="
-                  m.role === 'USER' ? 'bg-primary/15' : 'bg-white shadow-sm ring-1 ring-border'
-                "
+      <WorkflowPageScaffold v-else-if="task">
+        <template #title>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <template v-if="cognitiveHeadlineBody && !legacyComplete">
+                <p class="text-sm font-semibold text-primary">
+                  这一步我们一起搞懂
+                </p>
+                <p class="mt-0.5 text-base font-medium text-text-primary">
+                  {{ cognitiveHeadlineBody }}
+                </p>
+              </template>
+              <h1
+                class="text-2xl font-bold text-text-primary md:text-3xl"
+                :class="cognitiveHeadlineBody && !legacyComplete ? 'mt-2' : ''"
               >
-                {{ m.content }}
-              </span>
-              <div
-                v-if="m.detectedAction && m.role === 'USER'"
-                class="mt-0.5 text-xs text-gray-500"
+                {{ task.title }}
+              </h1>
+              <p
+                v-if="progress"
+                class="mt-1 text-sm text-text-secondary"
               >
-                识别：{{ actionLabel(m.detectedAction) }}
-              </div>
+                进度：第 {{ progress.currentIndex }} 步 / 共 {{ progress.totalTasks }} 步
+              </p>
+              <p class="mt-2 text-sm font-medium text-text-primary">
+                当前环节：{{ currentStepLabel }}
+              </p>
             </div>
-          </div>
-          <div class="flex gap-2">
-            <textarea
-              v-model="messageInput"
-              rows="2"
-              class="min-h-[3rem] flex-1 rounded-input border border-border px-3 py-2 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="输入你的问题…"
-              :disabled="sending || taskState === 'CHECK' || taskState === 'PASS'"
+            <StatusBadge
+              v-if="progress"
+              :label="`${progress.currentIndex}/${progress.totalTasks}`"
             />
-            <PrimaryButton
-              :loading="sending"
-              :disabled="!messageInput.trim() || taskState === 'CHECK' || taskState === 'PASS'"
-              class="self-end"
-              @click="sendMessage"
-            >
-              发送
-            </PrimaryButton>
           </div>
+        </template>
+
+        <template #primary>
           <div
-            v-if="exploreRoundCount >= 2 && taskState === 'EXPLORE'"
-            class="mt-4 border-t border-border pt-4"
+            class="rounded-card border-2 border-primary/25 bg-primary/5 p-5 text-sm leading-relaxed text-text-primary whitespace-pre-line"
           >
-            <SectionHeader>自我解释</SectionHeader>
-            <p class="mb-2 text-xs text-text-secondary">
-              用一段话复述你对本任务的理解（不少于约 35 字）。
+            {{ currentActionLine }}
+          </div>
+
+          <div v-if="!legacyComplete" class="mt-6">
+            <p class="mb-2 text-xs font-medium text-text-secondary">
+              学习进度（不用细看）
             </p>
-            <textarea
-              v-model="selfExplainInput"
-              rows="3"
-              class="mb-2 w-full rounded-input border border-border px-3 py-2 text-text-primary"
-              placeholder="我这样理解：……"
+            <GuidedStepCard
+              :steps="guidedSteps"
+              :current-step-id="currentGuidedStepId"
+              @select="onGuidedSelect"
             />
-            <PrimaryButton
-              :loading="submittingSelf"
-              :disabled="!selfExplainInput.trim()"
-              @click="submitSelfExplanation"
-            >
-              提交自我解释
-            </PrimaryButton>
           </div>
-          <div
-            v-if="taskState === 'CHECK'"
-            class="mt-4 border-t border-border pt-4"
-          >
-            <SectionHeader>微检查</SectionHeader>
-            <p class="mb-2 font-medium text-text-primary">{{ checkpointQuestion }}</p>
-            <textarea
-              v-model="checkpointAnswer"
-              rows="2"
-              class="mb-2 w-full rounded-input border border-border px-3 py-2"
-              placeholder="简要作答"
-            />
-            <PrimaryButton
-              :loading="submittingCheckpoint"
-              :disabled="!checkpointAnswer.trim()"
-              @click="submitCheckpoint"
-            >
-              提交答案
-            </PrimaryButton>
-          </div>
-          <div
-            v-if="taskState === 'REMEDIAL'"
-            class="mt-3 rounded bg-amber-50 p-3 text-sm text-amber-900"
-          >
-            需要再探索一轮：请继续向导师提问，满足轮次后可再次提交自我解释。
-          </div>
-        </FormCard>
 
-        <FormCard v-if="task.completionCriteria?.length">
-          <SectionHeader>完成标准</SectionHeader>
-          <ul class="list-disc space-y-1 pl-5 text-text-secondary">
-            <li v-for="(c, i) in task.completionCriteria" :key="i">{{ c }}</li>
-          </ul>
-        </FormCard>
+          <div id="guided-orient" class="scroll-mt-28 mt-8">
+            <FormCard>
+              <SectionHeader>这步要达成什么</SectionHeader>
+              <p class="text-text-primary">{{ task.goal }}</p>
+            </FormCard>
+          </div>
 
-        <FormCard>
-          <SectionHeader>标记任务完成</SectionHeader>
-          <p
-            v-if="taskState !== 'PASS' && !legacyComplete"
-            class="mb-3 text-sm text-amber-800"
+          <div
+            v-if="scaffold && !legacyComplete"
+            id="guided-explore"
+            class="scroll-mt-28 mt-6 space-y-4"
           >
-            须先完成上方脚手架流程（探索 → 自我解释 → 微检查通过）后才能提交。
-          </p>
-          <p
-            v-else-if="taskState === 'PASS' && !legacyComplete"
-            class="mb-3 text-sm text-green-700"
-          >
-            微检查已通过，可提交本轮任务完成。
-          </p>
-          <p
-            v-else-if="legacyComplete"
-            class="mb-3 text-sm text-text-secondary"
-          >
-            当前为直接完成模式（未启用脚手架流程时的行为）。
-          </p>
-          <form class="space-y-4" @submit.prevent="onComplete">
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-text-primary">
-                完成状态 <span class="text-red-500">*</span>
-              </label>
-              <select
-                v-model="completeForm.completionStatus"
-                class="w-full rounded-input border border-border px-4 py-2.5 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                required
-                :disabled="taskState !== 'PASS' && !legacyComplete"
+            <FormCard
+              v-if="requiredScaffoldPrompts.length || optionalScaffoldPrompts.length"
+            >
+              <SectionHeader>如果你有点不确定</SectionHeader>
+              <p
+                v-if="requiredScaffoldPrompts.length"
+                class="mb-2 text-xs text-text-secondary"
               >
-                <option
-                  v-for="(label, val) in taskCompletionStatusLabels"
-                  :key="val"
-                  :value="val"
+                可以从这里起步（点一下会填进对话区）：
+              </p>
+              <div
+                v-if="requiredScaffoldPrompts.length"
+                class="mb-4 flex flex-wrap gap-2"
+              >
+                <button
+                  v-for="p in requiredScaffoldPrompts"
+                  :key="'req' + (p.promptId || p.prompt)"
+                  type="button"
+                  class="rounded-input border-2 border-primary/40 bg-primary/5 px-3 py-1.5 text-left text-xs font-medium text-primary hover:bg-primary/10"
+                  @click="messageInput = p.prompt"
                 >
-                  {{ label }}
-                </option>
-              </select>
-            </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-text-primary">
-                耗时（分钟）
-              </label>
-              <input
-                v-model.number="completeForm.durationMinutes"
-                type="number"
-                min="0"
-                class="w-full rounded-input border border-border px-4 py-2.5 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                :disabled="taskState !== 'PASS' && !legacyComplete"
-              />
-            </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-text-primary">
-                交互次数
-              </label>
-              <input
-                v-model.number="completeForm.interactionCount"
-                type="number"
-                min="0"
-                class="w-full rounded-input border border-border px-4 py-2.5 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                :disabled="taskState !== 'PASS' && !legacyComplete"
-              />
-            </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-text-primary">
-                学习反思
-              </label>
+                  {{
+                    p.prompt.length > 48
+                      ? p.prompt.slice(0, 48) + '…'
+                      : p.prompt
+                  }}
+                </button>
+              </div>
+              <template v-if="optionalScaffoldPrompts.length">
+                <p class="mb-2 text-xs text-text-secondary">还想多试几句（选做）</p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="p in optionalScaffoldPrompts"
+                    :key="'opt' + (p.promptId || p.prompt)"
+                    type="button"
+                    class="rounded-input border border-border bg-white px-3 py-1.5 text-left text-xs text-text-primary hover:bg-gray-50"
+                    @click="messageInput = p.prompt"
+                  >
+                    {{
+                      p.prompt.length > 40
+                        ? p.prompt.slice(0, 40) + '…'
+                        : p.prompt
+                    }}
+                  </button>
+                </div>
+              </template>
+            </FormCard>
+            <FormCard v-else-if="fallbackQuickPrompts.length">
+              <SectionHeader>如果你有点不确定</SectionHeader>
+              <p class="mb-2 text-xs text-text-secondary">
+                可以从这里起步（点一下会填进对话区）：
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="(t, i) in fallbackQuickPrompts"
+                  :key="'q' + i"
+                  type="button"
+                  class="rounded-input border border-primary/30 bg-primary/5 px-3 py-1.5 text-left text-xs text-primary hover:bg-primary/10"
+                  @click="messageInput = t"
+                >
+                  {{ t.length > 40 ? t.slice(0, 40) + '…' : t }}
+                </button>
+              </div>
+            </FormCard>
+
+            <TaskCoachPanel
+              v-model:message-input="messageInput"
+              collapsible
+              :chat-turns="chatTurns"
+              :sending="sending"
+              :input-disabled="coachInputDisabled"
+              placeholder="说说你的理解，或告诉我卡在哪里"
+              :action-labels="actionLabels"
+              @send="sendMessage"
+            />
+          </div>
+
+          <div
+            v-if="scaffold && !legacyComplete"
+            id="guided-explain"
+            class="scroll-mt-28 mt-6"
+          >
+            <FormCard
+              v-if="exploreRoundCount >= 2 && taskState === 'EXPLORE'"
+            >
+              <SectionHeader>试试看你能不能讲清楚</SectionHeader>
+              <p class="mb-1 text-sm font-medium text-text-primary">
+                用你自己的话讲一遍本任务在说什么（不用很标准，说清楚就好）。
+              </p>
+              <p class="mb-2 text-xs text-text-secondary">
+                大约三五句话即可（不少于约 35 字）。没有标准答案，你理解对就行。
+              </p>
               <textarea
-                v-model="completeForm.learnerReflection"
+                v-model="selfExplainInput"
                 rows="3"
-                class="w-full rounded-input border border-border px-4 py-3 text-text-primary placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="简要记录你的理解与收获"
-                :disabled="taskState !== 'PASS' && !legacyComplete"
+                class="mb-3 w-full rounded-input border border-border px-3 py-2 text-text-primary"
+                placeholder="我这样理解：……"
               />
-            </div>
-            <div class="flex gap-3">
               <PrimaryButton
-                :loading="completing"
-                type="submit"
-                :disabled="taskState !== 'PASS' && !legacyComplete"
+                :loading="submittingSelf"
+                :disabled="!selfExplainInput.trim()"
+                @click="submitSelfExplanation"
               >
-                提交完成
+                我讲完了，继续
               </PrimaryButton>
+              <div
+                v-if="selfExplainMissingPoints.length"
+                class="mt-3 rounded-input border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-950"
+              >
+                <p class="font-medium">还可以再具体一点</p>
+                <ul class="mt-1 list-disc space-y-0.5 pl-4">
+                  <li
+                    v-for="(pt, idx) in selfExplainMissingPoints"
+                    :key="'mp' + idx"
+                  >
+                    {{ pt }}
+                  </li>
+                </ul>
+              </div>
+            </FormCard>
+          </div>
+
+          <div
+            v-if="scaffold && !legacyComplete"
+            id="guided-check"
+            class="scroll-mt-28 mt-6"
+          >
+            <FormCard v-if="taskState === 'CHECK'">
+              <SectionHeader>快速练一下</SectionHeader>
+              <p class="mb-2 font-medium text-text-primary">{{ checkpointQuestion }}</p>
+              <textarea
+                v-model="checkpointAnswer"
+                rows="2"
+                class="mb-3 w-full rounded-input border border-border px-3 py-2"
+                placeholder="用一两句话说说你的想法"
+              />
+              <PrimaryButton
+                :loading="submittingCheckpoint"
+                :disabled="!checkpointAnswer.trim()"
+                @click="submitCheckpoint"
+              >
+                写好了，继续
+              </PrimaryButton>
+            </FormCard>
+            <div
+              v-if="taskState === 'REMEDIAL'"
+              class="rounded-card border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+            >
+              还差一小步：再和导师聊一轮，把卡点说清楚后，可以再点「我讲完了，继续」试一次。
             </div>
-          </form>
-        </FormCard>
-      </div>
+          </div>
+
+          <div id="guided-wrap" class="scroll-mt-28 mt-6">
+            <FormCard>
+              <SectionHeader>好了就进入下一步</SectionHeader>
+              <p
+                v-if="!legacyComplete && taskState !== 'PASS'"
+                class="text-sm text-amber-800"
+              >
+                还差一小步：先在上面对话里把卡点聊清楚，再用自己的话讲一遍，最后快速练一下，然后回到这里。
+              </p>
+
+              <template v-else-if="legacyComplete || taskState === 'PASS'">
+                <p class="mb-4 text-sm text-text-secondary">
+                  {{
+                    legacyComplete
+                      ? '选好完成状态，填完下面几项就可以继续。'
+                      : '核心流程已经走完。用一句话收个尾，就能进入下一步。'
+                  }}
+                </p>
+
+                <div v-if="!legacyComplete" class="space-y-4">
+                  <div>
+                    <label class="mb-1.5 block text-sm font-medium text-text-primary">
+                      一句话说说你学会了什么
+                    </label>
+                    <textarea
+                      v-model="closureSummary"
+                      rows="2"
+                      class="w-full rounded-input border border-border px-3 py-2 text-text-primary"
+                      placeholder="随便写写，至少 10 个字即可"
+                    />
+                  </div>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label class="mb-1.5 block text-sm font-medium text-text-primary">
+                        收获要点 1
+                      </label>
+                      <input
+                        v-model="closurePoint1"
+                        type="text"
+                        class="w-full rounded-input border border-border px-3 py-2 text-text-primary"
+                        placeholder="例如：核心定义"
+                      />
+                    </div>
+                    <div>
+                      <label class="mb-1.5 block text-sm font-medium text-text-primary">
+                        收获要点 2
+                      </label>
+                      <input
+                        v-model="closurePoint2"
+                        type="text"
+                        class="w-full rounded-input border border-border px-3 py-2 text-text-primary"
+                        placeholder="例如：易错点"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="mb-1.5 block text-sm font-medium text-text-primary">
+                      接下来怎么练（可选）
+                    </label>
+                    <input
+                      v-model="closureNext"
+                      type="text"
+                      class="w-full rounded-input border border-border px-3 py-2 text-text-primary"
+                      placeholder="留空会用一轮默认建议"
+                    />
+                  </div>
+                </div>
+
+                <details
+                  class="mt-4 rounded-input border border-border bg-gray-50/80 p-3 text-sm"
+                >
+                  <summary class="cursor-pointer font-medium text-text-primary">
+                    更多选项
+                  </summary>
+                  <div class="mt-3 space-y-3 border-t border-border pt-3">
+                    <div>
+                      <label class="mb-1.5 block text-xs font-medium text-text-primary">
+                        完成状态
+                      </label>
+                      <select
+                        v-model="completeForm.completionStatus"
+                        class="w-full rounded-input border border-border px-3 py-2 text-text-primary"
+                      >
+                        <option
+                          v-for="(label, val) in taskCompletionStatusLabels"
+                          :key="val"
+                          :value="val"
+                        >
+                          {{ label }}
+                        </option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="mb-1.5 block text-xs font-medium text-text-primary">
+                        补充反思（可选）
+                      </label>
+                      <textarea
+                        v-model="completeForm.learnerReflection"
+                        rows="2"
+                        class="w-full rounded-input border border-border px-3 py-2 text-text-primary"
+                        placeholder="还想记下的内容"
+                      />
+                    </div>
+                  </div>
+                </details>
+
+                <div class="mt-6">
+                  <PrimaryButton :loading="completing" @click="onComplete">
+                    进入下一步
+                  </PrimaryButton>
+                </div>
+              </template>
+            </FormCard>
+          </div>
+        </template>
+
+        <template #secondary>
+          <details
+            v-if="task.completionCriteria?.length || (scaffold?.whyThisTask && !legacyComplete)"
+            class="rounded-card border border-border bg-white"
+          >
+            <summary
+              class="cursor-pointer p-4 text-sm font-medium text-text-primary marker:hidden [&::-webkit-details-marker]:hidden"
+            >
+              （可选）如果你还想更稳一点
+            </summary>
+            <div class="space-y-3 border-t border-border p-4 text-sm text-text-secondary">
+              <p v-if="scaffold?.whyThisTask && !legacyComplete">
+                {{ scaffold.whyThisTask }}
+              </p>
+              <ul
+                v-if="task.completionCriteria?.length"
+                class="list-disc space-y-1 pl-5"
+              >
+                <li v-for="(c, i) in task.completionCriteria" :key="i">{{ c }}</li>
+              </ul>
+            </div>
+          </details>
+        </template>
+      </WorkflowPageScaffold>
     </main>
   </PageContainer>
 </template>
@@ -309,6 +393,9 @@ import StatusBadge from '@/components/ui/StatusBadge.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import WorkflowPageScaffold from '@/components/workflow/WorkflowPageScaffold.vue'
+import GuidedStepCard from '@/components/workflow/GuidedStepCard.vue'
+import TaskCoachPanel from '@/components/workflow/TaskCoachPanel.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import {
   getCurrentTask,
@@ -322,6 +409,13 @@ import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
 import { taskCompletionStatusLabels } from '@/types/labels'
 import { TaskCompletionStatus } from '@/types/enums'
+import {
+  buildTaskGuidedSteps,
+  getCurrentGuidedStepId,
+  getCurrentActionInstruction,
+  getTaskCognitiveHeadlineBody,
+} from '@/utils/taskGuidedSteps'
+import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
 import type {
   CurrentTaskItem,
   ProgressItem,
@@ -346,33 +440,21 @@ const messageInput = ref('')
 const selfExplainInput = ref('')
 const checkpointAnswer = ref('')
 const checkpointQuestion = ref('')
-/** 脚手架加载失败时允许沿用旧版「直接完成」 */
 const legacyComplete = ref(false)
+const taskStartedAt = ref(Date.now())
+
+const closureSummary = ref('')
+const closurePoint1 = ref('')
+const closurePoint2 = ref('')
+const closureNext = ref('')
+const selfExplainMissingPoints = ref<string[]>([])
 
 const chatTurns = ref<
   { role: 'USER' | 'ASSISTANT'; content: string; detectedAction?: string }[]
 >([])
 
-const executionSteps = [
-  { key: 'ORIENT', label: '定向' },
-  { key: 'EXPLORE', label: '探索' },
-  { key: 'SELF_EXPLAIN', label: '自解释' },
-  { key: 'CHECK', label: '微检查' },
-  { key: 'PASS', label: '通过' },
-]
-
-const taskStateHighlight = computed(() => {
-  const s = taskState.value
-  if (s === 'REMEDIAL') return 'EXPLORE'
-  if (s === 'ASK') return 'EXPLORE'
-  if (s === 'INIT') return 'ORIENT'
-  return s
-})
-
 const completeForm = ref({
   completionStatus: TaskCompletionStatus.COMPLETED,
-  durationMinutes: undefined as number | undefined,
-  interactionCount: undefined as number | undefined,
   learnerReflection: '',
 })
 
@@ -381,7 +463,7 @@ const actionLabels: Record<string, string> = {
   ASK_FOR_EXAMPLE: '求举例',
   ASK_FOR_COMPARISON: '求对比',
   ASK_FOR_SIMPLIFICATION: '求简化',
-  SELF_EXPLANATION: '自我解释',
+  SELF_EXPLANATION: '自己复述',
   CONFUSION_SIGNAL: '表达困惑',
   SEEK_DIRECT_ANSWER: '直接要答案',
   OFF_TOPIC: '跑题',
@@ -389,16 +471,94 @@ const actionLabels: Record<string, string> = {
   ANSWER_CHECK: '检查作答',
 }
 
-function actionLabel(code: string) {
-  return actionLabels[code] ?? code
+const guidedSteps = computed(() =>
+  buildTaskGuidedSteps(legacyComplete.value, scaffold.value)
+)
+
+const cognitiveHeadlineBody = computed(() =>
+  legacyComplete.value ? '' : getTaskCognitiveHeadlineBody(scaffold.value)
+)
+
+const exploreUnitPrompts = computed(() => {
+  const u = scaffold.value?.cognitiveUnits?.find((x) => x.unitId === 'explore')
+  return u?.prompts ?? []
+})
+
+const requiredScaffoldPrompts = computed(() =>
+  exploreUnitPrompts.value.filter((p) => p.required)
+)
+
+const optionalScaffoldPrompts = computed(() =>
+  exploreUnitPrompts.value.filter((p) => !p.required)
+)
+
+const fallbackQuickPrompts = computed(() => {
+  if (exploreUnitPrompts.value.length) return []
+  const s = scaffold.value
+  if (!s) return []
+  const a = s.recommendedAskTemplates ?? []
+  const b = [
+    ...(s.recommendedFollowupTemplates ?? []),
+    ...(s.selfCheckTemplates ?? []).slice(0, 2),
+  ]
+  return [...a, ...b].filter(Boolean).slice(0, 6)
+})
+
+const currentGuidedStepId = computed(() =>
+  getCurrentGuidedStepId(
+    taskState.value,
+    exploreRoundCount.value,
+    legacyComplete.value
+  )
+)
+
+const currentStepLabel = computed(() => {
+  const id = currentGuidedStepId.value
+  return guidedSteps.value.find((s) => s.id === id)?.label ?? '推进学习'
+})
+
+const currentActionLine = computed(() =>
+  getCurrentActionInstruction(
+    taskState.value,
+    exploreRoundCount.value,
+    scaffold.value,
+    task.value?.goal ?? '',
+    legacyComplete.value
+  )
+)
+
+const coachInputDisabled = computed(
+  () =>
+    sending.value ||
+    taskState.value === 'CHECK' ||
+    taskState.value === 'PASS' ||
+    legacyComplete.value
+)
+
+function onGuidedSelect(id: string) {
+  document.getElementById(`guided-${id}`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  })
 }
 
 function isUiChatMessage(m: {
   role: 'USER' | 'ASSISTANT' | 'SYSTEM'
   content: string
   detectedAction?: string
-}) : m is { role: 'USER' | 'ASSISTANT'; content: string; detectedAction?: string } {
+}): m is { role: 'USER' | 'ASSISTANT'; content: string; detectedAction?: string } {
   return m.role === 'USER' || m.role === 'ASSISTANT'
+}
+
+function resetClosureFields() {
+  closureSummary.value = ''
+  closurePoint1.value = ''
+  closurePoint2.value = ''
+  closureNext.value = ''
+  completeForm.value = {
+    completionStatus: TaskCompletionStatus.COMPLETED,
+    learnerReflection: '',
+  }
 }
 
 async function fetchTask() {
@@ -425,6 +585,8 @@ async function fetchTask() {
 
 async function loadScaffold(taskId: string) {
   if (!store.sessionId) return
+  resetClosureFields()
+  taskStartedAt.value = Date.now()
   try {
     const s = await getTaskScaffold(taskId, store.sessionId)
     scaffold.value = s
@@ -442,11 +604,12 @@ async function loadScaffold(taskId: string) {
       }))
     selfExplainInput.value = ''
     checkpointAnswer.value = ''
+    selfExplainMissingPoints.value = []
   } catch {
     scaffold.value = null
     legacyComplete.value = true
     taskState.value = 'PASS'
-    showToast('脚手架暂不可用，已切换为直接提交完成（与未加载脚手架时行为一致）')
+    showToast('脚手架暂不可用，已改为简单完成模式，直接填表继续即可。')
   }
 }
 
@@ -481,7 +644,10 @@ async function submitSelfExplanation() {
     taskState.value = res.taskState
     if (res.checkpointQuestion) checkpointQuestion.value = res.checkpointQuestion
     if (res.evaluation === 'WEAK') {
-      showToast('自我解释偏短，请按提示补充后再试')
+      showToast('可以再写具体一点（参考下方提示），不追求标准答案。')
+      selfExplainMissingPoints.value = res.missingPoints ?? []
+    } else {
+      selfExplainMissingPoints.value = []
     }
   } catch (err) {
     showToast(getErrorMessage(err))
@@ -501,10 +667,10 @@ async function submitCheckpoint() {
     )
     taskState.value = res.taskState
     if (res.result === 'FAIL') {
-      showToast(res.reason || '未通过，请再探索')
+      showToast(res.reason || '还差一点点，再试一次或回去聊聊')
       checkpointAnswer.value = ''
     } else {
-      showToast('已通过微检查，可提交任务完成')
+      showToast('很好，这一步练过了。可以到下面进入下一步。')
     }
   } catch (err) {
     showToast(getErrorMessage(err))
@@ -515,23 +681,34 @@ async function submitCheckpoint() {
 
 async function onComplete() {
   if (!store.sessionId || !task.value) return
+  if (!legacyComplete.value) {
+    if (closureSummary.value.trim().length < 10) {
+      showToast('请用至少 10 个字总结本任务收获')
+      return
+    }
+    if (!closurePoint1.value.trim() || !closurePoint2.value.trim()) {
+      showToast('请填写两个收获要点')
+      return
+    }
+  }
   completing.value = true
   try {
-    const payload = {
+    const userMsgCount = chatTurns.value.filter((m) => m.role === 'USER').length
+    const payload = buildCompleteTaskPayload({
       sessionId: store.sessionId,
       completionStatus: completeForm.value.completionStatus,
-      durationMinutes: completeForm.value.durationMinutes,
-      interactionCount: completeForm.value.interactionCount,
-      learnerReflection: completeForm.value.learnerReflection || undefined,
-    }
+      legacyComplete: legacyComplete.value,
+      summaryText: closureSummary.value,
+      learnedPoint1: closurePoint1.value,
+      learnedPoint2: closurePoint2.value,
+      nextPracticeIntent: closureNext.value,
+      learnerReflection: completeForm.value.learnerReflection,
+      taskStartedAt: taskStartedAt.value,
+      userMessageCount: userMsgCount,
+    })
     const data = await completeTask(task.value.taskId, payload)
     store.currentTask = null
-    completeForm.value = {
-      completionStatus: TaskCompletionStatus.COMPLETED,
-      durationMinutes: undefined,
-      interactionCount: undefined,
-      learnerReflection: '',
-    }
+    resetClosureFields()
     if (data.nextTaskAvailable && data.nextTaskId) {
       store.currentTaskId = data.nextTaskId
       await fetchTask()
