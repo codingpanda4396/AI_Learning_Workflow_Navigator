@@ -1,5 +1,6 @@
 package navigator.application.report;
 
+import navigator.api.dto.CompleteTaskRequest;
 import navigator.domain.model.ExecutionEvidenceSummary;
 import navigator.infrastructure.persistence.entity.LearningPlanEntity;
 import navigator.infrastructure.persistence.entity.SessionTaskEntity;
@@ -61,31 +62,82 @@ public class SessionEvidenceAggregator {
 
         // 聚合 gap tags
         Set<String> gapTags = new LinkedHashSet<>();
+        // 聚合 completionInputJson 中的证据
+        int totalDurationMinutes = 0;
+        int totalInteractionCount = 0;
+        boolean summarySubmitted = false;
+        Set<String> behaviorSignalSet = new LinkedHashSet<>();
+        boolean hasLearnerReflection = false;
         if (completions != null) {
             for (TaskCompletionEntity completion : completions) {
                 java.util.List<String> tags = parseStringArrayJson(completion.getDetectedGapTagsJson());
                 if (tags != null) {
                     gapTags.addAll(tags);
                 }
+                CompleteTaskRequest input = parseCompletionInput(completion.getCompletionInputJson());
+                if (input != null) {
+                    if (input.getDurationMinutes() != null) {
+                        totalDurationMinutes += input.getDurationMinutes();
+                    }
+                    if (input.getInteractionCount() != null) {
+                        totalInteractionCount += input.getInteractionCount();
+                    }
+                    if (Boolean.TRUE.equals(input.getUserSummarySubmitted())) {
+                        summarySubmitted = true;
+                    }
+                    if (input.getBehaviorSignals() != null) {
+                        behaviorSignalSet.addAll(input.getBehaviorSignals());
+                    }
+                    if (input.getLearnerReflection() != null && !input.getLearnerReflection().isBlank()) {
+                        hasLearnerReflection = true;
+                    }
+                }
             }
         }
 
-        // 行为信号：目前先从最近一次交互抽取一个简单描述
-        java.util.List<String> behaviorSignals = new java.util.ArrayList<>();
-        if (latestInteraction != null && latestInteraction.getInteractionType() != null) {
+        // 行为信号：优先用 completion 的 behaviorSignals，不足时用最近交互
+        java.util.List<String> behaviorSignals = new java.util.ArrayList<>(behaviorSignalSet);
+        if (behaviorSignals.isEmpty() && latestInteraction != null && latestInteraction.getInteractionType() != null) {
             behaviorSignals.add("最近交互类型: " + latestInteraction.getInteractionType());
         }
 
+        // evidenceHighlights：基于真实证据
         java.util.List<String> evidenceHighlights = new java.util.ArrayList<>();
         evidenceHighlights.add("已完成 " + completedTasks + "/" + totalTasks + " 个任务");
+        if (totalDurationMinutes > 0) {
+            evidenceHighlights.add("总用时 " + totalDurationMinutes + " 分钟");
+        }
+        if (totalInteractionCount > 0) {
+            evidenceHighlights.add("总交互 " + totalInteractionCount + " 次");
+        }
+        if (summarySubmitted) {
+            evidenceHighlights.add("用户已提交自述");
+        }
+        if (hasLearnerReflection) {
+            evidenceHighlights.add("用户有反思记录");
+        }
 
         return ExecutionEvidenceSummary.builder()
                 .totalTasks(totalTasks)
                 .completedTasks(completedTasks)
+                .totalDurationMinutes(totalDurationMinutes > 0 ? totalDurationMinutes : null)
+                .totalInteractionCount(totalInteractionCount > 0 ? totalInteractionCount : null)
+                .summarySubmitted(summarySubmitted)
                 .aggregatedIssueTags(new java.util.ArrayList<>(gapTags))
                 .keyBehaviorSignals(behaviorSignals)
                 .evidenceHighlights(evidenceHighlights)
                 .build();
+    }
+
+    private CompleteTaskRequest parseCompletionInput(String json) {
+        if (json == null || json.isEmpty()) {
+            return null;
+        }
+        try {
+            return jsonSerde.fromJson(json, CompleteTaskRequest.class);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private java.util.List<String> parseStringArrayJson(String json) {

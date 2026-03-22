@@ -4,8 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import navigator.domain.model.TaskBlueprint;
 
+/**
+ * GET /api/sessions/{sessionId}/current-task 响应。
+ * 合同冻结：sessionId, currentTask, progress 为稳定字段。
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -15,6 +18,9 @@ public class CurrentTaskData {
     private CurrentTaskItem currentTask;
     private ProgressItem progress;
 
+    /**
+     * 稳定字段：taskId, title, taskType, goal, completionCriteria, evaluationRubricSummary, scaffoldPolicySummary
+     */
     @Data
     @Builder
     @NoArgsConstructor

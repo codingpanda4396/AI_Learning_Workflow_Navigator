@@ -11,6 +11,7 @@ import navigator.domain.model.ExecutionEvidenceSummary;
 import navigator.domain.model.LearningMethodProfile;
 import navigator.domain.model.LearningReport;
 import navigator.domain.model.NextActionDecision;
+import navigator.domain.model.StructuredLearningGoal;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.repository.TaskMethodProfileRepository;
 import navigator.infrastructure.persistence.serde.JsonSerde;
@@ -96,10 +97,8 @@ public class ReportApplicationService {
             status = ResultStatus.PARTIALLY_ACHIEVED;
         }
 
-        String goalReview = "本轮目标围绕当前学习计划中的链路执行情况进行回顾。";
-        java.util.List<String> completedProgress = java.util.List.of(
-                "已完成 " + completedTasks + "/" + totalTasks + " 个任务"
-        );
+        String goalReview = resolveGoalReview(sessionId, aggregated);
+        java.util.List<String> completedProgress = buildCompletedProgress(execution, completedTasks, totalTasks);
 
         java.util.List<String> unresolvedIssues = execution.getAggregatedIssueTags() != null
                 ? execution.getAggregatedIssueTags()
@@ -140,6 +139,9 @@ public class ReportApplicationService {
         boolean hasGap = execution.getAggregatedIssueTags() != null
                 && !execution.getAggregatedIssueTags().isEmpty();
         boolean methodWeak = methodRollup != null && "LOW".equals(methodRollup.getQuestioningQuality());
+        if (!methodWeak && completedTasks > 0 && !execution.isSummarySubmitted()) {
+            methodWeak = true;
+        }
 
         NextActionType actionType;
         boolean requiresReplan;
@@ -179,6 +181,46 @@ public class ReportApplicationService {
                 .adjustmentSignals(adjustmentSignals)
                 .requiresReplan(requiresReplan)
                 .build();
+    }
+
+    private String resolveGoalReview(String sessionId,
+                                     SessionEvidenceAggregator.AggregatedSessionEvidence aggregated) {
+        StructuredLearningGoal goal = null;
+        var state = store.getSessions().get(sessionId);
+        if (state != null && state.getPlanId() != null) {
+            var preview = store.getPlanPreviews().get(state.getPlanId());
+            if (preview != null && preview.getGoalId() != null) {
+                goal = store.getGoals().get(preview.getGoalId());
+            }
+        }
+        if (goal != null) {
+            String topicSummary = goal.getTopics() != null && !goal.getTopics().isEmpty()
+                    ? String.join("、", goal.getTopics())
+                    : (goal.getSubject() != null ? goal.getSubject() : "");
+            String base = goal.getRawGoalText() != null ? goal.getRawGoalText() : topicSummary;
+            if (!base.isBlank()) {
+                return "本轮目标：" + truncate(base, 80) + "。围绕该学习计划链路的执行情况进行回顾。";
+            }
+        }
+        return "本轮目标围绕当前学习计划中的链路执行情况进行回顾。";
+    }
+
+    private static String truncate(String s, int n) {
+        if (s == null || s.isBlank()) return "";
+        return s.length() <= n ? s.trim() : s.trim().substring(0, n) + "…";
+    }
+
+    private java.util.List<String> buildCompletedProgress(ExecutionEvidenceSummary execution,
+                                                          int completedTasks, int totalTasks) {
+        java.util.List<String> list = new java.util.ArrayList<>();
+        list.add("已完成 " + completedTasks + "/" + totalTasks + " 个任务");
+        if (execution.getTotalDurationMinutes() != null && execution.getTotalDurationMinutes() > 0) {
+            list.add("总用时 " + execution.getTotalDurationMinutes() + " 分钟");
+        }
+        if (execution.getTotalInteractionCount() != null && execution.getTotalInteractionCount() > 0) {
+            list.add("总交互 " + execution.getTotalInteractionCount() + " 次");
+        }
+        return list;
     }
 
     private Long extractNumericId(String id) {

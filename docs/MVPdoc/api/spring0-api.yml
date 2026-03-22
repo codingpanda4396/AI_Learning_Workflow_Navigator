@@ -6,6 +6,21 @@ info:
     Sprint 0 闭环接口文档：
     目标输入 -> 用户诊断 -> 学习规划 -> 任务执行 -> 学习报告 -> Next Action
 
+    ## 任务执行状态流转
+    ORIENT -> EXPLORE -> SELF_EXPLAIN -> CHECK -> PASS | REMEDIAL
+    完成 complete 前须满足：当前任务索引正确、未被重复 complete；
+    若已启用脚手架流程，则须达到 PASS 状态（完成探索、自我解释与微检查）。
+
+    ## complete 前置条件
+    - 当前任务为该 taskId
+    - 未重复 complete
+    - 若存在 TaskExecutionRuntime：state 须为 PASS（即已通过 self-explanation 与 checkpoint）
+
+    ## report 证据来源
+    - evidenceSummary：来自 ExecutionEvidenceSummary.evidenceHighlights（含已完成数、总用时、总交互、用户自述、反思记录）
+    - unresolvedIssues：来自 aggregatedIssueTags
+    - nextActionDecision：依赖 completedTasks、aggregatedIssueTags、learningMethodProfile
+
 servers:
   - url: http://localhost:8080
     description: Local Dev
@@ -237,6 +252,120 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/tasks/{taskId}/scaffold:
+    get:
+      tags: [Task]
+      summary: 获取任务脚手架
+      operationId: getTaskScaffold
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTaskScaffoldResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/tasks/{taskId}/messages:
+    post:
+      tags: [Task]
+      summary: 发送导师对话消息
+      operationId: postTaskMessage
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskMessageRequest'
+            example:
+              sessionId: learn_session_001
+              content: 请解释一下链表是什么
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostTaskMessageResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/tasks/{taskId}/self-explanation:
+    post:
+      tags: [Task]
+      summary: 提交自我解释
+      operationId: postSelfExplanation
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelfExplanationRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostSelfExplanationResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/tasks/{taskId}/checkpoint:
+    post:
+      tags: [Task]
+      summary: 提交微检查答案
+      operationId: postCheckpoint
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckpointRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostCheckpointResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /api/tasks/{taskId}/interactions:
     post:
       tags: [Task]
@@ -427,6 +556,38 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/TaskInteractionData'
+
+    GetTaskScaffoldResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/TaskScaffoldResponse'
+
+    PostTaskMessageResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/TaskMessageResponse'
+
+    PostSelfExplanationResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/SelfExplanationResponse'
+
+    PostCheckpointResponse:
+      allOf:
+        - $ref: '#/components/schemas/GlobalResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/CheckpointResponse'
 
     TaskCompleteResponse:
       allOf:
@@ -994,6 +1155,12 @@ components:
             type: string
         fallbackAction:
           type: string
+        evaluationRubricSummary:
+          type: string
+          description: 来自 ExecutableTaskSpec.evaluationRubric 的摘要
+        scaffoldPolicySummary:
+          type: string
+          description: 来自 ExecutableTaskSpec.scaffoldPolicy 的摘要
 
     SessionProgress:
       type: object
@@ -1048,6 +1215,114 @@ components:
           type: string
         accepted:
           type: boolean
+
+    TaskScaffoldResponse:
+      type: object
+      properties:
+        taskId:
+          type: string
+        taskType:
+          type: string
+        learningObjective:
+          type: string
+        whyThisTask:
+          type: string
+        recommendedAskTemplates:
+          type: array
+          items:
+            type: string
+        completionSignals:
+          type: array
+          items:
+            type: string
+        currentExecutionState:
+          type: string
+          enum: [ORIENT, EXPLORE, SELF_EXPLAIN, CHECK, PASS, REMEDIAL]
+        executionSnapshot:
+          type: object
+          properties:
+            currentState:
+              type: string
+            exploreTurnCount:
+              type: integer
+            checkpointQuestion:
+              type: string
+            canComplete:
+              type: boolean
+        recentMessages:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+              detectedAction:
+                type: string
+
+    TaskMessageRequest:
+      type: object
+      required: [sessionId, content]
+      properties:
+        sessionId:
+          type: string
+        content:
+          type: string
+
+    TaskMessageResponse:
+      type: object
+      properties:
+        assistantReply:
+          type: string
+        detectedAction:
+          type: string
+        taskState:
+          type: string
+        nextSuggestedPrompts:
+          type: array
+          items:
+            type: string
+        fallbackMode:
+          type: string
+          description: NONE|MOCK|TEMPLATE
+
+    SelfExplanationRequest:
+      type: object
+      required: [sessionId, content]
+      properties:
+        sessionId:
+          type: string
+        content:
+          type: string
+
+    SelfExplanationResponse:
+      type: object
+      properties:
+        evaluation:
+          type: string
+        taskState:
+          type: string
+        checkpointQuestion:
+          type: string
+
+    CheckpointRequest:
+      type: object
+      required: [sessionId, answer]
+      properties:
+        sessionId:
+          type: string
+        answer:
+          type: string
+
+    CheckpointResponse:
+      type: object
+      properties:
+        result:
+          type: string
+          enum: [PASS, FAIL]
+        taskState:
+          type: string
 
     TaskCompleteRequest:
       type: object

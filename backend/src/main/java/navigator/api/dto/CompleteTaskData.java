@@ -6,6 +6,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import navigator.domain.model.TaskExecutionRecord;
 
+/**
+ * POST /api/tasks/{taskId}/complete 响应。
+ * 合同冻结：taskExecutionRecord, nextTaskAvailable, nextTaskId, sessionProgress 为稳定字段。
+ */
 @Data
 @Builder
 @NoArgsConstructor

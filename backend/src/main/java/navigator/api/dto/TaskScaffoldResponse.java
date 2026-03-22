@@ -8,6 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * GET /api/tasks/{taskId}/scaffold 响应。
+ * 合同冻结：taskId, recommendedAskTemplates, completionSignals, currentExecutionState 为稳定字段。
+ */
 @Data
 @Builder
 @NoArgsConstructor

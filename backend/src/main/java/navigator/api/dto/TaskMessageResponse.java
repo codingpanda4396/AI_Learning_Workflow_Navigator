@@ -7,6 +7,11 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * POST /api/tasks/{taskId}/messages 响应。
+ * 合同冻结：assistantReply, taskState, detectedAction 为稳定字段。
+ * nextSuggestedPrompts 与 scaffold.recommendedFollowupTemplates 语义对应。
+ */
 @Data
 @Builder
 @NoArgsConstructor
