@@ -204,6 +204,8 @@ export interface CurrentTaskData {
   progress: ProgressItem
 }
 
+export type SelfRatedConfidenceType = 'LOW' | 'MEDIUM' | 'HIGH'
+
 export interface CompleteTaskRequest {
   sessionId: string
   completionStatus: TaskCompletionStatusType
@@ -214,6 +216,12 @@ export interface CompleteTaskRequest {
   detectedIssueTags?: string[]
   behaviorSignals?: string[]
   learnerReflection?: string
+  /** Sprint 4 脚手架任务收束（与后端 TaskClosureValidator 对齐） */
+  summaryText?: string
+  learnedFrameworkPoints?: string[]
+  nextPracticeIntent?: string
+  selfRatedConfidence?: SelfRatedConfidenceType
+  closurePayloadVersion?: string
 }
 
 export interface TaskExecutionRecord {
@@ -241,11 +249,33 @@ export interface CompleteTaskData {
   sessionProgress?: SessionProgressItem
 }
 
+export interface ScaffoldPromptItem {
+  promptId?: string
+  prompt: string
+  intent?: string
+  required: boolean
+}
+
+export interface CognitiveUnitItem {
+  unitId: string
+  order: number
+  label?: string
+  learningObjective: string
+  targetOutcome: string
+  failureSignal: string
+  actionBullets?: string[]
+  prompts?: ScaffoldPromptItem[]
+}
+
 export interface TaskScaffoldResponse {
   taskId: string
   taskType: string
+  /** 任务级认知意图（与 learningObjective 同源时可并存） */
+  taskLevelLearningIntent?: string
   learningObjective: string
   whyThisTask?: string
+  /** 认知推进单元 */
+  cognitiveUnits?: CognitiveUnitItem[]
   recommendedAskTemplates?: string[]
   recommendedFollowupTemplates?: string[]
   selfCheckTemplates?: string[]
