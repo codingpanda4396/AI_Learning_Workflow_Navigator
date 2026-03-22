@@ -1,6 +1,9 @@
 package navigator.application.task;
 
+import navigator.domain.enums.LearningGuidancePhase;
 import navigator.domain.enums.TaskExecutionState;
+import navigator.domain.model.TaskExecutionEvidenceSnapshot;
+import navigator.domain.model.TaskMessageMetadata;
 import navigator.domain.model.TaskScaffold;
 import navigator.infrastructure.persistence.entity.TaskExecutionRuntimeEntity;
 import navigator.infrastructure.persistence.entity.TaskMessageEntity;
@@ -52,6 +55,17 @@ public class TaskExecutionPersistenceService {
         }
         TaskScaffold scaffold = jsonSerde.fromJson(entity.getScaffoldJson(), TaskScaffold.class);
         rt.setScaffold(scaffold);
+        if (entity.getGuidancePhase() != null) {
+            try {
+                rt.setGuidancePhase(LearningGuidancePhase.valueOf(entity.getGuidancePhase()));
+            } catch (IllegalArgumentException ignored) {
+                rt.setGuidancePhase(LearningGuidancePhase.CLARIFY_GOAL);
+            }
+        }
+        if (entity.getEvidenceSnapshotJson() != null && !entity.getEvidenceSnapshotJson().isBlank()) {
+            TaskExecutionEvidenceSnapshot snap = jsonSerde.fromJson(entity.getEvidenceSnapshotJson(), TaskExecutionEvidenceSnapshot.class);
+            rt.setEvidenceSnapshot(snap);
+        }
         // actionHistory is stored as string array; keep safe parsing
         String[] actionNames = jsonSerde.fromJson(entity.getActionHistoryJson(), String[].class);
         if (actionNames != null) {
@@ -81,6 +95,8 @@ public class TaskExecutionPersistenceService {
         entity.setCheckpointQuestion(rt.getCheckpointQuestion());
         entity.setSelfExplanationEvaluation(rt.getSelfExplanationEvaluation());
         entity.setActionHistoryJson(jsonSerde.toJson(rt.getActionHistory().stream().map(Enum::name).toArray(String[]::new)));
+        entity.setGuidancePhase(rt.getGuidancePhase() != null ? rt.getGuidancePhase().name() : null);
+        entity.setEvidenceSnapshotJson(rt.getEvidenceSnapshot() != null ? jsonSerde.toJson(rt.getEvidenceSnapshot()) : null);
         runtimeRepository.saveOrUpdate(entity);
     }
 
@@ -101,6 +117,12 @@ public class TaskExecutionPersistenceService {
     public void appendMessage(String sessionKey, String taskCode, String role, String content,
                               String detectedAction, TaskExecutionState stateBefore, TaskExecutionState stateAfter,
                               String fallbackMode) {
+        appendMessage(sessionKey, taskCode, role, content, detectedAction, stateBefore, stateAfter, fallbackMode, null);
+    }
+
+    public void appendMessage(String sessionKey, String taskCode, String role, String content,
+                              String detectedAction, TaskExecutionState stateBefore, TaskExecutionState stateAfter,
+                              String fallbackMode, TaskMessageMetadata metadata) {
         if (sessionKey == null || taskCode == null || role == null || content == null) {
             return;
         }
@@ -113,6 +135,9 @@ public class TaskExecutionPersistenceService {
         e.setStateBefore(stateBefore != null ? stateBefore.name() : null);
         e.setStateAfter(stateAfter != null ? stateAfter.name() : null);
         e.setFallbackMode(fallbackMode != null ? fallbackMode : "NONE");
+        if (metadata != null) {
+            e.setMetadataJson(jsonSerde.toJson(metadata));
+        }
         e.setCreatedAt(LocalDateTime.now());
         messageRepository.save(e);
     }

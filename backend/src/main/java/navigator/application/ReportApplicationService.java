@@ -142,13 +142,20 @@ public class ReportApplicationService {
         if (!methodWeak && completedTasks > 0 && !execution.isSummarySubmitted()) {
             methodWeak = true;
         }
+        boolean highDirectAnswerDep = methodRollup != null && methodRollup.getDirectAnswerDependencyScore() != null
+                && methodRollup.getDirectAnswerDependencyScore() > 0.55;
 
         NextActionType actionType;
         boolean requiresReplan;
         String reason;
         String nextEntryPoint;
 
-        if (!hasGap && totalTasks > 0 && completedTasks >= totalTasks && !methodWeak) {
+        if (!hasGap && totalTasks > 0 && completedTasks >= totalTasks && highDirectAnswerDep) {
+            actionType = NextActionType.CHANGE_STRATEGY;
+            requiresReplan = false;
+            reason = "任务已完成，但监控到较强「直接要答案」倾向，建议下一轮强化自学表达与脚手架提问。";
+            nextEntryPoint = "优先用推荐问法自练，再在导师引导下纠偏。";
+        } else if (!hasGap && totalTasks > 0 && completedTasks >= totalTasks && !methodWeak) {
             actionType = NextActionType.CONTINUE;
             requiresReplan = false;
             reason = "任务完成度高且未检测到明显缺口，可以继续推进新的目标。";
@@ -219,6 +226,15 @@ public class ReportApplicationService {
         }
         if (execution.getTotalInteractionCount() != null && execution.getTotalInteractionCount() > 0) {
             list.add("总交互 " + execution.getTotalInteractionCount() + " 次");
+        }
+        if (execution.getTotalUserQuestionTurns() != null && execution.getTotalUserQuestionTurns() > 0) {
+            list.add("主动提问轮次累计 " + execution.getTotalUserQuestionTurns());
+        }
+        if (execution.getAvgDirectAnswerDependency() != null && execution.getAvgDirectAnswerDependency() > 0) {
+            list.add("直接答案依赖指数(会话均值) " + String.format("%.2f", execution.getAvgDirectAnswerDependency()));
+        }
+        if (execution.getClosureQualityScore() != null) {
+            list.add("收束完成质量分 " + execution.getClosureQualityScore());
         }
         return list;
     }

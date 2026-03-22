@@ -4,7 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import navigator.domain.enums.SelfRatedConfidence;
 import navigator.domain.enums.TaskCompletionStatus;
+import navigator.domain.model.TaskExecutionEvidenceSnapshot;
 
 import java.util.List;
 
@@ -22,4 +24,15 @@ public class CompleteTaskRequest {
     private List<String> detectedIssueTags;
     private List<String> behaviorSignals;
     private String learnerReflection;
+
+    /** Sprint 4 收束（脚手架任务必填，由 {@link navigator.application.task.TaskClosureValidator} 校验） */
+    private String summaryText;
+    private List<String> learnedFrameworkPoints;
+    private List<String> unresolvedQuestions;
+    private String nextPracticeIntent;
+    private SelfRatedConfidence selfRatedConfidence;
+    private String closurePayloadVersion;
+
+    /** 服务端写入，覆盖客户端伪造 */
+    private TaskExecutionEvidenceSnapshot evidenceSnapshot;
 }

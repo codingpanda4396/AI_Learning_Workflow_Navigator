@@ -4,7 +4,6 @@ import navigator.domain.enums.LearningActionType;
 import navigator.domain.model.LearningMethodProfile;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -61,7 +60,7 @@ public final class LearningMethodProfileAggregator {
             advice.add("保持当前提问节奏，继续用自我复述巩固理解。");
         }
 
-        return LearningMethodProfile.builder()
+        var profileBuilder = LearningMethodProfile.builder()
                 .sessionId(sessionId)
                 .taskId(taskId)
                 .questioningQuality(questioning)
@@ -71,8 +70,15 @@ public final class LearningMethodProfileAggregator {
                 .antiPatternObserved(anti.isEmpty() ? List.of() : anti)
                 .positiveSignals(pos.isEmpty() ? List.of("已参与结构化任务流") : pos)
                 .dominantActionTypes(dominant.isEmpty() ? List.of("GENERIC") : dominant)
-                .nextMethodAdvice(advice)
-                .build();
+                .nextMethodAdvice(advice);
+        if (rt.getEvidenceSnapshot() != null) {
+            var ev = rt.getEvidenceSnapshot();
+            profileBuilder.directAnswerDependencyScore(ev.getDirectAnswerDependencyScore());
+            int n = ev.getCompletedGuidancePhases() != null ? ev.getCompletedGuidancePhases().size() : 0;
+            profileBuilder.guidancePhaseCoverage(n + " phases touched");
+            profileBuilder.hintBurden(ev.getAssistantHintTurns() > ev.getUserInitiatedQuestionTurns() + 2 ? "HIGH" : "OK");
+        }
+        return profileBuilder.build();
     }
 
     /** 会话级汇总（报告用） */
@@ -95,6 +101,9 @@ public final class LearningMethodProfileAggregator {
         int self = 0, pass = 0;
         List<String> allAnti = new ArrayList<>();
         List<String> allAdvice = new ArrayList<>();
+        double depSum = 0;
+        int depC = 0;
+        boolean anyHintHigh = false;
         for (LearningMethodProfile p : tasks) {
             if ("GOOD".equals(p.getQuestioningQuality())) goodQ++;
             else if ("BASIC".equals(p.getQuestioningQuality())) basicQ++;
@@ -102,6 +111,13 @@ public final class LearningMethodProfileAggregator {
             if (Boolean.TRUE.equals(p.getCheckPassed())) pass++;
             if (p.getAntiPatternObserved() != null) allAnti.addAll(p.getAntiPatternObserved());
             if (p.getNextMethodAdvice() != null) allAdvice.addAll(p.getNextMethodAdvice());
+            if (p.getDirectAnswerDependencyScore() != null) {
+                depSum += p.getDirectAnswerDependencyScore();
+                depC++;
+            }
+            if ("HIGH".equals(p.getHintBurden())) {
+                anyHintHigh = true;
+            }
         }
         String q = goodQ >= tasks.size() / 2 ? "GOOD" : (basicQ + goodQ > 0 ? "BASIC" : "LOW");
         return LearningMethodProfile.builder()
@@ -118,6 +134,9 @@ public final class LearningMethodProfileAggregator {
                         "微检查通过任务：" + pass))
                 .dominantActionTypes(List.of())
                 .nextMethodAdvice(allAdvice.stream().distinct().limit(3).toList())
+                .directAnswerDependencyScore(depC > 0 ? depSum / depC : null)
+                .guidancePhaseCoverage("session rollup")
+                .hintBurden(anyHintHigh ? "HIGH" : "OK")
                 .build();
     }
 }

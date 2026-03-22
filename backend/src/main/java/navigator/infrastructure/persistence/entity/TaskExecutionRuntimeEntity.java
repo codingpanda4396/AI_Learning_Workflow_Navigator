@@ -20,6 +20,8 @@ public class TaskExecutionRuntimeEntity {
     private String checkpointQuestion;
     private String selfExplanationEvaluation;
     private String actionHistoryJson;
+    private String guidancePhase;
+    private String evidenceSnapshotJson;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

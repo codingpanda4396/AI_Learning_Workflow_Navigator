@@ -37,6 +37,7 @@ public class GlobalExceptionHandler {
             case PLAN_ALREADY_COMMITTED:
             case TASK_EXECUTION_NOT_READY_FOR_COMPLETE:
             case INVALID_TASK_EXECUTION_STATE:
+            case TASK_CLOSURE_INCOMPLETE:
                 return HttpStatus.CONFLICT;
             default:
                 return HttpStatus.BAD_REQUEST;

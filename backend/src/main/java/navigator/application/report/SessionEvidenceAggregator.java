@@ -2,6 +2,7 @@ package navigator.application.report;
 
 import navigator.api.dto.CompleteTaskRequest;
 import navigator.domain.model.ExecutionEvidenceSummary;
+import navigator.domain.model.TaskExecutionEvidenceSnapshot;
 import navigator.infrastructure.persistence.entity.LearningPlanEntity;
 import navigator.infrastructure.persistence.entity.SessionTaskEntity;
 import navigator.infrastructure.persistence.entity.TaskCompletionEntity;
@@ -68,6 +69,11 @@ public class SessionEvidenceAggregator {
         boolean summarySubmitted = false;
         Set<String> behaviorSignalSet = new LinkedHashSet<>();
         boolean hasLearnerReflection = false;
+        int totalUserQuestions = 0;
+        int totalVague = 0;
+        double depSum = 0.0;
+        int depCount = 0;
+        int closureOkTasks = 0;
         if (completions != null) {
             for (TaskCompletionEntity completion : completions) {
                 java.util.List<String> tags = parseStringArrayJson(completion.getDetectedGapTagsJson());
@@ -90,6 +96,16 @@ public class SessionEvidenceAggregator {
                     }
                     if (input.getLearnerReflection() != null && !input.getLearnerReflection().isBlank()) {
                         hasLearnerReflection = true;
+                    }
+                    TaskExecutionEvidenceSnapshot ev = input.getEvidenceSnapshot();
+                    if (ev != null) {
+                        totalUserQuestions += ev.getUserInitiatedQuestionTurns();
+                        totalVague += ev.getVagueUserReplyCount();
+                        depSum += ev.getDirectAnswerDependencyScore();
+                        depCount++;
+                    }
+                    if (closurePayloadOk(input)) {
+                        closureOkTasks++;
                     }
                 }
             }
@@ -117,6 +133,11 @@ public class SessionEvidenceAggregator {
             evidenceHighlights.add("用户有反思记录");
         }
 
+        Integer closureScore = null;
+        if (completedTasks > 0) {
+            closureScore = (int) Math.round(100.0 * closureOkTasks / completedTasks);
+        }
+
         return ExecutionEvidenceSummary.builder()
                 .totalTasks(totalTasks)
                 .completedTasks(completedTasks)
@@ -126,7 +147,27 @@ public class SessionEvidenceAggregator {
                 .aggregatedIssueTags(new java.util.ArrayList<>(gapTags))
                 .keyBehaviorSignals(behaviorSignals)
                 .evidenceHighlights(evidenceHighlights)
+                .totalUserQuestionTurns(totalUserQuestions > 0 ? totalUserQuestions : null)
+                .totalVagueReplies(totalVague > 0 ? totalVague : null)
+                .avgDirectAnswerDependency(depCount > 0 ? depSum / depCount : null)
+                .closureQualityScore(closureScore)
                 .build();
+    }
+
+    private static boolean closurePayloadOk(CompleteTaskRequest input) {
+        if (input == null) {
+            return false;
+        }
+        String s = input.getSummaryText();
+        if (s == null || s.trim().length() < 10) {
+            return false;
+        }
+        java.util.List<String> fw = input.getLearnedFrameworkPoints();
+        if (fw == null || fw.stream().filter(x -> x != null && !x.isBlank()).count() < 2) {
+            return false;
+        }
+        String n = input.getNextPracticeIntent();
+        return n != null && !n.isBlank();
     }
 
     private CompleteTaskRequest parseCompletionInput(String json) {

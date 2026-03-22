@@ -19,5 +19,7 @@ public enum BusinessErrorCode {
     /** 已启用任务脚手架流程但未到达 PASS，不允许 complete */
     TASK_EXECUTION_NOT_READY_FOR_COMPLETE,
     /** 当前执行态不允许该操作 */
-    INVALID_TASK_EXECUTION_STATE
+    INVALID_TASK_EXECUTION_STATE,
+    /** 任务收束信息不满足要求（summary / 框架点等） */
+    TASK_CLOSURE_INCOMPLETE
 }

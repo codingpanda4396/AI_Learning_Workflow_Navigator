@@ -146,7 +146,13 @@ class Sprint3Phase6MainLinkRegressionTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.result").value("PASS"));
 
-            String completeBody = "{\"sessionId\":\"" + sessionId + "\",\"completionStatus\":\"COMPLETED\",\"durationMinutes\":5,\"interactionCount\":2,\"userSummarySubmitted\":true,\"behaviorSignals\":[\"ASKED_FOR_EXAMPLE\"]}";
+            String completeBody = "{\"sessionId\":\"" + sessionId
+                    + "\",\"completionStatus\":\"COMPLETED\",\"durationMinutes\":5,\"interactionCount\":2"
+                    + ",\"userSummarySubmitted\":true,\"behaviorSignals\":[\"ASKED_FOR_EXAMPLE\"]"
+                    + ",\"summaryText\":\"本任务理解了链表结构与操作要点，能用自己的话复述。\""
+                    + ",\"learnedFrameworkPoints\":[\"指针串联节点\",\"插入改指针\"]"
+                    + ",\"unresolvedQuestions\":[]"
+                    + ",\"nextPracticeIntent\":\"练习更多链表题\"}";
             String completeResp = mvc.perform(post("/api/tasks/" + taskId + "/complete").contentType(MediaType.APPLICATION_JSON).content(completeBody))
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();

@@ -20,4 +20,10 @@ public class ExecutionEvidenceSummary {
     private List<String> aggregatedIssueTags;
     private List<String> keyBehaviorSignals;
     private List<String> evidenceHighlights;
+
+    private Integer totalUserQuestionTurns;
+    private Integer totalVagueReplies;
+    private Double avgDirectAnswerDependency;
+    /** 0–100 规则分 */
+    private Integer closureQualityScore;
 }

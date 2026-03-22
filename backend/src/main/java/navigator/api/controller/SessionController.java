@@ -3,6 +3,7 @@ package navigator.api.controller;
 import navigator.api.GlobalResponse;
 import navigator.api.dto.ConfirmNextActionRequest;
 import navigator.api.dto.CurrentTaskData;
+import navigator.api.dto.CurrentTaskGuidanceData;
 import navigator.api.dto.NextActionConfirmData;
 import navigator.api.dto.ReportData;
 import navigator.application.ReportApplicationService;
@@ -29,6 +30,13 @@ public class SessionController {
     @GetMapping("/{sessionId}/current-task")
     public GlobalResponse<CurrentTaskData> getCurrentTask(@PathVariable String sessionId) {
         CurrentTaskData data = executionService.getCurrentTask(sessionId);
+        if (data == null) return GlobalResponse.notFound("session or current task not found");
+        return GlobalResponse.ok(data);
+    }
+
+    @GetMapping("/{sessionId}/current-task-guidance")
+    public GlobalResponse<CurrentTaskGuidanceData> getCurrentTaskGuidance(@PathVariable String sessionId) {
+        CurrentTaskGuidanceData data = executionService.getCurrentTaskGuidance(sessionId);
         if (data == null) return GlobalResponse.notFound("session or current task not found");
         return GlobalResponse.ok(data);
     }

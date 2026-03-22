@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import navigator.domain.model.TaskExecutionEvidenceDelta;
+
 import java.util.List;
 
 /**
@@ -22,4 +24,10 @@ public class TaskMessageResponse {
     private String taskState;
     private List<String> nextSuggestedPrompts;
     private String fallbackMode;
+
+    private String guidanceIntent;
+    private String guidancePhase;
+    private TaskExecutionEvidenceDelta evidenceDelta;
+    private Boolean whetherCanComplete;
+    private List<RecommendedUserActionItem> recommendedUserActions;
 }

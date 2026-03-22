@@ -2,6 +2,7 @@ package navigator.application;
 
 import navigator.api.dto.CompleteTaskData;
 import navigator.api.dto.CurrentTaskData;
+import navigator.api.dto.CurrentTaskGuidanceData;
 import navigator.api.dto.TaskInteractionData;
 import navigator.application.guard.SessionStateGuard;
 import navigator.application.guard.TaskProgressGuard;
@@ -11,8 +12,11 @@ import navigator.domain.enums.TaskCompletionStatus;
 import navigator.domain.model.ExecutableTaskSpec;
 import navigator.domain.model.LearningPlanPreview;
 import navigator.application.task.LearningMethodProfileAggregator;
+import navigator.application.task.TaskClosureValidator;
+import navigator.application.task.TaskExecutionFlowService;
 import navigator.application.task.TaskExecutionPersistenceService;
 import navigator.application.task.TaskExecutionRuntime;
+import navigator.application.task.guidance.TaskExecutionEvidenceAccumulator;
 import navigator.domain.model.LearningMethodProfile;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskExecutionRecord;
@@ -41,6 +45,8 @@ public class ExecutionApplicationService {
     private final TaskExecutionPersistenceService taskExecutionPersistenceService;
     private final TaskExecutionEventIngestService taskExecutionEventIngestService;
     private final JsonSerde jsonSerde;
+    private final TaskExecutionFlowService taskExecutionFlowService;
+    private final TaskClosureValidator taskClosureValidator;
 
     public ExecutionApplicationService(InMemoryStore store,
                                        SessionStateGuard sessionStateGuard,
@@ -50,7 +56,9 @@ public class ExecutionApplicationService {
                                        TaskMethodProfileRepository taskMethodProfileRepository,
                                        TaskExecutionPersistenceService taskExecutionPersistenceService,
                                        TaskExecutionEventIngestService taskExecutionEventIngestService,
-                                       JsonSerde jsonSerde) {
+                                       JsonSerde jsonSerde,
+                                       TaskExecutionFlowService taskExecutionFlowService,
+                                       TaskClosureValidator taskClosureValidator) {
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
         this.taskProgressGuard = taskProgressGuard;
@@ -60,6 +68,12 @@ public class ExecutionApplicationService {
         this.taskExecutionPersistenceService = taskExecutionPersistenceService;
         this.taskExecutionEventIngestService = taskExecutionEventIngestService;
         this.jsonSerde = jsonSerde;
+        this.taskExecutionFlowService = taskExecutionFlowService;
+        this.taskClosureValidator = taskClosureValidator;
+    }
+
+    public CurrentTaskGuidanceData getCurrentTaskGuidance(String sessionId) {
+        return taskExecutionFlowService.getCurrentTaskGuidance(sessionId);
     }
 
     public CurrentTaskData getCurrentTask(String sessionId) {
@@ -112,6 +126,15 @@ public class ExecutionApplicationService {
     public CompleteTaskData completeTask(String taskId, navigator.api.dto.CompleteTaskRequest request) {
         String sessionId = request.getSessionId();
         taskProgressGuard.requireTaskCanComplete(sessionId, taskId);
+        taskClosureValidator.validateIfRuntimeTracked(sessionId, taskId, request);
+        String rtKey = InMemoryStore.taskRuntimeKey(sessionId, taskId);
+        TaskExecutionRuntime rtMerge = store.getTaskExecutionRuntimes().get(rtKey);
+        if (rtMerge == null) {
+            rtMerge = taskExecutionPersistenceService.loadRuntime(sessionId, taskId);
+        }
+        if (rtMerge != null) {
+            request.setEvidenceSnapshot(TaskExecutionEvidenceAccumulator.copySnapshot(rtMerge));
+        }
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
         TaskBlueprint blueprint = resolveBlueprint(state.getPlanId(), taskId);
         String taskTypeName = blueprint != null && blueprint.getTaskType() != null ? blueprint.getTaskType().name() : "CONCEPT_EXPLAIN";
@@ -127,13 +150,8 @@ public class ExecutionApplicationService {
                 .behaviorSignals(request.getBehaviorSignals())
                 .learnerReflection(request.getLearnerReflection())
                 .build();
-        String rtKey = InMemoryStore.taskRuntimeKey(sessionId, taskId);
-        TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(rtKey);
-        if (rt == null) {
-            rt = taskExecutionPersistenceService.loadRuntime(sessionId, taskId);
-        }
-        if (rt != null) {
-            LearningMethodProfile profile = LearningMethodProfileAggregator.aggregate(sessionId, taskId, rt);
+        if (rtMerge != null) {
+            LearningMethodProfile profile = LearningMethodProfileAggregator.aggregate(sessionId, taskId, rtMerge);
             store.getSessionMethodProfiles().computeIfAbsent(sessionId, k -> new ArrayList<>()).add(profile);
             TaskMethodProfileEntity e = new TaskMethodProfileEntity();
             e.setSessionKey(sessionId);

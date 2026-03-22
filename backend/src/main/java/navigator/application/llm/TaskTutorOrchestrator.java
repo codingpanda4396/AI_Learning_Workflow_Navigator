@@ -3,8 +3,10 @@ package navigator.application.llm;
 import navigator.application.task.TaskExecutionContext;
 import navigator.application.task.TaskExecutionRuntime;
 import navigator.domain.enums.FeedbackStyle;
+import navigator.domain.enums.GuidanceIntent;
 import navigator.domain.enums.LearningActionType;
 import navigator.domain.enums.TimeBudget;
+import navigator.domain.model.GuidanceDecision;
 import navigator.domain.model.*;
 import org.springframework.stereotype.Component;
 
@@ -20,31 +22,50 @@ public class TaskTutorOrchestrator {
     private final MockLlmGateway mockLlmGateway;
     private final OpenAiCompatibleLlmGateway openAiCompatibleLlmGateway;
     private final LlmProperties llmProperties;
+    private final TutorPromptBuilder tutorPromptBuilder;
 
     public TaskTutorOrchestrator(MockLlmGateway mockLlmGateway,
                                  OpenAiCompatibleLlmGateway openAiCompatibleLlmGateway,
-                                 LlmProperties llmProperties) {
+                                 LlmProperties llmProperties,
+                                 TutorPromptBuilder tutorPromptBuilder) {
         this.mockLlmGateway = mockLlmGateway;
         this.openAiCompatibleLlmGateway = openAiCompatibleLlmGateway;
         this.llmProperties = llmProperties;
+        this.tutorPromptBuilder = tutorPromptBuilder;
     }
 
-    public TutorTurnResult exploreTurn(TaskExecutionContext ctx, TaskExecutionRuntime rt, String userInput, LearningActionType action) {
+    public TutorTurnResult exploreTurn(TaskExecutionContext ctx, TaskExecutionRuntime rt, String userInput,
+                                       LearningActionType action, GuidanceDecision guidanceDecision) {
         String goal = resolveGoal(ctx);
         String completion = resolveCompletionCriteria(ctx);
         String boundary = resolveBoundary(ctx);
         String focus = resolveExplanationFocus(ctx);
         String topics = resolveTopics(ctx);
         String timeConstraint = resolveTimeConstraint(ctx);
-        String system = "PHASE=EXECUTION/EXPLORE\n" +
-                "GOAL=" + goal + "\n" +
-                (completion.isBlank() ? "" : ("COMPLETION_CRITERIA=" + completion + "\n")) +
-                (focus.isBlank() ? "" : ("EXPLANATION_FOCUS=" + focus + "\n")) +
-                (topics.isBlank() ? "" : ("TOPICS=" + topics + "\n")) +
-                (timeConstraint.isBlank() ? "" : ("TIME_CONSTRAINT=" + timeConstraint + "\n")) +
-                "BOUNDARY=" + boundary + "\n" +
-                "OUTPUT=plain_text";
-        LlmCall call = callLlm(system, userInput);
+
+        GuidanceDecision gd = guidanceDecision != null ? guidanceDecision : GuidanceDecision.builder().build();
+        if (gd.getPhase() == null && rt.getGuidancePhase() != null) {
+            gd.setPhase(rt.getGuidancePhase());
+        }
+        if (gd.getIntent() == null) {
+            gd.setIntent(GuidanceIntent.ASK_CLARIFYING_QUESTION);
+        }
+        String baseSystem = tutorPromptBuilder.buildExploreSystemPrompt(ctx, rt, gd, goal, completion, boundary);
+        String system = baseSystem
+                + (focus.isBlank() ? "" : "EXPLANATION_FOCUS=" + focus + "\n")
+                + (topics.isBlank() ? "" : "TOPICS=" + topics + "\n")
+                + (timeConstraint.isBlank() ? "" : "TIME_CONSTRAINT=" + timeConstraint + "\n");
+
+        String forced = gd.getPromptSlots() != null ? gd.getPromptSlots().get("forced_reply") : null;
+        LlmCall call;
+        if (forced != null && !forced.isBlank()) {
+            call = new LlmCall(forced, "TEMPLATE");
+        } else if (gd.getIntent() == GuidanceIntent.REDIRECT_OFF_TASK && action == LearningActionType.OFF_TOPIC) {
+            call = new LlmCall("我们先回到当前任务：" + truncate(goal, 60) + "。你可以从上面的推荐问法里选一句开始。", "TEMPLATE");
+        } else {
+            call = callLlm(system, userInput);
+        }
+
         String reply = call.reply;
         String fallbackMode = call.fallbackMode;
         List<String> prompts = new ArrayList<>();
@@ -52,12 +73,8 @@ public class TaskTutorOrchestrator {
             prompts.addAll(rt.getScaffold().getRecommendedFollowupTemplates());
         }
         prompts.add("我这样理解对吗：……");
-        if (action == LearningActionType.SEEK_DIRECT_ANSWER) {
-            reply = "直接给答案不利于形成自己的理解。请先试着用一句话说出你卡住的点，我们再从最小例子切入。";
-            fallbackMode = "TEMPLATE";
-        }
-        if (action == LearningActionType.OFF_TOPIC) {
-            reply = "我们先回到当前任务：" + truncate(goal, 60) + "。你可以从上面的推荐问法里选一句开始。";
+        if (!gd.isAllowSubstantiveAnswer() && looksLikeCompleteSolutionLeak(reply)) {
+            reply = "为避免代替你完成整题，我只给方向：先说出已知条件与目标，再尝试一步推理。你现在卡在哪一小步？";
             fallbackMode = "TEMPLATE";
         }
         return TutorTurnResult.builder()
@@ -143,6 +160,17 @@ public class TaskTutorOrchestrator {
     private static String truncate(String s, int n) {
         if (s == null) return "";
         return s.length() <= n ? s : s.substring(0, n) + "…";
+    }
+
+    /** 轻量启发式：疑似完整解答泄题时降级 */
+    private static boolean looksLikeCompleteSolutionLeak(String reply) {
+        if (reply == null || reply.length() < 80) {
+            return false;
+        }
+        String t = reply;
+        boolean manySteps = t.split("\\n\\s*\\d+\\.").length >= 4;
+        boolean answerPhrase = t.contains("因此答案") || t.contains("最终答案") || t.contains("答案是");
+        return manySteps || (answerPhrase && reply.length() > 200);
     }
 
     private record LlmCall(String reply, String fallbackMode) {

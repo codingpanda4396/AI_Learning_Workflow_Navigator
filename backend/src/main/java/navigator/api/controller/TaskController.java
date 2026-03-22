@@ -10,6 +10,7 @@ import navigator.api.dto.SelfExplanationRequest;
 import navigator.api.dto.SelfExplanationResponse;
 import navigator.api.dto.TaskInteractionData;
 import navigator.api.dto.TaskInteractionRequest;
+import navigator.api.dto.TaskExecutionSummaryData;
 import navigator.api.dto.TaskMessageRequest;
 import navigator.api.dto.TaskMessageResponse;
 import navigator.api.dto.TaskScaffoldResponse;
@@ -47,9 +48,15 @@ public class TaskController {
     public GlobalResponse<TaskMessageResponse> postMessage(
             @PathVariable String taskId,
             @Valid @RequestBody TaskMessageRequest request) {
-        TaskMessageResponse data = taskExecutionFlowService.postMessage(
-                taskId, request.getSessionId(), request.getContent());
+        TaskMessageResponse data = taskExecutionFlowService.postMessage(taskId, request);
         return GlobalResponse.ok(data);
+    }
+
+    @GetMapping("/{taskId}/execution-summary")
+    public GlobalResponse<TaskExecutionSummaryData> getExecutionSummary(
+            @PathVariable String taskId,
+            @RequestParam String sessionId) {
+        return GlobalResponse.ok(taskExecutionFlowService.getExecutionSummary(sessionId, taskId));
     }
 
     @PostMapping("/{taskId}/self-explanation")

@@ -25,4 +25,11 @@ public class LearningMethodProfile {
     private List<String> positiveSignals;
     private List<String> dominantActionTypes;
     private List<String> nextMethodAdvice;
+
+    /** Sprint 4：0–1，来自规则累计 */
+    private Double directAnswerDependencyScore;
+    /** 如 "5 phases" */
+    private String guidancePhaseCoverage;
+    /** 提示负担：OK / HIGH */
+    private String hintBurden;
 }

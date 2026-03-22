@@ -17,6 +17,7 @@ public class TaskMessageEntity {
     private String stateBefore;
     private String stateAfter;
     private String fallbackMode;
+    private String metadataJson;
     private LocalDateTime createdAt;
 }
 
