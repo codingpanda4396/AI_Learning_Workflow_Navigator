@@ -23,10 +23,12 @@ import navigator.domain.enums.GuidanceIntent;
 import navigator.domain.enums.LearningActionType;
 import navigator.domain.enums.LearningGuidancePhase;
 import navigator.domain.enums.TaskExecutionState;
+import navigator.domain.model.CognitiveUnit;
 import navigator.domain.model.GuidanceDecision;
 import navigator.domain.model.TaskMessageMetadata;
 import navigator.domain.model.LearningPlanPreview;
 import navigator.domain.model.LearnerStrategyProfile;
+import navigator.domain.model.ScaffoldPrompt;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskScaffold;
 import navigator.domain.model.ExecutableTaskSpec;
@@ -111,6 +113,7 @@ public class TaskExecutionFlowService {
         } else {
             rt.getScaffold().setCurrentExecutionState(rt.getState().name());
         }
+        ensureScaffoldCognitiveUnits(sessionId, taskId, rt);
         TaskExecutionEvidenceAccumulator.ensureSnapshot(rt);
         persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         return toScaffoldResponse(sessionId, taskId, rt);
@@ -142,6 +145,7 @@ public class TaskExecutionFlowService {
             }
             transition(sessionId, taskId, rt, TaskExecutionState.ORIENT, "lazy_scaffold");
         }
+        ensureScaffoldCognitiveUnits(sessionId, taskId, rt);
         TaskExecutionEvidenceAccumulator.ensureSnapshot(rt);
         LearningActionType action = actionDetector.detect(content);
         rt.recordAction(action);
@@ -274,6 +278,7 @@ public class TaskExecutionFlowService {
             }
             store.getTaskExecutionRuntimes().put(key, rt);
         }
+        ensureScaffoldCognitiveUnits(sessionId, taskId, rt);
         TaskExecutionState st = rt.getState();
         if (st != TaskExecutionState.EXPLORE && st != TaskExecutionState.REMEDIAL) {
             throw new BusinessException(BusinessErrorCode.INVALID_TASK_EXECUTION_STATE,
@@ -315,7 +320,7 @@ public class TaskExecutionFlowService {
                 : List.of("解释偏短，请结合任务目标补充关键概念或步骤");
         persistenceService.appendMessage(sessionId, taskId, "SYSTEM",
                 "SELF_EXPLAIN evaluation=WEAK", null, TaskExecutionState.SELF_EXPLAIN, TaskExecutionState.REMEDIAL, "NONE");
-            persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
+        persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         return SelfExplanationResponse.builder()
                 .evaluation("WEAK")
                 .missingPoints(missingPoints)
@@ -336,6 +341,7 @@ public class TaskExecutionFlowService {
             }
             store.getTaskExecutionRuntimes().put(key, rt);
         }
+        ensureScaffoldCognitiveUnits(sessionId, taskId, rt);
         rt.recordAction(LearningActionType.ANSWER_CHECK);
         TaskExecutionContext ctx = contextAssembler.assemble(sessionId, taskId);
         ExecutableTaskSpec spec = ctx != null ? ctx.getExecutableTaskSpec() : null;
@@ -390,8 +396,10 @@ public class TaskExecutionFlowService {
         return TaskScaffoldResponse.builder()
                 .taskId(s.getTaskId())
                 .taskType(s.getTaskType())
+                .taskLevelLearningIntent(s.getTaskLevelLearningIntent())
                 .learningObjective(s.getLearningObjective())
                 .whyThisTask(s.getWhyThisTask())
+                .cognitiveUnits(mapCognitiveUnits(s.getCognitiveUnits()))
                 .recommendedAskTemplates(s.getRecommendedAskTemplates())
                 .recommendedFollowupTemplates(s.getRecommendedFollowupTemplates())
                 .selfCheckTemplates(s.getSelfCheckTemplates())
@@ -412,6 +420,51 @@ public class TaskExecutionFlowService {
                         .createdAt(m.getCreatedAt())
                         .build()).toList())
                 .build();
+    }
+
+    private void ensureScaffoldCognitiveUnits(String sessionId, String taskId, TaskExecutionRuntime rt) {
+        if (rt == null || rt.getScaffold() == null) {
+            return;
+        }
+        TaskBlueprint bp = resolveBlueprint(sessionId, taskId);
+        if (bp == null) {
+            return;
+        }
+        TaskScaffoldFactory.ensureCognitiveUnits(rt.getScaffold(), bp, resolveStrategyProfile(sessionId));
+    }
+
+    private List<TaskScaffoldResponse.CognitiveUnitItem> mapCognitiveUnits(List<CognitiveUnit> units) {
+        if (units == null || units.isEmpty()) {
+            return null;
+        }
+        return units.stream().map(this::mapCognitiveUnit).toList();
+    }
+
+    private TaskScaffoldResponse.CognitiveUnitItem mapCognitiveUnit(CognitiveUnit u) {
+        return TaskScaffoldResponse.CognitiveUnitItem.builder()
+                .unitId(u.getUnitId())
+                .order(u.getOrder())
+                .label(u.getLabel())
+                .learningObjective(u.getLearningObjective())
+                .targetOutcome(u.getTargetOutcome())
+                .failureSignal(u.getFailureSignal())
+                .actionBullets(u.getActionBullets())
+                .prompts(mapScaffoldPromptItems(u.getPrompts()))
+                .build();
+    }
+
+    private List<TaskScaffoldResponse.ScaffoldPromptItem> mapScaffoldPromptItems(List<ScaffoldPrompt> prompts) {
+        if (prompts == null) {
+            return List.of();
+        }
+        return prompts.stream()
+                .map(p -> TaskScaffoldResponse.ScaffoldPromptItem.builder()
+                        .promptId(p.getPromptId())
+                        .prompt(p.getPrompt())
+                        .intent(p.getIntent() != null ? p.getIntent().name() : null)
+                        .required(p.isRequired())
+                        .build())
+                .toList();
     }
 
     private TaskBlueprint requireBlueprint(String sessionId, String taskId) {
