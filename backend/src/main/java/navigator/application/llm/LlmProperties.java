@@ -29,6 +29,7 @@ public class LlmProperties {
      */
     private String model = "gpt-4.1-mini";
 
-    private int timeoutMs = 8000;
+    /** HTTP 读超时（等完整响应）；连接超时在网关内 capped 为 min(本值, 15s)。 */
+    private int timeoutMs = 60000;
 }
 

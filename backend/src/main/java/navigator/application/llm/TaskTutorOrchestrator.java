@@ -7,7 +7,10 @@ import navigator.domain.enums.GuidanceIntent;
 import navigator.domain.enums.LearningActionType;
 import navigator.domain.enums.TimeBudget;
 import navigator.domain.model.GuidanceDecision;
+import jakarta.annotation.PostConstruct;
 import navigator.domain.model.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -18,6 +21,8 @@ import java.util.List;
  */
 @Component
 public class TaskTutorOrchestrator {
+
+    private static final Logger log = LoggerFactory.getLogger(TaskTutorOrchestrator.class);
 
     private final MockLlmGateway mockLlmGateway;
     private final OpenAiCompatibleLlmGateway openAiCompatibleLlmGateway;
@@ -32,6 +37,20 @@ public class TaskTutorOrchestrator {
         this.openAiCompatibleLlmGateway = openAiCompatibleLlmGateway;
         this.llmProperties = llmProperties;
         this.tutorPromptBuilder = tutorPromptBuilder;
+    }
+
+    @PostConstruct
+    void logLlmBindingSummary() {
+        if (llmProperties == null) {
+            return;
+        }
+        boolean keyOk = llmProperties.getApiKey() != null && !llmProperties.getApiKey().isBlank();
+        log.info("navigator.llm: enabled={} baseUrl={} model={} apiKeyConfigured={} timeoutMs={}",
+                llmProperties.isEnabled(),
+                llmProperties.getBaseUrl(),
+                llmProperties.getModel(),
+                keyOk,
+                llmProperties.getTimeoutMs());
     }
 
     public TutorTurnResult exploreTurn(TaskExecutionContext ctx, TaskExecutionRuntime rt, String userInput,
@@ -178,12 +197,23 @@ public class TaskTutorOrchestrator {
 
     private LlmCall callLlm(String system, String userInput) {
         if (llmProperties != null && llmProperties.isEnabled()) {
+            int sysLen = system != null ? system.length() : 0;
+            int userLen = userInput != null ? userInput.length() : 0;
+            log.debug("LLM chat.completions: invoking provider baseUrl={} model={} systemChars={} userChars={}",
+                    llmProperties.getBaseUrl(), llmProperties.getModel(), sysLen, userLen);
             try {
-                return new LlmCall(openAiCompatibleLlmGateway.generateReply(system, userInput), "NONE");
+                String reply = openAiCompatibleLlmGateway.generateReply(system, userInput);
+                log.debug("LLM chat.completions: success fallbackMode=NONE replyChars={}",
+                        reply != null ? reply.length() : 0);
+                return new LlmCall(reply, "NONE");
             } catch (Exception ex) {
+                log.warn("LLM chat.completions: provider failed, using MOCK fallback — {}: {}",
+                        ex.getClass().getSimpleName(), ex.getMessage());
+                log.debug("LLM chat.completions: provider failure detail", ex);
                 return new LlmCall(mockLlmGateway.generateReply(system, userInput), "MOCK");
             }
         }
+        log.debug("LLM chat.completions: navigator.llm.enabled=false, using MOCK (no HTTP call)");
         return new LlmCall(mockLlmGateway.generateReply(system, userInput), "MOCK");
     }
 }
