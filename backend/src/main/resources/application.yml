@@ -31,4 +31,4 @@ navigator:
     baseUrl: ${NAVIGATOR_LLM_BASE_URL:https://api.openai.com}
     apiKey: ${NAVIGATOR_LLM_API_KEY:}
     model: ${NAVIGATOR_LLM_MODEL:gpt-4.1-mini}
-    timeoutMs: ${NAVIGATOR_LLM_TIMEOUT_MS:8000}
+    timeoutMs: ${NAVIGATOR_LLM_TIMEOUT_MS:60000}

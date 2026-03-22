@@ -8,10 +8,18 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://8.145.55.7:5432/ai_learning_workflow_navigator}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:439695}
+    hikari:
+      # 远端库/LB 常先回收空闲连接；短于对端 idle 可避免「Failed to validate connection … closed」
+      max-lifetime: 300000
 
   flyway:
     # local 环境避免被历史 checksum 阻断；远端/CI 环境建议保持默认 true
     validate-on-migrate: false
+
+logging:
+  level:
+    # 本地排查 LLM：每次 chat.completions 请求/响应摘要（不含 apiKey）
+    navigator.application.llm: DEBUG
 
 navigator:
   llm:
@@ -20,5 +28,6 @@ navigator:
     baseUrl: https://dashscope.aliyuncs.com/compatible-mode
     apiKey: ${NAVIGATOR_LLM_API_KEY:sk-632cf870688143a8afde59259c20501d}
     model: qwen3.5-plus
-    timeoutMs: 8000
+    # 云端首包常 >8s，过短会 Read timed out 并降级 MOCK
+    timeoutMs: ${NAVIGATOR_LLM_TIMEOUT_MS:60000}
 

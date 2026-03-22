@@ -65,7 +65,12 @@ class Sprint3TaskExecutionFlowTest {
         mvc.perform(get("/api/tasks/" + taskId + "/scaffold").param("sessionId", sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.currentExecutionState").value("ORIENT"))
-                .andExpect(jsonPath("$.data.recommendedAskTemplates").isArray());
+                .andExpect(jsonPath("$.data.recommendedAskTemplates").isArray())
+                .andExpect(jsonPath("$.data.cognitiveUnits").isArray())
+                .andExpect(jsonPath("$.data.cognitiveUnits.length()").value(4))
+                .andExpect(jsonPath("$.data.cognitiveUnits[0].unitId").value("understand"))
+                .andExpect(jsonPath("$.data.cognitiveUnits[1].prompts[0].required").value(true))
+                .andExpect(jsonPath("$.data.taskLevelLearningIntent").exists());
 
         String msgBody = "{\"sessionId\":\"" + sessionId + "\",\"content\":\"请解释一下链表是什么\"}";
         mvc.perform(post("/api/tasks/" + taskId + "/messages").contentType(MediaType.APPLICATION_JSON).content(msgBody))
