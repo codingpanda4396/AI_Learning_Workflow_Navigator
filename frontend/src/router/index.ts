@@ -9,6 +9,12 @@ const router = createRouter({
     { path: '/diagnosis', name: 'diagnosis', component: () => import('@/views/DiagnosisView.vue'), meta: { step: 'diagnosis' } },
     { path: '/plan', name: 'plan', component: () => import('@/views/LearningPlanView.vue'), meta: { step: 'plan' } },
     {
+      path: '/execution',
+      name: 'execution',
+      component: () => import('@/views/ExecutionView.vue'),
+      meta: { step: 'task' },
+    },
+    {
       path: '/tasks/:taskId/run',
       name: 'taskRun',
       component: () => import('@/views/TaskRunView.vue'),

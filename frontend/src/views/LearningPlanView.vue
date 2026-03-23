@@ -151,16 +151,15 @@ async function fetchPlan() {
   }
 }
 
+function goExecution() {
+  const query: Record<string, string> = { step: '1' }
+  if (store.planId) query.planId = store.planId
+  router.push({ path: '/execution', query })
+}
+
 async function onStartStep() {
   if (store.sessionId) {
-    if (store.currentTaskId) {
-      router.push({
-        name: 'taskRun',
-        params: { taskId: store.currentTaskId },
-      })
-    } else {
-      router.push({ name: 'task' })
-    }
+    goExecution()
     return
   }
   if (!store.planId) return
@@ -170,10 +169,7 @@ async function onStartStep() {
     store.sessionId = data.sessionId
     store.currentTaskId = data.currentTaskId
     store.taskSequence = data.taskSequence ?? []
-    router.push({
-      name: 'taskRun',
-      params: { taskId: data.currentTaskId },
-    })
+    goExecution()
   } catch (err) {
     showToast(getErrorMessage(err))
   } finally {
