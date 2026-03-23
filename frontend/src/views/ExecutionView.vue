@@ -27,12 +27,14 @@ import {
 } from '@/constants/executionPath'
 import { getExecutionStepConfig } from '@/constants/executionSteps'
 import { useWorkflowStore } from '@/stores/workflow'
+import { useAiTutorStore } from '@/stores/aiTutor'
 import { showToast } from '@/stores/toast'
 import type { ExecutionState, ExecutionStep } from '@/types/execution'
 
 const route = useRoute()
 const router = useRouter()
 const store = useWorkflowStore()
+const aiTutorStore = useAiTutorStore()
 
 const phase = ref<ExecutionState>('PROMPT_SHOWN')
 
@@ -58,6 +60,45 @@ const mergedStep = computed<ExecutionStep>(() => ({
   ...stepTemplate.value,
   state: phase.value,
 }))
+
+function phaseMetaForStep(stepNum: number): { code: string; label: string } {
+  if (stepNum === 1) {
+    return { code: 'STRUCTURE', label: '结构认知' }
+  }
+  return { code: 'STRUCTURE', label: '结构认知' }
+}
+
+watch(
+  () => ({
+    stepId: stepTemplate.value.stepId,
+    step: stepIndex.value,
+    knowledgePoint: stepTemplate.value.knowledgePoint,
+    knowledgeKey: stepTemplate.value.knowledgeKey,
+  }),
+  (cur, prev) => {
+    const stepChanged = !prev || cur.stepId !== prev.stepId
+    const label = cur.knowledgePoint?.trim() || '当前主题'
+    const key =
+      (cur.knowledgeKey && cur.knowledgeKey.trim()) ||
+      cur.stepId.replace(/[^a-zA-Z0-9_]+/g, '_').toLowerCase() ||
+      'unknown'
+    const meta = phaseMetaForStep(cur.step)
+    aiTutorStore.setContext({
+      stepId: cur.stepId,
+      step: cur.step,
+      knowledgeKey: key,
+      knowledgeLabel: label,
+      phaseCode: meta.code,
+      phaseLabel: meta.label,
+    })
+    if (stepChanged) {
+      aiTutorStore.seedAssistantHint(
+        `我们先不着急背定义。\n\n你先说说看——你觉得「${label}」像什么？\n\n点右下角「AI导师」打开侧栏，用输入框或快捷问题直接聊即可。`
+      )
+    }
+  },
+  { immediate: true }
+)
 
 watch(stepIndex, () => {
   phase.value = 'PROMPT_SHOWN'

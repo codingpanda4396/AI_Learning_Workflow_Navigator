@@ -15,9 +15,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.JsonNode;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * OpenAI 兼容 Chat Completions；长超时与 2s 反馈超时各用独立 {@link RestTemplate}。
@@ -68,6 +79,101 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
     @Override
     public String chatForFeedback(String systemPrompt, String userPrompt) {
         return exchange(restTemplateFeedback, systemPrompt, userPrompt, FEEDBACK_READ_TIMEOUT_MS);
+    }
+
+    @Override
+    public void chatStream(String systemPrompt, String userPrompt, Consumer<String> onDelta)
+            throws IOException, InterruptedException {
+        if (!isLiveProviderReady()) {
+            throw new IllegalStateException("LLM provider disabled or apiKey empty");
+        }
+        String base = props.getBaseUrl() != null ? props.getBaseUrl().trim() : "";
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        String url = base + "/v1/chat/completions";
+        int readMs = Math.max(1000, props.getTimeoutMs());
+        int connectMs = Math.min(readMs, 15_000);
+
+        ChatCompletionStreamRequest req = new ChatCompletionStreamRequest(
+                props.getModel(),
+                List.of(
+                        new Message("system", systemPrompt != null ? systemPrompt : ""),
+                        new Message("user", userPrompt != null ? userPrompt : "")
+                ),
+                0.2,
+                true
+        );
+        String jsonBody = objectMapper.writeValueAsString(req);
+
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(connectMs))
+                .build();
+        HttpRequest httpReq = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofMillis(readMs))
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + props.getApiKey())
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
+                .build();
+
+        log.debug("LLM HTTP stream POST {} model={} readTimeoutMs={}", url, props.getModel(), readMs);
+
+        HttpResponse<InputStream> resp = httpClient.send(httpReq, HttpResponse.BodyHandlers.ofInputStream());
+        if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+            String errBody = new String(resp.body().readAllBytes(), StandardCharsets.UTF_8);
+            log.warn("LLM stream non-success: status={} bodyPreview={}",
+                    resp.statusCode(), truncateForLog(errBody, 800));
+            throw new IllegalStateException("LLM provider non-2xx: " + resp.statusCode());
+        }
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isEmpty()) {
+                    continue;
+                }
+                if (!line.startsWith("data:")) {
+                    continue;
+                }
+                String payload = line.substring(5).trim();
+                if ("[DONE]".equals(payload)) {
+                    break;
+                }
+                if (payload.isEmpty()) {
+                    continue;
+                }
+                String piece = extractStreamDeltaContent(payload);
+                if (piece != null && !piece.isEmpty()) {
+                    onDelta.accept(piece);
+                }
+            }
+        }
+    }
+
+    private String extractStreamDeltaContent(String payload) {
+        try {
+            JsonNode root = objectMapper.readTree(payload);
+            if (root.hasNonNull("error")) {
+                log.warn("LLM stream error field: {}", truncateForLog(payload, 500));
+                return null;
+            }
+            JsonNode choices = root.get("choices");
+            if (choices == null || !choices.isArray() || choices.isEmpty()) {
+                return null;
+            }
+            JsonNode delta = choices.get(0).get("delta");
+            if (delta == null) {
+                return null;
+            }
+            JsonNode content = delta.get("content");
+            if (content == null || !content.isTextual()) {
+                return null;
+            }
+            return content.asText();
+        } catch (Exception e) {
+            log.debug("LLM stream line parse skip: {}", e.getMessage());
+            return null;
+        }
     }
 
     private String exchange(RestTemplate restTemplate, String systemHint, String userContent, int readTimeoutMs) {
@@ -142,6 +248,14 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
             String model,
             List<Message> messages,
             @JsonProperty("temperature") Double temperature
+    ) {
+    }
+
+    private record ChatCompletionStreamRequest(
+            String model,
+            List<Message> messages,
+            @JsonProperty("temperature") double temperature,
+            @JsonProperty("stream") boolean stream
     ) {
     }
 

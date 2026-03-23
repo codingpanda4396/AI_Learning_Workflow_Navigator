@@ -59,7 +59,7 @@ class PlanningContextAssemblerTest {
         store.getGoals().put(
                 "goal_1",
                 StructuredLearningGoal.builder()
-                        .rawGoalText("我想搞懂二叉树遍历")
+                        .rawGoalText("我想搞懂动态规划入门")
                         .timeBudget(TimeBudget.WITHIN_30_MIN)
                         .build());
         store.getGoalContextSnapshots().put(

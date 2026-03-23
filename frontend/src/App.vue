@@ -1,5 +1,10 @@
 <template>
   <router-view />
+  <!-- 执行页导师入口挂在 App 根级，避免 router-view 子树层叠/裁剪导致悬浮钮不可见 -->
+  <template v-if="isExecutionRoute">
+    <AiTutorFloating />
+    <AiTutorPanel />
+  </template>
   <Teleport to="body">
     <Transition name="toast">
       <div
@@ -13,7 +18,14 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { toastMessage } from '@/stores/toast'
+import AiTutorFloating from '@/components/ai-tutor/AiTutorFloating.vue'
+import AiTutorPanel from '@/components/ai-tutor/AiTutorPanel.vue'
+
+const route = useRoute()
+const isExecutionRoute = computed(() => route.name === 'execution')
 </script>
 
 <style scoped>

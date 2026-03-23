@@ -179,4 +179,32 @@ public class TutorFallbackRegistry {
                 "试着先说出：这个概念让你联想到什么具体画面？",
                 null);
     }
+
+    /**
+     * R00035：内嵌导师对话在 LLM 不可用时的短回复（单轮、不记忆）。
+     */
+    public String embeddedChatFallback(String canonicalKnowledgeKey, String userMessage) {
+        String k = canonicalKnowledgeKey != null ? canonicalKnowledgeKey : TutorKnowledgeNormalizer.UNKNOWN;
+        String hint = (userMessage == null || userMessage.isBlank())
+                ? "先说说你对这个概念最直观的画面。"
+                : "我听到你在用「" + shorten(userMessage, 24) + "」这类想法碰它，这很好。";
+        if (TutorKnowledgeNormalizer.BINARY_TREE.equals(k)) {
+            return hint + " 试着回答：二叉树里，每个节点最多连出几个孩子？叶子在你心里长什么样？";
+        }
+        if (TutorKnowledgeNormalizer.LINKED_LIST.equals(k)) {
+            return hint + " 用「一节车厢指着下一节」类比时，插入中间要改几个指针？";
+        }
+        if (TutorKnowledgeNormalizer.SORTING.equals(k)) {
+            return hint + " 先钉死比较规则：按什么关键字、升序还是降序？再用两个数字走一小步。";
+        }
+        return hint + " 把它压成一两句自己的话，再标出一个你最不确定的词。";
+    }
+
+    private static String shorten(String s, int max) {
+        String t = s.trim().replaceAll("\\s+", " ");
+        if (t.length() <= max) {
+            return t;
+        }
+        return t.substring(0, max) + "…";
+    }
 }

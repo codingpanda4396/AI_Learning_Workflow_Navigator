@@ -1,0 +1,18 @@
+# 测试固定使用内存 H2，避免继承本机 SPRING_PROFILES_ACTIVE=local 时的远端数据源
+spring:
+  datasource:
+    url: jdbc:h2:mem:ai_learning_workflow_navigator_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  sql:
+    init:
+      mode: never
+
+server:
+  port: 0

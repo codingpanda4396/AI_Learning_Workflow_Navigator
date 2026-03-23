@@ -35,6 +35,8 @@ export interface ExecutionStepFeedback {
 
 export interface ExecutionStep {
   stepId: string
+  /** 传给后端上下文的稳定知识点 key（如 binary_tree） */
+  knowledgeKey?: string
   /** 传给 R0003 导师接口的知识点标签 */
   knowledgePoint?: string
   title: string

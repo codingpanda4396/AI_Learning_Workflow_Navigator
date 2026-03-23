@@ -1,7 +1,10 @@
 package navigator.application.tutor.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import navigator.api.dto.AiTutorChatRequest;
 import navigator.api.dto.TaskFeedbackResponse;
+import navigator.application.tutor.AiTutorChatResult;
+import navigator.application.tutor.AiTutorChatStreamHandler;
 import navigator.application.tutor.AiTutorFeedbackPayload;
 import navigator.application.tutor.AiTutorFeedbackResult;
 import navigator.application.tutor.AiTutorService;
@@ -15,6 +18,8 @@ import navigator.infrastructure.llm.LlmClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class AiTutorServiceImpl implements AiTutorService {
@@ -41,6 +46,89 @@ public class AiTutorServiceImpl implements AiTutorService {
         this.explainPrefetchCoordinator = explainPrefetchCoordinator;
         this.tutorFallbackRegistry = tutorFallbackRegistry;
         this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public AiTutorChatResult chat(AiTutorChatRequest request) {
+        AiTutorChatRequest.Context ctx = request.getContext();
+        String userMsg = request.getMessage() != null ? request.getMessage().trim() : "";
+        if (userMsg.isEmpty()) {
+            return new AiTutorChatResult(SOURCE_FALLBACK, tutorFallbackRegistry.embeddedChatFallback(
+                    TutorKnowledgeNormalizer.UNKNOWN, ""));
+        }
+        int stepNum = ctx.getStep() != null ? ctx.getStep() : 1;
+        String phase = ctx.getPhase() != null ? ctx.getPhase().trim() : "";
+        String knowledgeKey = ctx.getKnowledge() != null ? ctx.getKnowledge().trim() : "";
+        String knowledgeLabel = ctx.getKnowledgeLabel() != null ? ctx.getKnowledgeLabel().trim() : "";
+        String forNorm = !knowledgeKey.isBlank() ? knowledgeKey : knowledgeLabel;
+        String norm = TutorKnowledgeNormalizer.normalize(forNorm);
+        String display = !knowledgeLabel.isBlank() ? knowledgeLabel
+                : (!knowledgeKey.isBlank() ? knowledgeKey : "当前知识点");
+        String system = TutorPromptTemplates.embeddedChatSystemPrompt(stepNum, phase, display, norm);
+        if (llmClient.isLiveProviderReady()) {
+            try {
+                String raw = llmClient.chat(system, userMsg);
+                if (raw != null && !raw.isBlank()) {
+                    return new AiTutorChatResult(SOURCE_LLM, raw.trim());
+                }
+            } catch (Exception e) {
+                log.warn("AiTutor chat LLM failed — {}: {}", e.getClass().getSimpleName(), e.getMessage());
+            }
+        }
+        String fallback = tutorFallbackRegistry.embeddedChatFallback(norm, userMsg);
+        return new AiTutorChatResult(SOURCE_FALLBACK, fallback);
+    }
+
+    @Override
+    public void streamChat(AiTutorChatRequest request, AiTutorChatStreamHandler handler) {
+        AiTutorChatRequest.Context ctx = request.getContext();
+        String userMsg = request.getMessage() != null ? request.getMessage().trim() : "";
+        if (userMsg.isEmpty()) {
+            handler.onMeta(SOURCE_FALLBACK);
+            handler.onDelta(tutorFallbackRegistry.embeddedChatFallback(TutorKnowledgeNormalizer.UNKNOWN, ""));
+            return;
+        }
+        int stepNum = ctx.getStep() != null ? ctx.getStep() : 1;
+        String phase = ctx.getPhase() != null ? ctx.getPhase().trim() : "";
+        String knowledgeKey = ctx.getKnowledge() != null ? ctx.getKnowledge().trim() : "";
+        String knowledgeLabel = ctx.getKnowledgeLabel() != null ? ctx.getKnowledgeLabel().trim() : "";
+        String forNorm = !knowledgeKey.isBlank() ? knowledgeKey : knowledgeLabel;
+        String norm = TutorKnowledgeNormalizer.normalize(forNorm);
+        String display = !knowledgeLabel.isBlank() ? knowledgeLabel
+                : (!knowledgeKey.isBlank() ? knowledgeKey : "当前知识点");
+        String system = TutorPromptTemplates.embeddedChatSystemPrompt(stepNum, phase, display, norm);
+        if (!llmClient.isLiveProviderReady()) {
+            handler.onMeta(SOURCE_FALLBACK);
+            handler.onDelta(tutorFallbackRegistry.embeddedChatFallback(norm, userMsg));
+            return;
+        }
+        AtomicBoolean metaSent = new AtomicBoolean(false);
+        AtomicBoolean sawNonEmpty = new AtomicBoolean(false);
+        try {
+            llmClient.chatStream(system, userMsg, chunk -> {
+                if (chunk == null || chunk.isEmpty()) {
+                    return;
+                }
+                sawNonEmpty.set(true);
+                if (!metaSent.getAndSet(true)) {
+                    handler.onMeta(SOURCE_LLM);
+                }
+                handler.onDelta(chunk);
+            });
+            if (!sawNonEmpty.get()) {
+                handler.onMeta(SOURCE_FALLBACK);
+                handler.onDelta(tutorFallbackRegistry.embeddedChatFallback(norm, userMsg));
+            }
+        } catch (Exception e) {
+            log.warn("AiTutor chat stream LLM failed — {}: {}", e.getClass().getSimpleName(), e.getMessage());
+            if (!metaSent.get()) {
+                handler.onMeta(SOURCE_FALLBACK);
+                handler.onDelta(tutorFallbackRegistry.embeddedChatFallback(norm, userMsg));
+            } else {
+                handler.onDelta("\n\n（连接中断，以下为本地提示）\n"
+                        + tutorFallbackRegistry.embeddedChatFallback(norm, userMsg));
+            }
+        }
     }
 
     @Override
