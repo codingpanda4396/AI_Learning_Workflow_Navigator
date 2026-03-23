@@ -6,7 +6,14 @@
       {{ heroTitle }}
     </h1>
     <p
-      class="mx-auto mt-3 max-w-xl text-base font-medium leading-relaxed text-text-primary/90 md:mx-0"
+      v-if="userStateLine?.trim()"
+      class="mx-auto mt-3 max-w-xl text-sm font-medium leading-relaxed text-primary md:mx-0 md:text-base"
+    >
+      你现在是：{{ userStateLine.trim() }}
+    </p>
+    <p
+      class="mx-auto max-w-xl text-base font-medium leading-relaxed text-text-primary/90 md:mx-0"
+      :class="userStateLine?.trim() ? 'mt-2' : 'mt-3'"
     >
       {{ heroSubtitleLine }}
     </p>
@@ -33,6 +40,8 @@ const props = defineProps<{
   pathSummaryLine: string
   totalSteps: number
   showcase?: PlanShowcaseView | null
+  /** 来自诊断画像的口语摘要，不含技术字段名 */
+  userStateLine?: string | null
 }>()
 
 const heroTitle = computed(() => {

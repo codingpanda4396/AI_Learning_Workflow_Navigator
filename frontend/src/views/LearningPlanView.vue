@@ -10,10 +10,17 @@
       </ErrorState>
 
       <template v-else-if="plan && viewModel && currentStep">
+        <DiagnosisRecapCard
+          v-if="showDiagnosisRecap"
+          :bullets="recapBullets"
+          :closing-line="recapClosing"
+          @dismiss="onDismissDiagnosisRecap"
+        />
         <PlanHero
           :path-summary-line="viewModel.pathSummaryLine"
           :total-steps="viewModel.totalSteps"
           :showcase="viewModel.showcase"
+          :user-state-line="userStateSummaryLine"
         />
         <ShowcaseMindImageHint
           v-if="viewModel.showcase?.mindImageHint"
@@ -31,6 +38,22 @@
           :tips="viewModel.showcase.judgmentTips"
         />
         <OptionalTips :tips="viewModel.optionalTips" />
+
+        <section
+          class="mt-10 rounded-card border border-border bg-slate-50/80 px-5 py-6 text-center md:text-left"
+        >
+          <p class="text-sm font-medium text-text-primary md:text-base">
+            <span aria-hidden="true">👇</span>
+            下一步你可以直接开始这一小步
+          </p>
+          <PrimaryButton
+            class="mt-4 w-full justify-center py-3 md:inline-flex md:w-auto md:min-w-[240px]"
+            :loading="committing"
+            @click="onStartStep"
+          >
+            进入学习（执行页）
+          </PrimaryButton>
+        </section>
       </template>
     </main>
   </PageContainer>
@@ -42,6 +65,7 @@ import { useRouter } from 'vue-router'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
+import PrimaryButton from '@/components/ui/PrimaryButton.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import PlanHero from '@/components/plan/PlanHero.vue'
@@ -50,6 +74,7 @@ import CurrentStepCard from '@/components/plan/CurrentStepCard.vue'
 import OptionalTips from '@/components/plan/OptionalTips.vue'
 import ShowcaseMindImageHint from '@/components/plan/ShowcaseMindImageHint.vue'
 import ShowcaseJudgmentTips from '@/components/plan/ShowcaseJudgmentTips.vue'
+import DiagnosisRecapCard from '@/components/plan/DiagnosisRecapCard.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { previewPlan, commitPlan } from '@/api/learning-plan'
 import { showToast } from '@/stores/toast'
@@ -58,6 +83,13 @@ import {
   buildPlanViewModel,
   planStepsToFlowItems,
 } from '@/utils/planPresentationModel'
+import {
+  buildDiagnosisRecapBullets,
+  buildUserStateSummaryLine,
+  clearDiagnosisRecapSessionFlag,
+  diagnosisRecapClosingLine,
+  shouldShowDiagnosisRecapFromSession,
+} from '@/utils/diagnosisRecapCopy'
 import type { PlanPreviewData } from '@/types/dto'
 
 const router = useRouter()
@@ -67,6 +99,20 @@ const loading = ref(true)
 const committing = ref(false)
 const error = ref<string | null>(null)
 const plan = ref<PlanPreviewData | null>(null)
+const showDiagnosisRecap = ref(false)
+
+const recapBullets = computed(() =>
+  buildDiagnosisRecapBullets(store.learnerProfileSnapshot)
+)
+const recapClosing = diagnosisRecapClosingLine()
+const userStateSummaryLine = computed(() =>
+  buildUserStateSummaryLine(store.learnerProfileSnapshot)
+)
+
+function onDismissDiagnosisRecap() {
+  showDiagnosisRecap.value = false
+  clearDiagnosisRecapSessionFlag()
+}
 
 const viewModel = computed(() =>
   buildPlanViewModel(plan.value, {
@@ -136,6 +182,7 @@ async function onStartStep() {
 }
 
 onMounted(() => {
+  showDiagnosisRecap.value = shouldShowDiagnosisRecapFromSession()
   if (store.planPreview && !plan.value) plan.value = store.planPreview
   if (!plan.value) fetchPlan()
 })

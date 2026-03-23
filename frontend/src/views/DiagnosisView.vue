@@ -1,5 +1,9 @@
 <template>
   <PageContainer>
+    <TransitionOverlay
+      v-if="submitTransitionOverlay"
+      message="我正在根据你的回答整理思路，马上就好…"
+    />
     <AppTopBar current="diagnosis" />
     <main class="mx-auto max-w-2xl px-6 py-8">
       <LoadingState v-if="loading && !sessionReady" message="正在准备快速定位…" />
@@ -16,6 +20,10 @@
           </h1>
           <p class="mt-2 text-text-secondary">
             不用写小作文，选最贴近的一项即可；系统会据此生成你的学习路径。
+          </p>
+          <p class="mt-3 text-sm font-medium leading-snug text-text-primary">
+            <span aria-hidden="true">👉</span>
+            回答这 3 个问题，我就能帮你找到最合适的学习方式
           </p>
         </template>
 
@@ -107,7 +115,7 @@
 
             <div class="flex justify-end pt-2">
               <PrimaryButton :loading="submitting" @click="onSubmit">
-                生成我的学习路径
+                好了，帮我分析一下
               </PrimaryButton>
             </div>
           </form>
@@ -128,6 +136,7 @@ import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import WorkflowPageScaffold from '@/components/workflow/WorkflowPageScaffold.vue'
+import TransitionOverlay from '@/components/ui/TransitionOverlay.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { createSession, submitDiagnosis } from '@/api/diagnosis'
 import { showToast } from '@/stores/toast'
@@ -139,12 +148,14 @@ import {
   type PaceUiId,
   type QuickDiagnosisUiState,
 } from '@/utils/diagnosisSubmitMapper'
+import { SESSION_KEY_PLAN_DIAGNOSIS_RECAP } from '@/utils/diagnosisRecapCopy'
 
 const router = useRouter()
 const store = useWorkflowStore()
 
 const loading = ref(true)
 const submitting = ref(false)
+const submitTransitionOverlay = ref(false)
 const error = ref<string | null>(null)
 
 const ui = ref<QuickDiagnosisUiState>({
@@ -193,6 +204,12 @@ async function fetchSession() {
   }
 }
 
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
 async function onSubmit() {
   if (!ui.value.foundation) {
     showToast('请选择第 1 题')
@@ -212,14 +229,26 @@ async function onSubmit() {
     return
   }
   submitting.value = true
+  submitTransitionOverlay.value = true
+  const minMs = 900
+  const started = Date.now()
   try {
     const data = await submitDiagnosis(store.diagnosisId, ans)
     store.learnerProfileSnapshot = data.learnerProfileSnapshot
     store.diagnosisEvidenceSummary = data.diagnosisEvidenceSummary
-    router.push('/plan')
+    try {
+      sessionStorage.setItem(SESSION_KEY_PLAN_DIAGNOSIS_RECAP, '1')
+    } catch {
+      /* ignore */
+    }
+    const elapsed = Date.now() - started
+    const remaining = Math.max(0, minMs - elapsed)
+    if (remaining > 0) await delay(remaining)
+    await router.push('/plan')
   } catch (err) {
     showToast(getErrorMessage(err))
   } finally {
+    submitTransitionOverlay.value = false
     submitting.value = false
   }
 }

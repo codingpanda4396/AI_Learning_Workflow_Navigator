@@ -129,9 +129,9 @@ const BINARY_TREE_BASIC: ShowcaseKnowledgeConfig = {
   knowledgeKey: 'binary_tree_basic',
   hero: {
     title: '现在，我们先把二叉树真正看明白',
-    subtitle: '先建立画面感，再理解结构，别一上来就背定义',
+    subtitle: '先有画面，再抠细节，别一上来就背定义',
     auxiliaryLine:
-      '这一步的目标不是写代码，而是把二叉树的结构关系真正想清楚',
+      '这一步先不写代码，先把「长什么样、谁在上谁在下」在你脑子里想明白',
   },
   mindImageHint: {
     title: '你可以把它想成……',
@@ -150,7 +150,7 @@ const BINARY_TREE_BASIC: ShowcaseKnowledgeConfig = {
       icon: 'brain',
       headline: '先把二叉树在脑子里「画出来」',
       whyFirst:
-        '很多人学二叉树时，问题不在于不会背定义，而是脑子里根本没有画面。\n如果没有结构感，后面遍历、递归、建树都会越学越乱。',
+        '很多人不是不会背定义，而是脑子里没有画面。没画面的话，后面遍历、递归都会越学越乱。',
       objectiveIntro: '学完这一小步，你应该能：',
       objectiveBullets: [
         '用自己的话解释什么是二叉树',
@@ -161,7 +161,7 @@ const BINARY_TREE_BASIC: ShowcaseKnowledgeConfig = {
       suggestedPrompt:
         '请你用最直观的方式解释什么是二叉树，可以用生活中的类比来讲，比如家谱、组织结构或者树枝，不要一上来就讲很抽象的定义。',
       reflectionQuestions: [
-        '二叉树到底和普通线性结构有什么不一样？',
+        '二叉树和「一排元素连起来」那种有什么不一样？',
         '什么叫根节点？',
         '什么样的节点可以叫叶子节点？',
       ],
@@ -220,7 +220,7 @@ const BINARY_TREE_BASIC: ShowcaseKnowledgeConfig = {
       icon: 'check',
       headline: '诚实点名：还有哪些词你一说就心虚',
       whyFirst:
-        '很多人到这里会松一口气，但最容易翻车的是「以为自己有画面了」。\n我们用几个很快的问题把底试出来，说不清就当场标出来，别带到遍历和递归。',
+        '很多人到这里会松一口气，但最容易翻车的是「以为自己有画面了」。用几个快问把底试出来，说不清就标出来，别带到下一关。',
       objectiveIntro: '学完这一小步，你应该能：',
       objectiveBullets: [
         '用两三个快问快答检查：根、孩子、叶子、左/右子树是否还说利落',
@@ -228,14 +228,14 @@ const BINARY_TREE_BASIC: ShowcaseKnowledgeConfig = {
       ],
       timeLabel: '大概 6 分钟就够了',
       suggestedPrompt:
-        '请出 3 个「只考结构直觉、不考代码」的小问：比如指认根/叶子、说清左子树包含哪些节点、判断某节点有没有右孩子等。我答完后，告诉我哪一题最值得复盘。',
+        '请出 3 个「只考画面感、不考代码」的小问：比如指认根/叶子、说清左子树包含哪些节点、判断某节点有没有右孩子等。我答完后，告诉我哪一题最值得复盘。',
       reflectionQuestions: [
         '哪一题我答的时候还在猜？把题干关键词写下来。',
-        '如果明天再看，我最怕忘的是结构里的哪一点？',
+        '如果明天再看，我最怕忘的是哪一点？',
         '我今天最想记住的一句「防糊涂提醒」是什么？',
       ],
       closingLine:
-        '用一句话收尾：二叉树的结构里，我现在最想说清但还没说清的是哪一点？下一步我只补这一点。',
+        '用一句话收尾：二叉树这一小块里，我现在最想说清但还没说清的是哪一点？下一步我只补这一点。',
     },
   ],
 }
@@ -272,7 +272,7 @@ const DFS_VS_BFS: ShowcaseKnowledgeConfig = {
       icon: 'compare',
       headline: '先看懂 DFS 和 BFS 到底有什么不一样',
       whyFirst:
-        '很多人觉得自己学过 DFS 和 BFS，但一到题目里还是不会选。\n问题往往不在于没见过，而在于没有真正理解它们「是怎么搜的」。',
+        '很多人背过名字，但看见题还是空白。多半是还没把「它们各自怎么搜」想成自己能复述的过程。',
       objectiveIntro: '学完这一小步，你应该能：',
       objectiveBullets: [
         '说清 DFS 和 BFS 的搜索过程差别',
@@ -295,7 +295,7 @@ const DFS_VS_BFS: ShowcaseKnowledgeConfig = {
       icon: 'puzzle',
       headline: '从题干里抓线索：这题更像「往下试」还是「一层层扩」',
       whyFirst:
-        '会背名字不等于会做题。很多同学卡在「看见题脑子空白」，其实是没练过把题目语言和搜索方式连起来。\n我们先专门练：从描述里读出更偏 DFS 还是更偏 BFS 的信号。',
+        '会背名字不等于会做题。我们先练一件事：从题干里读出更偏「一路往下试」还是「一层层扩」。',
       objectiveIntro: '学完这一小步，你应该能：',
       objectiveBullets: [
         '说出两三类更常联想到 DFS 的题干信号',
@@ -379,7 +379,7 @@ const ARRAY_VS_LINKED_LIST: ShowcaseKnowledgeConfig = {
       icon: 'compare',
       headline: '先把顺序表和链表分清楚',
       whyFirst:
-        '很多人学到这里会混，不是因为听不懂，而是因为总觉得它们「差不多」。\n如果一开始没分清，后面一做题就容易乱。',
+        '很多人不是听不懂，而是总觉得它们「差不多」。一开始没分清，后面一做题就容易乱。',
       objectiveIntro: '学完这一小步，你应该能：',
       objectiveBullets: [
         '说出它们最核心的两个区别',
@@ -403,7 +403,7 @@ const ARRAY_VS_LINKED_LIST: ShowcaseKnowledgeConfig = {
       icon: 'puzzle',
       headline: '看到题目条件，先猜更适合用哪一个',
       whyFirst:
-        '很多人会背区别，但一做题就懵，多半是还没把「题目在考什么」和「该用哪种」连起来。\n我们先练几次「看到线索就站队」，后面会快很多。',
+        '很多人会背区别，但一做题就懵，多半是还没把题干线索和「该用哪种」连起来。先练几次「看见线索就站队」。',
       objectiveIntro: '学完这一小步，你应该能：',
       objectiveBullets: [
         '从题干里抓出一两个关键线索（比如插删多不多、要不要按下标秒取）',

@@ -1,8 +1,26 @@
 <template>
   <div class="mb-8">
-    <p class="mb-4 text-xs font-medium tracking-wide text-text-secondary">
-      咱们大概会走这几步
-    </p>
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <p class="text-xs font-medium tracking-wide text-text-secondary">
+        咱们大概会走这几步
+      </p>
+      <p class="text-xs font-semibold text-text-primary">
+        第 {{ currentStepNumber }} 步 / 共 {{ items.length }} 步
+      </p>
+    </div>
+    <div
+      class="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/90"
+      role="progressbar"
+      :aria-valuenow="currentStepNumber"
+      :aria-valuemin="1"
+      :aria-valuemax="items.length || 1"
+      aria-label="学习路径进度"
+    >
+      <div
+        class="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+        :style="{ width: progressPercent }"
+      />
+    </div>
     <div
       class="-mx-1 flex gap-2 overflow-x-auto pb-2 md:mx-0 md:flex-wrap md:overflow-visible"
       role="list"
@@ -12,7 +30,7 @@
         :key="item.stepIndex"
         role="listitem"
         class="flex min-w-[148px] shrink-0 flex-col rounded-card border px-3 py-3 md:min-w-0 md:flex-1 md:shrink md:px-4"
-        :class="cardClass(item.status)"
+        :class="cardClass(item)"
       >
         <div class="flex items-start gap-2">
           <span
@@ -45,21 +63,37 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import PlanStepIcon from '@/components/plan/PlanStepIcon.vue'
 import type { StepFlowItem, StepFlowStatus } from '@/utils/planPresentationModel'
 
-defineProps<{
+const props = defineProps<{
   items: StepFlowItem[]
 }>()
 
-function cardClass(status: StepFlowStatus): string {
+const currentStepNumber = computed(() => {
+  const cur = props.items.find((i) => i.status === 'CURRENT')
+  return cur?.stepIndex ?? props.items[0]?.stepIndex ?? 1
+})
+
+const progressPercent = computed(() => {
+  const n = props.items.length
+  if (!n) return '0%'
+  const cur = props.items.find((i) => i.status === 'CURRENT')
+  const idx = cur ? cur.stepIndex : 1
+  const pct = Math.min(100, Math.max(0, (idx / n) * 100))
+  return `${pct}%`
+})
+
+function cardClass(item: StepFlowItem): string {
+  const { status } = item
   if (status === 'CURRENT') {
-    return 'border-2 border-primary bg-primary/5 shadow-md ring-1 ring-primary/25'
+    return 'border-2 border-solid border-primary bg-primary/5 shadow-md ring-1 ring-primary/25'
   }
   if (status === 'DONE') {
-    return 'border border-border bg-slate-50/80 opacity-80'
+    return 'border border-solid border-border bg-slate-50/80 opacity-80'
   }
-  return 'border border-dashed border-border bg-white/50 opacity-55 grayscale-[0.35]'
+  return 'border border-dashed border-slate-300/90 bg-white/40 opacity-50 grayscale-[0.25]'
 }
 
 function iconWrapClass(status: StepFlowStatus): string {

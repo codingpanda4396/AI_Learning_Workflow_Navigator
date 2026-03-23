@@ -1,5 +1,9 @@
 <template>
   <PageContainer>
+    <TransitionOverlay
+      v-if="transitionOverlay"
+      message="我先帮你判断一下当前状态，大概需要几秒钟…"
+    />
     <AppTopBar current="goal" />
     <main class="mx-auto max-w-2xl px-6 py-8">
       <div class="mb-8">
@@ -35,6 +39,13 @@
             }}</span>
           </button>
         </div>
+        <p
+          v-if="presetFeedbackLine"
+          class="mt-4 rounded-input border border-primary/25 bg-primary/[0.06] px-3 py-2.5 text-sm leading-snug text-text-primary"
+        >
+          <span aria-hidden="true">👉</span>
+          {{ presetFeedbackLine }}
+        </p>
       </section>
 
       <FormCard>
@@ -47,7 +58,7 @@
               v-model="form.rawGoalText"
               rows="3"
               class="w-full rounded-input border border-border px-4 py-3 text-text-primary placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="例如：我想搞懂链表，会一点概念但做题总是不会"
+              placeholder="比如：我总是分不清链表和顺序表，希望能搞清楚什么时候用哪个"
               required
             />
           </div>
@@ -143,7 +154,7 @@
 
           <div class="flex justify-end gap-3 pt-2">
             <PrimaryButton :loading="loading" @click="onSubmit">
-              生成学习诊断
+              帮我看看我现在在哪一步
             </PrimaryButton>
           </div>
         </form>
@@ -159,6 +170,7 @@ import PageContainer from '@/components/layout/PageContainer.vue'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import FormCard from '@/components/ui/FormCard.vue'
 import PrimaryButton from '@/components/ui/PrimaryButton.vue'
+import TransitionOverlay from '@/components/ui/TransitionOverlay.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { createGoal } from '@/api/goals'
 import { showToast } from '@/stores/toast'
@@ -169,6 +181,7 @@ import type { TimeBudgetType, SelfReportedLevelType, PreferenceTagType } from '@
 import type { CreateGoalRequest } from '@/types/dto'
 import {
   GOAL_SHOWCASE_PRESETS,
+  GOAL_PRESET_FEEDBACK,
   findGoalShowcasePreset,
   type GoalShowcasePreset,
 } from '@/constants/goalShowcasePresets'
@@ -193,6 +206,9 @@ const entryPreferenceOptions: { value: PreferenceTagType; label: string }[] = [
 
 const showcasePresets = GOAL_SHOWCASE_PRESETS
 const activePresetId = ref<string | null>(null)
+const presetFeedbackLine = ref('')
+
+const transitionOverlay = ref(false)
 
 function applyShowcasePreset(preset: GoalShowcasePreset) {
   const patch = preset.apply()
@@ -200,7 +216,7 @@ function applyShowcasePreset(preset: GoalShowcasePreset) {
   form.value.topicHints = [...patch.topicHints]
   form.value.subjectHint = patch.subjectHint
   activePresetId.value = preset.id
-  showToast(`已填入「${preset.title}」示例，可按需修改后再生成诊断`)
+  presetFeedbackLine.value = GOAL_PRESET_FEEDBACK[preset.id] ?? ''
 }
 
 const loading = ref(false)
@@ -228,8 +244,16 @@ onMounted(() => {
   const q = route.query.preset
   const id = typeof q === 'string' ? q : Array.isArray(q) ? q[0] : undefined
   const preset = findGoalShowcasePreset(id)
-  if (preset) applyShowcasePreset(preset)
+  if (preset) {
+    applyShowcasePreset(preset)
+  }
 })
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
 
 async function onSubmit() {
   if (!form.value.rawGoalText.trim()) {
@@ -237,6 +261,8 @@ async function onSubmit() {
     return
   }
   loading.value = true
+  const minOverlayMs = 1200
+  const started = Date.now()
   try {
     const payload: CreateGoalRequest = {
       rawGoalText: form.value.rawGoalText.trim(),
@@ -254,10 +280,16 @@ async function onSubmit() {
     store.goalId = data.goalId
     store.structuredGoal = data.structuredGoal
     store.goalContextSnapshot = data.goalContextSnapshot
-    router.push('/diagnosis')
+    const elapsed = Date.now() - started
+    const remaining = Math.max(0, minOverlayMs - elapsed)
+    transitionOverlay.value = true
+    loading.value = false
+    if (remaining > 0) await delay(remaining)
+    await router.push('/diagnosis')
   } catch (err) {
     showToast(getErrorMessage(err))
   } finally {
+    transitionOverlay.value = false
     loading.value = false
   }
 }
