@@ -18,6 +18,8 @@ function foundationLine(level: string | undefined): string {
   }
 }
 
+const BLOCKER_LINE_PREFIX = '当前最卡的是：'
+
 function blockerLine(blockingPoint: string | undefined): string {
   switch (blockingPoint) {
     case 'CONCEPT_GAP':
@@ -33,6 +35,17 @@ function blockerLine(blockingPoint: string | undefined): string {
     default:
       return '当前最卡的是：需要先把「从哪下手」说清楚，再往下练。'
   }
+}
+
+/** 规划决策页「你的问题」一行（去掉「当前最卡的是：」前缀，避免与标题重复） */
+export function buildPlanProblemOneLiner(
+  snapshot: LearnerProfileSnapshot | null | undefined
+): string {
+  if (!snapshot) return '先对齐学习起点'
+  const full = blockerLine(snapshot.blockingPoint)
+  return full.startsWith(BLOCKER_LINE_PREFIX)
+    ? full.slice(BLOCKER_LINE_PREFIX.length)
+    : full
 }
 
 function riskOfRushingLine(blockingPoint: string | undefined): string {

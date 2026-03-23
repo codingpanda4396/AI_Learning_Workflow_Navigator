@@ -10,7 +10,7 @@
         class="w-full justify-center py-3 sm:w-auto sm:min-w-[200px]"
         @click="goUserConfirmed"
       >
-        我去问了
+        问过了，继续
       </PrimaryButton>
     </template>
 
@@ -18,49 +18,70 @@
       <ConfirmBlock :questions="step.reflectionQuestions" />
       <PrimaryButton
         class="w-full justify-center py-3 sm:w-auto sm:min-w-[200px]"
+        @click="goAiResponseShown"
+      >
+        下一步，看导师怎么说
+      </PrimaryButton>
+    </template>
+
+    <template v-else-if="phase === 'AI_RESPONSE_SHOWN'">
+      <AIResponseCard />
+      <PrimaryButton
+        class="w-full justify-center py-3 sm:w-auto sm:min-w-[200px]"
         @click="goThinkingDone"
       >
-        我想好了
+        想好了，写下来
       </PrimaryButton>
     </template>
 
     <template v-else-if="phase === 'THINKING_DONE'">
-      <UserInputBox v-model="answer" />
+      <UserInputBox
+        v-model="answer"
+        :hint="step.inputHint"
+        :placeholder="step.inputPlaceholder"
+      />
       <PrimaryButton
         class="w-full justify-center py-3 sm:w-auto sm:min-w-[200px]"
         :disabled="!answer.trim()"
         @click="submitAnswer"
       >
-        提交
+        写好了，给导师看看
       </PrimaryButton>
     </template>
 
     <template v-else-if="phase === 'USER_SUBMITTED'">
       <FormCard>
-        <LoadingState message="正在评估你的作答…" />
+        <LoadingState message="我帮你看一下你写的内容…" />
       </FormCard>
     </template>
 
     <template v-else-if="phase === 'FEEDBACK_SHOWN' && feedback">
       <FeedbackCard :feedback="feedback" />
-      <NextStepButton label="下一步" @click="goStepCompleted" />
+      <NextStepButton label="好，进入本步总结" @click="goStepCompleted" />
     </template>
 
     <template v-else-if="phase === 'STEP_COMPLETED'">
       <FormCard>
-        <p class="text-lg font-semibold text-text-primary">🎉 {{ step.completionHeadline || '本步完成' }}</p>
-        <p class="mt-3 text-xs font-medium text-text-secondary">你已经：</p>
+        <p class="text-xs font-medium text-text-secondary">👨‍🏫 AI导师</p>
+        <p class="mt-2 text-sm leading-relaxed text-text-primary">
+          很好，这一步你已经完成了。
+        </p>
+        <p
+          v-if="step.completionHeadline"
+          class="mt-2 text-base font-semibold text-text-primary"
+        >
+          {{ step.completionHeadline }}
+        </p>
+        <p class="mt-3 text-xs font-medium text-text-secondary">你现在已经：</p>
         <ul class="mt-1.5 space-y-1.5 text-sm text-text-primary">
           <li v-for="(line, i) in completionLines" :key="i" class="flex gap-2">
             <span class="text-emerald-600">✔</span>
             <span>{{ line }}</span>
           </li>
         </ul>
-        <p v-if="step.completionNextHint" class="mt-4 text-sm text-text-secondary">
-          👉 {{ step.completionNextHint }}
-        </p>
-        <p v-else class="mt-4 text-xs text-text-secondary">
-          接下来进入系统里的下一项学习任务。
+        <p class="mt-4 text-sm text-text-primary">👉 我们进入下一步。</p>
+        <p v-if="step.completionNextHint" class="mt-2 text-sm text-text-secondary">
+          {{ step.completionNextHint }}
         </p>
         <NextStepButton label="继续任务" @click="finish" />
       </FormCard>
@@ -77,6 +98,7 @@ import PromptCard from '@/components/execution/PromptCard.vue'
 import ConfirmBlock from '@/components/execution/ConfirmBlock.vue'
 import UserInputBox from '@/components/execution/UserInputBox.vue'
 import FeedbackCard from '@/components/execution/FeedbackCard.vue'
+import AIResponseCard from '@/components/execution/AIResponseCard.vue'
 import NextStepButton from '@/components/execution/NextStepButton.vue'
 import { postTaskFeedback } from '@/api/execution-feedback'
 import { showToast } from '@/stores/toast'
@@ -100,7 +122,11 @@ const submitting = ref(false)
 const completionLines = computed(() => {
   const lines = props.step.completionAchievements
   if (lines?.length) return lines
-  return ['完成了本步脚手架练习', '可以进入下一环节继续推进']
+  return [
+    '按提示真的去问过一次了',
+    '能用自己的话碰一碰这一步的核心',
+    '走完了「问—想—写」这一小段',
+  ]
 })
 
 watch(
@@ -113,6 +139,10 @@ watch(
 
 function goUserConfirmed() {
   phase.value = 'USER_CONFIRMED'
+}
+
+function goAiResponseShown() {
+  phase.value = 'AI_RESPONSE_SHOWN'
 }
 
 function goThinkingDone() {

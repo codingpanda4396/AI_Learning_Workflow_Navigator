@@ -1,7 +1,11 @@
 <template>
   <FormCard>
-    <p class="text-sm font-medium text-text-primary">用你自己的话写几句</p>
-    <p class="mt-1 text-xs text-text-secondary">
+    <p class="text-xs font-medium text-text-secondary">👨‍🏫 AI导师</p>
+    <p class="mt-2 text-sm font-medium text-text-primary">
+      用你自己的话说一遍就行，不用标准答案。
+    </p>
+    <p class="mt-1.5 text-xs text-text-secondary">👉 我帮你看哪里需要补一补。</p>
+    <p v-if="hint" class="mt-3 text-xs leading-relaxed text-text-secondary">
       {{ hint }}
     </p>
     <textarea
@@ -24,7 +28,7 @@ withDefaults(
     placeholder?: string
   }>(),
   {
-    hint: '结合上面的提示，把你在问答后脑子里留下的理解写下来（几句话即可）。',
+    hint: '就写你刚问完、想完之后，脑子里留下的那几句。不用长，真实就好。',
     placeholder: '例如：我理解它是……',
   }
 )

@@ -2,6 +2,7 @@ export type ExecutionState =
   | 'INIT'
   | 'PROMPT_SHOWN'
   | 'USER_CONFIRMED'
+  | 'AI_RESPONSE_SHOWN'
   | 'THINKING_DONE'
   | 'USER_SUBMITTED'
   | 'FEEDBACK_SHOWN'
