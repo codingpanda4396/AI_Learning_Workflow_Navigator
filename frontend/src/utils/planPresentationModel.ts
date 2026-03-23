@@ -3,7 +3,11 @@ import {
   mergeShellWithTaskTitle,
   shellRowForFourTaskSequence,
 } from '@/constants/planStepShell'
-import type { ShowcaseHeroConfig } from '@/constants/showcaseKnowledgeConfig'
+import type {
+  ShowcaseFocusType,
+  ShowcaseHeroConfig,
+  ShowcaseMindImageHint,
+} from '@/constants/showcaseKnowledgeConfig'
 import {
   resolveShowcaseKnowledge,
   type ShowcaseStepConfig,
@@ -62,6 +66,10 @@ export type StepFlowItem = {
 export type PlanShowcaseView = {
   hero: ShowcaseHeroConfig
   optionalTips?: string[]
+  mindImageHint?: ShowcaseMindImageHint
+  focusType?: ShowcaseFocusType
+  judgmentTips?: string[]
+  knowledgeLabel?: { title: string; subtitle?: string }
 }
 
 export type PlanViewModel = {
@@ -413,6 +421,10 @@ export function buildPlanViewModel(
     ? {
         hero: showcaseConfig!.hero,
         optionalTips: showcaseConfig!.optionalTips,
+        mindImageHint: showcaseConfig!.mindImageHint,
+        focusType: showcaseConfig!.focusType,
+        judgmentTips: showcaseConfig!.judgmentTips,
+        knowledgeLabel: showcaseConfig!.knowledgeLabel,
       }
     : null
 

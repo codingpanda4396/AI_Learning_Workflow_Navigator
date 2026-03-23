@@ -11,6 +11,32 @@
         </p>
       </div>
 
+      <section class="mb-8 rounded-input border border-border bg-white p-4 shadow-sm md:p-5">
+        <p class="text-sm font-medium text-text-primary">快速开始</p>
+        <p class="mt-1 text-sm text-text-secondary">
+          选一个最贴近你当前想学的小主题，会填入示例描述（仍可随意修改后再提交）。
+        </p>
+        <div class="mt-4 grid gap-3 sm:grid-cols-3">
+          <button
+            v-for="preset in showcasePresets"
+            :key="preset.id"
+            type="button"
+            class="flex flex-col items-start rounded-input border px-4 py-3 text-left text-sm transition-colors"
+            :class="
+              activePresetId === preset.id
+                ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                : 'border-border hover:border-primary/40 hover:bg-slate-50'
+            "
+            @click="applyShowcasePreset(preset)"
+          >
+            <span class="font-medium text-text-primary">{{ preset.title }}</span>
+            <span class="mt-1 text-xs leading-snug text-text-secondary">{{
+              preset.subtitle
+            }}</span>
+          </button>
+        </div>
+      </section>
+
       <FormCard>
         <form class="space-y-6" @submit.prevent="onSubmit">
           <div>
@@ -127,8 +153,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import FormCard from '@/components/ui/FormCard.vue'
@@ -141,8 +167,14 @@ import { timeBudgetLabels } from '@/types/labels'
 import { PreferenceTag } from '@/types/enums'
 import type { TimeBudgetType, SelfReportedLevelType, PreferenceTagType } from '@/types/enums'
 import type { CreateGoalRequest } from '@/types/dto'
+import {
+  GOAL_SHOWCASE_PRESETS,
+  findGoalShowcasePreset,
+  type GoalShowcasePreset,
+} from '@/constants/goalShowcasePresets'
 
 const router = useRouter()
+const route = useRoute()
 const store = useWorkflowStore()
 
 /** 目标页专用口语化基础文案（仍传后端既有 SelfReportedLevel 枚举值） */
@@ -158,6 +190,18 @@ const entryPreferenceOptions: { value: PreferenceTagType; label: string }[] = [
   { value: PreferenceTag.CONCEPT_FIRST, label: '先理解原理' },
   { value: PreferenceTag.PRACTICE_FIRST, label: '先学会做题' },
 ]
+
+const showcasePresets = GOAL_SHOWCASE_PRESETS
+const activePresetId = ref<string | null>(null)
+
+function applyShowcasePreset(preset: GoalShowcasePreset) {
+  const patch = preset.apply()
+  form.value.rawGoalText = patch.rawGoalText
+  form.value.topicHints = [...patch.topicHints]
+  form.value.subjectHint = patch.subjectHint
+  activePresetId.value = preset.id
+  showToast(`已填入「${preset.title}」示例，可按需修改后再生成诊断`)
+}
 
 const loading = ref(false)
 const form = ref({
@@ -178,6 +222,13 @@ const topicHintsStr = computed({
       ? v.split(/[,，、]/).map((s) => s.trim()).filter(Boolean)
       : []
   },
+})
+
+onMounted(() => {
+  const q = route.query.preset
+  const id = typeof q === 'string' ? q : Array.isArray(q) ? q[0] : undefined
+  const preset = findGoalShowcasePreset(id)
+  if (preset) applyShowcasePreset(preset)
 })
 
 async function onSubmit() {

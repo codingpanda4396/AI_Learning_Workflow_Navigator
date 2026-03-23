@@ -15,11 +15,20 @@
           :total-steps="viewModel.totalSteps"
           :showcase="viewModel.showcase"
         />
+        <ShowcaseMindImageHint
+          v-if="viewModel.showcase?.mindImageHint"
+          :hint="viewModel.showcase.mindImageHint"
+        />
         <StepFlow :items="flowItems" />
         <CurrentStepCard
           :step="currentStep"
+          :showcase-focus="viewModel.showcase?.focusType ?? 'default'"
           :loading="committing"
           @start="onStartStep"
+        />
+        <ShowcaseJudgmentTips
+          v-if="viewModel.showcase?.judgmentTips?.length"
+          :tips="viewModel.showcase.judgmentTips"
         />
         <OptionalTips :tips="viewModel.optionalTips" />
       </template>
@@ -39,6 +48,8 @@ import PlanHero from '@/components/plan/PlanHero.vue'
 import StepFlow from '@/components/plan/StepFlow.vue'
 import CurrentStepCard from '@/components/plan/CurrentStepCard.vue'
 import OptionalTips from '@/components/plan/OptionalTips.vue'
+import ShowcaseMindImageHint from '@/components/plan/ShowcaseMindImageHint.vue'
+import ShowcaseJudgmentTips from '@/components/plan/ShowcaseJudgmentTips.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { previewPlan, commitPlan } from '@/api/learning-plan'
 import { showToast } from '@/stores/toast'

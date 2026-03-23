@@ -11,6 +11,12 @@
       {{ heroSubtitleLine }}
     </p>
     <p
+      v-if="knowledgeLabelLine"
+      class="mx-auto mt-2 max-w-xl text-xs font-medium tracking-wide text-text-secondary/90 md:mx-0"
+    >
+      {{ knowledgeLabelLine }}
+    </p>
+    <p
       v-if="auxiliaryParagraph"
       class="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-text-primary/85 md:mx-0"
     >
@@ -40,6 +46,13 @@ const heroSubtitleLine = computed(() => {
   if (n <= 0) return '别急，我们一小步一小步来，你会跟得上的'
   if (n === 4) return '先不用想太远，把这 4 小步走完，你会发现顺很多'
   return `先不用想太远，把这 ${n} 小步走完，你会发现顺很多`
+})
+
+const knowledgeLabelLine = computed(() => {
+  const k = props.showcase?.knowledgeLabel
+  if (!k?.title?.trim()) return ''
+  const sub = k.subtitle?.trim()
+  return sub ? `${k.title.trim()} · ${sub}` : k.title.trim()
 })
 
 /** 演示模式：直接展示辅助说明；默认模式：目标摘要带引导前缀 */
