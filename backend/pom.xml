@@ -66,6 +66,12 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Local cache (R0003 AI Tutor explain/prompt) -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

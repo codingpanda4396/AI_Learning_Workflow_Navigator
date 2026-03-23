@@ -1,141 +1,23 @@
 package navigator.application.llm;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.*;
+import navigator.infrastructure.llm.LlmClient;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.time.Duration;
-import java.util.List;
 
 /**
  * Minimal OpenAI-compatible implementation.
- * It uses /v1/chat/completions with {model, messages}.
+ * Delegates to {@link LlmClient}（长超时）以保持与 R0003 技术出口一致。
  */
 @Component
 public class OpenAiCompatibleLlmGateway implements LlmGateway {
 
-    private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmGateway.class);
+    private final LlmClient llmClient;
 
-    private final LlmProperties props;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
-
-    public OpenAiCompatibleLlmGateway(LlmProperties props, RestTemplateBuilder restTemplateBuilder, ObjectMapper objectMapper) {
-        this.props = props;
-        this.objectMapper = objectMapper;
-        int readMs = Math.max(1000, props.getTimeoutMs());
-        // 连接阶段不宜与「等首包」混用同一超长超时；读响应（流式前等待 body）通常更久
-        int connectMs = Math.min(readMs, 15_000);
-        this.restTemplate = restTemplateBuilder
-                .setConnectTimeout(Duration.ofMillis(connectMs))
-                .setReadTimeout(Duration.ofMillis(readMs))
-                .build();
+    public OpenAiCompatibleLlmGateway(LlmClient llmClient) {
+        this.llmClient = llmClient;
     }
 
     @Override
     public String generateReply(String systemHint, String userContent) {
-        if (!props.isEnabled()) {
-            throw new IllegalStateException("LLM provider disabled");
-        }
-        if (props.getApiKey() == null || props.getApiKey().isBlank()) {
-            throw new IllegalStateException("LLM apiKey is empty");
-        }
-
-        String base = props.getBaseUrl() != null ? props.getBaseUrl().trim() : "";
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        String url = base + "/v1/chat/completions";
-
-        ChatCompletionRequest req = new ChatCompletionRequest(
-                props.getModel(),
-                List.of(
-                        new Message("system", systemHint != null ? systemHint : ""),
-                        new Message("user", userContent != null ? userContent : "")
-                ),
-                0.2
-        );
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(props.getApiKey());
-        HttpEntity<ChatCompletionRequest> entity = new HttpEntity<>(req, headers);
-
-        int sysLen = systemHint != null ? systemHint.length() : 0;
-        int userLen = userContent != null ? userContent.length() : 0;
-        int readMs = Math.max(1000, props.getTimeoutMs());
-        int connectMs = Math.min(readMs, 15_000);
-        log.debug("LLM HTTP POST {} model={} connectTimeoutMs={} readTimeoutMs={} systemChars={} userChars={}",
-                url, props.getModel(), connectMs, readMs, sysLen, userLen);
-
-        try {
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
-                log.warn("LLM HTTP non-success: status={} bodyPreview={}",
-                        resp.getStatusCode(), truncateForLog(resp.getBody(), 800));
-                throw new IllegalStateException("LLM provider non-2xx: " + resp.getStatusCode());
-            }
-            ChatCompletionResponse parsed = objectMapper.readValue(resp.getBody(), ChatCompletionResponse.class);
-            if (parsed == null || parsed.choices == null || parsed.choices.isEmpty()
-                    || parsed.choices.get(0).message == null || parsed.choices.get(0).message.content == null) {
-                log.warn("LLM HTTP 2xx but empty assistant content; bodyPreview={}",
-                        truncateForLog(resp.getBody(), 800));
-                throw new IllegalStateException("LLM provider empty reply");
-            }
-            String reply = parsed.choices.get(0).message.content.trim();
-            log.debug("LLM HTTP 2xx: assistantChars={}", reply.length());
-            return reply;
-        } catch (RestClientException ex) {
-            log.warn("LLM HTTP request failed: {}", ex.getMessage());
-            log.debug("LLM HTTP request failed detail", ex);
-            throw new IllegalStateException("LLM provider request failed", ex);
-        } catch (IllegalStateException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            log.warn("LLM response parse failed: {} — {}", ex.getClass().getSimpleName(), ex.getMessage());
-            log.debug("LLM response parse failed detail", ex);
-            throw new IllegalStateException("LLM provider parse failed", ex);
-        }
-    }
-
-    private static String truncateForLog(String body, int maxChars) {
-        if (body == null) {
-            return "";
-        }
-        String t = body.replace("\r\n", "\n").trim();
-        return t.length() <= maxChars ? t : t.substring(0, maxChars) + "…(truncated)";
-    }
-
-    public record ChatCompletionRequest(
-            String model,
-            List<Message> messages,
-            @JsonProperty("temperature") Double temperature
-    ) {
-    }
-
-    public record Message(String role, String content) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class ChatCompletionResponse {
-        public List<Choice> choices;
-
-        @JsonIgnoreProperties(ignoreUnknown = true)
-        public static class Choice {
-            public OutMessage message;
-        }
-
-        @JsonIgnoreProperties(ignoreUnknown = true)
-        public static class OutMessage {
-            public String content;
-        }
+        return llmClient.chat(systemHint, userContent);
     }
 }
-

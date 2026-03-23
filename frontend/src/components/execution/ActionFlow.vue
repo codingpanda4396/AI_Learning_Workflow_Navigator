@@ -1,8 +1,8 @@
 <template>
   <div class="space-y-6">
-    <template v-if="phase === 'PROMPT_SHOWN'">
+    <template v-if="phase === ExecutionPhaseR0003.AI_PROMPT">
       <PromptCard
-        :prompt="step.prompt"
+        :prompt="displayPrompt"
         :why-title="step.promptWhyTitle"
         :why-bullets="step.promptWhyBullets"
       />
@@ -14,7 +14,7 @@
       </PrimaryButton>
     </template>
 
-    <template v-else-if="phase === 'USER_CONFIRMED'">
+    <template v-else-if="phase === ExecutionPhaseR0003.AI_USER_CONFIRMED">
       <ConfirmBlock :questions="step.reflectionQuestions" />
       <PrimaryButton
         class="w-full justify-center py-3 sm:w-auto sm:min-w-[200px]"
@@ -24,8 +24,8 @@
       </PrimaryButton>
     </template>
 
-    <template v-else-if="phase === 'AI_RESPONSE_SHOWN'">
-      <AIResponseCard />
+    <template v-else-if="phase === ExecutionPhaseR0003.AI_EXPLAIN">
+      <AIResponseCard :explanation="aiExplanation" />
       <PrimaryButton
         class="w-full justify-center py-3 sm:w-auto sm:min-w-[200px]"
         @click="goThinkingDone"
@@ -34,7 +34,7 @@
       </PrimaryButton>
     </template>
 
-    <template v-else-if="phase === 'THINKING_DONE'">
+    <template v-else-if="phase === ExecutionPhaseR0003.WAIT_INPUT">
       <UserInputBox
         v-model="answer"
         :hint="step.inputHint"
@@ -49,18 +49,18 @@
       </PrimaryButton>
     </template>
 
-    <template v-else-if="phase === 'USER_SUBMITTED'">
+    <template v-else-if="phase === ExecutionPhaseR0003.AI_FEEDBACK_PENDING">
       <FormCard>
-        <LoadingState message="我帮你看一下你写的内容…" />
+        <LoadingState message="AI正在思考…" />
       </FormCard>
     </template>
 
-    <template v-else-if="phase === 'FEEDBACK_SHOWN' && feedback">
+    <template v-else-if="phase === ExecutionPhaseR0003.AI_FEEDBACK && feedback">
       <FeedbackCard :feedback="feedback" />
       <NextStepButton label="好，进入本步总结" @click="goStepCompleted" />
     </template>
 
-    <template v-else-if="phase === 'STEP_COMPLETED'">
+    <template v-else-if="phase === ExecutionPhaseR0003.STEP_COMPLETED">
       <FormCard>
         <p class="text-xs font-medium text-text-secondary">👨‍🏫 AI导师</p>
         <p class="mt-2 text-sm leading-relaxed text-text-primary">
@@ -91,6 +91,11 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import {
+  getTutorExplain,
+  getTutorPrompt,
+  postTutorPrefetch,
+} from '@/api/tutor'
 import FormCard from '@/components/ui/FormCard.vue'
 import PrimaryButton from '@/components/ui/PrimaryButton.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
@@ -103,7 +108,12 @@ import NextStepButton from '@/components/execution/NextStepButton.vue'
 import { postTaskFeedback } from '@/api/execution-feedback'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
-import type { ExecutionState, ExecutionStep, ExecutionStepFeedback } from '@/types/execution'
+import {
+  ExecutionPhaseR0003,
+  type ExecutionState,
+  type ExecutionStep,
+  type ExecutionStepFeedback,
+} from '@/types/execution'
 
 const phase = defineModel<ExecutionState>('phase', { required: true })
 
@@ -118,6 +128,8 @@ const emit = defineEmits<{
 const answer = ref('')
 const feedback = ref<ExecutionStepFeedback | null>(null)
 const submitting = ref(false)
+const aiGuidePrompt = ref<string | null>(null)
+const aiExplanation = ref<string | null>(null)
 
 const completionLines = computed(() => {
   const lines = props.step.completionAchievements
@@ -129,33 +141,79 @@ const completionLines = computed(() => {
   ]
 })
 
+function tutorKnowledgeLabel(): string {
+  const k = props.step.knowledgePoint?.trim()
+  if (k) return k
+  if (props.step.goal?.trim()) return props.step.goal.trim()
+  return props.step.title?.trim() || '当前主题'
+}
+
+const displayPrompt = computed(
+  () => (aiGuidePrompt.value?.trim() ? aiGuidePrompt.value.trim() : props.step.prompt)
+)
+
 watch(
   () => props.step.stepId,
   () => {
     answer.value = ''
     feedback.value = null
-  }
+    aiGuidePrompt.value = null
+    aiExplanation.value = null
+    const kp = tutorKnowledgeLabel()
+    postTutorPrefetch(props.step.stepId, kp)
+  },
+  { immediate: true }
+)
+
+watch(
+  () => [phase.value, props.step.stepId] as const,
+  async ([ph]) => {
+    const stepId = props.step.stepId
+    const kp = tutorKnowledgeLabel()
+    if (ph === ExecutionPhaseR0003.AI_PROMPT) {
+      try {
+        const env = await getTutorPrompt(stepId, kp)
+        aiGuidePrompt.value = env.content
+      } catch {
+        aiGuidePrompt.value = null
+      }
+    }
+    if (ph === ExecutionPhaseR0003.AI_EXPLAIN) {
+      aiExplanation.value = null
+      try {
+        const env = await getTutorExplain(stepId, kp)
+        aiExplanation.value = env.content
+      } catch {
+        aiExplanation.value = null
+      }
+    }
+  },
+  { immediate: true }
 )
 
 function goUserConfirmed() {
-  phase.value = 'USER_CONFIRMED'
+  phase.value = ExecutionPhaseR0003.AI_USER_CONFIRMED
 }
 
 function goAiResponseShown() {
-  phase.value = 'AI_RESPONSE_SHOWN'
+  phase.value = ExecutionPhaseR0003.AI_EXPLAIN
 }
 
 function goThinkingDone() {
-  phase.value = 'THINKING_DONE'
+  phase.value = ExecutionPhaseR0003.WAIT_INPUT
 }
 
 async function submitAnswer() {
   const text = answer.value.trim()
   if (!text || submitting.value) return
   submitting.value = true
-  phase.value = 'USER_SUBMITTED'
+  phase.value = ExecutionPhaseR0003.AI_FEEDBACK_PENDING
   try {
-    const res = await postTaskFeedback(text)
+    const res = await postTaskFeedback({
+      answer: text,
+      step: props.step.stepId,
+      knowledgePoint: props.step.knowledgePoint,
+    })
     feedback.value = {
       correct: res.correct,
       comment: res.comment,
@@ -164,17 +222,17 @@ async function submitAnswer() {
       gap: res.gap ?? undefined,
       nextHint: res.nextHint ?? undefined,
     }
-    phase.value = 'FEEDBACK_SHOWN'
+    phase.value = ExecutionPhaseR0003.AI_FEEDBACK
   } catch (err) {
     showToast(getErrorMessage(err))
-    phase.value = 'THINKING_DONE'
+    phase.value = ExecutionPhaseR0003.WAIT_INPUT
   } finally {
     submitting.value = false
   }
 }
 
 function goStepCompleted() {
-  phase.value = 'STEP_COMPLETED'
+  phase.value = ExecutionPhaseR0003.STEP_COMPLETED
 }
 
 function finish() {

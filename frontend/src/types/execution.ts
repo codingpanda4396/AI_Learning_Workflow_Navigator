@@ -8,6 +8,19 @@ export type ExecutionState =
   | 'FEEDBACK_SHOWN'
   | 'STEP_COMPLETED'
 
+/**
+ * R0003 导师执行流语义别名（值与 R0002 状态机一致，仅便于阅读与检索）。
+ */
+export const ExecutionPhaseR0003 = {
+  AI_PROMPT: 'PROMPT_SHOWN',
+  AI_USER_CONFIRMED: 'USER_CONFIRMED',
+  AI_EXPLAIN: 'AI_RESPONSE_SHOWN',
+  WAIT_INPUT: 'THINKING_DONE',
+  AI_FEEDBACK_PENDING: 'USER_SUBMITTED',
+  AI_FEEDBACK: 'FEEDBACK_SHOWN',
+  STEP_COMPLETED: 'STEP_COMPLETED',
+} as const satisfies Record<string, ExecutionState>
+
 export interface ExecutionStepFeedback {
   correct: boolean
   comment: string
@@ -22,6 +35,8 @@ export interface ExecutionStepFeedback {
 
 export interface ExecutionStep {
   stepId: string
+  /** 传给 R0003 导师接口的知识点标签 */
+  knowledgePoint?: string
   title: string
   goal: string
   prompt: string
@@ -50,4 +65,6 @@ export interface TaskFeedbackResponse {
   praise?: string | null
   gap?: string | null
   nextHint?: string | null
+  /** R0003：LLM | FALLBACK */
+  source?: string | null
 }

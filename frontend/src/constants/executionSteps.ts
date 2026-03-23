@@ -2,6 +2,7 @@ import type { ExecutionStep } from '@/types/execution'
 
 export const EXECUTION_STEP1: ExecutionStep = {
   stepId: 'step1',
+  knowledgePoint: '二叉树',
   title: '建立结构画面',
   goal: '理解二叉树的基本形态',
   prompt:

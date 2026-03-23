@@ -1,12 +1,18 @@
 import { request } from './request'
 import type { TaskFeedbackResponse } from '@/types/execution'
 
-export async function postTaskFeedback(
+export interface TaskFeedbackPayload {
   answer: string
+  step?: string
+  knowledgePoint?: string
+}
+
+export async function postTaskFeedback(
+  payload: TaskFeedbackPayload
 ): Promise<TaskFeedbackResponse> {
   const { data } = await request.post<TaskFeedbackResponse>(
     '/api/task/feedback',
-    { answer }
+    payload
   )
   return data
 }

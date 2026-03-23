@@ -17,4 +17,6 @@ public class TaskFeedbackResponse {
     private String gap;
     /** 展示用：建议下一步补充 */
     private String nextHint;
+    /** R0003：LLM | FALLBACK | CACHE（若复用） */
+    private String source;
 }

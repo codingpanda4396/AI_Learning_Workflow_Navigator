@@ -23,7 +23,7 @@ public class TaskFeedbackController {
     @PostMapping("/feedback")
     public GlobalResponse<TaskFeedbackResponse> feedback(
             @Valid @RequestBody TaskFeedbackRequest request) {
-        TaskFeedbackResponse data = taskFeedbackService.evaluate(request.getAnswer());
+        TaskFeedbackResponse data = taskFeedbackService.evaluate(request);
         return GlobalResponse.ok(data);
     }
 }
