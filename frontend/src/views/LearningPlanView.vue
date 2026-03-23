@@ -1,83 +1,28 @@
 <template>
   <PageContainer>
     <AppTopBar current="plan" />
-    <main class="mx-auto max-w-2xl px-6 py-8">
-      <LoadingState v-if="loading && !plan" message="正在生成计划..." />
+    <main class="mx-auto max-w-2xl px-6 py-10 md:py-14">
+      <LoadingState v-if="loading && !plan" message="正在帮你理一理怎么学…" />
       <ErrorState v-else-if="error" :message="error">
         <template #action>
           <SecondaryButton @click="fetchPlan">重试</SecondaryButton>
         </template>
       </ErrorState>
 
-      <WorkflowPageScaffold v-else-if="plan && presentation">
-        <template #title>
-          <h1 class="text-2xl font-bold text-text-primary md:text-3xl">
-            你的第一步学习动作
-          </h1>
-          <p class="mt-2 text-text-secondary">
-            系统已根据你的目标与诊断整理好起点；点下方按钮直接进入带练任务。
-          </p>
-        </template>
-
-        <template #primary>
-          <CurrentActionHero
-            :title="presentation.firstActionTitle"
-            eyebrow="你现在要做的第一步"
-            :minutes="presentation.estimatedMinutes"
-            :cta-label="presentation.commitCtaLabel"
-            :loading="committing"
-            @action="onCommit"
-          />
-          <div class="mt-5 space-y-4">
-            <WhyThisStepCard :text="presentation.whyOneLiner" />
-            <NextFlowMiniSteps :lines="presentation.nextThreeLines" />
-          </div>
-        </template>
-
-        <template #secondary>
-          <details class="group rounded-card border border-border bg-white">
-            <summary
-              class="cursor-pointer list-none p-4 text-sm font-medium text-text-primary marker:hidden [&::-webkit-details-marker]:hidden"
-            >
-              <span class="flex items-center justify-between gap-2">
-                查看计划摘要（可选）
-                <span class="text-xs font-normal text-text-secondary group-open:hidden">
-                  展开
-                </span>
-                <span class="hidden text-xs font-normal text-text-secondary group-open:inline">
-                  收起
-                </span>
-              </span>
-            </summary>
-            <div class="space-y-4 border-t border-border p-4 pt-0 text-sm text-text-secondary">
-              <div v-if="plan.recommendedStrategy">
-                <p class="font-medium text-text-primary">策略</p>
-                <p class="mt-1">
-                  {{ plan.recommendedStrategy.label ?? plan.recommendedStrategy.code }}
-                </p>
-              </div>
-              <div v-if="plan.tasks?.length">
-                <p class="font-medium text-text-primary">任务顺序</p>
-                <ol class="mt-1 list-decimal space-y-1 pl-5">
-                  <li v-for="t in plan.tasks" :key="t.taskId">{{ t.title }}</li>
-                </ol>
-              </div>
-              <div v-if="plan.successCriteria?.length">
-                <p class="font-medium text-text-primary">成功标准</p>
-                <ul class="mt-1 list-disc space-y-1 pl-5">
-                  <li v-for="(c, i) in plan.successCriteria" :key="i">{{ c }}</li>
-                </ul>
-              </div>
-              <div v-if="plan.risks?.length">
-                <p class="font-medium text-amber-800">提示</p>
-                <ul class="mt-1 list-disc space-y-1 pl-5 text-amber-900">
-                  <li v-for="(r, i) in plan.risks" :key="i">{{ r }}</li>
-                </ul>
-              </div>
-            </div>
-          </details>
-        </template>
-      </WorkflowPageScaffold>
+      <template v-else-if="plan && viewModel && currentStep">
+        <PlanHero
+          :path-summary-line="viewModel.pathSummaryLine"
+          :total-steps="viewModel.totalSteps"
+          :showcase="viewModel.showcase"
+        />
+        <StepFlow :items="flowItems" />
+        <CurrentStepCard
+          :step="currentStep"
+          :loading="committing"
+          @start="onStartStep"
+        />
+        <OptionalTips :tips="viewModel.optionalTips" />
+      </template>
     </main>
   </PageContainer>
 </template>
@@ -90,15 +35,18 @@ import AppTopBar from '@/components/layout/AppTopBar.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
-import WorkflowPageScaffold from '@/components/workflow/WorkflowPageScaffold.vue'
-import CurrentActionHero from '@/components/workflow/CurrentActionHero.vue'
-import WhyThisStepCard from '@/components/workflow/WhyThisStepCard.vue'
-import NextFlowMiniSteps from '@/components/workflow/NextFlowMiniSteps.vue'
+import PlanHero from '@/components/plan/PlanHero.vue'
+import StepFlow from '@/components/plan/StepFlow.vue'
+import CurrentStepCard from '@/components/plan/CurrentStepCard.vue'
+import OptionalTips from '@/components/plan/OptionalTips.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { previewPlan, commitPlan } from '@/api/learning-plan'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
-import { buildPlanPresentation } from '@/utils/planPresentationModel'
+import {
+  buildPlanViewModel,
+  planStepsToFlowItems,
+} from '@/utils/planPresentationModel'
 import type { PlanPreviewData } from '@/types/dto'
 
 const router = useRouter()
@@ -109,7 +57,26 @@ const committing = ref(false)
 const error = ref<string | null>(null)
 const plan = ref<PlanPreviewData | null>(null)
 
-const presentation = computed(() => buildPlanPresentation(plan.value))
+const viewModel = computed(() =>
+  buildPlanViewModel(plan.value, {
+    structuredGoal: store.structuredGoal,
+    learnerProfileSnapshot: store.learnerProfileSnapshot,
+    sessionId: store.sessionId,
+    progress: store.progress,
+    taskSequence: store.taskSequence,
+  })
+)
+
+const flowItems = computed(() =>
+  viewModel.value ? planStepsToFlowItems(viewModel.value) : []
+)
+
+const currentStep = computed(() => {
+  const vm = viewModel.value
+  if (!vm?.steps.length) return null
+  const i = Math.min(vm.currentStepIndex, vm.steps.length - 1)
+  return vm.steps[i] ?? null
+})
 
 async function fetchPlan() {
   if (!store.goalId || !store.diagnosisId) return
@@ -127,7 +94,18 @@ async function fetchPlan() {
   }
 }
 
-async function onCommit() {
+async function onStartStep() {
+  if (store.sessionId) {
+    if (store.currentTaskId) {
+      router.push({
+        name: 'taskRun',
+        params: { taskId: store.currentTaskId },
+      })
+    } else {
+      router.push({ name: 'task' })
+    }
+    return
+  }
   if (!store.planId) return
   committing.value = true
   try {
@@ -135,7 +113,10 @@ async function onCommit() {
     store.sessionId = data.sessionId
     store.currentTaskId = data.currentTaskId
     store.taskSequence = data.taskSequence ?? []
-    router.push('/task')
+    router.push({
+      name: 'taskRun',
+      params: { taskId: data.currentTaskId },
+    })
   } catch (err) {
     showToast(getErrorMessage(err))
   } finally {

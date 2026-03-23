@@ -382,7 +382,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import FormCard from '@/components/ui/FormCard.vue'
@@ -422,6 +422,7 @@ import type {
   TaskScaffoldResponse,
 } from '@/types/dto'
 
+const route = useRoute()
 const router = useRouter()
 const store = useWorkflowStore()
 
@@ -572,8 +573,15 @@ async function fetchTask() {
     task.value = data.currentTask
     progress.value = data.progress
     if (!data.currentTask) {
+      store.currentTaskId = null
       router.push('/report')
       return
+    }
+    store.currentTaskId = data.currentTask.taskId
+    const tid = data.currentTask.taskId
+    const rid = typeof route.params.taskId === 'string' ? route.params.taskId : ''
+    if (route.name === 'task' || (route.name === 'taskRun' && rid && rid !== tid)) {
+      router.replace({ name: 'taskRun', params: { taskId: tid } })
     }
     await loadScaffold(data.currentTask.taskId)
   } catch (err) {

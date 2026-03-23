@@ -10,6 +10,9 @@ import navigator.domain.model.StructuredLearningGoal;
 import navigator.domain.model.TimeBudgetConstraint;
 import navigator.infrastructure.memory.InMemoryStore;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import java.util.List;
 
 /**
  * Sprint 1: 从 store 按 goalId、diagnosisId 组装 PlanningContext。
@@ -47,6 +50,9 @@ public class PlanningContextAssembler {
                 ? goalContextSnapshot.getEntryGranularity() : EntryGranularity.SMALL;
         int minTasks = 1;
         int maxTasks = maxTasksFor(budget, granularity);
+        if (matchesArrayVsLinkedListShowcaseGoal(goal)) {
+            maxTasks = Math.max(maxTasks, 4);
+        }
         return TimeBudgetConstraint.builder()
                 .timeBudget(budget)
                 .totalMinutesCap(totalCap)
@@ -76,5 +82,41 @@ public class PlanningContextAssembler {
             return 5;
         }
         return 8;
+    }
+
+    /**
+     * 与前端演示知识点「顺序表 vs 链表」判定一致：保证该场景下任务不被压到 3 个以下。
+     */
+    private static boolean matchesArrayVsLinkedListShowcaseGoal(StructuredLearningGoal goal) {
+        if (goal == null) {
+            return false;
+        }
+        StringBuilder sb = new StringBuilder();
+        append(sb, goal.getRawGoalText());
+        append(sb, goal.getNormalizedGoalText());
+        append(sb, goal.getIntentDescription());
+        append(sb, goal.getSubject());
+        append(sb, goal.getSourceContext());
+        append(sb, goal.getPriorityModule());
+        List<String> topics = goal.getTopics();
+        if (topics != null) {
+            for (String t : topics) {
+                append(sb, t);
+            }
+        }
+        String corpus = sb.toString();
+        if (!StringUtils.hasText(corpus)) {
+            return false;
+        }
+        boolean hasList = corpus.contains("链表");
+        boolean hasSeqTable = corpus.contains("顺序表");
+        boolean hasArrayWord = corpus.contains("数组");
+        return hasList && (hasSeqTable || hasArrayWord);
+    }
+
+    private static void append(StringBuilder sb, String part) {
+        if (StringUtils.hasText(part)) {
+            sb.append(part);
+        }
     }
 }
