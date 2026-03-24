@@ -2,252 +2,333 @@
   <PageContainer>
     <TransitionOverlay
       v-if="transitionOverlay"
-      message="我先帮你判断一下当前状态，大概需要几秒钟…"
+      message="正在为你接通这轮学习流程，马上进入诊断..."
     />
     <AppTopBar current="goal" />
-    <main class="mx-auto max-w-2xl px-6 py-8">
-      <div class="mb-8">
-        <h1 class="text-2xl font-bold text-text-primary md:text-3xl">
-          先说好你要学什么
-        </h1>
-        <p class="mt-2 text-text-secondary">
-          填完这几项，系统会基于你的输入直接给出<strong class="font-medium text-text-primary">第一步学习动作</strong>，并带你往下走。
-        </p>
-      </div>
+    <main class="relative overflow-hidden">
+      <div class="absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.18),_transparent_58%)]" />
+      <div
+        class="absolute right-0 top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(245,158,11,0.18),_transparent_68%)] blur-3xl"
+      />
 
-      <section class="mb-8 rounded-input border border-border bg-white p-4 shadow-sm md:p-5">
-        <p class="text-sm font-medium text-text-primary">快速开始</p>
-        <p class="mt-1 text-sm text-text-secondary">
-          选一个最贴近你当前想学的小主题，会填入示例描述（仍可随意修改后再提交）。
-        </p>
-        <div class="mt-4 grid gap-3 sm:grid-cols-3">
-          <button
-            v-for="preset in showcasePresets"
-            :key="preset.id"
-            type="button"
-            class="flex flex-col items-start rounded-input border px-4 py-3 text-left text-sm transition-colors"
-            :class="
-              activePresetId === preset.id
-                ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                : 'border-border hover:border-primary/40 hover:bg-slate-50'
-            "
-            @click="applyShowcasePreset(preset)"
-          >
-            <span class="font-medium text-text-primary">{{ preset.title }}</span>
-            <span class="mt-1 text-xs leading-snug text-text-secondary">{{
-              preset.subtitle
-            }}</span>
-          </button>
-        </div>
-        <p
-          v-if="presetFeedbackLine"
-          class="mt-4 rounded-input border border-primary/25 bg-primary/[0.06] px-3 py-2.5 text-sm leading-snug text-text-primary"
+      <div class="relative mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:py-12">
+        <section
+          class="overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(140deg,_rgba(15,23,42,0.98)_0%,_rgba(30,41,59,0.96)_56%,_rgba(79,70,229,0.9)_100%)] px-6 py-8 text-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] md:px-8 md:py-10"
         >
-          <span aria-hidden="true">👉</span>
-          {{ presetFeedbackLine }}
-        </p>
-      </section>
+          <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <div class="max-w-3xl">
+              <p class="text-xs font-semibold uppercase tracking-[0.32em] text-white/60">
+                Learning Workflow
+              </p>
+              <h1 class="mt-4 max-w-2xl text-3xl font-semibold leading-tight md:text-5xl">
+                不是问 AI 一个问题，而是开启一轮学习流程
+              </h1>
+              <p class="mt-4 max-w-2xl text-sm leading-7 text-slate-200 md:text-base">
+                先选一个当前可用知识点，再决定这轮学习要先搭结构、讲机制、做练习还是做复盘。首页不再让你从空白输入开始。
+              </p>
+            </div>
 
-      <FormCard>
-        <form class="space-y-6" @submit.prevent="onSubmit">
-          <div>
-            <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              学习目标 <span class="text-red-500">*</span>
-            </label>
-            <textarea
-              v-model="form.rawGoalText"
-              rows="3"
-              class="w-full rounded-input border border-border px-4 py-3 text-text-primary placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="比如：我总是分不清链表和顺序表，希望能搞清楚什么时候用哪个"
-              required
-            />
-          </div>
-
-          <div>
-            <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              时间预算
-            </label>
-            <select
-              v-model="form.timeBudget"
-              class="w-full rounded-input border border-border px-4 py-2.5 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            <div
+              class="grid min-w-[280px] gap-3 rounded-[24px] border border-white/12 bg-white/8 p-4 text-sm text-slate-100 backdrop-blur"
             >
-              <option value="">请选择</option>
-              <option
-                v-for="(label, val) in timeBudgetLabels"
-                :key="val"
-                :value="val"
-              >
-                {{ label }}
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              当前基础
-            </label>
-            <select
-              v-model="form.selfReportedLevel"
-              class="w-full rounded-input border border-border px-4 py-2.5 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">请选择</option>
-              <option
-                v-for="(label, val) in goalPageLevelLabels"
-                :key="val"
-                :value="val"
-              >
-                {{ label }}
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <p class="mb-2 text-sm font-medium text-text-primary">
-              你现在更希望先？
-            </p>
-            <div class="space-y-2">
-              <label
-                v-for="opt in entryPreferenceOptions"
-                :key="opt.value"
-                class="flex cursor-pointer items-center gap-3 rounded-input border p-3 text-sm transition-colors"
-                :class="
-                  form.entryPreference === opt.value
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                "
-              >
-                <input
-                  v-model="form.entryPreference"
-                  type="radio"
-                  name="entryPreference"
-                  :value="opt.value"
-                  class="h-4 w-4 border-border text-primary focus:ring-primary"
-                />
-                <span class="text-text-primary">{{ opt.label }}</span>
-              </label>
+              <div class="flex items-center justify-between gap-4">
+                <span class="text-white/65">当前入口</span>
+                <span class="rounded-full bg-emerald-400/18 px-3 py-1 text-xs font-medium text-emerald-100">
+                  Quick Start
+                </span>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-2xl border border-white/10 bg-black/10 p-3">
+                  <p class="text-[11px] uppercase tracking-[0.24em] text-white/45">Topic</p>
+                  <p class="mt-2 font-medium text-white">{{ selectedTopic.label }}</p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-black/10 p-3">
+                  <p class="text-[11px] uppercase tracking-[0.24em] text-white/45">Stage</p>
+                  <p class="mt-2 font-medium text-white">
+                    {{ selectedQuickStart?.label ?? '先选启动方式' }}
+                  </p>
+                </div>
+              </div>
+              <p class="text-sm leading-6 text-slate-200/90">
+                {{ heroSupportCopy }}
+              </p>
             </div>
           </div>
+        </section>
 
-          <div>
-            <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              学科/课程（可选）
-            </label>
-            <input
-              v-model="form.subjectHint"
-              type="text"
-              class="w-full rounded-input border border-border px-4 py-2.5 text-text-primary placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="例如：数据结构、408"
-            />
-          </div>
+        <div class="grid gap-8 xl:grid-cols-[minmax(0,1.35fr)_360px]">
+          <section class="space-y-5">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                  Subject Matrix
+                </p>
+                <h2 class="mt-2 text-2xl font-semibold text-text-primary">
+                  四个入口，先点亮你这轮要走的知识点
+                </h2>
+              </div>
+              <div
+                class="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+              >
+                当前仅点亮 4 个真实知识点，灰态章节用于展示 408 学科扩展能力
+              </div>
+            </div>
 
-          <div>
-            <label class="mb-1.5 block text-sm font-medium text-text-primary">
-              知识点（可选，逗号或顿号分隔）
-            </label>
-            <input
-              v-model="topicHintsStr"
-              type="text"
-              class="w-full rounded-input border border-border px-4 py-2.5 text-text-primary placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="例如：链表、栈、队列"
-            />
-          </div>
+            <div class="grid gap-4 md:grid-cols-2">
+              <article
+                v-for="subject in HOME_SUBJECTS"
+                :key="subject.key"
+                class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition-transform hover:-translate-y-0.5"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 class="text-lg font-semibold text-text-primary">{{ subject.label }}</h3>
+                    <p class="mt-1 text-sm leading-6 text-text-secondary">{{ subject.caption }}</p>
+                  </div>
+                  <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                    {{ liveTopicCount(subject) }} / {{ subject.topicKeys.length }} 已点亮
+                  </span>
+                </div>
 
-          <div class="flex justify-end gap-3 pt-2">
-            <PrimaryButton :loading="loading" @click="onSubmit">
-              帮我看看我现在在哪一步
-            </PrimaryButton>
-          </div>
-        </form>
-      </FormCard>
+                <div class="mt-5 flex flex-wrap gap-2.5">
+                  <button
+                    v-for="topicKey in subject.topicKeys"
+                    :key="topicKey"
+                    type="button"
+                    class="rounded-full border px-3 py-2 text-sm transition-all"
+                    :class="chipClass(topicKey)"
+                    @click="selectTopic(topicKey)"
+                  >
+                    {{ getHomeTopic(topicKey).label }}
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <aside class="space-y-5">
+            <section
+              class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.08)]"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                    Topic Preview
+                  </p>
+                  <h2 class="mt-2 text-xl font-semibold text-text-primary">
+                    {{ selectedTopic.previewTitle }}
+                  </h2>
+                </div>
+                <span
+                  class="rounded-full px-3 py-1 text-xs font-medium"
+                  :class="
+                    selectedTopic.availability === 'live'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-slate-100 text-slate-500'
+                  "
+                >
+                  {{ selectedTopic.availability === 'live' ? '已开放' : '即将开放' }}
+                </span>
+              </div>
+
+              <p class="mt-4 text-sm leading-7 text-text-secondary">
+                {{ selectedTopic.previewBody }}
+              </p>
+
+              <div
+                class="mt-5 rounded-[20px] border px-4 py-4"
+                :class="
+                  selectedTopic.availability === 'live'
+                    ? 'border-indigo-200 bg-indigo-50/80'
+                    : 'border-slate-200 bg-slate-50'
+                "
+              >
+                <p class="text-sm font-medium text-text-primary">{{ selectedTopic.launchSummary }}</p>
+                <p class="mt-2 text-sm leading-6 text-text-secondary">
+                  {{ availabilityHint }}
+                </p>
+              </div>
+            </section>
+
+            <section
+              class="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 shadow-[0_12px_36px_rgba(15,23,42,0.08)]"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                    Quick Start
+                  </p>
+                  <h2 class="mt-2 text-xl font-semibold text-text-primary">
+                    选择这轮流程的起手方式
+                  </h2>
+                </div>
+                <span class="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+                  4 stages
+                </span>
+              </div>
+
+              <div class="mt-5 grid gap-3">
+                <button
+                  v-for="item in HOME_QUICK_STARTS"
+                  :key="item.key"
+                  type="button"
+                  class="rounded-[20px] border p-4 text-left transition-all"
+                  :class="
+                    selectedQuickStartKey === item.key
+                      ? 'border-primary bg-[linear-gradient(135deg,_rgba(79,70,229,0.12),_rgba(14,165,233,0.08))] shadow-[0_12px_24px_rgba(79,70,229,0.12)]'
+                      : 'border-slate-200 bg-white hover:border-primary/35 hover:bg-slate-50'
+                  "
+                  @click="selectedQuickStartKey = item.key"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-base font-semibold text-text-primary">{{ item.label }}</p>
+                      <p class="mt-1 text-sm leading-6 text-text-secondary">{{ item.subtitle }}</p>
+                    </div>
+                    <span
+                      class="mt-1 h-5 w-5 rounded-full border transition-colors"
+                      :class="
+                        selectedQuickStartKey === item.key
+                          ? 'border-primary bg-primary'
+                          : 'border-slate-300 bg-white'
+                      "
+                    />
+                  </div>
+                </button>
+              </div>
+
+              <div class="mt-5 rounded-[20px] border border-slate-200 bg-white p-4">
+                <p class="text-sm font-medium text-text-primary">{{ quickStartPreviewTitle }}</p>
+                <p class="mt-2 text-sm leading-6 text-text-secondary">
+                  {{ quickStartPreviewBody }}
+                </p>
+              </div>
+
+              <div class="mt-6 flex flex-col gap-3">
+                <PrimaryButton
+                  class="w-full justify-center py-4 text-base font-semibold shadow-[0_16px_32px_rgba(79,70,229,0.18)]"
+                  :loading="loading"
+                  :disabled="ctaDisabled"
+                  @click="onSubmit"
+                >
+                  {{ ctaLabel }}
+                </PrimaryButton>
+                <p class="text-sm leading-6 text-text-secondary">
+                  {{ ctaHint }}
+                </p>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </div>
     </main>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
-import FormCard from '@/components/ui/FormCard.vue'
 import PrimaryButton from '@/components/ui/PrimaryButton.vue'
 import TransitionOverlay from '@/components/ui/TransitionOverlay.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { createGoal } from '@/api/goals'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
-import { timeBudgetLabels } from '@/types/labels'
-import { PreferenceTag } from '@/types/enums'
-import type { TimeBudgetType, SelfReportedLevelType, PreferenceTagType } from '@/types/enums'
-import type { CreateGoalRequest } from '@/types/dto'
 import {
-  GOAL_SHOWCASE_PRESETS,
-  GOAL_PRESET_FEEDBACK,
-  findGoalShowcasePreset,
-  type GoalShowcasePreset,
-} from '@/constants/goalShowcasePresets'
+  buildHomeGoalRequest,
+  getHomeSubjectByTopic,
+  getHomeTopic,
+  HOME_DEFAULT_TOPIC_KEY,
+  HOME_QUICK_STARTS,
+  HOME_SUBJECTS,
+} from '@/constants/homeQuickStart'
 
 const router = useRouter()
-const route = useRoute()
 const store = useWorkflowStore()
 
-/** 目标页专用口语化基础文案（仍传后端既有 SelfReportedLevel 枚举值） */
-const goalPageLevelLabels: Record<string, string> = {
-  BEGINNER: '几乎零基础，刚开始接触',
-  BASIC: '知道一点，但很不熟',
-  PARTIAL_UNDERSTANDING: '学过一些，中间容易断档',
-  CAN_EXPLAIN_BUT_NOT_APPLY: '概念大概懂，一做题就懵',
-  SOLID_BUT_WANT_IMPROVE: '整体还行，想再稳一点',
-}
-
-const entryPreferenceOptions: { value: PreferenceTagType; label: string }[] = [
-  { value: PreferenceTag.CONCEPT_FIRST, label: '先理解原理' },
-  { value: PreferenceTag.PRACTICE_FIRST, label: '先学会做题' },
-]
-
-const showcasePresets = GOAL_SHOWCASE_PRESETS
-const activePresetId = ref<string | null>(null)
-const presetFeedbackLine = ref('')
-
+const selectedTopicKey = ref(HOME_DEFAULT_TOPIC_KEY)
+const selectedQuickStartKey = ref<(typeof HOME_QUICK_STARTS)[number]['key'] | null>(null)
 const transitionOverlay = ref(false)
+const loading = ref(false)
 
-function applyShowcasePreset(preset: GoalShowcasePreset) {
-  const patch = preset.apply()
-  form.value.rawGoalText = patch.rawGoalText
-  form.value.topicHints = [...patch.topicHints]
-  form.value.subjectHint = patch.subjectHint
-  activePresetId.value = preset.id
-  presetFeedbackLine.value = GOAL_PRESET_FEEDBACK[preset.id] ?? ''
+const selectedTopic = computed(() => getHomeTopic(selectedTopicKey.value))
+const selectedSubject = computed(() => getHomeSubjectByTopic(selectedTopicKey.value))
+const selectedQuickStart = computed(() =>
+  HOME_QUICK_STARTS.find((item) => item.key === selectedQuickStartKey.value) ?? null
+)
+
+const ctaDisabled = computed(
+  () => selectedTopic.value.availability !== 'live' || !selectedQuickStart.value
+)
+
+const heroSupportCopy = computed(() => {
+  if (!selectedQuickStart.value) {
+    return `当前已选 ${selectedTopic.value.label}，下一步只差确定这轮流程先从哪个阶段起步。`
+  }
+  return `${selectedQuickStart.value.previewPrefix}，围绕 ${selectedTopic.value.label} 生成诊断与后续学习编排。`
+})
+
+const availabilityHint = computed(() =>
+  selectedTopic.value.availability === 'live'
+    ? '点亮知识点可以直接进入诊断，让系统生成这一轮的学习路径。'
+    : '这个 chip 现在只做能力预览，开放后会接入同样的诊断、规划、执行闭环。'
+)
+
+const quickStartPreviewTitle = computed(() => {
+  if (!selectedQuickStart.value) return '先选一个 Quick Start，再决定这轮怎么启动'
+  return `${selectedQuickStart.value.label} · ${selectedSubject.value?.label ?? ''}`
+})
+
+const quickStartPreviewBody = computed(() => {
+  if (!selectedQuickStart.value) {
+    return '四个 Quick Start 分别对应 STRUCTURE / UNDERSTANDING / TRAINING / REFLECTION，不需要自由输入也能开始。'
+  }
+  return `${selectedQuickStart.value.previewPrefix}，围绕「${selectedTopic.value.label}」生成更适合这轮学习的起手路径。`
+})
+
+const ctaLabel = computed(() => {
+  if (selectedTopic.value.availability !== 'live') return '该章节即将开放'
+  if (!selectedQuickStart.value) return '先选择 Quick Start'
+  return selectedQuickStart.value.ctaLabel
+})
+
+const ctaHint = computed(() => {
+  if (selectedTopic.value.availability !== 'live') {
+    return '灰态章节当前只用于展示 408 学科扩展能力，暂不直接开启流程。'
+  }
+  if (!selectedQuickStart.value) {
+    return '选择一个 Quick Start 后，我们会按你的启动方式进入诊断页。'
+  }
+  return `点击后会以「${selectedTopic.value.label} + ${selectedQuickStart.value.label}」创建目标，并继续进入诊断。`
+})
+
+function chipClass(topicKey: string) {
+  const topic = getHomeTopic(topicKey)
+  const isSelected = selectedTopicKey.value === topicKey
+
+  if (topic.availability === 'live') {
+    if (isSelected) {
+      return 'border-primary bg-primary text-white shadow-[0_12px_24px_rgba(79,70,229,0.18)]'
+    }
+    return 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-primary hover:bg-indigo-100'
+  }
+
+  if (isSelected) {
+    return 'border-slate-300 bg-slate-200 text-slate-700'
+  }
+
+  return 'border-slate-200 bg-slate-50 text-slate-400 hover:border-slate-300 hover:bg-slate-100'
 }
 
-const loading = ref(false)
-const form = ref({
-  rawGoalText: '',
-  timeBudget: '' as string,
-  selfReportedLevel: '' as string,
-  entryPreference: PreferenceTag.CONCEPT_FIRST as PreferenceTagType,
-  subjectHint: '',
-  topicHints: [] as string[],
-  sourceContext: '',
-  priorityModule: '',
-})
+function liveTopicCount(subject: (typeof HOME_SUBJECTS)[number]) {
+  return subject.topicKeys.filter((topicKey) => getHomeTopic(topicKey).availability === 'live').length
+}
 
-const topicHintsStr = computed({
-  get: () => form.value.topicHints?.join('、') ?? '',
-  set: (v: string) => {
-    form.value.topicHints = v
-      ? v.split(/[,，、]/).map((s) => s.trim()).filter(Boolean)
-      : []
-  },
-})
-
-onMounted(() => {
-  const q = route.query.preset
-  const id = typeof q === 'string' ? q : Array.isArray(q) ? q[0] : undefined
-  const preset = findGoalShowcasePreset(id)
-  if (preset) {
-    applyShowcasePreset(preset)
-  }
-})
+function selectTopic(topicKey: string) {
+  selectedTopicKey.value = topicKey
+}
 
 function delay(ms: number) {
   return new Promise<void>((resolve) => {
@@ -256,30 +337,26 @@ function delay(ms: number) {
 }
 
 async function onSubmit() {
-  if (!form.value.rawGoalText.trim()) {
-    showToast('请填写学习目标')
+  if (ctaDisabled.value || !selectedQuickStart.value) {
+    if (selectedTopic.value.availability !== 'live') {
+      showToast('这个章节还未开放，请先选择已点亮的知识点')
+      return
+    }
+    showToast('请先选择 Quick Start')
     return
   }
+
   loading.value = true
   const minOverlayMs = 1200
   const started = Date.now()
+
   try {
-    const payload: CreateGoalRequest = {
-      rawGoalText: form.value.rawGoalText.trim(),
-      timeBudget: (form.value.timeBudget || undefined) as TimeBudgetType | undefined,
-      selfReportedLevel: (form.value.selfReportedLevel || undefined) as
-        | SelfReportedLevelType
-        | undefined,
-      preferenceTags: [form.value.entryPreference],
-      subjectHint: form.value.subjectHint || undefined,
-      topicHints: form.value.topicHints?.length ? form.value.topicHints : undefined,
-      sourceContext: form.value.sourceContext || undefined,
-      priorityModule: form.value.priorityModule || undefined,
-    }
+    const payload = buildHomeGoalRequest(selectedTopicKey.value, selectedQuickStart.value.key)
     const data = await createGoal(payload)
     store.goalId = data.goalId
     store.structuredGoal = data.structuredGoal
     store.goalContextSnapshot = data.goalContextSnapshot
+
     const elapsed = Date.now() - started
     const remaining = Math.max(0, minOverlayMs - elapsed)
     transitionOverlay.value = true
