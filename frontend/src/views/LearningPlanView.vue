@@ -23,6 +23,10 @@
             @start="onStartStep"
           />
 
+          <PlanScaffoldPreview
+            :expanded-stage-code="battleMap.expandedStageCode"
+          />
+
           <PlanPhasePathStrip
             :items="battleMap.pathStrip"
             :expanded-stage-code="battleMap.expandedStageCode"
@@ -49,6 +53,7 @@ import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import PlanRecommendationCard from '@/components/plan/PlanRecommendationCard.vue'
+import PlanScaffoldPreview from '@/components/plan/PlanScaffoldPreview.vue'
 import PlanPhasePathStrip from '@/components/plan/PlanPhasePathStrip.vue'
 import PlanCurrentPhaseTasks from '@/components/plan/PlanCurrentPhaseTasks.vue'
 import { useWorkflowStore } from '@/stores/workflow'
@@ -94,19 +99,23 @@ async function fetchPlan() {
 }
 
 function goExecution() {
-  const query: Record<string, string> = { step: '1' }
-  if (store.planId) query.planId = store.planId
-  router.push({ path: '/execution', query })
+  router.push({ name: 'task' })
 }
 
 async function onStartStep() {
-  if (store.sessionId) {
+  if (store.sessionId && store.currentTaskId) {
     goExecution()
     return
   }
   if (!store.planId) return
   committing.value = true
   try {
+    if (store.sessionId && !store.currentTaskId) {
+      store.sessionId = null
+      store.currentTask = null
+      store.progress = null
+      store.taskSequence = []
+    }
     const data = await commitPlan(store.planId)
     store.sessionId = data.sessionId
     store.currentTaskId = data.currentTaskId
@@ -122,6 +131,9 @@ async function onStartStep() {
 onMounted(() => {
   clearDiagnosisRecapSessionFlag()
   if (store.planPreview && !plan.value) plan.value = store.planPreview
+  if (plan.value?.planId && !store.planId) {
+    store.planId = plan.value.planId
+  }
   if (!plan.value) fetchPlan()
   else loading.value = false
 })
