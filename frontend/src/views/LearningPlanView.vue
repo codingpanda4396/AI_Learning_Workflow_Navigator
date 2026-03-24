@@ -2,8 +2,8 @@
   <PageContainer>
     <div class="min-h-screen bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_32%,#f8fafc_100%)]">
       <AppTopBar current="plan" />
-      <main class="mx-auto flex w-full max-w-7xl flex-col px-4 pb-10 pt-4 md:px-6 lg:px-8">
-        <LoadingState v-if="loading && !plan" message="正在生成你的四阶段作战图..." />
+      <main class="mx-auto flex w-full max-w-3xl flex-col px-4 pb-10 pt-4 md:max-w-4xl md:px-6 lg:px-8">
+        <LoadingState v-if="loading && !plan" message="正在生成你的学习路径…" />
         <ErrorState v-else-if="error" :message="error">
           <template #action>
             <SecondaryButton @click="fetchPlan">重新加载规划</SecondaryButton>
@@ -12,34 +12,28 @@
 
         <div
           v-else-if="plan && battleMap"
-          class="space-y-8"
+          class="space-y-6"
         >
-          <section class="rounded-[28px] border border-white/70 bg-white/75 p-5 shadow-[0_22px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm md:p-6">
-            <div class="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
-                  Planning Orchestration
-                </p>
-                <h1 class="mt-2 text-3xl font-semibold tracking-tight text-text-primary md:text-[42px]">
-                  规划不是说明页，而是学习编排台
-                </h1>
-              </div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-text-secondary">
-                <p v-if="userStateLine">当前状态：{{ userStateLine }}</p>
-                <p class="font-medium text-text-primary">问题焦点：{{ problemLine }}</p>
-              </div>
-            </div>
-          </section>
-
-          <PlanStrategyOverview
-            :overview="battleMap.strategyOverview"
+          <PlanRecommendationCard
+            :knowledge="battleMap.strategyOverview.currentKnowledge"
+            :recommended-start="battleMap.recommendedStartPhrase"
+            :why-line="battleMap.whyShortLine"
+            :total-time="battleMap.totalEstimatedLabel"
             :loading="committing"
             @start="onStartStep"
           />
 
-          <PlanStageMap :cards="battleMap.stageCards" />
+          <PlanPhasePathStrip
+            :items="battleMap.pathStrip"
+            :expanded-stage-code="battleMap.expandedStageCode"
+          />
 
-          <PlanTaskBoard :groups="battleMap.taskGroupsByStage" />
+          <PlanCurrentPhaseTasks
+            :groups="battleMap.taskGroupsByStage"
+            :expanded-stage-code="battleMap.expandedStageCode"
+            :loading="committing"
+            @start="onStartStep"
+          />
         </div>
       </main>
     </div>
@@ -54,19 +48,15 @@ import AppTopBar from '@/components/layout/AppTopBar.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
-import PlanStageMap from '@/components/plan/PlanStageMap.vue'
-import PlanStrategyOverview from '@/components/plan/PlanStrategyOverview.vue'
-import PlanTaskBoard from '@/components/plan/PlanTaskBoard.vue'
+import PlanRecommendationCard from '@/components/plan/PlanRecommendationCard.vue'
+import PlanPhasePathStrip from '@/components/plan/PlanPhasePathStrip.vue'
+import PlanCurrentPhaseTasks from '@/components/plan/PlanCurrentPhaseTasks.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { previewPlan, commitPlan } from '@/api/learning-plan'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
 import { buildPlanBattleMapView } from '@/utils/planPresentationModel'
-import {
-  buildPlanProblemOneLiner,
-  buildUserStateSummaryLine,
-  clearDiagnosisRecapSessionFlag,
-} from '@/utils/diagnosisRecapCopy'
+import { clearDiagnosisRecapSessionFlag } from '@/utils/diagnosisRecapCopy'
 import type { PlanPreviewData } from '@/types/dto'
 
 const router = useRouter()
@@ -76,14 +66,6 @@ const loading = ref(true)
 const committing = ref(false)
 const error = ref<string | null>(null)
 const plan = ref<PlanPreviewData | null>(null)
-
-const problemLine = computed(() =>
-  buildPlanProblemOneLiner(store.learnerProfileSnapshot)
-)
-
-const userStateLine = computed(() =>
-  buildUserStateSummaryLine(store.learnerProfileSnapshot)
-)
 
 const battleMap = computed(() =>
   buildPlanBattleMapView(plan.value, {

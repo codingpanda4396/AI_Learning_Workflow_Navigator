@@ -20,6 +20,7 @@ import type {
   StructuredLearningGoal,
   TaskBlueprint,
 } from '@/types/dto'
+import { workflowTopicLabelFromStructuredGoal } from '@/utils/workflowTopicLabel'
 
 /** 卡片内 1️⃣2️⃣3️⃣ 行动引导 */
 export type PlanActionGuide = {
@@ -105,15 +106,8 @@ export function resolveTopicLabel(
   plan: PlanPreviewData,
   ctx: PlanViewModelContext
 ): string {
-  const g = ctx.structuredGoal
-  const fromTopic = g?.topics?.find((t) => t?.trim())?.trim()
-  if (fromTopic) return truncate(fromTopic, 32)
-  const intent = g?.intentDescription?.trim()
-  if (intent) return truncate(intent, 32)
-  const norm = g?.normalizedGoalText?.trim()
-  if (norm) return truncate(norm, 32)
-  const raw = g?.rawGoalText?.trim()
-  if (raw) return truncate(raw, 32)
+  const fromGoal = workflowTopicLabelFromStructuredGoal(ctx.structuredGoal)
+  if (fromGoal) return fromGoal
   const pg = plan.goal?.trim()
   if (pg) return truncate(pg, 32)
   return '当前主题'
@@ -484,7 +478,19 @@ export type PlanStageCardView = {
   tutorRole: string
   checkpoint: string
   estimatedTime: string
+  /** 用于汇总总时长；缺省或 0 时不计入 */
+  estimatedMinutesTotal?: number
   taskCount: number
+  isRecommended: boolean
+  isCurrent: boolean
+}
+
+/** 四阶段路径条（扫读区） */
+export type PlanPathStripItem = {
+  code: PlanStageCode
+  title: string
+  scanLine: string
+  estimatedLabel: string
   isRecommended: boolean
   isCurrent: boolean
 }
@@ -512,6 +518,15 @@ export type PlanBattleMapView = {
   stageCards: PlanStageCardView[]
   taskGroupsByStage: PlanTaskGroupView[]
   recommendedStageCode: PlanStageCode
+  /** 有会话进度时优先展开该阶段，否则为推荐起点阶段 */
+  expandedStageCode: PlanStageCode
+  pathStrip: PlanPathStripItem[]
+  totalEstimatedMinutes: number
+  totalEstimatedLabel: string
+  /** 结论卡用：口语化推荐起点 */
+  recommendedStartPhrase: string
+  /** 结论卡用：一句原因（短） */
+  whyShortLine: string
 }
 
 type StageMeta = {
@@ -530,6 +545,22 @@ const PLAN_STAGE_ORDER: PlanStageCode[] = [
   'TRAINING',
   'REFLECTION',
 ]
+
+/** 路径条上一句扫读说明（与四阶段模型对齐，保持极短） */
+const STAGE_PATH_SCAN_LINE: Record<PlanStageCode, string> = {
+  STRUCTURE: '先把整体框架搭起来',
+  UNDERSTANDING: '再理解关键机制',
+  TRAINING: '再做题验证理解',
+  REFLECTION: '最后复盘薄弱点',
+}
+
+/** 结论卡「推荐起点」口语短句 */
+const RECOMMENDED_START_PHRASE: Record<PlanStageCode, string> = {
+  STRUCTURE: '先搭结构',
+  UNDERSTANDING: '先理解关键机制',
+  TRAINING: '先做小题验证',
+  REFLECTION: '先快速复盘',
+}
 
 const STAGE_META: Record<PlanStageCode, StageMeta> = {
   STRUCTURE: {
@@ -676,6 +707,17 @@ function summarizeWhy(plan: PlanPreviewData): string {
   const evidence = plan.keyEvidence?.filter((item) => item?.trim()) ?? []
   if (evidence.length) return truncate(evidence.slice(0, 2).join('；'), 88)
   return '系统先根据你的起点和风险，决定从最稳的阶段切入，再把后续动作串成闭环。'
+}
+
+/** 结论卡专用：更短、偏用户口吻的一句原因 */
+function summarizeWhyShort(plan: PlanPreviewData): string {
+  const entry = plan.recommendedEntry?.reason?.trim()
+  if (entry) return truncate(entry, 46)
+  const reason = plan.recommendedStrategy?.reason?.trim()
+  if (reason) return truncate(reason, 46)
+  const evidence = plan.keyEvidence?.filter((item) => item?.trim()) ?? []
+  if (evidence.length) return truncate(evidence[0]!, 46)
+  return '从你最顺手的阶段切入，后面再自动串起来。'
 }
 
 function summarizeRisk(
@@ -827,7 +869,7 @@ export function buildPlanBattleMapView(
   const taskGroups = buildTaskGroups(plan)
   const currentStageCode = currentStageCodeFromContext(plan, ctx)
 
-  const stageCards = PLAN_STAGE_ORDER.map((code, index) => {
+  const stageCards: PlanStageCardView[] = PLAN_STAGE_ORDER.map((code, index) => {
     const stage = stageByCode[code]
     const tasks = taskGroups[code]
     const taskMinutes = tasks.reduce(
@@ -847,11 +889,36 @@ export function buildPlanBattleMapView(
       tutorRole: meta.tutorRole,
       checkpoint: meta.checkpoint,
       estimatedTime: formatStageMinutes(minutes),
+      estimatedMinutesTotal:
+        minutes != null && minutes > 0 ? minutes : undefined,
       taskCount: tasks.length,
       isRecommended: code === recommendedStageCode,
       isCurrent: code === currentStageCode,
     }
   })
+
+  const pathStrip: PlanPathStripItem[] = PLAN_STAGE_ORDER.map((code) => {
+    const card = stageCards.find((c) => c.code === code)!
+    return {
+      code,
+      title: card.title,
+      scanLine: STAGE_PATH_SCAN_LINE[code],
+      estimatedLabel: card.estimatedTime,
+      isRecommended: code === recommendedStageCode,
+      isCurrent: code === currentStageCode,
+    }
+  })
+
+  const totalEstimatedMinutes = stageCards.reduce(
+    (sum, c) => sum + (c.estimatedMinutesTotal ?? 0),
+    0
+  )
+  const totalEstimatedLabel =
+    totalEstimatedMinutes > 0
+      ? `约 ${totalEstimatedMinutes} 分钟`
+      : '约 45–60 分钟'
+
+  const expandedStageCode = currentStageCode ?? recommendedStageCode
 
   const taskGroupsByStage = PLAN_STAGE_ORDER.map((code) => ({
     stageCode: code,
@@ -864,5 +931,11 @@ export function buildPlanBattleMapView(
     stageCards,
     taskGroupsByStage,
     recommendedStageCode,
+    expandedStageCode,
+    pathStrip,
+    totalEstimatedMinutes,
+    totalEstimatedLabel,
+    recommendedStartPhrase: RECOMMENDED_START_PHRASE[recommendedStageCode],
+    whyShortLine: summarizeWhyShort(plan),
   }
 }

@@ -17,14 +17,14 @@
       </template>
       <template v-else>
         <p class="mt-2 text-sm leading-relaxed text-text-primary">
-          你可以把二叉树理解成一个「家族结构」：
+          先把「{{ displayTopic }}」想成一块有层次的知识：上层是总览，下层是细节。
         </p>
         <ul class="mt-2 list-inside list-disc space-y-1.5 text-sm leading-relaxed text-text-primary">
-          <li>最上面是祖先（根节点）</li>
-          <li>每个人最多有两个孩子</li>
+          <li>用最直白的话说出：它解决什么问题？</li>
+          <li>和相邻概念相比，它的边界在哪里？</li>
         </ul>
         <p class="mt-3 text-sm leading-relaxed text-text-secondary">
-          👉 这样你就能理解「最多两个分支」的特点
+          👉 先建立画面，再补术语，会比死记定义更稳
         </p>
       </template>
     </div>
@@ -35,11 +35,15 @@
 import { computed } from 'vue'
 
 const props = defineProps<{
-  /** 来自 R0003 /api/ai-tutor/explain；为空时用内置二叉树兜底示例 */
+  /** 来自 R0003 /api/ai-tutor/explain；为空时用通用兜底示例 */
   explanation?: string | null
+  /** 当前步知识点标签，用于兜底文案 */
+  topicLabel?: string | null
 }>()
 
 const trimmedExplanation = computed(() => props.explanation?.trim() ?? '')
 
 const useGenerated = computed(() => trimmedExplanation.value.length > 0)
+
+const displayTopic = computed(() => props.topicLabel?.trim() || '当前主题')
 </script>

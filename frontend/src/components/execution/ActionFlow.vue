@@ -25,7 +25,10 @@
     </template>
 
     <template v-else-if="phase === ExecutionPhaseR0003.AI_EXPLAIN">
-      <AIResponseCard :explanation="aiExplanation" />
+      <AIResponseCard
+        :explanation="aiExplanation"
+        :topic-label="tutorKnowledgeLabel()"
+      />
       <PrimaryButton
         class="w-full justify-center py-3 sm:w-auto sm:min-w-[200px]"
         @click="goThinkingDone"

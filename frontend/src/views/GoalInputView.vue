@@ -1,224 +1,157 @@
 <template>
   <PageContainer>
-    <TransitionOverlay
-      v-if="transitionOverlay"
-      message="正在为你接通这轮学习流程，马上进入诊断..."
-    />
+    <TransitionOverlay v-if="transitionOverlay" message="进入诊断与规划…" />
     <AppTopBar current="goal" />
     <main class="relative overflow-hidden">
-      <div class="absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.18),_transparent_58%)]" />
       <div
-        class="absolute right-0 top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(245,158,11,0.18),_transparent_68%)] blur-3xl"
+        class="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(79,70,229,0.12),transparent)]"
       />
 
-      <div class="relative mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:py-12">
-        <section
-          class="overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(140deg,_rgba(15,23,42,0.98)_0%,_rgba(30,41,59,0.96)_56%,_rgba(79,70,229,0.9)_100%)] px-6 py-8 text-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] md:px-8 md:py-10"
-        >
-          <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-            <div class="max-w-3xl">
-              <p class="text-xs font-semibold uppercase tracking-[0.32em] text-white/60">
-                Learning Workflow
-              </p>
-              <h1 class="mt-4 max-w-2xl text-3xl font-semibold leading-tight md:text-5xl">
-                不是问 AI 一个问题，而是开启一轮学习流程
-              </h1>
-              <p class="mt-4 max-w-2xl text-sm leading-7 text-slate-200 md:text-base">
-                先选一个当前可用知识点，再决定这轮学习要先搭结构、讲机制、做练习还是做复盘。首页不再让你从空白输入开始。
-              </p>
-            </div>
+      <div class="relative mx-auto w-full max-w-3xl px-5 py-10 md:px-8 md:py-14">
+        <!-- A 顶部引导：一句话 + 当前入口（单视觉核心） -->
+        <header class="space-y-6">
+          <div class="space-y-2 text-center md:text-left">
+            <h1 class="text-2xl font-semibold tracking-tight text-text-primary md:text-3xl">
+              选入口，启动本轮学习
+            </h1>
+            <p class="text-sm text-text-secondary md:text-[15px]">
+              先选知识点，再选起手方式，然后进入诊断与规划。
+            </p>
+          </div>
 
-            <div
-              class="grid min-w-[280px] gap-3 rounded-[24px] border border-white/12 bg-white/8 p-4 text-sm text-slate-100 backdrop-blur"
-            >
-              <div class="flex items-center justify-between gap-4">
-                <span class="text-white/65">当前入口</span>
-                <span class="rounded-full bg-emerald-400/18 px-3 py-1 text-xs font-medium text-emerald-100">
-                  Quick Start
-                </span>
-              </div>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="rounded-2xl border border-white/10 bg-black/10 p-3">
-                  <p class="text-[11px] uppercase tracking-[0.24em] text-white/45">Topic</p>
-                  <p class="mt-2 font-medium text-white">{{ selectedTopic.label }}</p>
-                </div>
-                <div class="rounded-2xl border border-white/10 bg-black/10 p-3">
-                  <p class="text-[11px] uppercase tracking-[0.24em] text-white/45">Stage</p>
-                  <p class="mt-2 font-medium text-white">
-                    {{ selectedQuickStart?.label ?? '先选启动方式' }}
-                  </p>
-                </div>
-              </div>
-              <p class="text-sm leading-6 text-slate-200/90">
-                {{ heroSupportCopy }}
+          <div
+            class="rounded-2xl border border-slate-200/90 bg-white/90 px-5 py-4 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-sm md:flex md:items-stretch md:justify-between md:gap-6 md:py-5"
+          >
+            <div class="min-w-0 flex-1 space-y-1">
+              <p class="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">本轮入口</p>
+              <p class="truncate text-base font-semibold text-text-primary">
+                {{ selectedTopic.label }}
+                <span class="font-normal text-slate-400">·</span>
+                {{ selectedQuickStart?.label ?? '—' }}
+              </p>
+              <p v-if="selectedTopic.availability === 'live'" class="text-sm text-text-secondary">
+                {{ topicOneLiner }}
+              </p>
+              <p v-else class="text-sm text-slate-400">该知识点即将开放，请选已点亮项。</p>
+              <p
+                v-if="recommendedForTopic && selectedTopic.availability === 'live'"
+                class="pt-1 text-xs text-slate-400 md:hidden"
+              >
+                推荐起手：{{ recommendedForTopic.label }}
               </p>
             </div>
+            <div class="mt-4 flex shrink-0 flex-col justify-center gap-3 md:mt-0 md:w-[200px]">
+              <div
+                v-if="recommendedForTopic && selectedTopic.availability === 'live'"
+                class="hidden text-right text-xs text-slate-400 md:block"
+              >
+                <span>推荐起手</span>
+                <span class="ml-1 font-medium text-slate-600">{{ recommendedForTopic.label }}</span>
+              </div>
+              <PrimaryButton
+                class="w-full justify-center py-3 text-sm font-semibold shadow-[0_10px_24px_rgba(79,70,229,0.18)]"
+                :loading="loading"
+                :disabled="ctaDisabled"
+                @click="onSubmit"
+              >
+                {{ ctaLabel }}
+              </PrimaryButton>
+            </div>
+          </div>
+        </header>
+
+        <!-- B 知识点 -->
+        <section class="mt-12 space-y-4">
+          <div class="flex items-baseline justify-between gap-3">
+            <h2 class="text-base font-semibold text-text-primary">知识点</h2>
+          </div>
+          <p class="text-xs text-slate-400">点选知识点后，会更新上方入口与推荐起手。</p>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <article
+              v-for="subject in HOME_SUBJECTS"
+              :key="subject.key"
+              class="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <h3 class="text-[15px] font-semibold text-text-primary">{{ subject.label }}</h3>
+                  <p class="mt-0.5 text-xs text-slate-500">{{ subject.caption }}</p>
+                </div>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button
+                  v-for="topicKey in subject.topicKeys"
+                  :key="topicKey"
+                  type="button"
+                  class="rounded-full border px-3 py-1.5 text-xs font-medium transition-all"
+                  :class="chipClass(topicKey)"
+                  @click="selectTopic(topicKey)"
+                >
+                  {{ getHomeTopic(topicKey).label }}
+                </button>
+              </div>
+            </article>
           </div>
         </section>
 
-        <div class="grid gap-8 xl:grid-cols-[minmax(0,1.35fr)_360px]">
-          <section class="space-y-5">
-            <div class="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                  Subject Matrix
-                </p>
-                <h2 class="mt-2 text-2xl font-semibold text-text-primary">
-                  四个入口，先点亮你这轮要走的知识点
-                </h2>
-              </div>
-              <div
-                class="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
-              >
-                当前仅点亮 4 个真实知识点，灰态章节用于展示 408 学科扩展能力
-              </div>
-            </div>
-
-            <div class="grid gap-4 md:grid-cols-2">
-              <article
-                v-for="subject in HOME_SUBJECTS"
-                :key="subject.key"
-                class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition-transform hover:-translate-y-0.5"
-              >
-                <div class="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 class="text-lg font-semibold text-text-primary">{{ subject.label }}</h3>
-                    <p class="mt-1 text-sm leading-6 text-text-secondary">{{ subject.caption }}</p>
-                  </div>
-                  <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                    {{ liveTopicCount(subject) }} / {{ subject.topicKeys.length }} 已点亮
-                  </span>
-                </div>
-
-                <div class="mt-5 flex flex-wrap gap-2.5">
-                  <button
-                    v-for="topicKey in subject.topicKeys"
-                    :key="topicKey"
-                    type="button"
-                    class="rounded-full border px-3 py-2 text-sm transition-all"
-                    :class="chipClass(topicKey)"
-                    @click="selectTopic(topicKey)"
-                  >
-                    {{ getHomeTopic(topicKey).label }}
-                  </button>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <aside class="space-y-5">
-            <section
-              class="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.08)]"
+        <!-- C 起手方式 -->
+        <section class="mt-12 space-y-4">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 class="text-base font-semibold text-text-primary">起手方式</h2>
+            <p
+              v-if="selectedTopic.availability === 'live' && recommendedForTopic"
+              class="text-xs text-slate-400"
             >
-              <div class="flex items-start justify-between gap-3">
+              推荐：{{ recommendedForTopic.label }}
+            </p>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <button
+              v-for="item in HOME_QUICK_STARTS"
+              :key="item.key"
+              type="button"
+              class="rounded-2xl border p-4 text-left transition-all"
+              :class="
+                selectedQuickStartKey === item.key
+                  ? 'border-primary bg-indigo-50/80 ring-2 ring-primary/25'
+                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
+              "
+              @click="selectedQuickStartKey = item.key"
+            >
+              <div class="flex items-start justify-between gap-2">
                 <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                    Topic Preview
-                  </p>
-                  <h2 class="mt-2 text-xl font-semibold text-text-primary">
-                    {{ selectedTopic.previewTitle }}
-                  </h2>
+                  <p class="text-[15px] font-semibold text-text-primary">{{ item.label }}</p>
+                  <p class="mt-1 text-xs leading-relaxed text-text-secondary">{{ item.subtitle }}</p>
                 </div>
                 <span
-                  class="rounded-full px-3 py-1 text-xs font-medium"
-                  :class="
-                    selectedTopic.availability === 'live'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-slate-100 text-slate-500'
-                  "
-                >
-                  {{ selectedTopic.availability === 'live' ? '已开放' : '即将开放' }}
-                </span>
-              </div>
-
-              <p class="mt-4 text-sm leading-7 text-text-secondary">
-                {{ selectedTopic.previewBody }}
-              </p>
-
-              <div
-                class="mt-5 rounded-[20px] border px-4 py-4"
-                :class="
-                  selectedTopic.availability === 'live'
-                    ? 'border-indigo-200 bg-indigo-50/80'
-                    : 'border-slate-200 bg-slate-50'
-                "
-              >
-                <p class="text-sm font-medium text-text-primary">{{ selectedTopic.launchSummary }}</p>
-                <p class="mt-2 text-sm leading-6 text-text-secondary">
-                  {{ availabilityHint }}
-                </p>
-              </div>
-            </section>
-
-            <section
-              class="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 shadow-[0_12px_36px_rgba(15,23,42,0.08)]"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                    Quick Start
-                  </p>
-                  <h2 class="mt-2 text-xl font-semibold text-text-primary">
-                    选择这轮流程的起手方式
-                  </h2>
-                </div>
-                <span class="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-                  4 stages
-                </span>
-              </div>
-
-              <div class="mt-5 grid gap-3">
-                <button
-                  v-for="item in HOME_QUICK_STARTS"
-                  :key="item.key"
-                  type="button"
-                  class="rounded-[20px] border p-4 text-left transition-all"
+                  class="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 transition-colors"
                   :class="
                     selectedQuickStartKey === item.key
-                      ? 'border-primary bg-[linear-gradient(135deg,_rgba(79,70,229,0.12),_rgba(14,165,233,0.08))] shadow-[0_12px_24px_rgba(79,70,229,0.12)]'
-                      : 'border-slate-200 bg-white hover:border-primary/35 hover:bg-slate-50'
+                      ? 'border-primary bg-primary'
+                      : 'border-slate-300 bg-white'
                   "
-                  @click="selectedQuickStartKey = item.key"
-                >
-                  <div class="flex items-start justify-between gap-3">
-                    <div>
-                      <p class="text-base font-semibold text-text-primary">{{ item.label }}</p>
-                      <p class="mt-1 text-sm leading-6 text-text-secondary">{{ item.subtitle }}</p>
-                    </div>
-                    <span
-                      class="mt-1 h-5 w-5 rounded-full border transition-colors"
-                      :class="
-                        selectedQuickStartKey === item.key
-                          ? 'border-primary bg-primary'
-                          : 'border-slate-300 bg-white'
-                      "
-                    />
-                  </div>
-                </button>
+                />
               </div>
+            </button>
+          </div>
+        </section>
 
-              <div class="mt-5 rounded-[20px] border border-slate-200 bg-white p-4">
-                <p class="text-sm font-medium text-text-primary">{{ quickStartPreviewTitle }}</p>
-                <p class="mt-2 text-sm leading-6 text-text-secondary">
-                  {{ quickStartPreviewBody }}
-                </p>
-              </div>
-
-              <div class="mt-6 flex flex-col gap-3">
-                <PrimaryButton
-                  class="w-full justify-center py-4 text-base font-semibold shadow-[0_16px_32px_rgba(79,70,229,0.18)]"
-                  :loading="loading"
-                  :disabled="ctaDisabled"
-                  @click="onSubmit"
-                >
-                  {{ ctaLabel }}
-                </PrimaryButton>
-                <p class="text-sm leading-6 text-text-secondary">
-                  {{ ctaHint }}
-                </p>
-              </div>
-            </section>
-          </aside>
+        <!-- D 底部：再强调行动 + 弱提示 -->
+        <div class="mt-12 space-y-4 border-t border-slate-100 pt-10">
+          <PrimaryButton
+            class="w-full justify-center py-3.5 text-base font-semibold shadow-[0_12px_28px_rgba(79,70,229,0.2)]"
+            :loading="loading"
+            :disabled="ctaDisabled"
+            @click="onSubmit"
+          >
+            {{ ctaLabel }}
+          </PrimaryButton>
+          <p class="text-center text-xs text-slate-400">选好后点此开始；将进入诊断与规划。</p>
+          <p class="text-center text-[11px] text-slate-300">
+            {{ HOME_TOPIC_SLOT_COUNT }} 个展示位 · {{ HOME_LIVE_TOPIC_COUNT }} 个可学 · 408+ 可扩展
+          </p>
         </div>
       </div>
     </main>
@@ -226,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
@@ -238,71 +171,60 @@ import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
 import {
   buildHomeGoalRequest,
-  getHomeSubjectByTopic,
   getHomeTopic,
   HOME_DEFAULT_TOPIC_KEY,
+  HOME_LIVE_TOPIC_COUNT,
   HOME_QUICK_STARTS,
   HOME_SUBJECTS,
+  HOME_TOPIC_SLOT_COUNT,
 } from '@/constants/homeQuickStart'
 
 const router = useRouter()
 const store = useWorkflowStore()
 
+const initialTopic = getHomeTopic(HOME_DEFAULT_TOPIC_KEY)
 const selectedTopicKey = ref(HOME_DEFAULT_TOPIC_KEY)
-const selectedQuickStartKey = ref<(typeof HOME_QUICK_STARTS)[number]['key'] | null>(null)
+const selectedQuickStartKey = ref<(typeof HOME_QUICK_STARTS)[number]['key']>(
+  initialTopic.recommendedIntent ?? 'structure'
+)
 const transitionOverlay = ref(false)
 const loading = ref(false)
 
 const selectedTopic = computed(() => getHomeTopic(selectedTopicKey.value))
-const selectedSubject = computed(() => getHomeSubjectByTopic(selectedTopicKey.value))
 const selectedQuickStart = computed(() =>
   HOME_QUICK_STARTS.find((item) => item.key === selectedQuickStartKey.value) ?? null
 )
+
+const recommendedForTopic = computed(() => {
+  const ri = selectedTopic.value.recommendedIntent
+  if (!ri) return null
+  return HOME_QUICK_STARTS.find((x) => x.key === ri) ?? null
+})
+
+const topicOneLiner = computed(() => {
+  const t = selectedTopic.value
+  if (t.availability !== 'live') return ''
+  return t.previewBody
+})
 
 const ctaDisabled = computed(
   () => selectedTopic.value.availability !== 'live' || !selectedQuickStart.value
 )
 
-const heroSupportCopy = computed(() => {
-  if (!selectedQuickStart.value) {
-    return `当前已选 ${selectedTopic.value.label}，下一步只差确定这轮流程先从哪个阶段起步。`
-  }
-  return `${selectedQuickStart.value.previewPrefix}，围绕 ${selectedTopic.value.label} 生成诊断与后续学习编排。`
-})
-
-const availabilityHint = computed(() =>
-  selectedTopic.value.availability === 'live'
-    ? '点亮知识点可以直接进入诊断，让系统生成这一轮的学习路径。'
-    : '这个 chip 现在只做能力预览，开放后会接入同样的诊断、规划、执行闭环。'
-)
-
-const quickStartPreviewTitle = computed(() => {
-  if (!selectedQuickStart.value) return '先选一个 Quick Start，再决定这轮怎么启动'
-  return `${selectedQuickStart.value.label} · ${selectedSubject.value?.label ?? ''}`
-})
-
-const quickStartPreviewBody = computed(() => {
-  if (!selectedQuickStart.value) {
-    return '四个 Quick Start 分别对应 STRUCTURE / UNDERSTANDING / TRAINING / REFLECTION，不需要自由输入也能开始。'
-  }
-  return `${selectedQuickStart.value.previewPrefix}，围绕「${selectedTopic.value.label}」生成更适合这轮学习的起手路径。`
-})
-
 const ctaLabel = computed(() => {
-  if (selectedTopic.value.availability !== 'live') return '该章节即将开放'
-  if (!selectedQuickStart.value) return '先选择 Quick Start'
-  return selectedQuickStart.value.ctaLabel
+  if (selectedTopic.value.availability !== 'live') return '该知识点未开放'
+  return '开始这轮学习'
 })
 
-const ctaHint = computed(() => {
-  if (selectedTopic.value.availability !== 'live') {
-    return '灰态章节当前只用于展示 408 学科扩展能力，暂不直接开启流程。'
+watch(
+  () => selectedTopicKey.value,
+  (key) => {
+    const t = getHomeTopic(key)
+    if (t.availability === 'live' && t.recommendedIntent) {
+      selectedQuickStartKey.value = t.recommendedIntent
+    }
   }
-  if (!selectedQuickStart.value) {
-    return '选择一个 Quick Start 后，我们会按你的启动方式进入诊断页。'
-  }
-  return `点击后会以「${selectedTopic.value.label} + ${selectedQuickStart.value.label}」创建目标，并继续进入诊断。`
-})
+)
 
 function chipClass(topicKey: string) {
   const topic = getHomeTopic(topicKey)
@@ -310,20 +232,16 @@ function chipClass(topicKey: string) {
 
   if (topic.availability === 'live') {
     if (isSelected) {
-      return 'border-primary bg-primary text-white shadow-[0_12px_24px_rgba(79,70,229,0.18)]'
+      return 'border-primary bg-primary text-white shadow-sm'
     }
-    return 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-primary hover:bg-indigo-100'
+    return 'border-indigo-200/80 bg-indigo-50/90 text-indigo-800 hover:border-primary/50'
   }
 
   if (isSelected) {
-    return 'border-slate-300 bg-slate-200 text-slate-700'
+    return 'border-slate-300 bg-slate-100 text-slate-500'
   }
 
-  return 'border-slate-200 bg-slate-50 text-slate-400 hover:border-slate-300 hover:bg-slate-100'
-}
-
-function liveTopicCount(subject: (typeof HOME_SUBJECTS)[number]) {
-  return subject.topicKeys.filter((topicKey) => getHomeTopic(topicKey).availability === 'live').length
+  return 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
 }
 
 function selectTopic(topicKey: string) {
@@ -339,10 +257,10 @@ function delay(ms: number) {
 async function onSubmit() {
   if (ctaDisabled.value || !selectedQuickStart.value) {
     if (selectedTopic.value.availability !== 'live') {
-      showToast('这个章节还未开放，请先选择已点亮的知识点')
+      showToast('请先选择已点亮的知识点。')
       return
     }
-    showToast('请先选择 Quick Start')
+    showToast('请选择起手方式')
     return
   }
 

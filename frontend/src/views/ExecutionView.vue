@@ -23,6 +23,8 @@ import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { EXECUTION_PHASE_COUNT, EXECUTION_PHASE_LABELS } from '@/constants/executionPath'
 import { getExecutionStepConfig } from '@/constants/executionSteps'
+import { adaptExecutionStepForTopic } from '@/utils/adaptExecutionStepForTopic'
+import { workflowTopicLabelFromStructuredGoal } from '@/utils/workflowTopicLabel'
 import { useAiTutorStore } from '@/stores/aiTutor'
 import { showToast } from '@/stores/toast'
 import { useWorkflowStore } from '@/stores/workflow'
@@ -48,7 +50,17 @@ const pathCurrent = computed(() => {
   return n
 })
 
-const stepTemplate = computed<ExecutionStep>(() => getExecutionStepConfig(stepIndex.value))
+const workflowTopicLabel = computed(() => {
+  const t = workflowTopicLabelFromStructuredGoal(store.structuredGoal)
+  return t || '当前主题'
+})
+
+const stepTemplate = computed<ExecutionStep>(() =>
+  adaptExecutionStepForTopic(
+    getExecutionStepConfig(stepIndex.value),
+    workflowTopicLabel.value
+  )
+)
 
 const mergedStep = computed<ExecutionStep>(() => ({
   ...stepTemplate.value,

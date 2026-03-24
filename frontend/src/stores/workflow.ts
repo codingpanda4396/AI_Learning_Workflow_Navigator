@@ -17,7 +17,18 @@ const STORAGE_KEYS = {
   diagnosisId: 'workflow_diagnosisId',
   sessionId: 'workflow_sessionId',
   planId: 'workflow_planId',
+  structuredGoal: 'workflow_structuredGoal',
 } as const
+
+function parseStoredStructuredGoal(): StructuredLearningGoal | null {
+  try {
+    const raw = getStored(STORAGE_KEYS.structuredGoal)
+    if (!raw) return null
+    return JSON.parse(raw) as StructuredLearningGoal
+  } catch {
+    return null
+  }
+}
 
 function getStored(key: string): string | null {
   try {
@@ -37,7 +48,7 @@ function setStored(key: string, value: string | null) {
 
 export const useWorkflowStore = defineStore('workflow', () => {
   const goalId = ref<string | null>(getStored(STORAGE_KEYS.goalId))
-  const structuredGoal = ref<StructuredLearningGoal | null>(null)
+  const structuredGoal = ref<StructuredLearningGoal | null>(parseStoredStructuredGoal())
   const goalContextSnapshot = ref<GoalContextSnapshot | null>(null)
 
   const diagnosisId = ref<string | null>(getStored(STORAGE_KEYS.diagnosisId))
@@ -60,6 +71,21 @@ export const useWorkflowStore = defineStore('workflow', () => {
   watch(diagnosisId, (v) => setStored(STORAGE_KEYS.diagnosisId, v))
   watch(sessionId, (v) => setStored(STORAGE_KEYS.sessionId, v))
   watch(planId, (v) => setStored(STORAGE_KEYS.planId, v))
+  watch(
+    structuredGoal,
+    (v) => {
+      try {
+        if (v) {
+          setStored(STORAGE_KEYS.structuredGoal, JSON.stringify(v))
+        } else {
+          setStored(STORAGE_KEYS.structuredGoal, null)
+        }
+      } catch {
+        setStored(STORAGE_KEYS.structuredGoal, null)
+      }
+    },
+    { deep: true }
+  )
 
   function reset() {
     goalId.value = null
@@ -77,6 +103,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     progress.value = null
     report.value = null
     nextActionDecision.value = null
+    setStored(STORAGE_KEYS.structuredGoal, null)
   }
 
   return {

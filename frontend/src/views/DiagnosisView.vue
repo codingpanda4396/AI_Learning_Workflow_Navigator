@@ -21,6 +21,16 @@
           <p class="mt-2 text-text-secondary">
             不用写小作文，选最贴近的一项即可；系统会据此生成你的学习路径。
           </p>
+          <div
+            class="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3"
+          >
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-primary/90">
+              本轮学习主题
+            </p>
+            <p class="mt-1 text-base font-semibold text-text-primary">
+              {{ sessionTopicLabel }}
+            </p>
+          </div>
           <p class="mt-3 text-sm font-medium leading-snug text-text-primary">
             <span aria-hidden="true">👉</span>
             回答这 3 个问题，我就能帮你找到最合适的学习方式
@@ -149,9 +159,15 @@ import {
   type QuickDiagnosisUiState,
 } from '@/utils/diagnosisSubmitMapper'
 import { SESSION_KEY_PLAN_DIAGNOSIS_RECAP } from '@/utils/diagnosisRecapCopy'
+import { workflowTopicLabelFromStructuredGoal } from '@/utils/workflowTopicLabel'
 
 const router = useRouter()
 const store = useWorkflowStore()
+
+const sessionTopicLabel = computed(() => {
+  const t = workflowTopicLabelFromStructuredGoal(store.structuredGoal)
+  return t || '当前主题'
+})
 
 const loading = ref(true)
 const submitting = ref(false)
