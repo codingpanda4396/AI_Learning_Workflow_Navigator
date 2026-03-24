@@ -12,6 +12,7 @@ import {
   resolveShowcaseKnowledge,
   type ShowcaseStepConfig,
 } from '@/constants/showcaseKnowledgeConfig'
+import { STAGE_GUIDE_META } from '@/constants/guidanceConfig'
 import type {
   LearnerProfileSnapshot,
   PlanPreviewData,
@@ -468,6 +469,13 @@ export type PlanStrategyOverview = {
   skipRisk: string
 }
 
+export type PlanDecisionEvidenceView = {
+  currentProblem: string
+  recommendedLine: string
+  notYetLine: string
+  riskLine: string
+}
+
 export type PlanStageCardView = {
   code: PlanStageCode
   stageIndex: number
@@ -515,6 +523,7 @@ export type PlanTaskGroupView = {
 
 export type PlanBattleMapView = {
   strategyOverview: PlanStrategyOverview
+  decisionEvidence: PlanDecisionEvidenceView
   stageCards: PlanStageCardView[]
   taskGroupsByStage: PlanTaskGroupView[]
   recommendedStageCode: PlanStageCode
@@ -564,40 +573,40 @@ const RECOMMENDED_START_PHRASE: Record<PlanStageCode, string> = {
 
 const STAGE_META: Record<PlanStageCode, StageMeta> = {
   STRUCTURE: {
-    label: '结构建立',
-    title: 'STRUCTURE',
-    defaultObjective: '先搭出知识框架，知道这个点和前后内容分别是什么关系。',
+    label: STAGE_GUIDE_META.STRUCTURE.label,
+    title: STAGE_GUIDE_META.STRUCTURE.title,
+    defaultObjective: STAGE_GUIDE_META.STRUCTURE.stageGoal,
     deliverable: '一张能说清主线的结构图或最小框架。',
     tutorRole: '帮助拆主线、标关键概念、把复杂主题先压成可导航的骨架。',
     checkpoint: '你能说清“这一块在整个主题里属于哪一层”。',
-    fallbackRisk: '跳过结构阶段，后面容易只记零散结论，遇到变形题就断线。',
+    fallbackRisk: STAGE_GUIDE_META.STRUCTURE.skipRisk,
   },
   UNDERSTANDING: {
-    label: '机制理解',
-    title: 'UNDERSTANDING',
-    defaultObjective: '把概念、边界和机制讲明白，避免只背表面答案。',
+    label: STAGE_GUIDE_META.UNDERSTANDING.label,
+    title: STAGE_GUIDE_META.UNDERSTANDING.title,
+    defaultObjective: STAGE_GUIDE_META.UNDERSTANDING.stageGoal,
     deliverable: '一段自己的解释，能区分易混点并说出因果。',
     tutorRole: '用白话重讲原理，对比易混概念，追问“为什么成立”。',
     checkpoint: '你能不用原话复述概念，还能解释一个关键差异。',
-    fallbackRisk: '跳过理解阶段，训练时容易出现“看懂了但不会迁移”的假熟练。',
+    fallbackRisk: STAGE_GUIDE_META.UNDERSTANDING.skipRisk,
   },
   TRAINING: {
-    label: '应用训练',
-    title: 'TRAINING',
-    defaultObjective: '把理解落到动作里，通过最小练习建立可重复的方法感。',
+    label: STAGE_GUIDE_META.TRAINING.label,
+    title: STAGE_GUIDE_META.TRAINING.title,
+    defaultObjective: STAGE_GUIDE_META.TRAINING.stageGoal,
     deliverable: '完成一组微练习，并留下稳定的解题动作或操作步骤。',
     tutorRole: '给最小任务脚手架，盯住步骤、纠正动作、帮助形成方法。',
     checkpoint: '你能独立完成一题或一步，并说出自己为什么这样做。',
-    fallbackRisk: '跳过训练阶段，理解很难转成稳定表现，执行时会频繁卡壳。',
+    fallbackRisk: STAGE_GUIDE_META.TRAINING.skipRisk,
   },
   REFLECTION: {
-    label: '反思校准',
-    title: 'REFLECTION',
-    defaultObjective: '回看证据，确认学会了什么、还缺什么，以及下一步怎么补。',
+    label: STAGE_GUIDE_META.REFLECTION.label,
+    title: STAGE_GUIDE_META.REFLECTION.title,
+    defaultObjective: STAGE_GUIDE_META.REFLECTION.stageGoal,
     deliverable: '一份简短复盘，包含收获、漏洞和下一次切入点。',
     tutorRole: '帮助总结证据、指出薄弱点，把下一轮学习重新压缩成小步。',
     checkpoint: '你能明确说出“我已经会什么、还差什么、下一步练什么”。',
-    fallbackRisk: '跳过反思阶段，问题会重复出现，系统也难以为下一轮做准校准。',
+    fallbackRisk: STAGE_GUIDE_META.REFLECTION.skipRisk,
   },
 }
 
@@ -727,6 +736,42 @@ function summarizeRisk(
   const risks = plan.risks?.filter((item) => item?.trim()) ?? []
   if (risks.length) return truncate(risks.slice(0, 2).join('；'), 88)
   return STAGE_META[recommendedStageCode].fallbackRisk
+}
+
+function inferCurrentProblem(ctx: PlanViewModelContext): string {
+  const blocker = ctx.learnerProfileSnapshot?.blockingPoint?.trim()
+  if (blocker) return blocker
+
+  const blockerTags = ctx.learnerProfileSnapshot?.blockerTags ?? []
+  const riskTags = ctx.learnerProfileSnapshot?.riskTags ?? []
+  const tags = [...blockerTags, ...riskTags].join(' ').toUpperCase()
+
+  if (/CONCEPT|SHALLOW_UNDERSTANDING|EXPRESSION/.test(tags)) return '概念混淆'
+  if (/PROCEDURE|QUESTION_TYPE|PRACTICE/.test(tags)) return '会看不会做'
+  if (/PREREQUISITE|RELATIONSHIP/.test(tags)) return '前置结构还没搭稳'
+  if (/TIME|URGENT|SPRINT/.test(tags)) return '时间紧，需要先抓最关键的一步'
+  return '当前理解还不够稳定'
+}
+
+function chooseAvoidStageCode(recommendedStageCode: PlanStageCode): PlanStageCode {
+  if (recommendedStageCode === 'STRUCTURE') return 'TRAINING'
+  if (recommendedStageCode === 'UNDERSTANDING') return 'TRAINING'
+  if (recommendedStageCode === 'TRAINING') return 'REFLECTION'
+  return 'TRAINING'
+}
+
+function buildDecisionEvidence(
+  ctx: PlanViewModelContext,
+  recommendedStageCode: PlanStageCode
+): PlanDecisionEvidenceView {
+  const currentProblem = inferCurrentProblem(ctx)
+  const avoidStageCode = chooseAvoidStageCode(recommendedStageCode)
+  return {
+    currentProblem,
+    recommendedLine: `所以本轮先从 ${STAGE_META[recommendedStageCode].title} 切入。`,
+    notYetLine: `暂不建议直接进入 ${STAGE_META[avoidStageCode].title}。`,
+    riskLine: STAGE_GUIDE_META[recommendedStageCode].skipRisk,
+  }
 }
 
 function buildStrategyOverview(
@@ -928,6 +973,7 @@ export function buildPlanBattleMapView(
 
   return {
     strategyOverview,
+    decisionEvidence: buildDecisionEvidence(ctx, recommendedStageCode),
     stageCards,
     taskGroupsByStage,
     recommendedStageCode,

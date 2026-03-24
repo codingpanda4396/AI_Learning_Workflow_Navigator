@@ -1,96 +1,49 @@
 <template>
   <div class="space-y-6">
-    <section class="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_right,_rgba(79,70,229,0.12),_transparent_36%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.10),_transparent_38%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.98))] p-6 shadow-card md:p-8">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="max-w-4xl">
-          <p class="text-xs font-semibold uppercase tracking-[0.28em] text-primary">
-            {{ stageTitle }} / {{ stageLabel }}
-          </p>
-          <h2 class="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            {{ primaryActionTitle }}
-          </h2>
-          <p class="mt-3 max-w-3xl text-base leading-7 text-slate-700">
-            {{ stageObjective }}
+    <section
+      class="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_right,_rgba(79,70,229,0.10),_transparent_38%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.98))] p-5 shadow-card md:p-7"
+    >
+      <div class="grid gap-5 md:grid-cols-3">
+        <div class="rounded-[22px] border border-primary/20 bg-white/95 p-4 md:col-span-1">
+          <p class="text-sm font-bold text-slate-950">现在先做这一件事</p>
+          <p class="mt-2 text-base font-semibold leading-snug text-slate-900">
+            {{ scaffoldDoNow }}
           </p>
         </div>
-        <StatusBadge :label="stageTitle" variant="warning" />
-      </div>
-
-      <div class="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.1fr),minmax(280px,0.9fr)]">
-        <article class="rounded-[24px] border border-white/70 bg-white/80 p-5 backdrop-blur">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary">
-            为什么现在停在这里
-          </p>
-          <p class="mt-3 text-sm leading-6 text-text-primary">
-            {{ whyNow }}
-          </p>
-          <div class="mt-5 rounded-[20px] border border-primary/15 bg-primary/5 p-4">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-              当前唯一主动作
-            </p>
-            <p class="mt-2 text-sm font-semibold text-slate-950">
-              {{ primaryActionTitle }}
-            </p>
-            <p class="mt-2 text-sm leading-6 text-slate-700">
-              {{ primaryActionDescription }}
-            </p>
-          </div>
-        </article>
-
-        <article class="rounded-[24px] border border-slate-200 bg-slate-50/88 p-5">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary">
-            当前阶段规则
-          </p>
-          <div class="mt-4 space-y-4">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                阶段目标
-              </p>
-              <p class="mt-2 text-sm leading-6 text-text-primary">{{ stageDeliverable }}</p>
-            </div>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                通过标准
-              </p>
-              <p class="mt-2 text-sm leading-6 text-text-primary">{{ passCondition }}</p>
-            </div>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Tutor 角色
-              </p>
-              <p class="mt-2 text-sm leading-6 text-text-primary">{{ tutorRole }}</p>
-            </div>
-            <div class="rounded-[18px] border border-emerald-200 bg-emerald-50/80 p-4">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                系统摘要
-              </p>
-              <p class="mt-2 text-sm leading-6 text-emerald-950">
-                {{ systemSummary }}
-              </p>
-            </div>
-          </div>
-        </article>
+        <div class="rounded-[22px] border border-slate-200 bg-white/95 p-4 md:col-span-1">
+          <p class="text-sm font-bold text-slate-950">这样开始最容易</p>
+          <ul class="mt-2 space-y-1.5 text-sm font-medium leading-snug text-slate-800">
+            <li v-for="(line, idx) in scaffoldStarterPhrases" :key="idx">· {{ line }}</li>
+          </ul>
+        </div>
+        <div class="rounded-[22px] border border-emerald-200/80 bg-emerald-50/60 p-4 md:col-span-1">
+          <p class="text-sm font-bold text-emerald-950">写到这一步就可以继续</p>
+          <ul class="mt-2 list-disc space-y-1 pl-4 text-sm leading-snug text-emerald-950">
+            <li v-for="(line, idx) in scaffoldPassBullets" :key="idx">{{ line }}</li>
+          </ul>
+        </div>
       </div>
     </section>
 
     <ScaffoldSectionCard
       v-if="showStructuredReply"
       id="guided-response"
-      eyebrow="Scaffolded Action"
+      eyebrow="先动手写"
       :title="structuredReplyTitle"
       :description="structuredReplyDescription"
       :active="true"
-      :badge="coachInputDisabled ? '当前锁定' : '等待你的输入'"
+      emphasis
+      :badge="coachInputDisabled ? '暂不可写' : '写在这里'"
       :badge-variant="coachInputDisabled ? 'default' : 'warning'"
     >
       <div class="space-y-4">
         <div class="grid gap-4 md:grid-cols-3">
           <label class="block">
-            <span class="text-sm font-semibold text-text-primary">我现在看到的结构</span>
+            <span class="text-sm font-semibold text-text-primary">我现在的理解</span>
             <textarea
               :value="structuredReply.understanding"
               rows="5"
-              class="mt-2 w-full rounded-[18px] border border-border bg-white px-4 py-3 text-sm leading-6 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              class="mt-2 w-full rounded-[18px] border border-border bg-white px-4 py-3 text-sm leading-6 text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
               :disabled="coachInputDisabled"
               :placeholder="understandingPlaceholder"
               @input="updateField('understanding', $event)"
@@ -98,11 +51,11 @@
           </label>
 
           <label class="block">
-            <span class="text-sm font-semibold text-text-primary">我还没讲清的点</span>
+            <span class="text-sm font-semibold text-text-primary">我还不确定</span>
             <textarea
               :value="structuredReply.uncertainty"
               rows="5"
-              class="mt-2 w-full rounded-[18px] border border-border bg-white px-4 py-3 text-sm leading-6 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              class="mt-2 w-full rounded-[18px] border border-border bg-white px-4 py-3 text-sm leading-6 text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
               :disabled="coachInputDisabled"
               :placeholder="uncertaintyPlaceholder"
               @input="updateField('uncertainty', $event)"
@@ -110,11 +63,11 @@
           </label>
 
           <label class="block">
-            <span class="text-sm font-semibold text-text-primary">我希望系统怎么帮我</span>
+            <span class="text-sm font-semibold text-text-primary">我想先确认</span>
             <textarea
               :value="structuredReply.confirmation"
               rows="5"
-              class="mt-2 w-full rounded-[18px] border border-border bg-white px-4 py-3 text-sm leading-6 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              class="mt-2 w-full rounded-[18px] border border-border bg-white px-4 py-3 text-sm leading-6 text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
               :disabled="coachInputDisabled"
               :placeholder="confirmationPlaceholder"
               @input="updateField('confirmation', $event)"
@@ -123,10 +76,7 @@
         </div>
 
         <div v-if="templatePool.length" class="rounded-[22px] border border-border bg-slate-50/80 p-4">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <p class="text-sm font-semibold text-text-primary">可直接套用的脚手架句式</p>
-            <p class="text-xs text-text-secondary">只保留对当前阶段最有帮助的最小提示</p>
-          </div>
+          <p class="text-sm font-semibold text-text-primary">点一句，填进上面某一栏</p>
           <div class="mt-3 flex flex-wrap gap-2">
             <button
               v-for="item in templatePool"
@@ -146,11 +96,11 @@
           </div>
         </div>
 
-        <div v-if="recommendedActions.length" class="rounded-[20px] border border-slate-200 bg-white p-4">
-          <p class="text-sm font-semibold text-text-primary">系统建议你这样答</p>
+        <div v-if="recommendedActionsLimited.length" class="rounded-[20px] border border-slate-200 bg-white p-4">
+          <p class="text-sm font-semibold text-text-primary">也可以这样问</p>
           <div class="mt-3 flex flex-wrap gap-2">
             <StatusBadge
-              v-for="action in recommendedActions"
+              v-for="action in recommendedActionsLimited"
               :key="action.code"
               :label="action.label"
             />
@@ -165,9 +115,6 @@
           >
             提交这一步
           </PrimaryButton>
-          <p class="text-xs text-text-secondary">
-            系统会沿着当前阶段继续追问、最小提示或纠偏，不会切回开放式聊天。
-          </p>
         </div>
       </div>
     </ScaffoldSectionCard>
@@ -175,8 +122,8 @@
     <ScaffoldSectionCard
       v-if="showTrainingSupport"
       id="guided-training"
-      eyebrow="Training Check"
-      title="把理解变成动作"
+      eyebrow="自己讲一遍"
+      title="把理解落成一段话"
       :description="selfExplainDescription"
       :active="stageCode === 'TRAINING'"
       :badge="selfExplainBadge"
@@ -188,7 +135,7 @@
           rows="4"
           class="w-full rounded-[18px] border border-border px-4 py-3 text-sm leading-6 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           :disabled="!canSubmitSelfExplanation || submittingSelf"
-          placeholder="先用自己的话解释机制，再说明你会如何把它用出来。"
+          placeholder="用你自己的话写清「是什么、为什么」，三四句即可。"
           @input="onSelfExplainInput"
         />
         <div class="flex flex-wrap items-center gap-3">
@@ -199,9 +146,6 @@
           >
             提交训练结果
           </PrimaryButton>
-          <p class="text-xs text-text-secondary">
-            这里优先看你能不能独立讲清和独立完成，而不是复述系统的话。
-          </p>
         </div>
         <div
           v-if="selfExplainMissingPoints.length"
@@ -220,9 +164,9 @@
     <ScaffoldSectionCard
       v-if="showReflectionCheck"
       id="guided-check"
-      eyebrow="Reflection Check"
-      title="先独立检查，再决定是否放行"
-      description="反思阶段先看你能否脱离提示独立作答，只有通过才进入最终收束。"
+      eyebrow="独立检查"
+      title="不看提示，答这一题"
+      description="用你自己的话简短作答即可。"
       :active="taskState === 'CHECK'"
       :completed="taskState === 'PASS'"
       :badge="checkpointBadge"
@@ -230,16 +174,16 @@
     >
       <div v-if="taskState === 'CHECK'" class="space-y-4">
         <div class="rounded-[22px] border border-border bg-slate-50/80 p-4">
-          <p class="text-sm font-semibold text-text-primary">当前检查题</p>
+          <p class="text-sm font-semibold text-text-primary">题目</p>
           <p class="mt-2 text-sm leading-6 text-text-primary">
-            {{ checkpointQuestion || '系统正在生成检查题...' }}
+            {{ checkpointQuestion || '题目加载中…' }}
           </p>
         </div>
         <textarea
           :value="checkpointAnswer"
           rows="3"
           class="w-full rounded-[18px] border border-border px-4 py-3 text-sm leading-6 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          placeholder="用 1-2 句话回答这道检查题。"
+          placeholder="一两句话写清你的判断或步骤。"
           @input="onCheckpointInput"
         />
         <PrimaryButton
@@ -250,17 +194,15 @@
           提交检查答案
         </PrimaryButton>
       </div>
-      <p v-else class="text-sm leading-6 text-text-secondary">
-        检查通过后，系统会让你把这轮学习收束成一份可复用的结论。
-      </p>
+      <p v-else class="text-sm leading-6 text-text-secondary">通过后到下面写一句总结即可继续。</p>
     </ScaffoldSectionCard>
 
     <ScaffoldSectionCard
       v-if="showReflectionSummary"
       id="guided-wrap"
-      eyebrow="Reflection Summary"
+      eyebrow="收尾"
       title="收束这一轮学习"
-      description="最后留下可复用的学习结果，而不是只显示任务完成。"
+      description="留一句结论和两个要点，方便下次接着练。"
       :active="summaryUnlocked"
       badge="可提交"
       :badge-variant="summaryUnlocked ? 'success' : 'warning'"
@@ -337,9 +279,6 @@
         </details>
         <div class="flex flex-wrap items-center gap-3">
           <PrimaryButton :loading="completing" @click="$emit('complete')">进入下一步</PrimaryButton>
-          <p class="text-xs text-text-secondary">
-            这里仍然保留原有完成校验和 PASS 门槛，不绕开状态机。
-          </p>
         </div>
       </div>
     </ScaffoldSectionCard>
@@ -348,9 +287,7 @@
       v-if="chatTurns.length || completionCriteria.length"
       class="rounded-[24px] border border-border bg-white p-5 shadow-card"
     >
-      <summary class="cursor-pointer text-sm font-semibold text-text-primary">
-        查看这一步的引导记录与检查标准
-      </summary>
+      <summary class="cursor-pointer text-sm font-semibold text-text-primary">引导记录与检查标准</summary>
       <div class="mt-4 space-y-5 border-t border-border pt-4">
         <div v-if="completionCriteria.length">
           <p class="text-sm font-semibold text-text-primary">这一轮重点检查</p>
@@ -418,16 +355,9 @@ interface DisplayChatTurn {
 
 const props = defineProps<{
   stageCode: PlanStageCode
-  stageTitle: string
-  stageLabel: string
-  stageObjective: string
-  stageDeliverable: string
-  tutorRole: string
-  whyNow: string
-  passCondition: string
-  systemSummary: string
-  primaryActionTitle: string
-  primaryActionDescription: string
+  scaffoldDoNow: string
+  scaffoldStarterPhrases: string[]
+  scaffoldPassBullets: string[]
   taskState: string
   completionCriteria: string[]
   templatePool: TemplateItem[]
@@ -487,50 +417,52 @@ const showReflectionSummary = computed(
   () => props.stageCode === 'REFLECTION' && props.summaryUnlocked
 )
 
+const recommendedActionsLimited = computed(() => props.recommendedActions.slice(0, 3))
+
 const structuredReplyTitle = computed(() => {
-  if (props.stageCode === 'STRUCTURE') return '先搭出你的最小结构图'
-  if (props.stageCode === 'UNDERSTANDING') return '先讲清关键机制和因果'
-  return '先完成这一步的最小训练动作'
+  if (props.stageCode === 'STRUCTURE') return '先写出最小理解'
+  if (props.stageCode === 'UNDERSTANDING') return '把机制说清楚'
+  return '按脚手架做一小步'
 })
 
 const structuredReplyDescription = computed(() => {
   if (props.stageCode === 'STRUCTURE') {
-    return '不要直接展开细节，先说明它是什么、在整体里哪里、和什么最相关。'
+    return '先说清它是什么、在解决什么问题，不必写得很完整。'
   }
   if (props.stageCode === 'UNDERSTANDING') {
-    return '不要只贴定义，先说清它为什么这样工作、最容易和什么混淆。'
+    return '用因果把「为什么这样」串起来，点出你最不确定的一处。'
   }
-  return '训练阶段先让你自己动手，再根据你的表现给最小提示或纠偏。'
+  return '写你怎么做、为什么这样做；需要提示就写在第三栏。'
 })
 
 const understandingPlaceholder = computed(() => {
   if (props.stageCode === 'STRUCTURE') {
-    return '例如：它属于哪一层、解决什么问题、和前后概念怎么接上。'
+    return '它是什么、解决什么问题：我写「……是在处理……」'
   }
   if (props.stageCode === 'UNDERSTANDING') {
-    return '例如：关键步骤是怎样发生的，前后因果怎么串起来。'
+    return '关键步骤：先……再……所以结果是……'
   }
-  return '例如：我会先怎么做，为什么这样做。'
+  return '我会先做：……（一步具体动作）'
 })
 
 const uncertaintyPlaceholder = computed(() => {
   if (props.stageCode === 'STRUCTURE') {
-    return '例如：我还不清楚它和相邻概念的边界。'
+    return '和哪个概念最容易混、边界在哪：我写「我还不确定……」'
   }
   if (props.stageCode === 'UNDERSTANDING') {
-    return '例如：我还不明白为什么这里会这样变化。'
+    return '哪一步的「为什么」我还想不通：……'
   }
-  return '例如：我会做第一步，但不确定后面怎么判断。'
+  return '做到哪一步我会卡住：……'
 })
 
 const confirmationPlaceholder = computed(() => {
   if (props.stageCode === 'STRUCTURE') {
-    return '例如：请帮我补一个最关键的关系，不要展开太多。'
+    return '只想确认一件事：例如「它和……是什么关系？」'
   }
   if (props.stageCode === 'UNDERSTANDING') {
-    return '例如：请给我一个最小例子，只验证这条机制。'
+    return '想要一个最小例子或一句纠偏：例如「请用……举例」'
   }
-  return '例如：请只给一个最小提示，让我自己走完。'
+  return '只要一句提示：例如「下一步我只该想……」'
 })
 
 function updateField(field: keyof StructuredReplyDraft, event: Event) {

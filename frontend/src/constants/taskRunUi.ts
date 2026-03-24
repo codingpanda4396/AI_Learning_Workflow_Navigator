@@ -25,27 +25,17 @@ export const TUTOR_ACTIONS = [
   {
     id: 'explain_concept',
     label: '解释概念',
-    description: '只解释当前任务里的核心概念，不扩散到完整答案。',
+    description: '只讲这一步里的核心词，不展开成整题答案。',
   },
   {
     id: 'minimal_example',
-    label: '给最小例子',
-    description: '用最小可理解例子拆开这一步怎么工作。',
+    label: '给一个小例子',
+    description: '用最小例子走一遍关键步骤即可。',
   },
   {
     id: 'concept_compare',
-    label: '概念对比',
-    description: '把容易混淆的点并排比较，帮我建立边界。',
-  },
-  {
-    id: 'check_statement',
-    label: '检查我的表述',
-    description: '看我的理解哪里不完整，只指出缺口。',
-  },
-  {
-    id: 'hint_only',
-    label: '给提示，不直接给答案',
-    description: '只给下一步提示，保持我自己继续推。',
+    label: '提醒我别混淆',
+    description: '点出最容易混的两个点，帮我分清边界。',
   },
 ]
 

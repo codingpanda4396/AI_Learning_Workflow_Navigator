@@ -1,8 +1,8 @@
 <template>
   <section class="space-y-4">
-    <h2 class="text-base font-semibold text-text-primary">当前阶段任务</h2>
+    <h2 class="text-base font-semibold text-text-primary">接下来具体会做什么</h2>
     <p v-if="activeGroup" class="text-sm text-text-secondary">
-      这一阶段共有 {{ activeGroup.items.length }} 个任务，做完再进入执行。
+      每张卡只保留三件事：你要做什么、系统怎么帮、过关看什么。
     </p>
 
     <div class="space-y-3">
@@ -36,26 +36,51 @@
             <div
               v-for="item in group.items"
               :key="item.taskId"
-              class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-4 sm:flex-row sm:items-center sm:justify-between"
+              class="flex flex-col gap-4 rounded-[20px] border border-slate-100 bg-slate-50/70 p-4"
             >
-              <div class="min-w-0 flex-1">
-                <h4 class="font-semibold text-text-primary">
-                  {{ item.title }}
-                </h4>
-                <p class="mt-1 text-sm text-text-secondary">
-                  {{ oneLineGoal(item.actionGoal) }}
-                </p>
-                <p class="mt-2 text-xs text-slate-500">
-                  {{ item.estimatedTime }}
-                </p>
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <h4 class="font-semibold text-text-primary">
+                    {{ item.title }}
+                  </h4>
+                  <p class="mt-2 text-xs text-slate-500">
+                    {{ item.estimatedTime }}
+                  </p>
+                </div>
+                <SecondaryButton
+                  class="shrink-0"
+                  :disabled="loading"
+                  @click="$emit('start')"
+                >
+                  进入任务
+                </SecondaryButton>
               </div>
-              <SecondaryButton
-                class="shrink-0 self-start sm:self-center"
-                :disabled="loading"
-                @click="$emit('start')"
-              >
-                进入任务
-              </SecondaryButton>
+              <div class="grid gap-3 md:grid-cols-3">
+                <div class="rounded-2xl border border-white bg-white px-4 py-3">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    你要做什么
+                  </p>
+                  <p class="mt-2 text-sm leading-6 text-text-primary">
+                    {{ oneLineGoal(item.actionGoal, 80) }}
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-white bg-white px-4 py-3">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    系统怎么帮
+                  </p>
+                  <p class="mt-2 text-sm leading-6 text-text-primary">
+                    {{ oneLineGoal(item.tutorSupport, 80) }}
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-white bg-white px-4 py-3">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    过关看什么
+                  </p>
+                  <p class="mt-2 text-sm leading-6 text-text-primary">
+                    {{ item.completionChecks[0] ?? '按这一阶段要求完成最小产出。' }}
+                  </p>
+                </div>
+              </div>
             </div>
             <div
               v-if="group.items.length === 0"

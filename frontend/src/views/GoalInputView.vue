@@ -9,44 +9,41 @@
 
       <div class="relative mx-auto w-full max-w-4xl px-5 py-10 md:px-8 md:py-14">
         <header class="space-y-6">
-          <div class="space-y-2 text-center md:text-left">
-            <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Quick Start</p>
-            <h1 class="text-3xl font-semibold tracking-tight text-text-primary md:text-4xl">
-              选入口，启动这一轮学习工作流
-            </h1>
-            <p class="max-w-2xl text-sm leading-6 text-text-secondary md:text-[15px]">
-              先选知识点，再选起手方式。系统会从目标、诊断、规划一路编排到执行与报告。
-            </p>
-          </div>
-
-          <div class="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+          <div class="grid gap-4 xl:grid-cols-[1.05fr_0.95fr_0.7fr]">
             <section
-              class="rounded-[28px] border border-slate-200/90 bg-white/90 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] backdrop-blur-sm"
+              class="rounded-[32px] border border-slate-200/90 bg-[linear-gradient(145deg,#ffffff_0%,#f8fafc_46%,#eef2ff_100%)] px-6 py-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
             >
-              <div class="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-                <div class="min-w-0 flex-1 space-y-2">
-                  <p class="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">本轮入口</p>
-                  <p class="truncate text-lg font-semibold text-text-primary">
-                    {{ selectedTopic.label }}
-                    <span class="px-2 text-slate-300">/</span>
-                    {{ selectedQuickStart?.label ?? '请选择起手方式' }}
-                  </p>
-                  <p v-if="selectedTopic.availability === 'live'" class="text-sm leading-6 text-text-secondary">
-                    {{ topicOneLiner }}
-                  </p>
-                  <p v-else class="text-sm text-slate-400">该知识点将在后续扩展中开放，请先选择已点亮主题。</p>
-                </div>
+              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Guided Start</p>
+              <h1 class="mt-3 text-3xl font-semibold tracking-tight text-text-primary md:text-4xl">
+                这不是聊天入口，而是一轮被搭好的学习起点
+              </h1>
+              <p class="mt-4 max-w-xl text-sm leading-7 text-text-secondary md:text-[15px]">
+                很多学生会直接问答案，但真正难的是把问题拆小、讲清理解、再逐步校准。
+              </p>
+              <p class="mt-3 max-w-xl text-sm leading-7 text-slate-700">
+                系统会先把这套过程搭出来，你只需要沿着脚手架推进这一轮学习。
+              </p>
 
-                <div class="w-full space-y-3 md:w-[220px]">
+              <div class="mt-6 rounded-[24px] border border-white/70 bg-white/85 p-5 shadow-sm">
+                <p class="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">本轮入口</p>
+                <p class="mt-2 text-lg font-semibold text-text-primary">
+                  {{ selectedTopic.label }}
+                  <span class="px-2 text-slate-300">/</span>
+                  {{ selectedQuickStart?.label ?? '请选择起手方式' }}
+                </p>
+                <p v-if="selectedTopic.availability === 'live'" class="mt-3 text-sm leading-6 text-text-secondary">
+                  {{ topicOneLiner }}
+                </p>
+                <p v-else class="mt-3 text-sm text-slate-400">该知识点将在后续扩展中开放，请先选择已点亮主题。</p>
+                <div class="mt-5 flex flex-wrap items-center gap-3">
                   <div
                     v-if="recommendedForTopic && selectedTopic.availability === 'live'"
-                    class="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500"
+                    class="rounded-2xl bg-slate-50 px-4 py-2 text-xs text-slate-500"
                   >
-                    推荐起手：
-                    <span class="font-medium text-slate-700">{{ recommendedForTopic.label }}</span>
+                    推荐起手：<span class="font-medium text-slate-700">{{ recommendedForTopic.label }}</span>
                   </div>
                   <PrimaryButton
-                    class="w-full justify-center py-3 text-sm font-semibold shadow-[0_12px_24px_rgba(15,23,42,0.15)]"
+                    class="justify-center px-5 py-3 text-sm font-semibold shadow-[0_12px_24px_rgba(15,23,42,0.15)]"
                     :loading="loading"
                     :disabled="ctaDisabled"
                     @click="onSubmit"
@@ -57,14 +54,38 @@
               </div>
             </section>
 
+            <section class="rounded-[32px] border border-slate-200/90 bg-white/90 px-6 py-6 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Quick Start</p>
+                  <h2 class="mt-2 text-xl font-semibold text-text-primary">系统会怎么带你走</h2>
+                </div>
+                <p class="text-xs text-slate-400">4 个阶段 / 1 条主线</p>
+              </div>
+              <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                <article
+                  v-for="stage in stageCards"
+                  :key="stage.code"
+                  class="rounded-[22px] border p-4"
+                  :class="stageCardClass(stage.code)"
+                >
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    {{ stage.title }}
+                  </p>
+                  <p class="mt-2 text-sm font-semibold text-text-primary">{{ stage.label }}</p>
+                  <p class="mt-2 text-sm leading-6 text-text-secondary">{{ stage.learnerFriendlyCopy.launch }}</p>
+                </article>
+              </div>
+            </section>
+
             <aside
-              class="rounded-[28px] border border-slate-200/90 bg-slate-950 px-5 py-5 text-white shadow-[0_18px_48px_rgba(15,23,42,0.18)]"
+              class="rounded-[32px] border border-slate-200/90 bg-slate-950 px-5 py-5 text-white shadow-[0_18px_48px_rgba(15,23,42,0.18)]"
             >
               <template v-if="auth.isAuthenticated && auth.user">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">当前账号</p>
                 <p class="mt-3 text-xl font-semibold">{{ auth.user.displayName }}</p>
                 <p class="mt-2 text-sm leading-6 text-slate-300">
-                  新创建的学习目标和流程都会绑定到这个账号下。
+                  这一轮的目标、诊断、规划与执行证据都会绑定到当前账号。
                 </p>
 
                 <button
@@ -81,9 +102,9 @@
 
               <template v-else>
                 <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">登录后可用</p>
-                <p class="mt-3 text-xl font-semibold">保存你的学习链路</p>
+                <p class="mt-3 text-xl font-semibold">保存这一轮学习链路</p>
                 <p class="mt-2 text-sm leading-6 text-slate-300">
-                  开始这一轮前先登录，目标、诊断、规划与执行进度才能归到你的账号。
+                  登录后开始，系统才会把你的规划、执行过程和报告沉淀下来。
                 </p>
                 <router-link
                   to="/auth/login"
@@ -95,6 +116,19 @@
             </aside>
           </div>
         </header>
+
+        <section class="mt-8 grid gap-3 md:grid-cols-3">
+          <article
+            v-for="item in misuseComparisons"
+            :key="item.wrong"
+            class="rounded-[24px] border border-slate-200/80 bg-white/90 px-5 py-5 shadow-sm"
+          >
+            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">常见情况</p>
+            <p class="mt-2 text-sm font-semibold text-slate-500">{{ item.wrong }}</p>
+            <p class="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">这里会换成</p>
+            <p class="mt-2 text-sm leading-6 text-text-primary">{{ item.better }}</p>
+          </article>
+        </section>
 
         <section class="mt-12 space-y-4">
           <div class="flex items-baseline justify-between gap-3">
@@ -223,6 +257,7 @@ import {
   HOME_SUBJECTS,
   HOME_TOPIC_SLOT_COUNT,
 } from '@/constants/homeQuickStart'
+import { HOME_MISUSE_COMPARISONS, stageList } from '@/constants/guidanceConfig'
 
 const STORAGE_KEYS = {
   topic: 'goal_selected_topic',
@@ -276,6 +311,8 @@ const topicOneLiner = computed(() => {
   const topic = selectedTopic.value
   return topic.availability === 'live' ? topic.previewBody : ''
 })
+const stageCards = stageList()
+const misuseComparisons = HOME_MISUSE_COMPARISONS
 
 const continueLabel = computed(() => {
   const entry = auth.recentLearningEntry
@@ -333,6 +370,19 @@ function chipClass(topicKey: string) {
 
 function selectTopic(topicKey: string) {
   selectedTopicKey.value = topicKey
+}
+
+function stageCardClass(code: string) {
+  if (code === 'STRUCTURE') {
+    return 'border-sky-200/80 bg-[linear-gradient(145deg,#ffffff_0%,#f0f9ff_100%)]'
+  }
+  if (code === 'UNDERSTANDING') {
+    return 'border-indigo-200/80 bg-[linear-gradient(145deg,#ffffff_0%,#eef2ff_100%)]'
+  }
+  if (code === 'TRAINING') {
+    return 'border-emerald-200/80 bg-[linear-gradient(145deg,#ffffff_0%,#ecfdf5_100%)]'
+  }
+  return 'border-amber-200/80 bg-[linear-gradient(145deg,#ffffff_0%,#fffbeb_100%)]'
 }
 
 function delay(ms: number) {

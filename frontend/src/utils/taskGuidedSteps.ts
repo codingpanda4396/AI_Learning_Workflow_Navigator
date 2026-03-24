@@ -222,3 +222,32 @@ export function getCurrentActionInstruction(
   }
   return `${SMALL_STEP_LEAD}\n\n先看清上面的任务目标，再进入对话。`
 }
+
+const HEADER_ONELINER_MAX = 80
+
+/**
+ * 顶栏「一句最短目标」：从完整行动说明里取首行，避免多段小字。
+ */
+export function getHeaderGoalOneLiner(
+  taskState: string,
+  exploreRoundCount: number,
+  scaffold: TaskScaffoldResponse | null,
+  taskGoal: string,
+  legacyComplete: boolean
+): string {
+  const full = getCurrentActionInstruction(
+    taskState,
+    exploreRoundCount,
+    scaffold,
+    taskGoal,
+    legacyComplete
+  )
+  const stripped = full.replace(/^先做一件小事：[：]?\s*/m, '').trim()
+  const firstLine =
+    stripped
+      .split(/\n/)
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? stripped
+  if (firstLine.length <= HEADER_ONELINER_MAX) return firstLine
+  return `${firstLine.slice(0, HEADER_ONELINER_MAX - 1)}…`
+}

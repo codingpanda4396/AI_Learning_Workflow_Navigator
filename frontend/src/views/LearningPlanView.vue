@@ -19,6 +19,10 @@
             :recommended-start="battleMap.recommendedStartPhrase"
             :why-line="battleMap.whyShortLine"
             :total-time="battleMap.totalEstimatedLabel"
+            :current-problem="battleMap.decisionEvidence.currentProblem"
+            :recommended-line="battleMap.decisionEvidence.recommendedLine"
+            :not-yet-line="battleMap.decisionEvidence.notYetLine"
+            :risk-line="battleMap.decisionEvidence.riskLine"
             :loading="committing"
             @start="onStartStep"
           />
