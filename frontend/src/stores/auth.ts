@@ -42,6 +42,9 @@ export const useAuthStore = defineStore('auth', () => {
       initPromise = (async () => {
         try {
           await refresh()
+        } catch {
+          user.value = null
+          recentLearningEntry.value = null
         } finally {
           isReady.value = true
         }
