@@ -1,10 +1,10 @@
 <template>
   <aside class="space-y-4">
     <section
-      class="overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 text-white shadow-[0_20px_50px_rgba(15,23,42,0.22)]"
+      class="overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-5 text-white shadow-[0_20px_50px_rgba(15,23,42,0.22)]"
     >
       <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
-        Task Context
+        Protocol Rail
       </p>
       <h2 class="mt-3 text-lg font-semibold leading-tight">
         {{ title }}
@@ -16,8 +16,14 @@
       <p v-if="progressText" class="mt-4 text-sm text-slate-300">
         {{ progressText }}
       </p>
-      <p v-if="guidancePhaseLabel" class="mt-1 text-sm text-slate-300">
-        引导相位：{{ guidancePhaseLabel }}
+      <p class="mt-4 text-sm leading-6 text-slate-100">
+        {{ phaseSummary }}
+      </p>
+      <p
+        v-if="phaseReason"
+        class="mt-3 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-slate-300"
+      >
+        {{ phaseReason }}
       </p>
     </section>
 
@@ -74,10 +80,10 @@
       class="rounded-[24px] border border-border bg-white p-5 shadow-card"
     >
       <p class="text-xs font-semibold uppercase tracking-[0.22em] text-text-secondary">
-        Guidance
+        为什么现在停在这里
       </p>
       <p class="mt-2 text-sm font-semibold text-text-primary">
-        {{ guidanceTitle || '沿着当前脚手架推进' }}
+        {{ guidanceTitle || '系统正在沿当前脚手架推进' }}
       </p>
       <ul
         v-if="guidanceBullets.length"
@@ -87,6 +93,9 @@
           {{ bullet }}
         </li>
       </ul>
+      <p v-else class="mt-3 text-sm leading-6 text-text-secondary">
+        系统会先判断你是否已经说出关键结构，再决定继续追问还是给最小提示。
+      </p>
     </section>
   </aside>
 </template>
@@ -109,24 +118,26 @@ const props = withDefaults(
     taskStateLabel: string
     stateVariant: 'default' | 'success' | 'warning' | 'error'
     progressText?: string
-    guidancePhaseLabel?: string
     guidanceTitle?: string
     guidanceBullets?: string[]
+    phaseSummary?: string
+    phaseReason?: string
     steps: TaskGuidedStep[]
     currentStepId: string
     metrics: SidebarMetric[]
   }>(),
   {
     progressText: '',
-    guidancePhaseLabel: '',
     guidanceTitle: '',
     guidanceBullets: () => [],
+    phaseSummary: '',
+    phaseReason: '',
   }
 )
 
 function stepClass(stepId: string) {
   if (stepId === props.currentStepId) {
-    return 'border-primary/40 bg-primary/5 text-text-primary shadow-[0_12px_30px_rgba(42,157,143,0.12)]'
+    return 'border-primary/40 bg-primary/5 text-text-primary shadow-[0_12px_30px_rgba(79,70,229,0.12)]'
   }
   const activeIndex = props.steps.findIndex((step) => step.id === props.currentStepId)
   const stepIndex = props.steps.findIndex((step) => step.id === stepId)
