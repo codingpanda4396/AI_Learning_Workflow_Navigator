@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+import { postAiTutorChat, postAiTutorFeedback } from '@/api/tutor'
 
 export interface AiTutorContextState {
   step: number
@@ -10,10 +11,12 @@ export interface AiTutorContextState {
   stepId: string
 }
 
-export interface AiTutorChatMessage {
+export interface AiTutorMessage {
   id: string
-  role: 'user' | 'assistant'
+  role: 'ai' | 'user'
   content: string
+  type?: 'prompt' | 'feedback' | 'hint'
+  source?: string
   at: number
 }
 
@@ -32,9 +35,10 @@ const defaultContext = (): AiTutorContextState => ({
 
 export const useAiTutorStore = defineStore('aiTutor', () => {
   const visible = ref(false)
-  const messages = ref<AiTutorChatMessage[]>([])
+  const messages = ref<AiTutorMessage[]>([])
   const context = ref<AiTutorContextState>(defaultContext())
   const lastBoundStepId = ref<string | null>(null)
+  const sending = ref(false)
 
   const contextPayload = computed(() => ({
     step: context.value.step,
@@ -72,7 +76,7 @@ export const useAiTutorStore = defineStore('aiTutor', () => {
     }
   }
 
-  function appendUserMessage(content: string) {
+  function addUserMessage(content: string) {
     const text = content.trim()
     if (!text) return
     messages.value.push({
@@ -83,46 +87,90 @@ export const useAiTutorStore = defineStore('aiTutor', () => {
     })
   }
 
-  function appendAssistantMessage(content: string) {
+  function addAiMessage(
+    content: string,
+    type?: AiTutorMessage['type'],
+    source?: string
+  ) {
+    const text = content.trim()
+    if (!text) return
     messages.value.push({
       id: newId(),
-      role: 'assistant',
-      content: content.trim(),
+      role: 'ai',
+      content: text,
+      type,
+      source,
       at: Date.now(),
     })
   }
 
-  /** 创建空助手气泡，返回 id，供流式追加正文 */
-  function beginAssistantStream(): string {
-    const id = newId()
-    messages.value.push({
-      id,
-      role: 'assistant',
-      content: '',
-      at: Date.now(),
-    })
-    return id
+  function buildOpeningPrompt(label: string) {
+    const display = label.trim() || '当前知识点'
+    return `我们先不急着背定义。你觉得${display}更像什么，或者你脑中会出现什么画面？`
   }
 
-  function appendToAssistantMessage(id: string, chunk: string) {
-    if (!chunk) return
-    const m = messages.value.find((x) => x.id === id)
-    if (m) m.content += chunk
+  function resetForStep(next: Partial<AiTutorContextState> & { stepId: string }) {
+    setContext(next)
+    clearMessages()
+    addAiMessage(buildOpeningPrompt(context.value.knowledgeLabel), 'prompt')
   }
 
-  function finalizeAssistantMessage(id: string) {
-    const m = messages.value.find((x) => x.id === id)
-    if (m) m.content = m.content.trim()
+  function buildFeedbackMessage(feedback: {
+    comment: string
+    suggestion: string
+    praise?: string | null
+    gap?: string | null
+  }) {
+    return [feedback.praise, feedback.comment, feedback.gap, feedback.suggestion]
+      .map((item) => item?.trim())
+      .filter((item): item is string => Boolean(item))
+      .join('\n\n')
   }
 
-  function removeMessage(id: string) {
-    const i = messages.value.findIndex((x) => x.id === id)
-    if (i >= 0) messages.value.splice(i, 1)
-  }
+  async function submitTutorTurn(input: string): Promise<void> {
+    const text = input.trim()
+    if (!text || sending.value) return
+    sending.value = true
+    addUserMessage(text)
 
-  function seedAssistantHint(content: string) {
-    if (messages.value.length > 0) return
-    appendAssistantMessage(content)
+    try {
+      const chatRes = await postAiTutorChat({
+        message: text,
+        context: contextPayload.value,
+      })
+      addAiMessage(chatRes.reply, 'prompt', chatRes.source)
+    } catch (error) {
+      sending.value = false
+      throw error
+    }
+
+    try {
+      const feedbackRes = await postAiTutorFeedback({
+        answer: text,
+        step: context.value.stepId,
+        knowledgePoint: context.value.knowledgeLabel,
+      })
+      addAiMessage(
+        buildFeedbackMessage(feedbackRes),
+        'feedback',
+        feedbackRes.source ?? undefined
+      )
+      if (feedbackRes.nextHint?.trim()) {
+        addAiMessage(
+          feedbackRes.nextHint,
+          'hint',
+          feedbackRes.source ?? undefined
+        )
+      }
+    } catch {
+      addAiMessage(
+        '我先帮你记下这次表达。刚才这段已经有思路了，你可以换个更具体的例子再说一遍，我们继续一起推。',
+        'hint',
+        'FALLBACK'
+      )
+    } finally {
+      sending.value = false
+    }
   }
 
   return {
@@ -130,17 +178,15 @@ export const useAiTutorStore = defineStore('aiTutor', () => {
     messages,
     context,
     contextPayload,
+    sending,
     toggleVisible,
     openPanel,
     closePanel,
     clearMessages,
     setContext,
-    appendUserMessage,
-    appendAssistantMessage,
-    beginAssistantStream,
-    appendToAssistantMessage,
-    finalizeAssistantMessage,
-    removeMessage,
-    seedAssistantHint,
+    addAiMessage,
+    addUserMessage,
+    resetForStep,
+    submitTutorTurn,
   }
 })

@@ -23,9 +23,7 @@
             AI导师
           </h2>
           <p class="mt-1 text-xs text-text-secondary">
-            当前阶段：{{ store.context.phaseLabel }} · 当前知识：{{
-              store.context.knowledgeLabel
-            }}
+            当前阶段：{{ store.context.phaseLabel }} · 当前知识：{{ store.context.knowledgeLabel }}
           </p>
         </div>
         <button
@@ -34,19 +32,19 @@
           aria-label="关闭"
           @click="store.closePanel()"
         >
-          ✕
+          ×
         </button>
       </header>
 
       <section class="shrink-0 space-y-2 border-b border-border px-4 py-3">
-        <p class="text-xs font-medium text-text-secondary">快捷问题</p>
+        <p class="text-xs font-medium text-text-secondary">快捷追问</p>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="(q, i) in quickQuestions"
             :key="i"
             type="button"
-            class="rounded-input border border-border bg-slate-50 px-3 py-1.5 text-left text-xs text-text-primary transition hover:border-primary/40 hover:bg-white"
-            :disabled="sending"
+            class="rounded-input border border-border bg-slate-50 px-3 py-1.5 text-left text-xs text-text-primary transition hover:border-primary/40 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="store.sending"
             @click="sendQuick(q)"
           >
             {{ q }}
@@ -63,28 +61,15 @@
           :key="m.id"
           :role="m.role"
           :content="m.content"
+          :type="m.type"
+          :source="m.source"
         />
       </div>
 
-      <footer class="shrink-0 border-t border-border p-4">
-        <div class="flex gap-2">
-          <input
-            v-model="draft"
-            type="text"
-            class="min-w-0 flex-1 rounded-input border border-border px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/70 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            placeholder="输入你想问的话…"
-            maxlength="2000"
-            :disabled="sending"
-            @keydown.enter.prevent="sendDraft"
-          />
-          <PrimaryButton
-            :loading="sending"
-            :disabled="!draft.trim()"
-            @click="sendDraft"
-          >
-            发送
-          </PrimaryButton>
-        </div>
+      <footer class="shrink-0 border-t border-border px-4 py-4">
+        <p class="text-sm leading-relaxed text-text-secondary">
+          这里展示的是和执行页完全同步的一段导师对话。继续输入请在执行页下方的输入框里完成。
+        </p>
       </footer>
     </aside>
   </Teleport>
@@ -92,24 +77,20 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { useAiTutorStore } from '@/stores/aiTutor'
-import { streamAiTutorChat } from '@/api/tutor'
+import AiTutorMessage from '@/components/ai-tutor/AiTutorMessage.vue'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
-import AiTutorMessage from '@/components/ai-tutor/AiTutorMessage.vue'
-import PrimaryButton from '@/components/ui/PrimaryButton.vue'
+import { useAiTutorStore } from '@/stores/aiTutor'
 
 const store = useAiTutorStore()
-const draft = ref('')
-const sending = ref(false)
 const scrollRef = ref<HTMLElement | null>(null)
 
 const quickQuestions = computed(() => {
-  const k = store.context.knowledgeLabel || '这个知识点'
+  const knowledge = store.context.knowledgeLabel || '这个知识点'
   return [
-    `${k}到底是什么？`,
-    '我这样理解对吗？',
-    '能换种方式解释吗？',
+    `${knowledge}到底更像什么？`,
+    '我刚才的理解哪里还不够完整？',
+    '你能再换一种方式追问我吗？',
   ]
 })
 
@@ -123,45 +104,16 @@ watch(
   () => store.messages.length,
   () => {
     void scrollToBottom()
-  }
+  },
+  { immediate: true }
 )
 
 async function sendQuick(text: string) {
-  draft.value = text
-  await sendDraft()
-}
-
-async function sendDraft() {
-  const text = draft.value.trim()
-  if (!text || sending.value) return
-  sending.value = true
-  store.appendUserMessage(text)
-  draft.value = ''
-  const assistantId = store.beginAssistantStream()
+  if (!text.trim() || store.sending) return
   try {
-    await streamAiTutorChat(
-      {
-        message: text,
-        context: store.contextPayload,
-      },
-      {
-        onDelta: (d) => store.appendToAssistantMessage(assistantId, d),
-      }
-    )
-    store.finalizeAssistantMessage(assistantId)
-    const last = store.messages.find((m) => m.id === assistantId)
-    if (last && !last.content) {
-      last.content = '（暂无回复）'
-    }
-  } catch (e) {
-    store.finalizeAssistantMessage(assistantId)
-    const last = store.messages.find((m) => m.id === assistantId)
-    if (last && !last.content) {
-      store.removeMessage(assistantId)
-    }
-    showToast(getErrorMessage(e))
-  } finally {
-    sending.value = false
+    await store.submitTutorTurn(text)
+  } catch (error) {
+    showToast(getErrorMessage(error))
   }
 }
 </script>

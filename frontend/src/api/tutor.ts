@@ -1,4 +1,5 @@
 import { request } from './request'
+import type { TaskFeedbackResponse } from '@/types/execution'
 
 /** GET /api/ai-tutor/prompt、GET /api/ai-tutor/explain */
 export interface AiTutorEnvelope {
@@ -73,11 +74,27 @@ export interface AiTutorChatResponseData {
   source?: string
 }
 
+export interface AiTutorFeedbackPayload {
+  answer: string
+  step?: string
+  knowledgePoint?: string
+}
+
 export async function postAiTutorChat(
   payload: AiTutorChatRequestPayload
 ): Promise<AiTutorChatResponseData> {
   const { data } = await request.post<AiTutorChatResponseData>(
     '/api/ai-tutor/chat',
+    payload
+  )
+  return data
+}
+
+export async function postAiTutorFeedback(
+  payload: AiTutorFeedbackPayload
+): Promise<TaskFeedbackResponse> {
+  const { data } = await request.post<TaskFeedbackResponse>(
+    '/api/ai-tutor/feedback',
     payload
   )
   return data

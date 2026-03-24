@@ -8,27 +8,24 @@
         :total="EXECUTION_PHASE_COUNT"
         :labels="EXECUTION_PHASE_LABELS"
       />
-      <ActionFlow v-model:phase="phase" :step="mergedStep" @completed="onStepCompleted" />
+      <ExecutionMessageFlow :step="mergedStep" @completed="onStepCompleted" />
     </main>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import PageContainer from '@/components/layout/PageContainer.vue'
-import AppTopBar from '@/components/layout/AppTopBar.vue'
-import StepHeader from '@/components/execution/StepHeader.vue'
+import ExecutionMessageFlow from '@/components/execution/ExecutionMessageFlow.vue'
 import ProgressBar from '@/components/execution/ProgressBar.vue'
-import ActionFlow from '@/components/execution/ActionFlow.vue'
-import {
-  EXECUTION_PHASE_COUNT,
-  EXECUTION_PHASE_LABELS,
-} from '@/constants/executionPath'
+import StepHeader from '@/components/execution/StepHeader.vue'
+import AppTopBar from '@/components/layout/AppTopBar.vue'
+import PageContainer from '@/components/layout/PageContainer.vue'
+import { EXECUTION_PHASE_COUNT, EXECUTION_PHASE_LABELS } from '@/constants/executionPath'
 import { getExecutionStepConfig } from '@/constants/executionSteps'
-import { useWorkflowStore } from '@/stores/workflow'
 import { useAiTutorStore } from '@/stores/aiTutor'
 import { showToast } from '@/stores/toast'
+import { useWorkflowStore } from '@/stores/workflow'
 import type { ExecutionState, ExecutionStep } from '@/types/execution'
 
 const route = useRoute()
@@ -44,7 +41,6 @@ const stepIndex = computed(() => {
   return Number.isFinite(n) ? n : 1
 })
 
-/** 路径展示用：夹在 1..EXECUTION_PHASE_COUNT */
 const pathCurrent = computed(() => {
   const n = stepIndex.value
   if (n < 1) return 1
@@ -52,9 +48,7 @@ const pathCurrent = computed(() => {
   return n
 })
 
-const stepTemplate = computed<ExecutionStep>(() =>
-  getExecutionStepConfig(stepIndex.value)
-)
+const stepTemplate = computed<ExecutionStep>(() => getExecutionStepConfig(stepIndex.value))
 
 const mergedStep = computed<ExecutionStep>(() => ({
   ...stepTemplate.value,
@@ -83,6 +77,19 @@ watch(
       cur.stepId.replace(/[^a-zA-Z0-9_]+/g, '_').toLowerCase() ||
       'unknown'
     const meta = phaseMetaForStep(cur.step)
+
+    if (stepChanged) {
+      aiTutorStore.resetForStep({
+        stepId: cur.stepId,
+        step: cur.step,
+        knowledgeKey: key,
+        knowledgeLabel: label,
+        phaseCode: meta.code,
+        phaseLabel: meta.label,
+      })
+      return
+    }
+
     aiTutorStore.setContext({
       stepId: cur.stepId,
       step: cur.step,
@@ -91,11 +98,6 @@ watch(
       phaseCode: meta.code,
       phaseLabel: meta.label,
     })
-    if (stepChanged) {
-      aiTutorStore.seedAssistantHint(
-        `我们先不着急背定义。\n\n你先说说看——你觉得「${label}」像什么？\n\n点右下角「AI导师」打开侧栏，用输入框或快捷问题直接聊即可。`
-      )
-    }
   },
   { immediate: true }
 )
@@ -110,8 +112,7 @@ onMounted(() => {
     return
   }
   const n = typeof raw === 'string' ? parseInt(raw, 10) : NaN
-  const inRange =
-    Number.isFinite(n) && n >= 1 && n <= EXECUTION_PHASE_COUNT
+  const inRange = Number.isFinite(n) && n >= 1 && n <= EXECUTION_PHASE_COUNT
   if (!inRange) {
     showToast('阶段序号无效，已为你打开第 1 阶段。')
     router.replace({
