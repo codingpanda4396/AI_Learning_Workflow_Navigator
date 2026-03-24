@@ -33,4 +33,4 @@ navigator:
     model: ${NAVIGATOR_LLM_MODEL:gpt-4.1-mini}
     connectTimeoutMs: ${NAVIGATOR_LLM_CONNECT_TIMEOUT_MS:3000}
     timeoutMs: ${NAVIGATOR_LLM_TIMEOUT_MS:60000}
-    feedbackTimeoutMs: ${NAVIGATOR_LLM_FEEDBACK_TIMEOUT_MS:10000}
+    feedbackTimeoutMs: ${NAVIGATOR_LLM_FEEDBACK_TIMEOUT_MS:60000}

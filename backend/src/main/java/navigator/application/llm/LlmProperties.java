@@ -50,6 +50,6 @@ public class LlmProperties {
     /** HTTP read timeout in milliseconds. */
     private int timeoutMs = 60000;
 
-    /** Shorter HTTP read timeout for structured feedback calls. */
-    private int feedbackTimeoutMs = 10000;
+    /** HTTP read timeout for structured feedback calls. */
+    private int feedbackTimeoutMs = 60000;
 }

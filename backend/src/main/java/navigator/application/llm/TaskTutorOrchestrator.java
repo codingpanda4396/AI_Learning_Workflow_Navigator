@@ -45,12 +45,24 @@ public class TaskTutorOrchestrator {
             return;
         }
         boolean keyOk = llmProperties.getApiKey() != null && !llmProperties.getApiKey().isBlank();
-        log.info("navigator.llm: enabled={} baseUrl={} model={} apiKeyConfigured={} timeoutMs={}",
+        log.info("navigator.llm: enabled={} baseUrl={} model={} apiKeyConfigured={} apiKeyFingerprint={} timeoutMs={}",
                 llmProperties.isEnabled(),
                 llmProperties.getBaseUrl(),
                 llmProperties.getModel(),
                 keyOk,
+                maskKey(llmProperties.getApiKey()),
                 llmProperties.getTimeoutMs());
+    }
+
+    private static String maskKey(String key) {
+        if (key == null || key.isBlank()) {
+            return "EMPTY";
+        }
+        String trimmed = key.trim();
+        if (trimmed.length() <= 8) {
+            return "****";
+        }
+        return trimmed.substring(0, 6) + "..." + trimmed.substring(trimmed.length() - 4);
     }
 
     public TutorTurnResult exploreTurn(TaskExecutionContext ctx, TaskExecutionRuntime rt, String userInput,

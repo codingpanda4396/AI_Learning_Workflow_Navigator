@@ -23,7 +23,6 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.SynchronousSink;
 import reactor.netty.http.client.HttpClient;
 
 import java.nio.charset.StandardCharsets;
@@ -106,7 +105,7 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
             return Flux.error(new IllegalStateException("LLM provider disabled or apiKey empty"));
         }
 
-        String url = sanitizeBaseUrl() + "/v1/chat/completions";
+        String url = buildChatCompletionsUrl();
         ChatCompletionStreamRequest req = new ChatCompletionStreamRequest(
                 props.getModel(),
                 List.of(
@@ -118,7 +117,8 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
                 normalizeMaxTokens(props.getStreamMaxTokens())
         );
 
-        log.debug("LLM HTTP stream POST {} model={} readTimeoutMs={}", url, props.getModel(), props.getTimeoutMs());
+        log.debug("LLM HTTP stream POST {} model={} stream=true apiKeyFingerprint={} readTimeoutMs={}",
+                url, props.getModel(), maskKey(props.getApiKey()), props.getTimeoutMs());
 
         return webClient.post()
                 .uri(url)
@@ -142,10 +142,10 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
     private Flux<String> decodeStreamChunks(Flux<DataBuffer> body) {
         return Flux.defer(() -> {
             StringBuilder carry = new StringBuilder();
-            Flux<String> chunks = body.handle((buffer, sink) -> {
+            Flux<String> chunks = body.flatMapIterable(buffer -> {
                 try {
                     carry.append(buffer.toString(StandardCharsets.UTF_8));
-                    drainCompleteLines(carry, sink);
+                    return drainCompleteLines(carry);
                 } finally {
                     DataBufferUtils.release(buffer);
                 }
@@ -154,13 +154,18 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
         });
     }
 
-    private void drainCompleteLines(StringBuilder carry, SynchronousSink<String> sink) {
+    private List<String> drainCompleteLines(StringBuilder carry) {
+        List<String> pieces = new java.util.ArrayList<>();
         int newline;
         while ((newline = carry.indexOf("\n")) >= 0) {
             String line = carry.substring(0, newline);
             carry.delete(0, newline + 1);
-            emitDeltaFromLine(line, sink);
+            String piece = extractDeltaFromLine(line);
+            if (piece != null && !piece.isEmpty()) {
+                pieces.add(piece);
+            }
         }
+        return pieces;
     }
 
     private Flux<String> flushTail(StringBuilder carry) {
@@ -171,13 +176,6 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
         carry.setLength(0);
         String piece = extractDeltaFromLine(tail);
         return piece == null || piece.isEmpty() ? Flux.empty() : Flux.just(piece);
-    }
-
-    private void emitDeltaFromLine(String rawLine, SynchronousSink<String> sink) {
-        String piece = extractDeltaFromLine(rawLine);
-        if (piece != null && !piece.isEmpty()) {
-            sink.next(piece);
-        }
     }
 
     private String extractDeltaFromLine(String rawLine) {
@@ -227,7 +225,7 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
             throw new IllegalStateException("LLM provider disabled or apiKey empty");
         }
 
-        String url = sanitizeBaseUrl() + "/v1/chat/completions";
+        String url = buildChatCompletionsUrl();
         ChatCompletionRequest req = new ChatCompletionRequest(
                 props.getModel(),
                 List.of(
@@ -245,8 +243,8 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
 
         int sysLen = systemHint != null ? systemHint.length() : 0;
         int userLen = userContent != null ? userContent.length() : 0;
-        log.debug("LLM HTTP POST {} model={} readTimeoutMs={} systemChars={} userChars={}",
-                url, props.getModel(), readTimeoutMs, sysLen, userLen);
+        log.debug("LLM HTTP POST {} model={} stream=false apiKeyFingerprint={} readTimeoutMs={} systemChars={} userChars={}",
+                url, props.getModel(), maskKey(props.getApiKey()), readTimeoutMs, sysLen, userLen);
 
         try {
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
@@ -284,6 +282,17 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
             return base.substring(0, base.length() - 1);
         }
         return base;
+    }
+
+    private String buildChatCompletionsUrl() {
+        String base = sanitizeBaseUrl();
+        if (base.endsWith("/chat/completions")) {
+            return base;
+        }
+        if (base.endsWith("/v1")) {
+            return base + "/chat/completions";
+        }
+        return base + "/v1/chat/completions";
     }
 
     private static String truncateForLog(String body, int maxChars) {
@@ -331,6 +340,17 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
 
     private static Integer normalizeMaxTokens(Integer maxTokens) {
         return maxTokens != null && maxTokens > 0 ? maxTokens : null;
+    }
+
+    private static String maskKey(String key) {
+        if (key == null || key.isBlank()) {
+            return "EMPTY";
+        }
+        String trimmed = key.trim();
+        if (trimmed.length() <= 8) {
+            return "****";
+        }
+        return trimmed.substring(0, 6) + "..." + trimmed.substring(trimmed.length() - 4);
     }
 
     private static int normalizeConnectTimeout(int configuredConnectMs, int readMs, int capMs) {
