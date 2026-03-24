@@ -29,7 +29,27 @@ public class LlmProperties {
      */
     private String model = "gpt-4.1-mini";
 
-    /** HTTP 读超时（等完整响应）；连接超时在网关内 capped 为 min(本值, 15s)。 */
-    private int timeoutMs = 60000;
-}
+    /**
+     * Max tokens for regular tutor chat to keep replies concise and fast.
+     */
+    private Integer chatMaxTokens = 220;
 
+    /**
+     * Max tokens for streaming tutor chat.
+     */
+    private Integer streamMaxTokens = 220;
+
+    /**
+     * Max tokens for structured tutor feedback.
+     */
+    private Integer feedbackMaxTokens = 180;
+
+    /** HTTP connect timeout in milliseconds. */
+    private int connectTimeoutMs = 3000;
+
+    /** HTTP read timeout in milliseconds. */
+    private int timeoutMs = 60000;
+
+    /** Shorter HTTP read timeout for structured feedback calls. */
+    private int feedbackTimeoutMs = 10000;
+}
