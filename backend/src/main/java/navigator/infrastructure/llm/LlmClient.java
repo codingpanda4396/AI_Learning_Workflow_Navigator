@@ -1,7 +1,6 @@
 package navigator.infrastructure.llm;
 
-import java.io.IOException;
-import java.util.function.Consumer;
+import reactor.core.publisher.Flux;
 
 /**
  * R0003：OpenAI 兼容 Chat Completions 抽象；与业务阶段无关的纯技术出口。
@@ -17,8 +16,7 @@ public interface LlmClient {
      * 流式输出：按供应商返回的增量调用 {@code onDelta}（可能含多段空字符串，由实现过滤）。
      * 仅在 {@link #isLiveProviderReady()} 为 true 时调用；否则由业务层走兜底，不调用本方法。
      */
-    void chatStream(String systemPrompt, String userPrompt, Consumer<String> onDelta)
-            throws IOException, InterruptedException;
+    Flux<String> chatStream(String systemPrompt, String userPrompt);
 
     /**
      * 反馈同步路径：固定短读超时（2s），避免用户等待抖动。

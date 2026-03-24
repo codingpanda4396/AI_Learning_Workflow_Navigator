@@ -1,6 +1,7 @@
 package navigator.application.tutor;
 
 import navigator.api.dto.AiTutorChatRequest;
+import reactor.core.publisher.Flux;
 
 public interface AiTutorService {
 
@@ -12,7 +13,7 @@ public interface AiTutorService {
     /**
      * 流式单轮对话；由 Controller 以 SSE 等方式写出。实现侧在异常时追加兜底片段，不向调用方抛业务异常。
      */
-    void streamChat(AiTutorChatRequest request, AiTutorChatStreamHandler handler);
+    Flux<AiTutorStreamEvent> streamChat(AiTutorChatRequest request);
 
     AiTutorTextResult getPrompt(String step, String knowledgePoint);
 

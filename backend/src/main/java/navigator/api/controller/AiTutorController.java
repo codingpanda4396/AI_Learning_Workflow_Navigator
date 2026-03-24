@@ -10,36 +10,33 @@ import navigator.api.dto.AiTutorExplainResponse;
 import navigator.api.dto.AiTutorPrefetchRequest;
 import navigator.api.dto.TaskFeedbackRequest;
 import navigator.api.dto.TaskFeedbackResponse;
-import navigator.application.llm.LlmProperties;
 import navigator.application.tutor.AiTutorChatResult;
-import navigator.application.tutor.AiTutorChatStreamHandler;
 import navigator.application.tutor.AiTutorFeedbackResult;
 import navigator.application.tutor.AiTutorService;
+import navigator.application.tutor.AiTutorStreamEvent;
 import navigator.application.tutor.AiTutorTextResult;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/ai-tutor")
 public class AiTutorController {
 
-    private final AiTutorService aiTutorService;
-    private final LlmProperties llmProperties;
+    private static final String STREAM_ERROR_MESSAGE = "\u6D41\u5F0F\u8F93\u51FA\u5931\u8D25";
 
-    public AiTutorController(AiTutorService aiTutorService, LlmProperties llmProperties) {
+    private final AiTutorService aiTutorService;
+
+    public AiTutorController(AiTutorService aiTutorService) {
         this.aiTutorService = aiTutorService;
-        this.llmProperties = llmProperties;
     }
 
     @GetMapping("/prompt")
@@ -58,9 +55,6 @@ public class AiTutorController {
         return GlobalResponse.ok(new AiTutorEnvelopeResponse(r.source(), r.content()));
     }
 
-    /**
-     * 兼容旧前端：POST body；行为与 GET 一致（忽略 userPrompt，同步路径不调用 LLM）。
-     */
     @PostMapping("/explain")
     public GlobalResponse<AiTutorExplainResponse> explainPost(@RequestBody AiTutorExplainRequest req) {
         String step = req.getStep() != null ? req.getStep() : "";
@@ -92,51 +86,19 @@ public class AiTutorController {
         return GlobalResponse.ok(new AiTutorChatResponse(r.reply(), r.source()));
     }
 
-    /**
-     * 内嵌导师单轮对话（流式）：SSE，事件名 meta / delta / done / error；data 为 JSON。
-     */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter chatStream(@Valid @RequestBody AiTutorChatRequest request) {
-        long ttlMs = Math.max(120_000L, (long) llmProperties.getTimeoutMs() + 60_000L);
-        SseEmitter emitter = new SseEmitter(ttlMs);
-        CompletableFuture.runAsync(() -> {
-            try {
-                aiTutorService.streamChat(request, new AiTutorChatStreamHandler() {
-                    @Override
-                    public void onMeta(String source) {
-                        sseSend(emitter, "meta", Map.of("source", source != null ? source : ""));
-                    }
-
-                    @Override
-                    public void onDelta(String text) {
-                        if (text == null || text.isEmpty()) {
-                            return;
-                        }
-                        sseSend(emitter, "delta", Map.of("text", text));
-                    }
-                });
-                sseSend(emitter, "done", Map.of());
-                emitter.complete();
-            } catch (Exception ex) {
-                try {
-                    emitter.send(SseEmitter.event()
-                            .name("error")
-                            .data(Map.of("message",
-                                    ex.getMessage() != null ? ex.getMessage() : "流式输出失败")));
-                } catch (IOException ignored) {
-                    // client gone
-                }
-                emitter.completeWithError(ex);
-            }
-        });
-        return emitter;
+    public Flux<ServerSentEvent<Map<String, String>>> chatStream(@Valid @RequestBody AiTutorChatRequest request) {
+        return aiTutorService.streamChat(request)
+                .concatWithValues(AiTutorStreamEvent.done())
+                .map(this::toSse)
+                .onErrorResume(ex -> Flux.just(toSse(AiTutorStreamEvent.error(
+                        ex.getMessage() != null ? ex.getMessage() : STREAM_ERROR_MESSAGE))));
     }
 
-    private static void sseSend(SseEmitter emitter, String eventName, Object data) {
-        try {
-            emitter.send(SseEmitter.event().name(eventName).data(data));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    private ServerSentEvent<Map<String, String>> toSse(AiTutorStreamEvent event) {
+        return ServerSentEvent.<Map<String, String>>builder()
+                .event(event.event())
+                .data(event.data())
+                .build();
     }
 }

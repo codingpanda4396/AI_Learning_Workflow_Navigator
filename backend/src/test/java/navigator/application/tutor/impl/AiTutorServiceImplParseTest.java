@@ -9,6 +9,7 @@ import navigator.application.tutor.fallback.TutorFallbackRegistry;
 import navigator.infrastructure.cache.TutorContentCache;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -64,7 +65,11 @@ class AiTutorServiceImplParseTest {
         LlmProperties p = new LlmProperties();
         p.setEnabled(false);
         ObjectMapper om = new ObjectMapper();
-        OpenAiCompatibleLlmClientAdapter client = new OpenAiCompatibleLlmClientAdapter(p, new RestTemplateBuilder(), om);
+        OpenAiCompatibleLlmClientAdapter client = new OpenAiCompatibleLlmClientAdapter(
+                p,
+                new RestTemplateBuilder(),
+                WebClient.builder(),
+                om);
         return new AiTutorServiceImpl(
                 client,
                 new TutorContentCache(),

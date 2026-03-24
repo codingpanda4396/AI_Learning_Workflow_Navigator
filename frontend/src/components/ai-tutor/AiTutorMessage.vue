@@ -8,10 +8,12 @@
         class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
         :class="role === 'user' ? 'bg-primary/10 text-primary' : 'bg-slate-900 text-white'"
       >
-        {{ role === 'user' ? '我' : 'AI' }}
+        {{ role === 'user' ? '\u6211' : 'AI' }}
       </div>
       <div class="rounded-input px-3 py-2 text-sm leading-relaxed shadow-sm" :class="bubbleClass">
-        <p class="whitespace-pre-wrap break-words">{{ content }}</p>
+        <p class="whitespace-pre-wrap break-words">
+          {{ content }}<span v-if="showStreamingCursor" class="typing-cursor" aria-hidden="true" />
+        </p>
         <p
           v-if="role === 'ai' && source"
           class="mt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-text-secondary/70"
@@ -31,6 +33,7 @@ const props = defineProps<{
   content: string
   type?: 'prompt' | 'feedback' | 'hint'
   source?: string
+  streaming?: boolean
 }>()
 
 const bubbleClass = computed(() => {
@@ -45,4 +48,33 @@ const bubbleClass = computed(() => {
   }
   return 'border border-border bg-slate-50 text-text-primary'
 })
+
+const showStreamingCursor = computed(
+  () => props.role === 'ai' && props.streaming && props.content.trim().length > 0
+)
 </script>
+
+<style scoped>
+.typing-cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  margin-left: 0.08em;
+  vertical-align: -0.18em;
+  border-radius: 999px;
+  background: currentColor;
+  animation: blink-cursor 1s steps(1, end) infinite;
+}
+
+@keyframes blink-cursor {
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+</style>

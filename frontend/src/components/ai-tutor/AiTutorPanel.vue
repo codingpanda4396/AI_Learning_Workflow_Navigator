@@ -63,6 +63,7 @@
           :content="m.content"
           :type="m.type"
           :source="m.source"
+          :streaming="m.streaming"
         />
       </div>
 
@@ -101,7 +102,7 @@ async function scrollToBottom() {
 }
 
 watch(
-  () => store.messages.length,
+  () => store.messages.map((message) => `${message.id}:${message.content.length}:${message.streaming ? 1 : 0}`).join('|'),
   () => {
     void scrollToBottom()
   },
