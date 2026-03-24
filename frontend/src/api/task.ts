@@ -1,6 +1,7 @@
 import { request } from './request'
 import type {
   CurrentTaskData,
+  CurrentTaskGuidanceData,
   CompleteTaskRequest,
   CompleteTaskData,
   TaskScaffoldResponse,
@@ -14,6 +15,15 @@ export async function getCurrentTask(
 ): Promise<CurrentTaskData> {
   const { data } = await request.get<CurrentTaskData>(
     `/api/sessions/${sessionId}/current-task`
+  )
+  return data
+}
+
+export async function getCurrentTaskGuidance(
+  sessionId: string
+): Promise<CurrentTaskGuidanceData> {
+  const { data } = await request.get<CurrentTaskGuidanceData>(
+    `/api/sessions/${sessionId}/current-task-guidance`
   )
   return data
 }
