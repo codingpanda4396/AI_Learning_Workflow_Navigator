@@ -1,6 +1,7 @@
 package navigator.application;
 
 import navigator.api.dto.CreateGoalData;
+import navigator.api.auth.CurrentUserHolder;
 import navigator.application.goal.GoalContextDeriver;
 import navigator.application.goal.GoalRuleEngine;
 import navigator.domain.model.GoalContextSnapshot;
@@ -34,9 +35,10 @@ public class GoalApplicationService {
     }
 
     public CreateGoalData createGoal(LearningGoalInput input) {
+        Long userId = CurrentUserHolder.require().id();
         StructuredLearningGoal goal = goalRuleEngine.derive(input);
         GoalContextSnapshot snapshot = goalContextDeriver.derive(goal);
-        LearningGoalEntity entity = buildEntity(input, goal, snapshot);
+        LearningGoalEntity entity = buildEntity(userId, input, goal, snapshot);
         learningGoalRepository.saveNew(entity);
         Long dbId = entity.getId();
         if (dbId == null) {
@@ -56,10 +58,12 @@ public class GoalApplicationService {
                 .build();
     }
 
-    private LearningGoalEntity buildEntity(LearningGoalInput input,
+    private LearningGoalEntity buildEntity(Long userId,
+                                          LearningGoalInput input,
                                           StructuredLearningGoal goal,
                                           GoalContextSnapshot snapshot) {
         LearningGoalEntity entity = new LearningGoalEntity();
+        entity.setUserId(userId);
         entity.setRawGoalText(input != null ? input.getRawGoalText() : goal != null ? goal.getRawGoalText() : null);
         entity.setTimeBudget(input != null && input.getTimeBudget() != null ? input.getTimeBudget().name() : null);
         entity.setSelfReportedLevel(input != null && input.getSelfReportedLevel() != null ? input.getSelfReportedLevel().name() : null);

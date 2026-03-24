@@ -1,13 +1,14 @@
 package navigator.api.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,14 +35,15 @@ class LlmFallbackIntegrationTest {
 
     @Test
     void messagesShouldFallbackToMockWhenProviderFails() throws Exception {
+        Cookie authCookie = TestAuthSupport.registerAndLogin(mvc, "llm_user");
         String goalBody = """
                 {"rawGoalText":"哈希表入门","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC"}
                 """;
-        String goalId = objectMapper.readTree(mvc.perform(post("/api/goals").contentType(MediaType.APPLICATION_JSON).content(goalBody))
+        String goalId = objectMapper.readTree(mvc.perform(post("/api/goals").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content(goalBody))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
                 .get("data").get("goalId").asText();
 
-        String diagResp = mvc.perform(post("/api/diagnosis/sessions")
+        String diagResp = mvc.perform(post("/api/diagnosis/sessions").cookie(authCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"goalId\":\"" + goalId + "\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
@@ -50,26 +52,26 @@ class LlmFallbackIntegrationTest {
         String submitBody = """
                 {"diagnosisId":"%s","answers":[{"questionId":"q_goal_outcome","selectedOptions":["BUILD_FRAMEWORK"]},{"questionId":"q_foundation_state","selectedOptions":["BASIC_BUT_FRAGILE"]},{"questionId":"q_primary_gap","selectedOptions":["CONCEPT_GAP"]},{"questionId":"q_scope_of_problem","selectedOptions":["MULTI_POINT"]},{"questionId":"q_preferred_entry_mode","selectedOptions":["CONCEPT_FIRST"]},{"questionId":"q_execution_risk","selectedOptions":["LOW_RISK"]}]}
                 """.formatted(diagnosisId);
-        mvc.perform(post("/api/diagnosis/submissions").contentType(MediaType.APPLICATION_JSON).content(submitBody))
+        mvc.perform(post("/api/diagnosis/submissions").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content(submitBody))
                 .andExpect(status().isOk());
 
-        String planId = objectMapper.readTree(mvc.perform(post("/api/learning-plans/preview")
+        String planId = objectMapper.readTree(mvc.perform(post("/api/learning-plans/preview").cookie(authCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"goalId\":\"" + goalId + "\",\"diagnosisId\":\"" + diagnosisId + "\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
                 .get("data").get("planId").asText();
 
-        String sessionId = objectMapper.readTree(mvc.perform(post("/api/learning-plans/commit")
+        String sessionId = objectMapper.readTree(mvc.perform(post("/api/learning-plans/commit").cookie(authCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"planId\":\"" + planId + "\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
                 .get("data").get("sessionId").asText();
 
-        String taskId = objectMapper.readTree(mvc.perform(get("/api/sessions/" + sessionId + "/current-task"))
+        String taskId = objectMapper.readTree(mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
                 .get("data").get("currentTask").get("taskId").asText();
 
-        mvc.perform(post("/api/tasks/" + taskId + "/messages").contentType(MediaType.APPLICATION_JSON).content(
+        mvc.perform(post("/api/tasks/" + taskId + "/messages").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content(
                         "{\"sessionId\":\"" + sessionId + "\",\"content\":\"请用最小例子解释哈希冲突\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fallbackMode").value("MOCK"))
@@ -87,4 +89,3 @@ class LlmFallbackIntegrationTest {
                 .andExpect(jsonPath("$.data.reply").isNotEmpty());
     }
 }
-

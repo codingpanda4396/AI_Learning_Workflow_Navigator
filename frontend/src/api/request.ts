@@ -7,6 +7,7 @@ const baseURL = import.meta.env.DEV ? '' : 'http://localhost:8080'
 export const request = axios.create({
   baseURL,
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },

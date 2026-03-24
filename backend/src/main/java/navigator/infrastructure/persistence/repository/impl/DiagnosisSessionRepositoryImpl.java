@@ -6,6 +6,7 @@ import navigator.infrastructure.persistence.mapper.DiagnosisSessionMapper;
 import navigator.infrastructure.persistence.repository.DiagnosisSessionRepository;
 import org.springframework.stereotype.Repository;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import java.time.LocalDateTime;
 
 @Repository
@@ -18,16 +19,18 @@ public class DiagnosisSessionRepositoryImpl implements DiagnosisSessionRepositor
     }
 
     @Override
-    public DiagnosisSessionEntity saveNew(Long sessionId,
+    public DiagnosisSessionEntity saveNew(Long userId,
+                                         Long sessionId,
                                          Long goalId,
                                          String status,
                                          String generationMode,
                                          String questionsJson) {
-        if (sessionId == null || goalId == null) {
+        if (userId == null || sessionId == null || goalId == null) {
             return null;
         }
         LocalDateTime now = LocalDateTime.now();
         DiagnosisSessionEntity entity = new DiagnosisSessionEntity();
+        entity.setUserId(userId);
         entity.setSessionId(sessionId);
         entity.setGoalId(goalId);
         entity.setStatus(status != null ? status : DiagnosisSessionStatus.READY.name());
@@ -46,6 +49,17 @@ public class DiagnosisSessionRepositoryImpl implements DiagnosisSessionRepositor
             return null;
         }
         return mapper.selectById(diagnosisSessionId);
+    }
+
+    @Override
+    public DiagnosisSessionEntity findBySessionId(Long sessionId) {
+        if (sessionId == null) {
+            return null;
+        }
+        return mapper.selectOne(new QueryWrapper<DiagnosisSessionEntity>()
+                .eq("session_id", sessionId)
+                .orderByDesc("id")
+                .last("LIMIT 1"));
     }
 
     @Override

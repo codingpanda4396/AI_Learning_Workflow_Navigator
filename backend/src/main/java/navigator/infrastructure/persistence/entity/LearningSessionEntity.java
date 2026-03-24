@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class LearningSessionEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long userId;
     private Long goalId;
     private Long diagnosisSessionId;
     private Long planId;
@@ -24,4 +25,3 @@ public class LearningSessionEntity {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
-

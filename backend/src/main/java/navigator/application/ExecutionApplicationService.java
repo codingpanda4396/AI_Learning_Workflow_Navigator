@@ -24,6 +24,7 @@ import navigator.domain.model.ExecutableTaskSpec;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.entity.TaskCompletionEntity;
 import navigator.infrastructure.persistence.entity.TaskMethodProfileEntity;
+import navigator.infrastructure.persistence.repository.LearningSessionRepository;
 import navigator.infrastructure.persistence.repository.SessionTaskRepository;
 import navigator.infrastructure.persistence.repository.TaskCompletionRepository;
 import navigator.infrastructure.persistence.repository.TaskMethodProfileRepository;
@@ -40,6 +41,7 @@ public class ExecutionApplicationService {
     private final SessionStateGuard sessionStateGuard;
     private final TaskProgressGuard taskProgressGuard;
     private final SessionTaskRepository sessionTaskRepository;
+    private final LearningSessionRepository learningSessionRepository;
     private final TaskCompletionRepository taskCompletionRepository;
     private final TaskMethodProfileRepository taskMethodProfileRepository;
     private final TaskExecutionPersistenceService taskExecutionPersistenceService;
@@ -52,6 +54,7 @@ public class ExecutionApplicationService {
                                        SessionStateGuard sessionStateGuard,
                                        TaskProgressGuard taskProgressGuard,
                                        SessionTaskRepository sessionTaskRepository,
+                                       LearningSessionRepository learningSessionRepository,
                                        TaskCompletionRepository taskCompletionRepository,
                                        TaskMethodProfileRepository taskMethodProfileRepository,
                                        TaskExecutionPersistenceService taskExecutionPersistenceService,
@@ -63,6 +66,7 @@ public class ExecutionApplicationService {
         this.sessionStateGuard = sessionStateGuard;
         this.taskProgressGuard = taskProgressGuard;
         this.sessionTaskRepository = sessionTaskRepository;
+        this.learningSessionRepository = learningSessionRepository;
         this.taskCompletionRepository = taskCompletionRepository;
         this.taskMethodProfileRepository = taskMethodProfileRepository;
         this.taskExecutionPersistenceService = taskExecutionPersistenceService;
@@ -184,6 +188,11 @@ public class ExecutionApplicationService {
             state.setStatus(LearningSessionStatus.COMPLETED.name());
         }
         int completed = store.getOrCreateTaskRecords(request.getSessionId()).size();
+        learningSessionRepository.updateProgress(
+                extractNumericId(sessionId),
+                completed,
+                nextAvailable ? LearningSessionStatus.IN_PROGRESS.name() : LearningSessionStatus.COMPLETED.name()
+        );
         CompleteTaskData.SessionProgressItem progress = CompleteTaskData.SessionProgressItem.builder()
                 .completedTasks(completed)
                 .totalTasks(state.getTaskSequence().size())

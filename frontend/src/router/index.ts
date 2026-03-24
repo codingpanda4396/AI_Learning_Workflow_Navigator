@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { useWorkflowStore } from '@/stores/workflow'
 
 const router = createRouter({
@@ -6,6 +7,8 @@ const router = createRouter({
   routes: [
     { path: '/', redirect: '/goal' },
     { path: '/goal', name: 'goal', component: () => import('@/views/GoalInputView.vue'), meta: { step: 'goal' } },
+    { path: '/auth/login', name: 'login', component: () => import('@/views/AuthView.vue'), meta: { guestOnly: true } },
+    { path: '/auth/register', name: 'register', component: () => import('@/views/AuthView.vue'), meta: { guestOnly: true } },
     { path: '/diagnosis', name: 'diagnosis', component: () => import('@/views/DiagnosisView.vue'), meta: { step: 'diagnosis' } },
     { path: '/plan', name: 'plan', component: () => import('@/views/LearningPlanView.vue'), meta: { step: 'plan' } },
     {
@@ -25,38 +28,44 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
   const store = useWorkflowStore()
-  const step = to.meta.step as string
+  await auth.ensureReady()
+
+  if (to.meta.guestOnly && auth.isAuthenticated) {
+    return { name: 'goal' }
+  }
+
+  const step = to.meta.step as string | undefined
+  if (step && step !== 'goal' && !auth.isAuthenticated) {
+    auth.setPendingRedirect(to.fullPath)
+    return { name: 'login' }
+  }
 
   if (step === 'diagnosis' && !store.goalId) {
-    next({ name: 'goal' })
-    return
+    return { name: 'goal' }
   }
   if (step === 'plan' && (!store.goalId || !store.diagnosisId)) {
-    next(store.goalId ? { name: 'diagnosis' } : { name: 'goal' })
-    return
+    return store.goalId ? { name: 'diagnosis' } : { name: 'goal' }
   }
   if ((step === 'task' || step === 'report') && !store.sessionId) {
-    next({ name: 'plan' })
-    return
+    return { name: 'plan' }
   }
   if (to.name === 'task' && store.sessionId && store.currentTaskId) {
-    next({
+    return {
       name: 'taskRun',
       params: { taskId: store.currentTaskId },
       replace: true,
-    })
-    return
+    }
   }
   if (to.name === 'execution' && store.sessionId) {
-    next({
+    return {
       name: 'task',
       replace: true,
-    })
-    return
+    }
   }
-  next()
+  return true
 })
 
 export default router

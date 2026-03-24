@@ -1,14 +1,11 @@
-/**
- * 枚举 -> 中文文案映射
- */
 import {
-  TimeBudget,
-  SelfReportedLevel,
-  PreferenceTag,
   GoalType,
-  TaskCompletionStatus,
-  ResultStatus,
   NextActionType,
+  PreferenceTag,
+  ResultStatus,
+  SelfReportedLevel,
+  TaskCompletionStatus,
+  TimeBudget,
 } from './enums'
 
 export const timeBudgetLabels: Record<string, string> = {
@@ -24,7 +21,7 @@ export const selfReportedLevelLabels: Record<string, string> = {
   [SelfReportedLevel.BASIC]: '略懂皮毛',
   [SelfReportedLevel.PARTIAL_UNDERSTANDING]: '部分理解',
   [SelfReportedLevel.CAN_EXPLAIN_BUT_NOT_APPLY]: '能讲但不会用',
-  [SelfReportedLevel.SOLID_BUT_WANT_IMPROVE]: '较扎实想提升',
+  [SelfReportedLevel.SOLID_BUT_WANT_IMPROVE]: '比较扎实想提升',
 }
 
 export const preferenceTagLabels: Record<string, string> = {
@@ -67,7 +64,7 @@ export const nextActionTypeLabels: Record<string, string> = {
 }
 
 export const errorCodeLabels: Record<string, string> = {
-  RESOURCE_NOT_FOUND: '资源不存在，请从目标输入重新开始',
+  RESOURCE_NOT_FOUND: '资源不存在，请从目标页重新开始',
   INVALID_ARGUMENT: '参数无效',
   DIAGNOSIS_NOT_COMPLETED: '请先完成诊断',
   PLAN_NOT_COMMITTED: '请先确认学习计划',
@@ -82,4 +79,8 @@ export const errorCodeLabels: Record<string, string> = {
   BAD_REQUEST: '请求参数错误',
   NOT_FOUND: '资源不存在',
   CONFLICT: '状态冲突',
+  UNAUTHORIZED: '请先登录再开始这一轮学习',
+  INVALID_CREDENTIALS: '账号名或密码不正确',
+  USERNAME_ALREADY_EXISTS: '这个账号名已经被使用',
+  FORBIDDEN: '你没有权限访问该资源',
 }

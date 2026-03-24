@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class DiagnosisSessionEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long userId;
     private Long sessionId;
     private Long goalId;
     private String status;
@@ -24,4 +25,3 @@ public class DiagnosisSessionEntity {
     private LocalDateTime completedAt;
     private LocalDateTime createdAt;
 }
-

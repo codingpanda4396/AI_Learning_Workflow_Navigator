@@ -23,9 +23,11 @@ import { useRoute } from 'vue-router'
 import { toastMessage } from '@/stores/toast'
 import AiTutorFloating from '@/components/ai-tutor/AiTutorFloating.vue'
 import AiTutorPanel from '@/components/ai-tutor/AiTutorPanel.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const isExecutionRoute = computed(() => route.name === 'execution')
+useAuthStore().ensureReady()
 </script>
 
 <style scoped>

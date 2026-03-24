@@ -23,8 +23,15 @@ public class GlobalExceptionHandler {
 
     private static HttpStatus httpStatusFor(BusinessErrorCode code) {
         switch (code) {
+            case UNAUTHORIZED:
+            case INVALID_CREDENTIALS:
+                return HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN:
+                return HttpStatus.FORBIDDEN;
             case RESOURCE_NOT_FOUND:
                 return HttpStatus.NOT_FOUND;
+            case USERNAME_ALREADY_EXISTS:
+                return HttpStatus.CONFLICT;
             case INVALID_ARGUMENT:
                 return HttpStatus.BAD_REQUEST;
             case DIAGNOSIS_NOT_COMPLETED:

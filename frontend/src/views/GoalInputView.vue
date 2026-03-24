@@ -1,71 +1,107 @@
 <template>
   <PageContainer>
-    <TransitionOverlay v-if="transitionOverlay" message="进入诊断与规划…" />
+    <TransitionOverlay v-if="transitionOverlay" message="正在进入诊断与规划..." />
     <AppTopBar current="goal" />
     <main class="relative overflow-hidden">
       <div
-        class="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(79,70,229,0.12),transparent)]"
+        class="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(15,23,42,0.12),transparent)]"
       />
 
-      <div class="relative mx-auto w-full max-w-3xl px-5 py-10 md:px-8 md:py-14">
-        <!-- A 顶部引导：一句话 + 当前入口（单视觉核心） -->
+      <div class="relative mx-auto w-full max-w-4xl px-5 py-10 md:px-8 md:py-14">
         <header class="space-y-6">
           <div class="space-y-2 text-center md:text-left">
-            <h1 class="text-2xl font-semibold tracking-tight text-text-primary md:text-3xl">
-              选入口，启动本轮学习
+            <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Quick Start</p>
+            <h1 class="text-3xl font-semibold tracking-tight text-text-primary md:text-4xl">
+              选入口，启动这一轮学习工作流
             </h1>
-            <p class="text-sm text-text-secondary md:text-[15px]">
-              先选知识点，再选起手方式，然后进入诊断与规划。
+            <p class="max-w-2xl text-sm leading-6 text-text-secondary md:text-[15px]">
+              先选知识点，再选起手方式。系统会从目标、诊断、规划一路编排到执行与报告。
             </p>
           </div>
 
-          <div
-            class="rounded-2xl border border-slate-200/90 bg-white/90 px-5 py-4 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-sm md:flex md:items-stretch md:justify-between md:gap-6 md:py-5"
-          >
-            <div class="min-w-0 flex-1 space-y-1">
-              <p class="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">本轮入口</p>
-              <p class="truncate text-base font-semibold text-text-primary">
-                {{ selectedTopic.label }}
-                <span class="font-normal text-slate-400">·</span>
-                {{ selectedQuickStart?.label ?? '—' }}
-              </p>
-              <p v-if="selectedTopic.availability === 'live'" class="text-sm text-text-secondary">
-                {{ topicOneLiner }}
-              </p>
-              <p v-else class="text-sm text-slate-400">该知识点即将开放，请选已点亮项。</p>
-              <p
-                v-if="recommendedForTopic && selectedTopic.availability === 'live'"
-                class="pt-1 text-xs text-slate-400 md:hidden"
-              >
-                推荐起手：{{ recommendedForTopic.label }}
-              </p>
-            </div>
-            <div class="mt-4 flex shrink-0 flex-col justify-center gap-3 md:mt-0 md:w-[200px]">
-              <div
-                v-if="recommendedForTopic && selectedTopic.availability === 'live'"
-                class="hidden text-right text-xs text-slate-400 md:block"
-              >
-                <span>推荐起手</span>
-                <span class="ml-1 font-medium text-slate-600">{{ recommendedForTopic.label }}</span>
+          <div class="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+            <section
+              class="rounded-[28px] border border-slate-200/90 bg-white/90 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] backdrop-blur-sm"
+            >
+              <div class="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+                <div class="min-w-0 flex-1 space-y-2">
+                  <p class="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">本轮入口</p>
+                  <p class="truncate text-lg font-semibold text-text-primary">
+                    {{ selectedTopic.label }}
+                    <span class="px-2 text-slate-300">/</span>
+                    {{ selectedQuickStart?.label ?? '请选择起手方式' }}
+                  </p>
+                  <p v-if="selectedTopic.availability === 'live'" class="text-sm leading-6 text-text-secondary">
+                    {{ topicOneLiner }}
+                  </p>
+                  <p v-else class="text-sm text-slate-400">该知识点将在后续扩展中开放，请先选择已点亮主题。</p>
+                </div>
+
+                <div class="w-full space-y-3 md:w-[220px]">
+                  <div
+                    v-if="recommendedForTopic && selectedTopic.availability === 'live'"
+                    class="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500"
+                  >
+                    推荐起手：
+                    <span class="font-medium text-slate-700">{{ recommendedForTopic.label }}</span>
+                  </div>
+                  <PrimaryButton
+                    class="w-full justify-center py-3 text-sm font-semibold shadow-[0_12px_24px_rgba(15,23,42,0.15)]"
+                    :loading="loading"
+                    :disabled="ctaDisabled"
+                    @click="onSubmit"
+                  >
+                    {{ ctaLabel }}
+                  </PrimaryButton>
+                </div>
               </div>
-              <PrimaryButton
-                class="w-full justify-center py-3 text-sm font-semibold shadow-[0_10px_24px_rgba(79,70,229,0.18)]"
-                :loading="loading"
-                :disabled="ctaDisabled"
-                @click="onSubmit"
-              >
-                {{ ctaLabel }}
-              </PrimaryButton>
-            </div>
+            </section>
+
+            <aside
+              class="rounded-[28px] border border-slate-200/90 bg-slate-950 px-5 py-5 text-white shadow-[0_18px_48px_rgba(15,23,42,0.18)]"
+            >
+              <template v-if="auth.isAuthenticated && auth.user">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">当前账号</p>
+                <p class="mt-3 text-xl font-semibold">{{ auth.user.displayName }}</p>
+                <p class="mt-2 text-sm leading-6 text-slate-300">
+                  新创建的学习目标和流程都会绑定到这个账号下。
+                </p>
+
+                <button
+                  v-if="auth.recentLearningEntry?.sessionId"
+                  type="button"
+                  class="mt-5 w-full rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-left transition hover:bg-white/12"
+                  @click="continueLatest"
+                >
+                  <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Continue</p>
+                  <p class="mt-2 text-sm font-medium text-white">继续上次学习</p>
+                  <p class="mt-1 text-xs text-slate-400">{{ continueLabel }}</p>
+                </button>
+              </template>
+
+              <template v-else>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">登录后可用</p>
+                <p class="mt-3 text-xl font-semibold">保存你的学习链路</p>
+                <p class="mt-2 text-sm leading-6 text-slate-300">
+                  开始这一轮前先登录，目标、诊断、规划与执行进度才能归到你的账号。
+                </p>
+                <router-link
+                  to="/auth/login"
+                  class="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+                >
+                  登录开始
+                </router-link>
+              </template>
+            </aside>
           </div>
         </header>
 
-        <!-- B 知识点 -->
         <section class="mt-12 space-y-4">
           <div class="flex items-baseline justify-between gap-3">
             <h2 class="text-base font-semibold text-text-primary">知识点</h2>
+            <p class="text-xs text-slate-400">408 个学科入口持续扩展中</p>
           </div>
-          <p class="text-xs text-slate-400">点选知识点后，会更新上方入口与推荐起手。</p>
+          <p class="text-xs text-slate-400">亮色主题可直接开始；灰色主题代表后续将接入更大的学科覆盖。</p>
 
           <div class="grid gap-4 sm:grid-cols-2">
             <article
@@ -95,7 +131,6 @@
           </div>
         </section>
 
-        <!-- C 起手方式 -->
         <section class="mt-12 space-y-4">
           <div class="flex flex-wrap items-baseline justify-between gap-2">
             <h2 class="text-base font-semibold text-text-primary">起手方式</h2>
@@ -115,21 +150,31 @@
               class="rounded-2xl border p-4 text-left transition-all"
               :class="
                 selectedQuickStartKey === item.key
-                  ? 'border-primary bg-indigo-50/80 ring-2 ring-primary/25'
+                  ? 'border-slate-950 bg-slate-950 text-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]'
                   : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
               "
               @click="selectedQuickStartKey = item.key"
             >
               <div class="flex items-start justify-between gap-2">
                 <div>
-                  <p class="text-[15px] font-semibold text-text-primary">{{ item.label }}</p>
-                  <p class="mt-1 text-xs leading-relaxed text-text-secondary">{{ item.subtitle }}</p>
+                  <p
+                    class="text-[15px] font-semibold"
+                    :class="selectedQuickStartKey === item.key ? 'text-white' : 'text-text-primary'"
+                  >
+                    {{ item.label }}
+                  </p>
+                  <p
+                    class="mt-1 text-xs leading-relaxed"
+                    :class="selectedQuickStartKey === item.key ? 'text-slate-300' : 'text-text-secondary'"
+                  >
+                    {{ item.subtitle }}
+                  </p>
                 </div>
                 <span
                   class="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 transition-colors"
                   :class="
                     selectedQuickStartKey === item.key
-                      ? 'border-primary bg-primary'
+                      ? 'border-white bg-white'
                       : 'border-slate-300 bg-white'
                   "
                 />
@@ -138,19 +183,18 @@
           </div>
         </section>
 
-        <!-- D 底部：再强调行动 + 弱提示 -->
         <div class="mt-12 space-y-4 border-t border-slate-100 pt-10">
           <PrimaryButton
-            class="w-full justify-center py-3.5 text-base font-semibold shadow-[0_12px_28px_rgba(79,70,229,0.2)]"
+            class="w-full justify-center py-3.5 text-base font-semibold shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
             :loading="loading"
             :disabled="ctaDisabled"
             @click="onSubmit"
           >
             {{ ctaLabel }}
           </PrimaryButton>
-          <p class="text-center text-xs text-slate-400">选好后点此开始；将进入诊断与规划。</p>
+          <p class="text-center text-xs text-slate-400">选好之后点此开始，将进入诊断与规划。</p>
           <p class="text-center text-[11px] text-slate-300">
-            {{ HOME_TOPIC_SLOT_COUNT }} 个展示位 · {{ HOME_LIVE_TOPIC_COUNT }} 个可学 · 408+ 可扩展
+            {{ HOME_TOPIC_SLOT_COUNT }} 个展示位 / {{ HOME_LIVE_TOPIC_COUNT }} 个可学 / 408+ 可扩展
           </p>
         </div>
       </div>
@@ -159,12 +203,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PrimaryButton from '@/components/ui/PrimaryButton.vue'
 import TransitionOverlay from '@/components/ui/TransitionOverlay.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useWorkflowStore } from '@/stores/workflow'
 import { createGoal } from '@/api/goals'
 import { showToast } from '@/stores/toast'
@@ -179,13 +224,39 @@ import {
   HOME_TOPIC_SLOT_COUNT,
 } from '@/constants/homeQuickStart'
 
+const STORAGE_KEYS = {
+  topic: 'goal_selected_topic',
+  quickStart: 'goal_selected_quickstart',
+} as const
+
+function getStored(key: string) {
+  try {
+    return sessionStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function setStored(key: string, value: string) {
+  try {
+    sessionStorage.setItem(key, value)
+  } catch {
+    // ignore
+  }
+}
+
 const router = useRouter()
+const auth = useAuthStore()
 const store = useWorkflowStore()
 
-const initialTopic = getHomeTopic(HOME_DEFAULT_TOPIC_KEY)
-const selectedTopicKey = ref(HOME_DEFAULT_TOPIC_KEY)
+const fallbackTopic = HOME_DEFAULT_TOPIC_KEY
+const initialTopicKey = getStored(STORAGE_KEYS.topic) ?? fallbackTopic
+const initialTopic = getHomeTopic(initialTopicKey)
+const selectedTopicKey = ref(initialTopicKey)
 const selectedQuickStartKey = ref<(typeof HOME_QUICK_STARTS)[number]['key']>(
-  initialTopic.recommendedIntent ?? 'structure'
+  (getStored(STORAGE_KEYS.quickStart) as (typeof HOME_QUICK_STARTS)[number]['key'] | null) ??
+    initialTopic.recommendedIntent ??
+    'structure'
 )
 const transitionOverlay = ref(false)
 const loading = ref(false)
@@ -202,9 +273,14 @@ const recommendedForTopic = computed(() => {
 })
 
 const topicOneLiner = computed(() => {
-  const t = selectedTopic.value
-  if (t.availability !== 'live') return ''
-  return t.previewBody
+  const topic = selectedTopic.value
+  return topic.availability === 'live' ? topic.previewBody : ''
+})
+
+const continueLabel = computed(() => {
+  const entry = auth.recentLearningEntry
+  if (!entry?.sessionId) return ''
+  return entry.sessionStatus === 'COMPLETED' ? '回到这轮报告页，查看结果与下一步建议。' : '回到最近一轮执行进度，继续任务脚手架。'
 })
 
 const ctaDisabled = computed(
@@ -212,19 +288,30 @@ const ctaDisabled = computed(
 )
 
 const ctaLabel = computed(() => {
-  if (selectedTopic.value.availability !== 'live') return '该知识点未开放'
-  return '开始这轮学习'
+  if (selectedTopic.value.availability !== 'live') return '该知识点尚未开放'
+  return auth.isAuthenticated ? '开始这一轮学习' : '登录后开始这一轮'
 })
 
-watch(
-  () => selectedTopicKey.value,
-  (key) => {
-    const t = getHomeTopic(key)
-    if (t.availability === 'live' && t.recommendedIntent) {
-      selectedQuickStartKey.value = t.recommendedIntent
-    }
+onMounted(async () => {
+  if (!auth.isAuthenticated) return
+  try {
+    await auth.refresh()
+  } catch {
+    // Keep the goal page usable even if refreshing auth context fails.
   }
-)
+})
+
+watch(selectedTopicKey, (value) => {
+  setStored(STORAGE_KEYS.topic, value)
+  const topic = getHomeTopic(value)
+  if (topic.availability === 'live' && topic.recommendedIntent) {
+    selectedQuickStartKey.value = topic.recommendedIntent
+  }
+})
+
+watch(selectedQuickStartKey, (value) => {
+  setStored(STORAGE_KEYS.quickStart, value)
+})
 
 function chipClass(topicKey: string) {
   const topic = getHomeTopic(topicKey)
@@ -232,9 +319,9 @@ function chipClass(topicKey: string) {
 
   if (topic.availability === 'live') {
     if (isSelected) {
-      return 'border-primary bg-primary text-white shadow-sm'
+      return 'border-slate-950 bg-slate-950 text-white shadow-sm'
     }
-    return 'border-indigo-200/80 bg-indigo-50/90 text-indigo-800 hover:border-primary/50'
+    return 'border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300'
   }
 
   if (isSelected) {
@@ -254,13 +341,42 @@ function delay(ms: number) {
   })
 }
 
+async function continueLatest() {
+  const entry = auth.recentLearningEntry
+  if (!entry?.sessionId) return
+  store.goalId = entry.goalId ?? null
+  store.diagnosisId = entry.diagnosisId ?? null
+  store.planId = entry.planId ?? null
+  store.sessionId = entry.sessionId
+  store.currentTaskId = entry.currentTaskId ?? null
+
+  if (entry.sessionStatus === 'COMPLETED') {
+    await router.push('/report')
+    return
+  }
+  if (entry.currentTaskId) {
+    await router.push({ name: 'taskRun', params: { taskId: entry.currentTaskId } })
+    return
+  }
+  if (entry.diagnosisId) {
+    await router.push('/diagnosis')
+  }
+}
+
 async function onSubmit() {
   if (ctaDisabled.value || !selectedQuickStart.value) {
     if (selectedTopic.value.availability !== 'live') {
-      showToast('请先选择已点亮的知识点。')
+      showToast('请先选择已点亮的知识点')
       return
     }
     showToast('请选择起手方式')
+    return
+  }
+
+  if (!auth.isAuthenticated) {
+    auth.setPendingRedirect('/goal')
+    showToast('登录后即可开始这一轮学习')
+    await router.push('/auth/login')
     return
   }
 

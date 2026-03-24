@@ -6,6 +6,7 @@ import navigator.infrastructure.persistence.mapper.LearningPlanMapper;
 import navigator.infrastructure.persistence.repository.LearningPlanRepository;
 import org.springframework.stereotype.Repository;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import java.time.LocalDateTime;
 
 @Repository
@@ -45,6 +46,16 @@ public class LearningPlanRepositoryImpl implements LearningPlanRepository {
             return null;
         }
         return mapper.selectById(id);
+    }
+
+    @Override
+    public LearningPlanEntity findByIdAndUserId(Long id, Long userId) {
+        if (id == null || userId == null) {
+            return null;
+        }
+        return mapper.selectOne(new QueryWrapper<LearningPlanEntity>()
+                .eq("id", id)
+                .eq("user_id", userId));
     }
 
     @Override

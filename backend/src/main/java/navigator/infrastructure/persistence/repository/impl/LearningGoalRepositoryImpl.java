@@ -5,6 +5,8 @@ import navigator.infrastructure.persistence.mapper.LearningGoalMapper;
 import navigator.infrastructure.persistence.repository.LearningGoalRepository;
 import org.springframework.stereotype.Repository;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+
 @Repository
 public class LearningGoalRepositoryImpl implements LearningGoalRepository {
 
@@ -31,11 +33,26 @@ public class LearningGoalRepositoryImpl implements LearningGoalRepository {
     }
 
     @Override
+    public LearningGoalEntity findByIdAndUserId(Long id, Long userId) {
+        if (id == null || userId == null) {
+            return null;
+        }
+        return mapper.selectOne(new QueryWrapper<LearningGoalEntity>()
+                .eq("id", id)
+                .eq("user_id", userId));
+    }
+
+    @Override
     public boolean exists(Long id) {
         if (id == null) {
             return false;
         }
         return mapper.selectById(id) != null;
+    }
+
+    @Override
+    public boolean existsByIdAndUserId(Long id, Long userId) {
+        return findByIdAndUserId(id, userId) != null;
     }
 }
 

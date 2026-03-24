@@ -2,6 +2,7 @@ package navigator.application;
 
 import navigator.api.BusinessErrorCode;
 import navigator.api.BusinessException;
+import navigator.api.auth.CurrentUserHolder;
 import navigator.api.dto.CommitPlanData;
 import navigator.api.dto.PlanPreviewData;
 import navigator.application.guard.EntityLookupGuard;
@@ -232,6 +233,7 @@ public class PlanningApplicationService {
             return null;
         }
         LearningPlanEntity entity = new LearningPlanEntity();
+        entity.setUserId(CurrentUserHolder.require().id());
         entity.setSessionId(sessionDbId);
         entity.setGoalId(goalDbId);
         entity.setDiagnosisSessionId(diagnosisDbId);

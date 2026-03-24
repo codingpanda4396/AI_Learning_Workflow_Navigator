@@ -34,6 +34,9 @@ public class SessionStateGuard {
     public void requireSessionInProgressWithCommittedPlan(String sessionId) {
         entityLookupGuard.requireSession(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
+        if (state == null) {
+            throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found: " + sessionId);
+        }
         if (!"IN_PROGRESS".equals(state.getStatus())) {
             throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed or session not in progress");
         }
@@ -51,6 +54,9 @@ public class SessionStateGuard {
     public void requireSessionCompletedForReport(String sessionId) {
         entityLookupGuard.requireSession(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
+        if (state == null) {
+            throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found: " + sessionId);
+        }
         if (!"COMPLETED".equals(state.getStatus())) {
             throw new BusinessException(BusinessErrorCode.SESSION_NOT_COMPLETED, "session not completed");
         }

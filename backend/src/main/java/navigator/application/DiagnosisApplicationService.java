@@ -2,6 +2,7 @@ package navigator.application;
 
 import navigator.api.dto.DiagnosisSessionData;
 import navigator.api.dto.SubmitDiagnosisData;
+import navigator.api.auth.CurrentUserHolder;
 import navigator.application.diagnosis.DiagnosisAnswerNormalizer;
 import navigator.application.diagnosis.DiagnosisEvidenceBuilder;
 import navigator.application.diagnosis.DiagnosisQuestionBank;
@@ -64,6 +65,7 @@ public class DiagnosisApplicationService {
     }
 
     public DiagnosisSessionData createSession(String goalId) {
+        Long userId = CurrentUserHolder.require().id();
         entityLookupGuard.requireGoal(goalId);
         StructuredLearningGoal goal = store.getGoals().get(goalId);
         GoalContextSnapshot goalContext = store.getGoalContextSnapshots().get(goalId);
@@ -72,13 +74,14 @@ public class DiagnosisApplicationService {
         if (goalDbId == null) {
             throw new navigator.api.BusinessException(navigator.api.BusinessErrorCode.INVALID_ARGUMENT, "invalid goalId: " + goalId);
         }
-        LearningSessionEntity sessionEntity = learningSessionRepository.createInitialSession(goalDbId);
+        LearningSessionEntity sessionEntity = learningSessionRepository.createInitialSession(userId, goalDbId);
         if (sessionEntity == null || sessionEntity.getId() == null) {
             throw new navigator.api.BusinessException(navigator.api.BusinessErrorCode.INTERNAL_ERROR, "failed to create learning session");
         }
         Long sessionDbId = sessionEntity.getId();
         String questionsJson = jsonSerde.toJson(questions);
         DiagnosisSessionEntity diagEntity = diagnosisSessionRepository.saveNew(
+                userId,
                 sessionDbId,
                 goalDbId,
                 DiagnosisSessionStatus.READY.name(),

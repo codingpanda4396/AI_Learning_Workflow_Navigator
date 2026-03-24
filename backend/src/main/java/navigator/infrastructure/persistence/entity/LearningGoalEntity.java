@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class LearningGoalEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long userId;
     private String rawGoalText;
     private String timeBudget;
     private String selfReportedLevel;
@@ -25,4 +26,3 @@ public class LearningGoalEntity {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
-

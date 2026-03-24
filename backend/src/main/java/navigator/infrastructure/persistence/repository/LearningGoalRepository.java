@@ -8,6 +8,10 @@ public interface LearningGoalRepository {
 
     LearningGoalEntity findById(Long id);
 
+    LearningGoalEntity findByIdAndUserId(Long id, Long userId);
+
     boolean exists(Long id);
+
+    boolean existsByIdAndUserId(Long id, Long userId);
 }
 
