@@ -297,12 +297,35 @@ export interface TaskScaffoldResponse {
   }[]
 }
 
+export interface RecommendedUserActionItem {
+  code: string
+  label: string
+}
+
+export interface CurrentGuidanceBlock {
+  title: string
+  bullets?: string[]
+}
+
+export interface CurrentTaskGuidanceData {
+  sessionId: string
+  taskId: string
+  taskExecutionState: string
+  guidancePhase?: string | null
+  currentGuidance?: CurrentGuidanceBlock | null
+  recommendedUserActions?: RecommendedUserActionItem[]
+  policyVersion?: string | null
+}
+
 export interface TaskMessageResponse {
   assistantReply: string
   detectedAction: string
   taskState: string
   nextSuggestedPrompts?: string[]
   fallbackMode?: string
+  guidancePhase?: string | null
+  recommendedUserActions?: RecommendedUserActionItem[]
+  whetherCanComplete?: boolean | null
 }
 
 export interface SelfExplanationResponse {
