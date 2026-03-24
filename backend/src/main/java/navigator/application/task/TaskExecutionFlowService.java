@@ -17,6 +17,7 @@ import navigator.application.guard.EntityLookupGuard;
 import navigator.application.guard.SessionStateGuard;
 import navigator.application.learning.LearningActionDetector;
 import navigator.application.llm.TaskTutorOrchestrator;
+import navigator.application.rule.engine.RuleResult;
 import navigator.application.task.guidance.TaskExecutionEvidenceAccumulator;
 import navigator.application.task.guidance.TaskGuidanceEngine;
 import navigator.domain.enums.GuidanceIntent;
@@ -162,9 +163,11 @@ public class TaskExecutionFlowService {
 
         TaskExecutionState stateBefore = rt.getState();
         rt.setExploreTurnCount(rt.getExploreTurnCount() + 1);
-        taskGuidanceEngine.syncGuidancePhaseFromExploreCount(rt);
+        RuleResult<LearningGuidancePhase> phaseSelection = taskGuidanceEngine.syncGuidancePhase(rt, action, content);
 
         GuidanceDecision gd = taskGuidanceEngine.decideForExploreTurn(rt, action, rt.getScaffold(), resolveStrategyProfile(sessionId));
+        gd.setPhaseRuleId(phaseSelection.getRuleId());
+        gd.setPhaseReason(phaseSelection.getReason());
 
         boolean userAsked = isActiveQuestionType(action);
         boolean vague = content != null && !content.isBlank() && content.trim().length() < 12;
@@ -173,6 +176,8 @@ public class TaskExecutionFlowService {
                 .messageType("USER")
                 .guidancePhase(rt.getGuidancePhase())
                 .guidanceIntent(gd.getIntent())
+                .guidancePhaseRuleId(gd.getPhaseRuleId())
+                .guidancePhaseReason(gd.getPhaseReason())
                 .userActionType(action)
                 .userAskedActively(userAsked)
                 .vagueAnswer(vague)
@@ -192,6 +197,8 @@ public class TaskExecutionFlowService {
                 .messageType("ASSISTANT")
                 .guidancePhase(rt.getGuidancePhase())
                 .guidanceIntent(gd.getIntent())
+                .guidancePhaseRuleId(gd.getPhaseRuleId())
+                .guidancePhaseReason(gd.getPhaseReason())
                 .hintGiven(hintGiven)
                 .taskExecutionStateBefore(stateBefore.name())
                 .taskExecutionStateAfter(rt.getState().name())
@@ -211,6 +218,8 @@ public class TaskExecutionFlowService {
                 .fallbackMode(turn.getFallbackMode())
                 .guidanceIntent(gd.getIntent() != null ? gd.getIntent().name() : null)
                 .guidancePhase(rt.getGuidancePhase() != null ? rt.getGuidancePhase().name() : null)
+                .guidancePhaseRuleId(gd.getPhaseRuleId())
+                .guidancePhaseReason(gd.getPhaseReason())
                 .evidenceDelta(delta)
                 .whetherCanComplete(rt.getState() == TaskExecutionState.PASS)
                 .recommendedUserActions(recommendedActionsForPhase(rt.getGuidancePhase()))

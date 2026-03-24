@@ -1,9 +1,15 @@
 package navigator.application.planning;
 
+import navigator.application.rule.planning.PlanningRule;
+import navigator.application.rule.planning.rules.ConceptClarificationRule;
+import navigator.application.rule.planning.rules.DrillStrengthenRule;
+import navigator.application.rule.planning.rules.FoundationPatchRule;
+import navigator.application.rule.planning.rules.FrameworkBuildRule;
+import navigator.application.rule.planning.rules.LocalRepairRule;
+import navigator.application.rule.planning.rules.SprintCorrectionRule;
 import navigator.domain.enums.FoundationLevel;
 import navigator.domain.enums.GoalType;
 import navigator.domain.enums.UrgencyLevel;
-import navigator.domain.model.GoalContextSnapshot;
 import navigator.domain.model.LearnerProfileSnapshot;
 import navigator.domain.model.StructuredLearningGoal;
 import org.junit.jupiter.api.Test;
@@ -14,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PlanStrategySelectorTest {
 
-    private final PlanStrategySelector selector = new PlanStrategySelector();
+    private final PlanStrategySelector selector = new PlanStrategySelector(defaultRules());
 
     @Test
     void systematicProgressiveForCourseScope() {
@@ -59,5 +65,30 @@ class PlanStrategySelectorTest {
                 .learnerProfileSnapshot(LearnerProfileSnapshot.builder().foundationLevel(FoundationLevel.BASIC).blockerTags(List.of()).build())
                 .build();
         assertThat(selector.select(ctx)).isEqualTo(PlanStrategySelector.CONCEPT_CLARIFICATION);
+    }
+
+    @Test
+    void selectResultShouldExposeRuleMetadata() {
+        PlanningContext ctx = PlanningContext.builder()
+                .goal(StructuredLearningGoal.builder().goalType(GoalType.FIX_SPECIFIC_BLOCKER).topicScopeType("SINGLE_TOPIC").build())
+                .learnerProfileSnapshot(LearnerProfileSnapshot.builder().foundationLevel(FoundationLevel.BASIC).build())
+                .build();
+
+        var result = selector.selectResult(ctx);
+
+        assertThat(result.getResult()).isEqualTo(PlanStrategySelector.LOCAL_REPAIR);
+        assertThat(result.getRuleId()).isEqualTo("LOCAL_REPAIR_RULE");
+        assertThat(result.getReason()).isEqualTo("Single-topic blocker should use local repair");
+    }
+
+    private static List<PlanningRule> defaultRules() {
+        return List.of(
+                new ConceptClarificationRule(),
+                new LocalRepairRule(),
+                new DrillStrengthenRule(),
+                new SprintCorrectionRule(),
+                new FoundationPatchRule(),
+                new FrameworkBuildRule()
+        );
     }
 }

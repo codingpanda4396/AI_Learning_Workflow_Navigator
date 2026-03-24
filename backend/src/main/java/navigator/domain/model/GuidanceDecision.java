@@ -23,6 +23,8 @@ public class GuidanceDecision {
     private boolean allowSubstantiveAnswer = false;
     @Builder.Default
     private List<String> mandatoryBehaviors = new ArrayList<>();
+    private String phaseRuleId;
+    private String phaseReason;
     private String policyRuleId;
     @Builder.Default
     private Map<String, String> promptSlots = new HashMap<>();

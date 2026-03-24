@@ -1,16 +1,12 @@
 package navigator.application.planning;
 
-import navigator.domain.enums.FoundationLevel;
-import navigator.domain.enums.GoalType;
-import navigator.domain.enums.UrgencyLevel;
-import navigator.domain.model.GoalContextSnapshot;
-import navigator.domain.model.LearnerProfileSnapshot;
-import navigator.domain.model.StructuredLearningGoal;
+import navigator.application.rule.engine.RuleEngine;
+import navigator.application.rule.engine.RuleResult;
+import navigator.application.rule.planning.PlanningRule;
 import org.springframework.stereotype.Component;
 
-/**
- * Sprint 2.5: 规则矩阵选择策略，输出 RecommendedStrategyCode 对应的字符串。
- */
+import java.util.List;
+
 @Component
 public class PlanStrategySelector {
 
@@ -21,27 +17,28 @@ public class PlanStrategySelector {
     public static final String LOCAL_REPAIR = "LOCAL_REPAIR";
     public static final String CONCEPT_CLARIFICATION = "CONCEPT_CLARIFICATION";
 
+    private static final String DEFAULT_RULE_ID = "DEFAULT_CONCEPT_CLARIFICATION_RULE";
+    private static final String DEFAULT_REASON = "Planning context is incomplete, fallback to concept clarification";
+
+    private final RuleEngine<PlanningContext, String> engine;
+
+    public PlanStrategySelector(List<PlanningRule> rules) {
+        this.engine = new RuleEngine<>(rules);
+    }
+
     public String select(PlanningContext ctx) {
-        if (ctx == null) return CONCEPT_CLARIFICATION;
-        StructuredLearningGoal goal = ctx.getGoal();
-        GoalContextSnapshot goalContext = ctx.getGoalContextSnapshot();
-        LearnerProfileSnapshot profile = ctx.getLearnerProfileSnapshot();
-        if (goal == null) return CONCEPT_CLARIFICATION;
+        return selectResult(ctx).getResult();
+    }
 
-        String scope = goal.getTopicScopeType();
-        boolean chapterOrCourse = "CHAPTER".equals(scope) || "COURSE".equals(scope);
-        boolean systematicGoal = goal.getGoalType() == GoalType.BUILD_SYSTEMATIC_UNDERSTANDING;
-        boolean prerequisiteGap = profile != null && profile.getRiskTags() != null && profile.getRiskTags().contains("PREREQUISITE_GAP");
-        boolean beginner = profile != null && profile.getFoundationLevel() == FoundationLevel.BEGINNER;
-        String primaryGap = profile != null && profile.getBlockerTags() != null && !profile.getBlockerTags().isEmpty() ? profile.getBlockerTags().get(0) : null;
-        boolean procedureOrQuestionGap = "QUESTION_TYPE_RECOGNITION_GAP".equals(primaryGap) || "PROCEDURE_GAP".equals(primaryGap);
-        boolean highUrgency = UrgencyLevel.HIGH == goal.getUrgencyLevel();
-
-        if (chapterOrCourse || systematicGoal) return FRAMEWORK_BUILD;
-        if (beginner || prerequisiteGap) return FOUNDATION_PATCH;
-        if (goal.getGoalType() == GoalType.REVIEW_FOR_EXAM && highUrgency && !beginner) return SPRINT_CORRECTION;
-        if (procedureOrQuestionGap || goal.getGoalType() == GoalType.PRACTICE_ENHANCEMENT) return DRILL_STRENGTHEN;
-        if (goal.getGoalType() == GoalType.FIX_SPECIFIC_BLOCKER && "SINGLE_TOPIC".equals(scope)) return LOCAL_REPAIR;
-        return CONCEPT_CLARIFICATION;
+    public RuleResult<String> selectResult(PlanningContext ctx) {
+        if (ctx == null || ctx.getGoal() == null) {
+            return RuleResult.<String>builder()
+                    .result(CONCEPT_CLARIFICATION)
+                    .ruleId(DEFAULT_RULE_ID)
+                    .reason(DEFAULT_REASON)
+                    .priority(Integer.MIN_VALUE)
+                    .build();
+        }
+        return engine.execute(ctx);
     }
 }

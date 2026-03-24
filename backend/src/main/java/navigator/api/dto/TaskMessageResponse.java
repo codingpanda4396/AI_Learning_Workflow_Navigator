@@ -27,6 +27,8 @@ public class TaskMessageResponse {
 
     private String guidanceIntent;
     private String guidancePhase;
+    private String guidancePhaseRuleId;
+    private String guidancePhaseReason;
     private TaskExecutionEvidenceDelta evidenceDelta;
     private Boolean whetherCanComplete;
     private List<RecommendedUserActionItem> recommendedUserActions;

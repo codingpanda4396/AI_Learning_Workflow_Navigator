@@ -1,17 +1,16 @@
 package navigator.application.task.guidance;
 
+import navigator.application.rule.engine.RuleResult;
+import navigator.application.task.TaskExecutionRuntime;
 import navigator.domain.enums.LearningActionType;
+import navigator.domain.enums.LearningGuidancePhase;
 import navigator.domain.enums.TaskExecutionState;
 import navigator.domain.model.GuidanceDecision;
 import navigator.domain.model.LearnerStrategyProfile;
 import navigator.domain.model.TaskScaffold;
 import navigator.domain.policy.tutor.TutorInteractionPolicy;
-import navigator.application.task.TaskExecutionRuntime;
 import org.springframework.stereotype.Component;
 
-/**
- * 任务引导编排入口：状态合法时产出 {@link GuidanceDecision}。
- */
 @Component
 public class TaskGuidanceEngine {
 
@@ -25,31 +24,42 @@ public class TaskGuidanceEngine {
     }
 
     public GuidanceDecision decideForExploreTurn(TaskExecutionRuntime rt,
-                                                   LearningActionType action,
-                                                   TaskScaffold scaffold,
-                                                   LearnerStrategyProfile strategyProfile) {
+                                                 LearningActionType action,
+                                                 TaskScaffold scaffold,
+                                                 LearnerStrategyProfile strategyProfile) {
         TaskExecutionState st = rt.getState();
         if (st != TaskExecutionState.EXPLORE && st != TaskExecutionState.REMEDIAL) {
             return null;
         }
-        var phase = rt.getGuidancePhase() != null ? rt.getGuidancePhase()
-                : navigator.domain.enums.LearningGuidancePhase.CLARIFY_GOAL;
+        LearningGuidancePhase phase = rt.getGuidancePhase() != null
+                ? rt.getGuidancePhase()
+                : LearningGuidancePhase.CLARIFY_GOAL;
         GuidanceDecision base = tutorInteractionPolicy.decide(phase, action, strategyProfile);
         base.setPhase(phase);
         return base;
     }
 
-    /** 在 exploreTurnCount 递增之后调用，使当轮策略与轮次一致 */
-    public void syncGuidancePhaseFromExploreCount(TaskExecutionRuntime rt) {
+    public RuleResult<LearningGuidancePhase> syncGuidancePhase(TaskExecutionRuntime rt,
+                                                               LearningActionType action,
+                                                               String userInput) {
         if (rt.getState() != TaskExecutionState.EXPLORE && rt.getState() != TaskExecutionState.REMEDIAL) {
-            return;
+            LearningGuidancePhase phase = rt.getGuidancePhase() != null
+                    ? rt.getGuidancePhase()
+                    : LearningGuidancePhase.CLARIFY_GOAL;
+            return RuleResult.<LearningGuidancePhase>builder()
+                    .result(phase)
+                    .ruleId("GUIDANCE_PHASE_SKIPPED")
+                    .reason("Guidance phase stays unchanged outside EXPLORE or REMEDIAL")
+                    .priority(Integer.MIN_VALUE)
+                    .build();
         }
-        int n = rt.getExploreTurnCount();
-        var phase = phaseTransitionEvaluator.phaseForExploreCount(n);
+        RuleResult<LearningGuidancePhase> result = phaseTransitionEvaluator.evaluate(rt, action, userInput);
+        LearningGuidancePhase phase = result.getResult();
         rt.setGuidancePhase(phase);
         TaskExecutionEvidenceAccumulator.ensureSnapshot(rt);
         if (phase != null) {
             rt.getEvidenceSnapshot().getCompletedGuidancePhases().add(phase);
         }
+        return result;
     }
 }

@@ -11,6 +11,7 @@ import navigator.application.planning.PlanTemplateFactory;
 import navigator.application.planning.PlanningContext;
 import navigator.application.planning.PlanningContextAssembler;
 import navigator.application.planning.RecommendedEntryBuilder;
+import navigator.application.rule.engine.RuleResult;
 import navigator.domain.enums.PlanStatus;
 import navigator.domain.enums.RecommendedStrategyCode;
 import navigator.domain.model.ExecutableTaskSpec;
@@ -82,12 +83,13 @@ public class PlanningApplicationService {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found for diagnosis: " + diagnosisId);
         }
         PlanningContext ctx = planningContextAssembler.assemble(goalId, diagnosisId);
-        String strategy = planStrategySelector.select(ctx);
+        RuleResult<String> strategySelection = planStrategySelector.selectResult(ctx);
+        String strategy = strategySelection.getResult();
         String topicLabel = ctx.getGoal() != null && ctx.getGoal().getTopics() != null && !ctx.getGoal().getTopics().isEmpty()
                 ? String.join("、", ctx.getGoal().getTopics()) : "当前主题";
         PlanTemplateFactory.StagesAndTasks stagesAndTasks = planTemplateFactory.build(strategy, "plan_pending", topicLabel, ctx);
         RecommendedEntry entry = recommendedEntryBuilder.build(strategy, ctx);
-        RecommendedStrategy recommendedStrategy = toRecommendedStrategy(strategy);
+        RecommendedStrategy recommendedStrategy = toRecommendedStrategy(strategySelection);
         List<String> successCriteria = stagesAndTasks.tasks.stream()
                 .flatMap(t -> t.getCompletionCriteria() != null ? t.getCompletionCriteria().stream() : java.util.stream.Stream.empty())
                 .distinct()
@@ -133,7 +135,8 @@ public class PlanningApplicationService {
                 .build();
     }
 
-    private static RecommendedStrategy toRecommendedStrategy(String strategy) {
+    private static RecommendedStrategy toRecommendedStrategy(RuleResult<String> strategySelection) {
+        String strategy = strategySelection.getResult();
         RecommendedStrategyCode code;
         String label;
         switch (strategy) {
@@ -166,7 +169,7 @@ public class PlanningApplicationService {
         return RecommendedStrategy.builder()
                 .code(code)
                 .label(label)
-                .reason("根据目标与诊断选择")
+                .reason(strategySelection.getRuleId() + ": " + strategySelection.getReason())
                 .build();
     }
 

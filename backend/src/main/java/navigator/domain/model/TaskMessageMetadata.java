@@ -19,6 +19,8 @@ public class TaskMessageMetadata {
     private String messageType;
     private LearningGuidancePhase guidancePhase;
     private GuidanceIntent guidanceIntent;
+    private String guidancePhaseRuleId;
+    private String guidancePhaseReason;
     private LearningActionType userActionType;
     private Boolean userAskedActively;
     private Boolean vagueAnswer;
