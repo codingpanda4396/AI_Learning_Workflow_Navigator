@@ -1,80 +1,45 @@
 <template>
   <PageContainer>
-    <div class="flex min-h-screen flex-col">
+    <div class="min-h-screen bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_32%,#f8fafc_100%)]">
       <AppTopBar current="plan" />
-      <main
-        class="mx-auto flex w-full max-w-lg flex-1 flex-col px-5 pb-6 pt-4 min-h-0"
-      >
-        <LoadingState v-if="loading && !plan" message="加载中…" />
+      <main class="mx-auto flex w-full max-w-7xl flex-col px-4 pb-10 pt-4 md:px-6 lg:px-8">
+        <LoadingState v-if="loading && !plan" message="正在生成你的四阶段作战图..." />
         <ErrorState v-else-if="error" :message="error">
           <template #action>
-            <SecondaryButton @click="fetchPlan">重试</SecondaryButton>
+            <SecondaryButton @click="fetchPlan">重新加载规划</SecondaryButton>
           </template>
         </ErrorState>
 
         <div
-          v-else-if="plan && viewModel && pathSegmentLabels.length"
-          class="flex flex-1 flex-col min-h-0 gap-6"
+          v-else-if="plan && battleMap"
+          class="space-y-8"
         >
-          <div class="min-h-0 flex-1 space-y-5 overflow-y-auto">
-            <section
-              class="rounded-card border border-border bg-white px-4 py-4 shadow-sm"
-            >
-              <p class="text-sm leading-snug text-text-primary">
-                <span class="font-semibold text-text-primary">👉 你的问题：</span>
-                <span>{{ problemLine }}</span>
-              </p>
-              <p
-                class="mt-3 text-sm leading-snug text-text-primary"
-              >
-                <span class="font-semibold text-text-primary">👉 当前策略：</span>
-                <span>{{ strategyLine }}</span>
-              </p>
-            </section>
-
-            <section class="rounded-card border border-border bg-slate-50/90 px-4 py-4">
-              <p class="text-xs font-medium tracking-wide text-text-secondary">
-                学习路径
-              </p>
-              <div
-                class="mt-3 flex flex-wrap items-center gap-x-1 gap-y-2 text-sm"
-                role="list"
-              >
-                <template v-for="(label, idx) in pathSegmentLabels" :key="idx">
-                  <span
-                    v-if="idx > 0"
-                    class="px-0.5 text-text-secondary"
-                    aria-hidden="true"
-                  >→</span>
-                  <span
-                    role="listitem"
-                    class="rounded-md px-2 py-1"
-                    :class="
-                      idx === currentPathIndex
-                        ? 'bg-primary/10 font-semibold text-primary'
-                        : 'text-text-secondary'
-                    "
-                  >
-                    {{ label }}
-                  </span>
-                </template>
+          <section class="rounded-[28px] border border-white/70 bg-white/75 p-5 shadow-[0_22px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm md:p-6">
+            <div class="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
+                  Planning Orchestration
+                </p>
+                <h1 class="mt-2 text-3xl font-semibold tracking-tight text-text-primary md:text-[42px]">
+                  规划不是说明页，而是学习编排台
+                </h1>
               </div>
-              <p class="mt-3 text-sm font-medium text-text-primary">
-                <span aria-hidden="true">👉</span>
-                当前：{{ currentPhaseDisplayName }}
-              </p>
-            </section>
-          </div>
+              <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-text-secondary">
+                <p v-if="userStateLine">当前状态：{{ userStateLine }}</p>
+                <p class="font-medium text-text-primary">问题焦点：{{ problemLine }}</p>
+              </div>
+            </div>
+          </section>
 
-          <div class="shrink-0 border-t border-border/60 pt-4">
-            <PrimaryButton
-              class="w-full justify-center py-4 text-base font-semibold shadow-md"
-              :loading="committing"
-              @click="onStartStep"
-            >
-              开始第1步
-            </PrimaryButton>
-          </div>
+          <PlanStrategyOverview
+            :overview="battleMap.strategyOverview"
+            :loading="committing"
+            @start="onStartStep"
+          />
+
+          <PlanStageMap :cards="battleMap.stageCards" />
+
+          <PlanTaskBoard :groups="battleMap.taskGroupsByStage" />
         </div>
       </main>
     </div>
@@ -82,35 +47,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
-import PrimaryButton from '@/components/ui/PrimaryButton.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
+import PlanStageMap from '@/components/plan/PlanStageMap.vue'
+import PlanStrategyOverview from '@/components/plan/PlanStrategyOverview.vue'
+import PlanTaskBoard from '@/components/plan/PlanTaskBoard.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { previewPlan, commitPlan } from '@/api/learning-plan'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
-import {
-  buildPlanViewModel,
-  planStepsToFlowItems,
-} from '@/utils/planPresentationModel'
+import { buildPlanBattleMapView } from '@/utils/planPresentationModel'
 import {
   buildPlanProblemOneLiner,
+  buildUserStateSummaryLine,
   clearDiagnosisRecapSessionFlag,
 } from '@/utils/diagnosisRecapCopy'
 import type { PlanPreviewData } from '@/types/dto'
-
-const PATH_FOUR_LABELS = ['结构认知', '基本操作', '遍历', '应用'] as const
-
-function truncateText(s: string, max: number): string {
-  const t = s.trim()
-  if (t.length <= max) return t
-  return t.slice(0, max) + '…'
-}
 
 const router = useRouter()
 const store = useWorkflowStore()
@@ -124,8 +81,12 @@ const problemLine = computed(() =>
   buildPlanProblemOneLiner(store.learnerProfileSnapshot)
 )
 
-const viewModel = computed(() =>
-  buildPlanViewModel(plan.value, {
+const userStateLine = computed(() =>
+  buildUserStateSummaryLine(store.learnerProfileSnapshot)
+)
+
+const battleMap = computed(() =>
+  buildPlanBattleMapView(plan.value, {
     structuredGoal: store.structuredGoal,
     learnerProfileSnapshot: store.learnerProfileSnapshot,
     sessionId: store.sessionId,
@@ -133,42 +94,6 @@ const viewModel = computed(() =>
     taskSequence: store.taskSequence,
   })
 )
-
-const flowItems = computed(() =>
-  viewModel.value ? planStepsToFlowItems(viewModel.value) : []
-)
-
-const pathSegmentLabels = computed(() => {
-  const items = flowItems.value
-  if (items.length === 4) return [...PATH_FOUR_LABELS]
-  return items.map((i) => i.title)
-})
-
-const currentPathIndex = computed(() => {
-  const vm = viewModel.value
-  const n = pathSegmentLabels.value.length
-  if (!vm || n === 0) return 0
-  return Math.min(Math.max(vm.currentStepIndex, 0), n - 1)
-})
-
-const currentPhaseDisplayName = computed(() => {
-  const labels = pathSegmentLabels.value
-  const i = currentPathIndex.value
-  return labels[i] ?? ''
-})
-
-const strategyLine = computed(() => {
-  const p = plan.value
-  const vm = viewModel.value
-  if (!p || !vm) return '从第 1 步开始'
-  const label = p.recommendedStrategy?.label?.trim()
-  if (label) return truncateText(label, 36)
-  const sub = vm.showcase?.hero?.subtitle?.trim()
-  if (sub) return truncateText(sub, 36)
-  const path = vm.pathSummaryLine?.trim()
-  if (path) return truncateText(path, 36)
-  return '从第 1 步开始'
-})
 
 async function fetchPlan() {
   if (!store.goalId || !store.diagnosisId) return
@@ -216,5 +141,6 @@ onMounted(() => {
   clearDiagnosisRecapSessionFlag()
   if (store.planPreview && !plan.value) plan.value = store.planPreview
   if (!plan.value) fetchPlan()
+  else loading.value = false
 })
 </script>
