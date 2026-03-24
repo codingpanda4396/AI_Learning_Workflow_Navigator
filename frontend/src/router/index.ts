@@ -49,6 +49,13 @@ router.beforeEach((to, _from, next) => {
     })
     return
   }
+  if (to.name === 'execution' && store.sessionId) {
+    next({
+      name: 'task',
+      replace: true,
+    })
+    return
+  }
   next()
 })
 
