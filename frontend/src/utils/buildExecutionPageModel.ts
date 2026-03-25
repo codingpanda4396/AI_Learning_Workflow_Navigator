@@ -3,6 +3,7 @@ import type {
   CurrentTaskItem,
   ProgressItem,
   RecommendedUserActionItem,
+  StructuredLearningGoal,
   TaskBlueprint,
   TaskScaffoldResponse,
 } from '@/types/dto'
@@ -15,6 +16,7 @@ import type {
   ExecutionPageViewModel,
   ExecutionScaffoldCardModel,
 } from '@/types/executionGuide'
+import { useKnowledgePack } from '@/composables/useKnowledgePack'
 
 interface BuildExecutionPageModelInput {
   task: CurrentTaskItem
@@ -30,6 +32,8 @@ interface BuildExecutionPageModelInput {
   checkpointQuestion: string
   selfExplainMissingPoints: string[]
   legacyComplete: boolean
+  structuredGoal?: StructuredLearningGoal | null
+  plan?: { knowledgeKey?: string; packId?: string } | null
 }
 
 const STEP_TIMES: Record<string, string> = {
@@ -219,8 +223,10 @@ const STAGE_RAIL_LABEL: Record<string, string> = {
 
 function buildScaffoldCards(
   focus: string,
-  scaffold: TaskScaffoldResponse | null
+  scaffold: TaskScaffoldResponse | null,
+  packCards?: ExecutionScaffoldCardModel[]
 ): ExecutionScaffoldCardModel[] {
+  if (packCards?.length) return packCards.slice(0, 3)
   const f = trimText(focus) || '这个知识点'
   const templates = scaffold?.recommendedAskTemplates?.filter(Boolean).slice(0, 3) ?? []
   const base: ExecutionScaffoldCardModel[] = [
@@ -536,6 +542,12 @@ export function buildExecutionPageModel(
   input: BuildExecutionPageModelInput
 ): ExecutionPageViewModel {
   const state = normalizeState(input.taskState, input.legacyComplete)
+  const pack = useKnowledgePack({
+    scaffold: input.scaffold,
+    structuredGoal: input.structuredGoal,
+    knowledgeKey: input.plan?.knowledgeKey,
+    packId: input.plan?.packId,
+  })
   const copy = STEP_COPY[state]
   const knowledgePoints = buildKnowledgePoints(input.task, input.progress, input.planTasks)
   const activePoint =
@@ -543,7 +555,10 @@ export function buildExecutionPageModel(
 
   const focusTitle =
     activePoint?.title || summarizeLine(input.task.title, '当前知识点') || '当前知识点'
-  const completionCriteria = buildRoundCompletionCriteria(state, input.task, input.scaffold)
+  const completionCriteria =
+    state === 'CHECK' && pack
+      ? pack.checkpoint.checkpointRubric.slice(0, 3)
+      : buildRoundCompletionCriteria(state, input.task, input.scaffold)
   const metaParts = [
     copy.stageLabel,
     input.progress ? `任务 ${input.progress.currentIndex}/${input.progress.totalTasks}` : null,
@@ -551,23 +566,41 @@ export function buildExecutionPageModel(
   ].filter(Boolean) as string[]
   const metaLine = metaParts.join(' · ')
 
-  const scaffoldCards = buildScaffoldCards(focusTitle, input.scaffold)
+  const scaffoldCards = buildScaffoldCards(
+    focusTitle,
+    input.scaffold,
+    pack?.execution.scaffoldCards
+  )
+  const progressRail = buildProgressRail(
+    knowledgePoints,
+    activePoint,
+    state,
+    completionCriteria
+  )
 
   return {
     currentStepIndex: input.guidedStepCurrent,
     currentStepTitle: copy.title,
     header: {
-      heroTitle: `这轮只解决一个问题：${focusTitle}`,
-      heroSubtitle: buildHeroSubtitle(state, activePoint),
+      heroTitle: pack
+        ? `${pack.tutor.focusLabel} · ${focusTitle}`
+        : `这轮只解决一个问题：${focusTitle}`,
+      heroSubtitle:
+        pack?.execution.phaseHero[state as keyof typeof pack.execution.phaseHero] ||
+        buildHeroSubtitle(state, activePoint),
       completionCriteria,
       metaLine,
       title: activePoint?.title || input.task.title,
       stageLabel: `${copy.stageLabel} · 执行中`,
       stepLabel: `${input.guidedStepCurrent}/${input.guidedStepTotal}`,
       estimatedTime: STEP_TIMES[state],
-      subtitle: activePoint
-        ? `今天不用学完全部，先把「${activePoint.title}」吃透。`
-        : copy.description,
+      subtitle:
+        pack?.execution.phaseObjective[
+          state as keyof typeof pack.execution.phaseObjective
+        ] ||
+        (activePoint
+          ? `今天不用学完全部，先把「${activePoint.title}」吃透。`
+          : copy.description),
       taskLabel: input.progress
         ? `任务 ${input.progress.currentIndex}/${input.progress.totalTasks}`
         : undefined,
@@ -590,7 +623,13 @@ export function buildExecutionPageModel(
       input.checkpointQuestion,
       input.selfExplainMissingPoints
     ),
-    progressRail: buildProgressRail(knowledgePoints, activePoint, state, completionCriteria),
+    progressRail: {
+      ...progressRail,
+      nextPreview:
+        state === 'CHECK' && pack
+          ? pack.checkpoint.checkpointPrompt
+          : progressRail.nextPreview,
+    },
     helpSections: buildHelpSections(input.task, input.scaffold, input.currentGuidance),
     scaffoldCards,
   }

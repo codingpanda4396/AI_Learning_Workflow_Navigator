@@ -16,6 +16,7 @@ import navigator.application.FixedSampleData;
 import navigator.application.guard.EntityLookupGuard;
 import navigator.application.guard.SessionStateGuard;
 import navigator.application.learning.LearningActionDetector;
+import navigator.application.knowledge.KnowledgePackMetadata;
 import navigator.application.llm.TaskTutorOrchestrator;
 import navigator.application.rule.engine.RuleResult;
 import navigator.application.task.guidance.TaskExecutionEvidenceAccumulator;
@@ -401,10 +402,18 @@ public class TaskExecutionFlowService {
 
     private TaskScaffoldResponse toScaffoldResponse(String sessionId, String taskId, TaskExecutionRuntime rt) {
         var s = rt.getScaffold();
+        KnowledgePackMetadata.PackMeta packMeta = resolvePackMeta(sessionId);
         List<TaskMessageEntity> recent = persistenceService.findRecentMessagesAscending(sessionId, taskId, 20);
         return TaskScaffoldResponse.builder()
                 .taskId(s.getTaskId())
                 .taskType(s.getTaskType())
+                .knowledgeKey(packMeta != null ? packMeta.knowledgeKey() : null)
+                .packId(packMeta != null ? packMeta.packId() : null)
+                .knowledgeType(packMeta != null ? packMeta.knowledgeType() : null)
+                .scaffoldType(packMeta != null ? packMeta.scaffoldType() : null)
+                .starterPrompts(packMeta != null ? packMeta.starterPrompts() : null)
+                .checkpointMode(packMeta != null ? packMeta.checkpointMode() : null)
+                .visualHintType(packMeta != null ? packMeta.visualHintType() : null)
                 .taskLevelLearningIntent(s.getTaskLevelLearningIntent())
                 .learningObjective(s.getLearningObjective())
                 .whyThisTask(s.getWhyThisTask())
@@ -429,6 +438,15 @@ public class TaskExecutionFlowService {
                         .createdAt(m.getCreatedAt())
                         .build()).toList())
                 .build();
+    }
+
+    private KnowledgePackMetadata.PackMeta resolvePackMeta(String sessionId) {
+        InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
+        if (state == null || state.getPlanId() == null) return null;
+        LearningPlanPreview plan = store.getPlanPreviews().get(state.getPlanId());
+        if (plan == null || plan.getGoalId() == null) return null;
+        var goal = store.getGoals().get(plan.getGoalId());
+        return KnowledgePackMetadata.fromGoal(goal);
     }
 
     private void ensureScaffoldCognitiveUnits(String sessionId, String taskId, TaskExecutionRuntime rt) {

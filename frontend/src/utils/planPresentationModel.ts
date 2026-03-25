@@ -8,10 +8,8 @@ import type {
   ShowcaseHeroConfig,
   ShowcaseMindImageHint,
 } from '@/constants/showcaseKnowledgeConfig'
-import {
-  resolveShowcaseKnowledge,
-  type ShowcaseStepConfig,
-} from '@/constants/showcaseKnowledgeConfig'
+import { useKnowledgePack } from '@/composables/useKnowledgePack'
+import type { PlanningPackStep } from '@/types/knowledgePack'
 import { STAGE_GUIDE_META } from '@/constants/guidanceConfig'
 import type {
   LearnerProfileSnapshot,
@@ -225,7 +223,7 @@ function buildActionGuide(
 function showcaseStepToPlanStep(
   task: TaskBlueprint,
   index: number,
-  shell: ShowcaseStepConfig
+  shell: PlanningPackStep
 ): PlanStep {
   return {
     stepIndex: index + 1,
@@ -390,7 +388,8 @@ export function buildPlanViewModel(
 
   const topic = resolveTopicLabel(plan, ctx)
   let steps: PlanStep[]
-  const showcaseConfig = resolveShowcaseKnowledge(plan, ctx)
+  const pack = useKnowledgePack({ plan, structuredGoal: ctx.structuredGoal })
+  const showcaseConfig = pack?.planning
   const useShowcase =
     !!showcaseConfig &&
     plan.tasks?.length === 4 &&
@@ -416,10 +415,13 @@ export function buildPlanViewModel(
     ? {
         hero: showcaseConfig!.hero,
         optionalTips: showcaseConfig!.optionalTips,
-        mindImageHint: showcaseConfig!.mindImageHint,
-        focusType: showcaseConfig!.focusType,
-        judgmentTips: showcaseConfig!.judgmentTips,
-        knowledgeLabel: showcaseConfig!.knowledgeLabel,
+        mindImageHint: undefined,
+        focusType: 'default',
+        judgmentTips: showcaseConfig!.commonMisconceptions,
+        knowledgeLabel: {
+          title: plan.goal || topic,
+          subtitle: pack?.knowledgeType,
+        },
       }
     : null
 
@@ -1234,6 +1236,7 @@ export function buildPlanActionPanelView(
 ): PlanActionPanelView | null {
   if (!plan) return null
 
+  const pack = useKnowledgePack({ plan, structuredGoal: ctx.structuredGoal })
   const topic = resolveTopicLabel(plan, ctx)
   const recommendedStageCode = inferRecommendedStageCode(plan, ctx)
   const currentStageCode = currentStageCodeFromContext(plan, ctx)
@@ -1260,15 +1263,21 @@ export function buildPlanActionPanelView(
 
   const hero: PlanActionHeroView = {
     topic,
-    headline: `这一轮先从「${STAGE_ZH_LABEL[recommendedStageCode]}」开始`,
-    subline: buildHeroSubline(currentProblemLabel, recommendedStageCode),
+    headline:
+      pack?.planning.hero.title ||
+      `这一轮先从「${STAGE_ZH_LABEL[recommendedStageCode]}」开始`,
+    subline:
+      pack?.planning.hero.subtitle ||
+      buildHeroSubline(currentProblemLabel, recommendedStageCode),
     currentProblemLabel,
     recommendedStageCode,
     recommendedStageLabelZh: STAGE_ZH_LABEL[recommendedStageCode],
     recommendedStageLabelEn: STAGE_EN_LABEL[recommendedStageCode],
     totalEstimatedLabel,
     totalSteps,
-    whyThisFirst: buildWhyThisFirstLines(currentProblemLabel, recommendedStageCode),
+    whyThisFirst: pack?.planning.commonMisconceptions?.length
+      ? pack.planning.commonMisconceptions.slice(0, 3)
+      : buildWhyThisFirstLines(currentProblemLabel, recommendedStageCode),
     startButtonLabel: currentStageCode ? '进入当前步骤' : '开始第 1 步',
   }
 
@@ -1317,12 +1326,17 @@ export function buildPlanActionPanelView(
       code,
       titleZh: STAGE_ZH_LABEL[code],
       titleEn: STAGE_EN_LABEL[code],
-      objective: stage?.objective?.trim() || meta.defaultObjective,
+      objective:
+        pack?.planning.phaseHighlights?.[code] ||
+        stage?.objective?.trim() ||
+        meta.defaultObjective,
       taskCount: cardTasks.length,
       completionStandard: completionStandard.length
         ? completionStandard
         : [meta.checkpoint],
-      scaffoldPrompts: buildStagePanelScaffoldPrompts(tasks, code, topic),
+      scaffoldPrompts: pack?.planning.steps?.[PLAN_STAGE_ORDER.indexOf(code)]
+        ? [pack.planning.steps[PLAN_STAGE_ORDER.indexOf(code)]!.suggestedPrompt]
+        : buildStagePanelScaffoldPrompts(tasks, code, topic),
       tasks: cardTasks.map((item) => ({
         taskId: item.taskId,
         title: item.title,

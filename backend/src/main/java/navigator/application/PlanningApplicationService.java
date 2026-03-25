@@ -12,6 +12,7 @@ import navigator.application.planning.PlanTemplateFactory;
 import navigator.application.planning.PlanningContext;
 import navigator.application.planning.PlanningContextAssembler;
 import navigator.application.planning.RecommendedEntryBuilder;
+import navigator.application.knowledge.KnowledgePackMetadata;
 import navigator.application.rule.engine.RuleResult;
 import navigator.domain.enums.PlanStatus;
 import navigator.domain.enums.RecommendedStrategyCode;
@@ -120,11 +121,18 @@ public class PlanningApplicationService {
         store.getPlanPreviews().put(planId, preview);
         store.getPlanStatuses().put(planId, PlanStatus.PREVIEW_READY);
         String goalSummary = ctx.getGoal() != null && ctx.getGoal().getNormalizedGoalText() != null ? ctx.getGoal().getNormalizedGoalText() : "学习目标";
+        KnowledgePackMetadata.PackMeta packMeta = KnowledgePackMetadata.fromGoal(ctx.getGoal());
         return PlanPreviewData.builder()
                 .planId(planId)
                 .status(PlanStatus.PREVIEW_READY.name())
                 .previewOnly(true)
                 .committed(false)
+                .knowledgeKey(packMeta != null ? packMeta.knowledgeKey() : null)
+                .packId(packMeta != null ? packMeta.packId() : null)
+                .knowledgeType(packMeta != null ? packMeta.knowledgeType() : null)
+                .displayMode(packMeta != null ? packMeta.displayMode() : null)
+                .phaseHighlights(packMeta != null ? packMeta.phaseHighlights() : null)
+                .commonMisconceptions(packMeta != null ? packMeta.commonMisconceptions() : null)
                 .goal(goalSummary)
                 .recommendedEntry(entry)
                 .recommendedStrategy(recommendedStrategy)

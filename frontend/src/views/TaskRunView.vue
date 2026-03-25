@@ -140,6 +140,7 @@ import { TaskCompletionStatus, type TaskCompletionStatusType } from '@/types/enu
 import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
 import { buildExecutionPageModel } from '@/utils/buildExecutionPageModel'
 import { buildTaskGuidedSteps, getCurrentGuidedStepId } from '@/utils/taskGuidedSteps'
+import { useKnowledgePack } from '@/composables/useKnowledgePack'
 
 interface ChatTurn {
   role: 'USER' | 'ASSISTANT'
@@ -273,8 +274,18 @@ const pageModel = computed<ExecutionPageViewModel>(() => {
     checkpointQuestion: checkpointQuestion.value,
     selfExplainMissingPoints: selfExplainMissingPoints.value,
     legacyComplete: legacyComplete.value,
+    structuredGoal: store.structuredGoal,
+    plan: store.planPreview,
   })
 })
+
+const knowledgePack = computed(() =>
+  useKnowledgePack({
+    scaffold: scaffold.value,
+    structuredGoal: store.structuredGoal,
+    plan: store.planPreview,
+  })
+)
 
 const transcriptItems = computed(() =>
   chatTurns.value.map((item) => ({
@@ -299,6 +310,8 @@ const useDrivingSeat = computed(
 const chatPairs = computed(() => countChatPairs(chatTurns.value))
 
 const microCheckLabels = computed(() => {
+  const fromPack = knowledgePack.value?.execution.microCheckLabels ?? []
+  if (fromPack.length >= 2) return fromPack.slice(0, 3)
   const raw = scaffold.value?.selfCheckTemplates?.filter((s) => s?.trim()).slice(0, 3) ?? []
   if (raw.length >= 2) return raw
   return [
