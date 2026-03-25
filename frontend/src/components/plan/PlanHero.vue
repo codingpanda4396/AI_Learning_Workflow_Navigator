@@ -1,77 +1,98 @@
 <template>
-  <header class="mb-10 text-center md:mb-12 md:text-left">
-    <h1
-      class="text-2xl font-bold leading-tight tracking-tight text-text-primary md:text-3xl"
-    >
-      {{ heroTitle }}
-    </h1>
-    <p
-      v-if="userStateLine?.trim()"
-      class="mx-auto mt-3 max-w-xl text-sm font-medium leading-relaxed text-primary md:mx-0 md:text-base"
-    >
-      你现在是：{{ userStateLine.trim() }}
-    </p>
-    <p
-      class="mx-auto max-w-xl text-base font-medium leading-relaxed text-text-primary/90 md:mx-0"
-      :class="userStateLine?.trim() ? 'mt-2' : 'mt-3'"
-    >
-      {{ heroSubtitleLine }}
-    </p>
-    <p
-      v-if="knowledgeLabelLine"
-      class="mx-auto mt-2 max-w-xl text-xs font-medium tracking-wide text-text-secondary/90 md:mx-0"
-    >
-      {{ knowledgeLabelLine }}
-    </p>
-    <p
-      v-if="auxiliaryParagraph"
-      class="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-text-primary/85 md:mx-0"
-    >
-      {{ auxiliaryParagraph }}
-    </p>
-  </header>
+  <section
+    class="overflow-hidden rounded-[32px] border border-sky-100/90 bg-[linear-gradient(140deg,#f3f8ff_0%,#ffffff_46%,#f8fafc_100%)] p-6 shadow-[0_26px_70px_rgba(15,23,42,0.08)] md:p-8"
+  >
+    <div class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
+      <div class="space-y-5">
+        <div class="space-y-3">
+          <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-sky-700/80">
+            Plan
+          </p>
+          <div>
+            <p class="text-sm font-medium text-sky-700">
+              {{ topic }}
+            </p>
+            <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950 md:text-[2.35rem]">
+              {{ headline }}
+            </h1>
+          </div>
+          <p class="max-w-2xl text-sm leading-7 text-slate-600 md:text-[15px]">
+            {{ subline }}
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 text-sm">
+          <span class="rounded-full border border-sky-200 bg-white px-3 py-1.5 font-medium text-slate-700">
+            {{ totalEstimatedLabel }}
+          </span>
+          <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 font-medium text-slate-700">
+            共 {{ totalSteps }} 步
+          </span>
+          <span class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-500">
+            {{ recommendedStageLabelZh }}
+            <span class="ml-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              {{ recommendedStageLabelEn }}
+            </span>
+          </span>
+        </div>
+
+        <PrimaryButton
+          class="min-w-[220px] justify-center px-7 py-3.5 text-base font-semibold shadow-[0_16px_36px_rgba(79,70,229,0.26)]"
+          :loading="loading"
+          @click="$emit('start')"
+        >
+          {{ startButtonLabel }}
+        </PrimaryButton>
+      </div>
+
+      <aside class="rounded-[28px] border border-slate-200/80 bg-white/88 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-base font-semibold text-slate-900">{{ PLAN_COPY.whyFirst }}</p>
+            <p class="mt-1 text-xs uppercase tracking-[0.22em] text-slate-400">
+              {{ PLAN_COPY.currentAdvice }}
+            </p>
+          </div>
+          <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+            {{ currentProblemLabel }}
+          </span>
+        </div>
+
+        <div class="mt-4 space-y-3">
+          <div
+            v-for="line in whyThisFirst"
+            :key="line"
+            class="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+          >
+            <p class="text-sm leading-6 text-slate-700">
+              {{ line }}
+            </p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { PlanShowcaseView } from '@/utils/planPresentationModel'
+import PrimaryButton from '@/components/ui/PrimaryButton.vue'
+import { PLAN_COPY } from '@/constants/uiCopy'
 
-const props = defineProps<{
-  pathSummaryLine: string
+defineProps<{
+  topic: string
+  headline: string
+  subline: string
+  currentProblemLabel: string
+  recommendedStageLabelZh: string
+  recommendedStageLabelEn: string
+  totalEstimatedLabel: string
   totalSteps: number
-  showcase?: PlanShowcaseView | null
-  /** 来自诊断画像的口语摘要，不含技术字段名 */
-  userStateLine?: string | null
+  whyThisFirst: string[]
+  startButtonLabel: string
+  loading?: boolean
 }>()
 
-const heroTitle = computed(() => {
-  if (props.showcase?.hero?.title) return props.showcase.hero.title
-  return '现在，我们一起把这个知识学会'
-})
-
-const heroSubtitleLine = computed(() => {
-  if (props.showcase?.hero?.subtitle) return props.showcase.hero.subtitle
-  const n = props.totalSteps
-  if (n <= 0) return '别急，我们一小步一小步来，你会跟得上的'
-  if (n === 4) return '先不用想太远，把这 4 小步走完，你会发现顺很多'
-  return `先不用想太远，把这 ${n} 小步走完，你会发现顺很多`
-})
-
-const knowledgeLabelLine = computed(() => {
-  const k = props.showcase?.knowledgeLabel
-  if (!k?.title?.trim()) return ''
-  const sub = k.subtitle?.trim()
-  return sub ? `${k.title.trim()} · ${sub}` : k.title.trim()
-})
-
-/** 演示模式：直接展示辅助说明；默认模式：目标摘要带引导前缀 */
-const auxiliaryParagraph = computed(() => {
-  if (props.showcase?.hero?.auxiliaryLine) {
-    return props.showcase.hero.auxiliaryLine
-  }
-  if (props.pathSummaryLine?.trim()) {
-    return `你现在心里最想推进的是：${props.pathSummaryLine}`
-  }
-  return ''
-})
+defineEmits<{
+  start: []
+}>()
 </script>

@@ -20,7 +20,7 @@
             id="ai-tutor-panel-title"
             class="text-base font-semibold text-text-primary"
           >
-            AI导师
+            导师
           </h2>
           <p class="mt-1 text-xs text-text-secondary">
             当前阶段：{{ store.context.phaseLabel }} · 当前知识：{{ store.context.knowledgeLabel }}
@@ -37,7 +37,7 @@
       </header>
 
       <section class="shrink-0 space-y-2 border-b border-border px-4 py-3">
-        <p class="text-xs font-medium text-text-secondary">快捷追问</p>
+        <p class="text-xs font-medium text-text-secondary">快速追问</p>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="(q, i) in quickQuestions"
@@ -69,7 +69,7 @@
 
       <footer class="shrink-0 border-t border-border px-4 py-4">
         <p class="text-sm leading-relaxed text-text-secondary">
-          这里展示的是和执行页完全同步的一段导师对话。继续输入请在执行页下方的输入框里完成。
+          这里只看本步记录。继续输入在主卡完成。
         </p>
       </footer>
     </aside>

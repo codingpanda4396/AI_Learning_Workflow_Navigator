@@ -6,11 +6,11 @@
       type="button"
       class="ai-tutor-float flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       :style="floatBtnStyle"
-      aria-label="打开 AI 导师"
+      aria-label="打开导师"
       @click="store.toggleVisible()"
     >
       <span class="text-base leading-none" aria-hidden="true">💬</span>
-      <span>AI导师</span>
+      <span>导师</span>
     </button>
   </Teleport>
 </template>

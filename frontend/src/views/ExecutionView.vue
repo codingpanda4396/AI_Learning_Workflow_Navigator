@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <PageContainer>
     <AppTopBar current="task" />
     <main class="mx-auto max-w-3xl px-6 py-12">
@@ -7,10 +7,10 @@
           Redirecting
         </p>
         <h1 class="mt-3 text-2xl font-semibold text-text-primary">
-          正在切换到新的脚手架执行页
+          {{ EXECUTION_COPY.redirectTitle }}
         </h1>
         <p class="mt-3 text-sm leading-6 text-text-secondary">
-          旧的执行页仅保留为兼容入口，系统会自动带你进入新的任务执行界面。
+          {{ EXECUTION_COPY.redirectSubtitle }}
         </p>
       </div>
     </main>
@@ -24,6 +24,7 @@ import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { showToast } from '@/stores/toast'
 import { useWorkflowStore } from '@/stores/workflow'
+import { EXECUTION_COPY } from '@/constants/uiCopy'
 
 const router = useRouter()
 const store = useWorkflowStore()
@@ -34,7 +35,9 @@ onMounted(() => {
     return
   }
 
-  showToast('当前没有可执行任务，已带你返回规划页。')
+  showToast(EXECUTION_COPY.noTaskToast)
   router.replace({ name: 'plan' })
 })
 </script>
+
+

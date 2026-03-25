@@ -1,6 +1,6 @@
 <template>
   <section class="space-y-3">
-    <h2 class="text-sm font-semibold text-text-primary">接下来会这样推进</h2>
+    <h2 class="text-sm font-semibold text-text-primary">学习顺序</h2>
     <div class="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] md:items-stretch">
       <template v-for="(item, index) in items" :key="item.code">
         <div
@@ -15,13 +15,13 @@
               v-if="item.code === expandedStageCode"
               class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800"
             >
-              当前看这步
+              当前这步
             </span>
             <span
               v-else-if="item.isRecommended"
               class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
             >
-              推荐先手
+              从这里开始
             </span>
           </div>
           <p class="mt-2 text-sm font-medium leading-snug text-text-primary">

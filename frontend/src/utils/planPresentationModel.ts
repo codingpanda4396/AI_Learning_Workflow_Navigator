@@ -557,18 +557,18 @@ const PLAN_STAGE_ORDER: PlanStageCode[] = [
 
 /** 路径条上一句扫读说明（与四阶段模型对齐，保持极短） */
 const STAGE_PATH_SCAN_LINE: Record<PlanStageCode, string> = {
-  STRUCTURE: '先把整体框架搭起来',
-  UNDERSTANDING: '再理解关键机制',
-  TRAINING: '再做题验证理解',
-  REFLECTION: '最后复盘薄弱点',
+  STRUCTURE: '先搭起来',
+  UNDERSTANDING: '再讲明白',
+  TRAINING: '再动手练',
+  REFLECTION: '最后检查',
 }
 
 /** 结论卡「推荐起点」口语短句 */
 const RECOMMENDED_START_PHRASE: Record<PlanStageCode, string> = {
-  STRUCTURE: '先搭结构',
-  UNDERSTANDING: '先理解关键机制',
-  TRAINING: '先做小题验证',
-  REFLECTION: '先快速复盘',
+  STRUCTURE: '先搭起来',
+  UNDERSTANDING: '先讲明白',
+  TRAINING: '先动手练',
+  REFLECTION: '先检查一下',
 }
 
 const STAGE_META: Record<PlanStageCode, StageMeta> = {
@@ -576,26 +576,26 @@ const STAGE_META: Record<PlanStageCode, StageMeta> = {
     label: STAGE_GUIDE_META.STRUCTURE.label,
     title: STAGE_GUIDE_META.STRUCTURE.title,
     defaultObjective: STAGE_GUIDE_META.STRUCTURE.stageGoal,
-    deliverable: '一张能说清主线的结构图或最小框架。',
-    tutorRole: '帮助拆主线、标关键概念、把复杂主题先压成可导航的骨架。',
-    checkpoint: '你能说清“这一块在整个主题里属于哪一层”。',
+    deliverable: '搭出这块内容的最小框架。',
+    tutorRole: '先帮你分清主线、位置和边界。',
+    checkpoint: '你能说清这块内容放在整体里的哪里。',
     fallbackRisk: STAGE_GUIDE_META.STRUCTURE.skipRisk,
   },
   UNDERSTANDING: {
     label: STAGE_GUIDE_META.UNDERSTANDING.label,
     title: STAGE_GUIDE_META.UNDERSTANDING.title,
     defaultObjective: STAGE_GUIDE_META.UNDERSTANDING.stageGoal,
-    deliverable: '一段自己的解释，能区分易混点并说出因果。',
-    tutorRole: '用白话重讲原理，对比易混概念，追问“为什么成立”。',
-    checkpoint: '你能不用原话复述概念，还能解释一个关键差异。',
+    deliverable: '写出一段自己的解释，讲清关键因果。',
+    tutorRole: '帮你把易混点拆开，把为什么讲顺。',
+    checkpoint: '你能用自己的话讲清为什么会这样。',
     fallbackRisk: STAGE_GUIDE_META.UNDERSTANDING.skipRisk,
   },
   TRAINING: {
     label: STAGE_GUIDE_META.TRAINING.label,
     title: STAGE_GUIDE_META.TRAINING.title,
     defaultObjective: STAGE_GUIDE_META.TRAINING.stageGoal,
-    deliverable: '完成一组微练习，并留下稳定的解题动作或操作步骤。',
-    tutorRole: '给最小任务脚手架，盯住步骤、纠正动作、帮助形成方法。',
+    deliverable: '做完一题或一步，留下可重复的做法。',
+    tutorRole: '给一小步练习，盯住动作是否到位。',
     checkpoint: '你能独立完成一题或一步，并说出自己为什么这样做。',
     fallbackRisk: STAGE_GUIDE_META.TRAINING.skipRisk,
   },
@@ -603,8 +603,8 @@ const STAGE_META: Record<PlanStageCode, StageMeta> = {
     label: STAGE_GUIDE_META.REFLECTION.label,
     title: STAGE_GUIDE_META.REFLECTION.title,
     defaultObjective: STAGE_GUIDE_META.REFLECTION.stageGoal,
-    deliverable: '一份简短复盘，包含收获、漏洞和下一次切入点。',
-    tutorRole: '帮助总结证据、指出薄弱点，把下一轮学习重新压缩成小步。',
+    deliverable: '留下一句总结和下一步练习方向。',
+    tutorRole: '帮你收住这一轮，指出还要补哪里。',
     checkpoint: '你能明确说出“我已经会什么、还差什么、下一步练什么”。',
     fallbackRisk: STAGE_GUIDE_META.REFLECTION.skipRisk,
   },
@@ -715,7 +715,7 @@ function summarizeWhy(plan: PlanPreviewData): string {
   if (reason) return truncate(reason, 88)
   const evidence = plan.keyEvidence?.filter((item) => item?.trim()) ?? []
   if (evidence.length) return truncate(evidence.slice(0, 2).join('；'), 88)
-  return '系统先根据你的起点和风险，决定从最稳的阶段切入，再把后续动作串成闭环。'
+  return '先从你现在最需要的一步开始，后面再顺着往下走。'
 }
 
 /** 结论卡专用：更短、偏用户口吻的一句原因 */
@@ -726,7 +726,7 @@ function summarizeWhyShort(plan: PlanPreviewData): string {
   if (reason) return truncate(reason, 46)
   const evidence = plan.keyEvidence?.filter((item) => item?.trim()) ?? []
   if (evidence.length) return truncate(evidence[0]!, 46)
-  return '从你最顺手的阶段切入，后面再自动串起来。'
+  return '先从最该补的一步开始。'
 }
 
 function summarizeRisk(
@@ -768,9 +768,9 @@ function buildDecisionEvidence(
   const avoidStageCode = chooseAvoidStageCode(recommendedStageCode)
   return {
     currentProblem,
-    recommendedLine: `所以本轮先从 ${STAGE_META[recommendedStageCode].title} 切入。`,
-    notYetLine: `暂不建议直接进入 ${STAGE_META[avoidStageCode].title}。`,
-    riskLine: STAGE_GUIDE_META[recommendedStageCode].skipRisk,
+    recommendedLine: `这一步先做：${STAGE_META[recommendedStageCode].label}`,
+    notYetLine: `先别急着跳到${STAGE_META[avoidStageCode].label}。`,
+    riskLine: `先把这一段做稳，后面会更顺。`,
   }
 }
 
@@ -782,9 +782,9 @@ function buildStrategyOverview(
   return {
     currentKnowledge: chooseCurrentKnowledge(plan, ctx),
     recommendedStrategy:
-      plan.recommendedStrategy?.label?.trim() || '分阶段推进',
+      plan.recommendedStrategy?.label?.trim() || '分步学习',
     recommendedStageCode,
-    recommendedStageLabel: `${STAGE_META[recommendedStageCode].title} / ${STAGE_META[recommendedStageCode].label}`,
+    recommendedStageLabel: STAGE_META[recommendedStageCode].label,
     whyThisArrangement: summarizeWhy(plan),
     skipRisk: summarizeRisk(plan, recommendedStageCode),
   }
@@ -983,5 +983,362 @@ export function buildPlanBattleMapView(
     totalEstimatedLabel,
     recommendedStartPhrase: RECOMMENDED_START_PHRASE[recommendedStageCode],
     whyShortLine: summarizeWhyShort(plan),
+  }
+}
+
+export type PlanTimelineStatus = 'current' | 'done' | 'upcoming' | 'recommended'
+
+export type PlanActionHeroView = {
+  topic: string
+  headline: string
+  subline: string
+  currentProblemLabel: string
+  recommendedStageCode: PlanStageCode
+  recommendedStageLabelZh: string
+  recommendedStageLabelEn: string
+  totalEstimatedLabel: string
+  totalSteps: number
+  whyThisFirst: string[]
+  startButtonLabel: string
+}
+
+export type PlanTimelineItemView = {
+  code: PlanStageCode
+  titleZh: string
+  titleEn: string
+  objective: string
+  estimatedLabel: string
+  status: PlanTimelineStatus
+}
+
+export type PlanAccordionTaskView = {
+  taskId: string
+  title: string
+  estimatedLabel: string
+}
+
+export type PlanStagePanelView = {
+  code: PlanStageCode
+  titleZh: string
+  titleEn: string
+  objective: string
+  taskCount: number
+  completionStandard: string[]
+  scaffoldPrompts: string[]
+  tasks: PlanAccordionTaskView[]
+  estimatedLabel: string
+  isCurrent: boolean
+  isRecommended: boolean
+  isExpandedDefault: boolean
+}
+
+export type PlanActionPanelView = {
+  hero: PlanActionHeroView
+  timeline: PlanTimelineItemView[]
+  stagePanels: PlanStagePanelView[]
+  expandedStageCode: PlanStageCode
+}
+
+const STAGE_ZH_LABEL: Record<PlanStageCode, string> = {
+  STRUCTURE: '先搭框架',
+  UNDERSTANDING: '再讲明白',
+  TRAINING: '再动手练',
+  REFLECTION: '最后检查',
+}
+
+const STAGE_EN_LABEL: Record<PlanStageCode, string> = {
+  STRUCTURE: 'STRUCTURE',
+  UNDERSTANDING: 'UNDERSTANDING',
+  TRAINING: 'TRAINING',
+  REFLECTION: 'REFLECTION',
+}
+
+function normalizeTagLabel(tag: string): string {
+  const normalized = tag.trim().toUpperCase()
+  if (!normalized) return ''
+  if (normalized.includes('QUESTION_TYPE_RECOGNITION_GAP')) return '题型识别不稳'
+  if (
+    normalized.includes('PROCEDURE_GAP') ||
+    normalized.includes('PRACTICE') ||
+    normalized.includes('QUESTION_TYPE')
+  ) {
+    return '会看但一做就乱'
+  }
+  if (
+    normalized.includes('CONCEPT') ||
+    normalized.includes('SHALLOW_UNDERSTANDING') ||
+    normalized.includes('EXPRESSION')
+  ) {
+    return '概念还没讲透'
+  }
+  if (
+    normalized.includes('PREREQUISITE') ||
+    normalized.includes('RELATIONSHIP')
+  ) {
+    return '前置框架还没理顺'
+  }
+  if (normalized.includes('TIME') || normalized.includes('URGENT')) {
+    return '时间紧，需要先抓住关键一步'
+  }
+  return ''
+}
+
+function normalizeBlockerLabel(text: string | undefined): string {
+  const trimmed = text?.trim()
+  if (!trimmed) return ''
+  const fromTag = normalizeTagLabel(trimmed)
+  if (fromTag) return fromTag
+  if (/^[A-Z0-9_ -]+$/.test(trimmed)) return '当前卡点还需要先理顺'
+  return trimmed
+}
+
+function inferCurrentProblemLabel(ctx: PlanViewModelContext): string {
+  const blocker = normalizeBlockerLabel(ctx.learnerProfileSnapshot?.blockingPoint)
+  if (blocker) return blocker
+
+  const tags = [
+    ...(ctx.learnerProfileSnapshot?.blockerTags ?? []),
+    ...(ctx.learnerProfileSnapshot?.riskTags ?? []),
+  ]
+  for (const tag of tags) {
+    const label = normalizeTagLabel(tag)
+    if (label) return label
+  }
+
+  return '当前理解还不够稳定'
+}
+
+function buildHeroSubline(
+  currentProblemLabel: string,
+  recommendedStageCode: PlanStageCode
+): string {
+  const endings: Record<PlanStageCode, string> = {
+    STRUCTURE: '先把框架理顺，再进入后面的讲解和练习。',
+    UNDERSTANDING: '先把关键机制讲清楚，再进入后面的练习和检查。',
+    TRAINING: '先把理解变成动作，再判断哪里已经真正站稳。',
+    REFLECTION: '先把这一轮收住，再决定下一轮该补哪里。',
+  }
+  return `因为你当前更像是「${currentProblemLabel}」，${endings[recommendedStageCode]}`
+}
+
+function buildWhyThisFirstLines(
+  currentProblemLabel: string,
+  recommendedStageCode: PlanStageCode
+): string[] {
+  const lines: Record<PlanStageCode, string[]> = {
+    STRUCTURE: [
+      `你当前主要问题：${currentProblemLabel}`,
+      '如果现在直接做题，容易只记住零散做法，框架还是散的。',
+      '先把章节轮廓和判断线索搭起来，后面讲解和练习会更顺。',
+    ],
+    UNDERSTANDING: [
+      `你当前主要问题：${currentProblemLabel}`,
+      '如果现在直接进入练习，容易会模仿步骤，但不知道为什么这么做。',
+      '先把关键机制讲明白，后面的练习才更容易做稳。',
+    ],
+    TRAINING: [
+      `你当前主要问题：${currentProblemLabel}`,
+      '如果现在只停留在听懂，到了自己动手时还是容易卡住。',
+      '先用小题把理解变成动作，后面的检查才有依据。',
+    ],
+    REFLECTION: [
+      `你当前主要问题：${currentProblemLabel}`,
+      '如果这一步不先收住，很容易把旧问题直接带进下一轮。',
+      '先检查哪里已经站稳、哪里还虚，后面补缺口会更准。',
+    ],
+  }
+  return lines[recommendedStageCode]
+}
+
+function buildTimelineStatus(
+  code: PlanStageCode,
+  currentStageCode: PlanStageCode | null,
+  recommendedStageCode: PlanStageCode
+): PlanTimelineStatus {
+  if (currentStageCode) {
+    const currentIndex = PLAN_STAGE_ORDER.indexOf(currentStageCode)
+    const itemIndex = PLAN_STAGE_ORDER.indexOf(code)
+    if (code === currentStageCode) return 'current'
+    if (itemIndex < currentIndex) return 'done'
+    return 'upcoming'
+  }
+  return code === recommendedStageCode ? 'recommended' : 'upcoming'
+}
+
+function compactSentence(text: string, max = 34): string {
+  const trimmed = text.trim()
+  if (!trimmed) return ''
+  if (trimmed.length <= max) return trimmed
+  return `${trimmed.slice(0, max)}...`
+}
+
+function buildTimelineObjective(
+  code: PlanStageCode,
+  objective: string
+): string {
+  const compact = compactSentence(objective, 30)
+  if (compact) return compact
+  return STAGE_META[code].defaultObjective
+}
+
+function dedupeLines(lines: string[], max = 3): string[] {
+  const result: string[] = []
+  const seen = new Set<string>()
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || seen.has(trimmed)) continue
+    seen.add(trimmed)
+    result.push(trimmed)
+    if (result.length >= max) break
+  }
+  return result
+}
+
+function buildStagePanelScaffoldPrompts(
+  tasks: TaskBlueprint[],
+  stageCode: PlanStageCode,
+  topic: string
+): string[] {
+  const prompts = dedupeLines(
+    tasks
+      .map((task) => buildAiPromptLine(task, topic))
+      .filter(Boolean),
+    3
+  )
+  if (prompts.length) return prompts
+
+  const fallback: Record<PlanStageCode, string[]> = {
+    STRUCTURE: [
+      `这一章常见题型有哪些？先给我框架，不要先展开细节。`,
+      `这几个知识点之间是什么关系？先帮我把位置理顺。`,
+    ],
+    UNDERSTANDING: [
+      `这一步为什么要这样做？请用对比方式讲清楚。`,
+      `最容易混淆的点在哪里？先帮我拆开讲。`,
+    ],
+    TRAINING: [
+      `给我一道最小练习题，我先自己做，再请你检查思路。`,
+      `先不要直接给答案，先看我这一步动作对不对。`,
+    ],
+    REFLECTION: [
+      `请帮我检查这一轮哪里已经站稳，哪里还需要补。`,
+      `如果只安排下一步练习，最该补哪一类？`,
+    ],
+  }
+  return fallback[stageCode]
+}
+
+export function buildPlanActionPanelView(
+  plan: PlanPreviewData | null,
+  ctx: PlanViewModelContext = {}
+): PlanActionPanelView | null {
+  if (!plan) return null
+
+  const topic = resolveTopicLabel(plan, ctx)
+  const recommendedStageCode = inferRecommendedStageCode(plan, ctx)
+  const currentStageCode = currentStageCodeFromContext(plan, ctx)
+  const expandedStageCode = currentStageCode ?? recommendedStageCode
+  const stageByCode = mapStagesByCode(plan)
+  const taskGroups = buildTaskGroups(plan)
+  const totalSteps = PLAN_STAGE_ORDER.length
+
+  const totalEstimatedMinutes = PLAN_STAGE_ORDER.reduce((sum, code) => {
+    const taskMinutes = taskGroups[code].reduce(
+      (taskSum, item) => taskSum + (item.estimatedMinutes ?? 0),
+      0
+    )
+    if (taskMinutes > 0) return sum + taskMinutes
+    return sum + (stageByCode[code]?.estimatedMinutes ?? 0)
+  }, 0)
+
+  const totalEstimatedLabel =
+    totalEstimatedMinutes > 0
+      ? `约 ${totalEstimatedMinutes} 分钟`
+      : '约 45-60 分钟'
+
+  const currentProblemLabel = inferCurrentProblemLabel(ctx)
+
+  const hero: PlanActionHeroView = {
+    topic,
+    headline: `这一轮先从「${STAGE_ZH_LABEL[recommendedStageCode]}」开始`,
+    subline: buildHeroSubline(currentProblemLabel, recommendedStageCode),
+    currentProblemLabel,
+    recommendedStageCode,
+    recommendedStageLabelZh: STAGE_ZH_LABEL[recommendedStageCode],
+    recommendedStageLabelEn: STAGE_EN_LABEL[recommendedStageCode],
+    totalEstimatedLabel,
+    totalSteps,
+    whyThisFirst: buildWhyThisFirstLines(currentProblemLabel, recommendedStageCode),
+    startButtonLabel: currentStageCode ? '进入当前步骤' : '开始第 1 步',
+  }
+
+  const timeline: PlanTimelineItemView[] = PLAN_STAGE_ORDER.map((code) => {
+    const meta = STAGE_META[code]
+    const stage = stageByCode[code]
+    const tasks = taskGroups[code]
+    const taskMinutes = tasks.reduce(
+      (sum, item) => sum + (item.estimatedMinutes ?? 0),
+      0
+    )
+    const minutes =
+      taskMinutes > 0 ? taskMinutes : (stage?.estimatedMinutes ?? undefined)
+
+    return {
+      code,
+      titleZh: STAGE_ZH_LABEL[code],
+      titleEn: STAGE_EN_LABEL[code],
+      objective: buildTimelineObjective(code, stage?.objective?.trim() || meta.defaultObjective),
+      estimatedLabel: formatStageMinutes(minutes),
+      status: buildTimelineStatus(code, currentStageCode, recommendedStageCode),
+    }
+  })
+
+  const stagePanels: PlanStagePanelView[] = PLAN_STAGE_ORDER.map((code) => {
+    const meta = STAGE_META[code]
+    const stage = stageByCode[code]
+    const tasks = plan.tasks?.filter((task, index) =>
+      mapTaskToStageCode(task, index, plan.tasks.length) === code
+    ) ?? []
+    const cardTasks = taskGroups[code]
+
+    const taskMinutes = cardTasks.reduce(
+      (sum, item) => sum + (item.estimatedMinutes ?? 0),
+      0
+    )
+    const minutes =
+      taskMinutes > 0 ? taskMinutes : (stage?.estimatedMinutes ?? undefined)
+
+    const completionStandard = dedupeLines(
+      cardTasks.flatMap((item) => item.completionChecks),
+      3
+    )
+
+    return {
+      code,
+      titleZh: STAGE_ZH_LABEL[code],
+      titleEn: STAGE_EN_LABEL[code],
+      objective: stage?.objective?.trim() || meta.defaultObjective,
+      taskCount: cardTasks.length,
+      completionStandard: completionStandard.length
+        ? completionStandard
+        : [meta.checkpoint],
+      scaffoldPrompts: buildStagePanelScaffoldPrompts(tasks, code, topic),
+      tasks: cardTasks.map((item) => ({
+        taskId: item.taskId,
+        title: item.title,
+        estimatedLabel: item.estimatedTime,
+      })),
+      estimatedLabel: formatStageMinutes(minutes),
+      isCurrent: code === currentStageCode,
+      isRecommended: code === recommendedStageCode,
+      isExpandedDefault: code === expandedStageCode,
+    }
+  })
+
+  return {
+    hero,
+    timeline,
+    stagePanels,
+    expandedStageCode,
   }
 }

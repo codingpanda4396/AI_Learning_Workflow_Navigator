@@ -1,8 +1,8 @@
 <template>
   <section class="space-y-4">
-    <h2 class="text-base font-semibold text-text-primary">接下来具体会做什么</h2>
+    <h2 class="text-base font-semibold text-text-primary">每一步要做什么</h2>
     <p v-if="activeGroup" class="text-sm text-text-secondary">
-      每张卡只保留三件事：你要做什么、系统怎么帮、过关看什么。
+      不用一次看完全部内容，先看当前这一步。
     </p>
 
     <div class="space-y-3">
@@ -41,7 +41,7 @@
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
                   <h4 class="font-semibold text-text-primary">
-                    {{ item.title }}
+                    第 {{ itemIndex(group.items, item.taskId) }} 步｜{{ item.title }}
                   </h4>
                   <p class="mt-2 text-xs text-slate-500">
                     {{ item.estimatedTime }}
@@ -52,13 +52,13 @@
                   :disabled="loading"
                   @click="$emit('start')"
                 >
-                  进入任务
+                  做这一步
                 </SecondaryButton>
               </div>
               <div class="grid gap-3 md:grid-cols-3">
                 <div class="rounded-2xl border border-white bg-white px-4 py-3">
                   <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    你要做什么
+                    这一步要完成
                   </p>
                   <p class="mt-2 text-sm leading-6 text-text-primary">
                     {{ oneLineGoal(item.actionGoal, 80) }}
@@ -66,15 +66,15 @@
                 </div>
                 <div class="rounded-2xl border border-white bg-white px-4 py-3">
                   <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    系统怎么帮
+                    为什么先做这一步
                   </p>
                   <p class="mt-2 text-sm leading-6 text-text-primary">
-                    {{ oneLineGoal(item.tutorSupport, 80) }}
+                    {{ oneLineReason(item.tutorSupport, item.stageCode) }}
                   </p>
                 </div>
                 <div class="rounded-2xl border border-white bg-white px-4 py-3">
                   <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    过关看什么
+                    做到这里就可以继续
                   </p>
                   <p class="mt-2 text-sm leading-6 text-text-primary">
                     {{ item.completionChecks[0] ?? '按这一阶段要求完成最小产出。' }}
@@ -86,7 +86,7 @@
               v-if="group.items.length === 0"
               class="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm text-text-secondary"
             >
-              本阶段没有单独拆任务，跟着上一步的引导继续即可。
+              这一段没有额外拆任务，顺着当前步骤继续就行。
             </div>
           </div>
         </template>
@@ -133,10 +133,10 @@ defineEmits<{
 }>()
 
 const SCAN: Record<PlanStageCode, string> = {
-  STRUCTURE: '先把整体框架搭起来',
-  UNDERSTANDING: '再理解关键机制',
-  TRAINING: '再做题验证理解',
-  REFLECTION: '最后复盘薄弱点',
+  STRUCTURE: '先搭起来',
+  UNDERSTANDING: '再讲明白',
+  TRAINING: '再动手练',
+  REFLECTION: '最后检查',
 }
 
 function collapsedSummary(code: PlanStageCode): string {
@@ -148,6 +148,27 @@ function oneLineGoal(text: string, max = 52): string {
   if (!t) return '按引导完成本步即可。'
   if (t.length <= max) return t
   return t.slice(0, max) + '…'
+}
+
+function itemIndex(items: PlanTaskGroupView['items'], taskId: string): number {
+  const index = items.findIndex((item) => item.taskId === taskId)
+  return index >= 0 ? index + 1 : 1
+}
+
+function oneLineReason(text: string, stageCode: PlanStageCode): string {
+  const normalized = text.trim()
+  if (normalized) {
+    if (normalized.length <= 42) return `先做这一步，是因为你现在更需要${normalized}`
+    return `先做这一步，是因为你现在更需要${normalized.slice(0, 38)}…`
+  }
+
+  const fallback: Record<PlanStageCode, string> = {
+    STRUCTURE: '先把框架搭起来',
+    UNDERSTANDING: '先把关键点讲明白',
+    TRAINING: '先把理解变成动作',
+    REFLECTION: '先确认哪里已经站稳',
+  }
+  return `先做这一步，是因为你现在更需要${fallback[stageCode]}`
 }
 
 const activeGroup = computed(() =>

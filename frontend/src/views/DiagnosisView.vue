@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <PageContainer>
     <TransitionOverlay
       v-if="submitTransitionOverlay"
@@ -16,16 +16,16 @@
       <WorkflowPageScaffold v-else-if="sessionReady">
         <template #title>
           <h1 class="text-2xl font-bold text-text-primary md:text-3xl">
-            三步快速定位
+            {{ DIAGNOSIS_COPY.title }}
           </h1>
           <p class="mt-2 text-text-secondary">
-            不用写小作文，选最贴近的一项即可；系统会据此生成你的学习路径。
+            {{ DIAGNOSIS_COPY.subtitle }}
           </p>
           <div
             class="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3"
           >
             <p class="text-[11px] font-semibold uppercase tracking-wider text-primary/90">
-              本轮学习主题
+              {{ DIAGNOSIS_COPY.topicLabel }}
             </p>
             <p class="mt-1 text-base font-semibold text-text-primary">
               {{ sessionTopicLabel }}
@@ -33,7 +33,7 @@
           </div>
           <p class="mt-3 text-sm font-medium leading-snug text-text-primary">
             <span aria-hidden="true">👉</span>
-            回答这 3 个问题，我就能帮你找到最合适的学习方式
+            {{ DIAGNOSIS_COPY.intro }}
           </p>
         </template>
 
@@ -98,7 +98,7 @@
             <FormCard class="space-y-3">
               <p class="text-sm font-semibold text-primary">第 3 题</p>
               <h3 class="text-base font-medium text-text-primary">
-                你这次更希望系统怎么带你学？
+                你这次想怎么推进？
               </h3>
               <div class="space-y-2 pt-1">
                 <label
@@ -125,7 +125,7 @@
 
             <div class="flex justify-end pt-2">
               <PrimaryButton :loading="submitting" @click="onSubmit">
-                好了，帮我分析一下
+                {{ DIAGNOSIS_COPY.submit }}
               </PrimaryButton>
             </div>
           </form>
@@ -160,6 +160,7 @@ import {
 } from '@/utils/diagnosisSubmitMapper'
 import { SESSION_KEY_PLAN_DIAGNOSIS_RECAP } from '@/utils/diagnosisRecapCopy'
 import { workflowTopicLabelFromStructuredGoal } from '@/utils/workflowTopicLabel'
+import { DIAGNOSIS_COPY } from '@/constants/uiCopy'
 
 const router = useRouter()
 const store = useWorkflowStore()
@@ -277,3 +278,7 @@ onMounted(() => {
   fetchSession()
 })
 </script>
+
+
+
+

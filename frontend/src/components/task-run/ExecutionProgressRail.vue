@@ -1,29 +1,48 @@
 <template>
-  <aside data-testid="execution-progress-rail" class="rounded-[28px] border border-slate-200 bg-white p-5 shadow-card">
-    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">当前进度感</p>
-    <h3 class="mt-2 text-lg font-semibold text-slate-950">你正在推进一个有顺序的学习过程</h3>
+  <aside
+    data-testid="execution-progress-rail"
+    class="space-y-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-card"
+  >
+    <section>
+      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {{ model.progressSectionTitle }}
+      </p>
+      <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+        <li v-for="(line, i) in model.progressLines" :key="`p-${i}`">
+          {{ line }}
+        </li>
+      </ul>
+    </section>
 
-    <div class="mt-5 space-y-3">
-      <article class="rounded-[20px] border border-emerald-100 bg-emerald-50/80 p-4">
-        <p class="text-sm font-semibold text-emerald-900">已完成</p>
-        <p class="mt-2 text-sm leading-6 text-emerald-900">{{ model.done }}</p>
-      </article>
+    <section class="rounded-[20px] border border-slate-100 bg-slate-50/80 p-4">
+      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {{ model.criteriaSectionTitle }}
+      </p>
+      <ul class="mt-3 list-disc space-y-1.5 pl-4 text-sm leading-6 text-slate-700">
+        <li v-for="(line, i) in model.completionLines" :key="`c-${i}`">
+          {{ line }}
+        </li>
+      </ul>
+    </section>
 
-      <article class="rounded-[20px] border border-primary/15 bg-primary/5 p-4">
-        <p class="text-sm font-semibold text-primary">进行中</p>
-        <p class="mt-2 text-sm leading-6 text-slate-700">{{ model.current }}</p>
-      </article>
+    <section class="rounded-[20px] border border-sky-100 bg-sky-50/50 p-4">
+      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-800">
+        {{ model.nextSectionTitle }}
+      </p>
+      <p class="mt-2 text-sm leading-6 text-slate-700">
+        {{ model.nextPreview }}
+      </p>
+    </section>
 
-      <article class="rounded-[20px] border border-slate-200 bg-slate-50/80 p-4">
-        <p class="text-sm font-semibold text-slate-900">下一步</p>
-        <p class="mt-2 text-sm leading-6 text-slate-700">{{ model.next }}</p>
-      </article>
-
-      <article class="rounded-[20px] border border-slate-200 bg-slate-50/60 p-4">
-        <p class="text-sm font-semibold text-slate-900">后续</p>
-        <p class="mt-2 text-sm leading-6 text-slate-700">{{ model.later }}</p>
-      </article>
-    </div>
+    <section v-if="model.knowledgeOutline?.length" class="border-t border-slate-100 pt-4">
+      <p class="text-xs font-medium text-slate-500">目录</p>
+      <ul class="mt-2 space-y-1 text-xs leading-5 text-slate-600">
+        <li v-for="p in model.knowledgeOutline" :key="p.id">
+          <span class="text-slate-400">{{ p.index }}.</span>
+          {{ p.title }}
+        </li>
+      </ul>
+    </section>
   </aside>
 </template>
 

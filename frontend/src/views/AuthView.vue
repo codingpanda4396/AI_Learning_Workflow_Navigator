@@ -6,13 +6,13 @@
       <div class="relative mx-auto flex min-h-[calc(100vh-56px)] max-w-5xl items-center px-6 py-10">
         <section class="grid w-full gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div class="space-y-6">
-            <p class="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">AI Learning Workflow</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">{{ AUTH_COPY.eyebrow }}</p>
             <div class="space-y-4">
               <h1 class="max-w-xl text-4xl font-semibold leading-tight text-slate-950">
-                让每一轮学习，都有明确的归属和可继续的进度。
+                {{ AUTH_COPY.heroTitle }}
               </h1>
               <p class="max-w-lg text-base leading-7 text-slate-600">
-                登录后，目标、诊断、规划和执行记录都会绑定到你的账号。下一次回来，可以直接接着这一轮继续。
+                {{ AUTH_COPY.heroSubtitle }}
               </p>
             </div>
             <div class="grid gap-3 sm:grid-cols-3">
@@ -69,7 +69,7 @@
               </div>
 
               <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                登录后会自动恢复当前会话，并把新创建的学习链路绑定到你的账号。
+                {{ AUTH_COPY.helper }}
               </div>
 
               <button
@@ -77,7 +77,7 @@
                 class="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                 :disabled="loading"
               >
-                {{ loading ? '处理中...' : mode === 'login' ? '登录并开始' : '注册并开始' }}
+                {{ loading ? '处理中...' : mode === 'login' ? AUTH_COPY.submitLogin : AUTH_COPY.submitRegister }}
               </button>
             </form>
           </section>
@@ -96,6 +96,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useWorkflowStore } from '@/stores/workflow'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
+import { AUTH_COPY } from '@/constants/uiCopy'
 
 const route = useRoute()
 const router = useRouter()
@@ -110,11 +111,7 @@ const form = reactive({
   password: '',
 })
 
-const highlights = [
-  { kicker: 'Structure', title: '目标不会丢', body: '每次创建的目标和结构化意图都会挂在当前账号下。' },
-  { kicker: 'Understanding', title: '诊断可延续', body: '学习者画像和当前阶段判断会跟着这轮学习保存下来。' },
-  { kicker: 'Training', title: '执行能续接', body: '回到系统后，可以直接回到最近一次任务脚手架。' },
-]
+const highlights = AUTH_COPY.highlights
 
 async function submit() {
   if (!form.username || !form.password) {

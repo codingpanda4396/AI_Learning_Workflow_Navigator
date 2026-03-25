@@ -56,33 +56,33 @@ const STAGE_META: Record<PlanStageCode, StageMeta> = {
   STRUCTURE: {
     title: STAGE_GUIDE_META.STRUCTURE.title,
     label: STAGE_GUIDE_META.STRUCTURE.label,
-    scanLine: '先把整体框架搭起来',
+    scanLine: '先搭起来',
     objective: STAGE_GUIDE_META.STRUCTURE.stageGoal,
-    deliverable: '一段能说明整体框架与关键关系的最小结构描述。',
+    deliverable: '一段最小框架描述。',
     tutorRole: STAGE_GUIDE_META.STRUCTURE.learnerFriendlyCopy.execution,
   },
   UNDERSTANDING: {
     title: STAGE_GUIDE_META.UNDERSTANDING.title,
     label: STAGE_GUIDE_META.UNDERSTANDING.label,
-    scanLine: '再理解关键机制',
+    scanLine: '再讲明白',
     objective: STAGE_GUIDE_META.UNDERSTANDING.stageGoal,
-    deliverable: '一段能解释“为什么这样工作”的最小机制说明。',
+    deliverable: '一段能讲清为什么的说明。',
     tutorRole: STAGE_GUIDE_META.UNDERSTANDING.learnerFriendlyCopy.execution,
   },
   TRAINING: {
     title: STAGE_GUIDE_META.TRAINING.title,
     label: STAGE_GUIDE_META.TRAINING.label,
-    scanLine: '再做最小练习验证',
+    scanLine: '再动手练',
     objective: STAGE_GUIDE_META.TRAINING.stageGoal,
-    deliverable: '一次结构化作答、最小练习或自我解释。',
+    deliverable: '一次最小练习或自我解释。',
     tutorRole: STAGE_GUIDE_META.TRAINING.learnerFriendlyCopy.execution,
   },
   REFLECTION: {
     title: STAGE_GUIDE_META.REFLECTION.title,
     label: STAGE_GUIDE_META.REFLECTION.label,
-    scanLine: '最后收束薄弱点',
+    scanLine: '最后检查',
     objective: STAGE_GUIDE_META.REFLECTION.stageGoal,
-    deliverable: '一次独立检查或一份可复用的简短复盘。',
+    deliverable: '一次独立检查或简短复盘。',
     tutorRole: STAGE_GUIDE_META.REFLECTION.learnerFriendlyCopy.execution,
   },
 }
@@ -141,10 +141,10 @@ function buildWhyNow(
   if (guidanceTitle) {
     return guidanceBullets.length ? `${guidanceTitle}：${guidanceBullets[0]}` : guidanceTitle
   }
-  if (stageCode === 'REFLECTION') return '系统正在确认你是否已经能独立说明并完成收束。'
-  if (stageCode === 'TRAINING') return '系统判断现在最重要的是把理解变成动作，而不是继续听解释。'
-  if (stageCode === 'UNDERSTANDING') return '系统判断你还需要先讲清机制，再进入训练。'
-  return '系统判断你需要先搭起框架，避免直接掉进零散细节。'
+  if (stageCode === 'REFLECTION') return '先做个检查，把这一轮收住。'
+  if (stageCode === 'TRAINING') return '先把理解变成动作，再继续往下走。'
+  if (stageCode === 'UNDERSTANDING') return '先把关键机制讲清楚。'
+  return '先把框架搭起来，再进入细节。'
 }
 
 const STAGE_STARTERS: Record<PlanStageCode, [string, string]> = {
@@ -196,23 +196,19 @@ function buildScaffoldPassBullets(
   return out.slice(0, 3)
 }
 
-function buildSystemSummary(
-  stageCode: PlanStageCode,
-  guidanceBullets: string[],
-  passCondition: string
-): string {
+function buildSystemSummary(guidanceBullets: string[], passCondition: string): string {
   const gap = guidanceBullets[0]?.trim()
   if (gap) {
-    return `系统当前判断你在 ${stageCode}，还缺少：${gap}`
+    return `你现在先补：${gap}`
   }
-  return `系统当前判断你在 ${stageCode}，通过标准是：${passCondition}`
+  return `做到这里就可以继续：${passCondition}`
 }
 
 function buildDecisionReason(stageCode: PlanStageCode): string {
-  if (stageCode === 'REFLECTION') return '系统已经拿到足够多的过程证据，正在确认你能否独立收束。'
-  if (stageCode === 'TRAINING') return '系统判断现在最重要的不是继续听解释，而是看你能不能自己做出动作。'
-  if (stageCode === 'UNDERSTANDING') return '系统判断你还需要先讲清机制和因果，再进入训练会更稳。'
-  return '系统判断你需要先把结构搭起来，避免一上来就掉进零散细节。'
+  if (stageCode === 'REFLECTION') return '现在先确认这一步是否已经站稳。'
+  if (stageCode === 'TRAINING') return '现在先看你能不能自己做出来。'
+  if (stageCode === 'UNDERSTANDING') return '现在先把机制和因果讲顺。'
+  return '现在先把结构搭起来。'
 }
 
 function buildLockReason(
@@ -220,27 +216,27 @@ function buildLockReason(
   stageCode: PlanStageCode,
   canSubmitSelfExplanation: boolean
 ): string {
-  if (taskState === 'CHECK') return '你正在独立检查，系统先看证据是否足够，再决定是否放行。'
-  if (taskState === 'PASS') return '当前阶段已经通过，现在可以把这轮学习收束成可复用的结果。'
+  if (taskState === 'CHECK') return '你正在做独立检查，先把这一题答完。'
+  if (taskState === 'PASS') return '这一步已经通过，现在把这一轮收住。'
   if (stageCode === 'TRAINING' && !canSubmitSelfExplanation) {
-    return '你还没有完成足够的探索，当前证据不足以进入自我解释。'
+    return '先把前面的探索补够，再进入自我解释。'
   }
   if (stageCode === 'TRAINING' && canSubmitSelfExplanation) {
-    return '你已完成两轮探索，现在必须先自己讲清楚，系统才会开放检查点。'
+    return '先自己讲清楚，再进入检查。'
   }
   if (stageCode === 'UNDERSTANDING') {
-    return '系统先要求你说清为什么成立，而不是直接跳去做题。'
+    return '先说清为什么成立，不急着直接做题。'
   }
   if (stageCode === 'STRUCTURE') {
-    return '系统先要求你把主题放进整体结构里，再继续追细节。'
+    return '先把主题放进整体结构里，再追细节。'
   }
-  return '系统还在等待关键证据，因此暂不开放下一步。'
+  return '先把当前这一步做完，再打开下一步。'
 }
 
 function buildUnlockCondition(taskState: string, passCondition: string): string {
-  if (taskState === 'PASS') return '下一步会进入总结区，留下这轮收获和下一步动作。'
-  if (taskState === 'CHECK') return '通过这一轮检查后，系统才会开放最终收束。'
-  return `解锁条件：${passCondition}`
+  if (taskState === 'PASS') return '下一步会进入总结区，留下一句收获和下一步动作。'
+  if (taskState === 'CHECK') return '答完这一轮检查后，就能进入最后收束。'
+  return `做到这里就继续：${passCondition}`
 }
 
 function buildPath(currentStageCode: PlanStageCode): TaskRunStageStripItem[] {
@@ -280,11 +276,7 @@ export function buildTaskRunStageViewModel(
     currentStageTutorRole: meta.tutorRole,
     currentPassCondition: input.passCondition,
     currentWhyNow: buildWhyNow(currentStageCode, guidanceTitle, guidanceBullets),
-    currentSystemSummary: buildSystemSummary(
-      currentStageCode,
-      guidanceBullets,
-      input.passCondition
-    ),
+    currentSystemSummary: buildSystemSummary(guidanceBullets, input.passCondition),
     currentDecisionReason: buildDecisionReason(currentStageCode),
     currentLockReason: buildLockReason(
       input.taskState,

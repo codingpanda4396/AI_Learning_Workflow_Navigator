@@ -3,43 +3,40 @@
     <div class="min-h-screen bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_32%,#f8fafc_100%)]">
       <AppTopBar current="plan" />
       <main class="mx-auto flex w-full max-w-3xl flex-col px-4 pb-10 pt-4 md:max-w-4xl md:px-6 lg:px-8">
-        <LoadingState v-if="loading && !plan" message="正在生成你的学习路径…" />
+        <LoadingState v-if="loading && !plan" :message="PLAN_COPY.loading" />
         <ErrorState v-else-if="error" :message="error">
           <template #action>
-            <SecondaryButton @click="fetchPlan">重新加载规划</SecondaryButton>
+            <SecondaryButton @click="fetchPlan">{{ PLAN_COPY.reload }}</SecondaryButton>
           </template>
         </ErrorState>
 
         <div
-          v-else-if="plan && battleMap"
+          v-else-if="plan && actionPanel"
           class="space-y-6"
         >
-          <PlanRecommendationCard
-            :knowledge="battleMap.strategyOverview.currentKnowledge"
-            :recommended-start="battleMap.recommendedStartPhrase"
-            :why-line="battleMap.whyShortLine"
-            :total-time="battleMap.totalEstimatedLabel"
-            :current-problem="battleMap.decisionEvidence.currentProblem"
-            :recommended-line="battleMap.decisionEvidence.recommendedLine"
-            :not-yet-line="battleMap.decisionEvidence.notYetLine"
-            :risk-line="battleMap.decisionEvidence.riskLine"
+          <PlanHero
+            :topic="actionPanel.hero.topic"
+            :headline="actionPanel.hero.headline"
+            :subline="actionPanel.hero.subline"
+            :current-problem-label="actionPanel.hero.currentProblemLabel"
+            :recommended-stage-label-zh="actionPanel.hero.recommendedStageLabelZh"
+            :recommended-stage-label-en="actionPanel.hero.recommendedStageLabelEn"
+            :total-estimated-label="actionPanel.hero.totalEstimatedLabel"
+            :total-steps="actionPanel.hero.totalSteps"
+            :why-this-first="actionPanel.hero.whyThisFirst"
+            :start-button-label="actionPanel.hero.startButtonLabel"
             :loading="committing"
             @start="onStartStep"
           />
 
-          <PlanScaffoldPreview
-            :expanded-stage-code="battleMap.expandedStageCode"
+          <PlanTimeline
+            :items="actionPanel.timeline"
           />
 
-          <PlanPhasePathStrip
-            :items="battleMap.pathStrip"
-            :expanded-stage-code="battleMap.expandedStageCode"
-          />
-
-          <PlanCurrentPhaseTasks
-            :groups="battleMap.taskGroupsByStage"
-            :expanded-stage-code="battleMap.expandedStageCode"
+          <PlanStepAccordion
+            :panels="actionPanel.stagePanels"
             :loading="committing"
+            :action-label="actionPanel.hero.startButtonLabel"
             @start="onStartStep"
           />
         </div>
@@ -56,17 +53,17 @@ import AppTopBar from '@/components/layout/AppTopBar.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
-import PlanRecommendationCard from '@/components/plan/PlanRecommendationCard.vue'
-import PlanScaffoldPreview from '@/components/plan/PlanScaffoldPreview.vue'
-import PlanPhasePathStrip from '@/components/plan/PlanPhasePathStrip.vue'
-import PlanCurrentPhaseTasks from '@/components/plan/PlanCurrentPhaseTasks.vue'
+import PlanHero from '@/components/plan/PlanHero.vue'
+import PlanTimeline from '@/components/plan/PlanTimeline.vue'
+import PlanStepAccordion from '@/components/plan/PlanStepAccordion.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { previewPlan, commitPlan } from '@/api/learning-plan'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
-import { buildPlanBattleMapView } from '@/utils/planPresentationModel'
+import { buildPlanActionPanelView } from '@/utils/planPresentationModel'
 import { clearDiagnosisRecapSessionFlag } from '@/utils/diagnosisRecapCopy'
 import type { PlanPreviewData } from '@/types/dto'
+import { PLAN_COPY } from '@/constants/uiCopy'
 
 const router = useRouter()
 const store = useWorkflowStore()
@@ -76,8 +73,8 @@ const committing = ref(false)
 const error = ref<string | null>(null)
 const plan = ref<PlanPreviewData | null>(null)
 
-const battleMap = computed(() =>
-  buildPlanBattleMapView(plan.value, {
+const actionPanel = computed(() =>
+  buildPlanActionPanelView(plan.value, {
     structuredGoal: store.structuredGoal,
     learnerProfileSnapshot: store.learnerProfileSnapshot,
     sessionId: store.sessionId,

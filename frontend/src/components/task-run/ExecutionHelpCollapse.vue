@@ -4,9 +4,7 @@
     data-testid="execution-help-collapse"
     class="rounded-[28px] border border-slate-200 bg-white shadow-card"
   >
-    <summary class="cursor-pointer px-5 py-4 text-sm font-medium text-slate-900">
-      查看补充说明
-    </summary>
+    <summary class="cursor-pointer px-5 py-4 text-sm font-medium text-slate-900">需要时再看</summary>
 
     <div class="space-y-4 border-t border-slate-200 px-5 py-5">
       <article
@@ -30,7 +28,7 @@
         v-if="transcript.length"
         class="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4"
       >
-        <h3 class="text-sm font-semibold text-slate-950">引导记录</h3>
+        <h3 class="text-sm font-semibold text-slate-950">本步记录</h3>
         <div class="mt-3 space-y-3">
           <div
             v-for="(item, index) in transcript"

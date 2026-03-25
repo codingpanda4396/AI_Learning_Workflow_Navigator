@@ -7,7 +7,7 @@
         to="/goal"
         class="text-lg font-semibold text-text-primary transition-colors hover:text-primary"
       >
-        Lumina AI
+        {{ APP_COPY.brand }}
       </router-link>
 
       <WorkflowStepper v-if="current" :current="current" />
@@ -16,14 +16,14 @@
         <template v-if="auth.isAuthenticated && auth.user">
           <div class="hidden text-right md:block">
             <p class="text-sm font-medium text-text-primary">{{ auth.user.displayName }}</p>
-            <p class="text-xs text-slate-400">学习资产已绑定当前账号</p>
+            <p class="text-xs text-slate-400">{{ APP_COPY.appBarSignedInHint }}</p>
           </div>
           <button
             type="button"
             class="rounded-full border border-slate-200 px-3 py-1.5 text-sm text-text-secondary transition hover:border-slate-300 hover:text-text-primary"
             @click="handleLogout"
           >
-            退出
+            {{ APP_COPY.logoutCta }}
           </button>
         </template>
         <router-link
@@ -31,7 +31,7 @@
           to="/auth/login"
           class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
         >
-          登录开始
+          {{ APP_COPY.loginCta }}
         </router-link>
       </div>
     </div>
@@ -43,6 +43,7 @@ import { useRouter } from 'vue-router'
 import WorkflowStepper from './WorkflowStepper.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkflowStore } from '@/stores/workflow'
+import { APP_COPY } from '@/constants/uiCopy'
 
 defineProps<{
   current?: 'goal' | 'diagnosis' | 'plan' | 'task' | 'report'

@@ -4,9 +4,7 @@
     class="overflow-hidden rounded-[32px] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,1),_rgba(248,250,252,0.96))] p-5 shadow-card md:p-7"
   >
     <div class="max-w-3xl">
-      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {{ model.eyebrow }}
-      </p>
+      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ model.eyebrow }}</p>
       <h2 class="mt-3 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
         {{ model.title }}
       </h2>
@@ -14,6 +12,38 @@
         {{ model.description }}
       </p>
     </div>
+
+    <section
+      v-if="model.focusTitle || model.focusObjective || model.focusReason || model.focusTips?.length"
+      class="mt-6 grid gap-4 rounded-[28px] border border-sky-100 bg-[linear-gradient(135deg,_rgba(240,249,255,0.95),_rgba(255,255,255,0.98))] p-5 md:grid-cols-[minmax(0,1.2fr),minmax(0,0.8fr)]"
+    >
+      <article>
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+          {{ model.focusLabel || '当前知识点' }}
+        </p>
+        <h3 v-if="model.focusTitle" class="mt-3 text-xl font-semibold text-slate-950">
+          {{ model.focusTitle }}
+        </h3>
+        <p v-if="model.focusObjective" class="mt-3 text-sm leading-6 text-slate-700">
+          {{ model.focusObjective }}
+        </p>
+      </article>
+
+      <article class="rounded-[22px] border border-white/80 bg-white/85 p-4">
+        <p class="text-sm font-semibold text-slate-950">现在先做</p>
+        <p v-if="model.focusReason" class="mt-2 text-sm leading-6 text-slate-700">
+          {{ model.focusReason }}
+        </p>
+        <ul
+          v-if="model.focusTips?.length"
+          class="mt-3 list-disc space-y-1.5 pl-5 text-sm leading-6 text-slate-700"
+        >
+          <li v-for="(tip, index) in model.focusTips" :key="`${index}-${tip}`">
+            {{ tip }}
+          </li>
+        </ul>
+      </article>
+    </section>
 
     <div v-if="model.mode === 'guided-input'" class="mt-6 space-y-5">
       <label class="block">
@@ -30,7 +60,7 @@
       </label>
 
       <div v-if="model.chips.length" class="space-y-3">
-        <p class="text-sm font-semibold text-slate-950">这样开始最轻松</p>
+        <p class="text-sm font-semibold text-slate-950">这样开头</p>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="chip in model.chips"
@@ -47,14 +77,19 @@
       </div>
 
       <div class="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-        <p class="text-sm font-semibold text-slate-950">写到什么程度就可以继续</p>
+        <p class="text-sm font-semibold text-slate-950">写到这里就能继续</p>
         <p class="mt-2 text-sm leading-6 text-slate-700">
-          {{ model.passHint || '先把最小理解写出来，系统会根据这句带你进入下一步。' }}
+          {{ model.passHint || '先把当前知识点的最小判断写出来，写到能看出你的理解就够了。' }}
         </p>
       </div>
 
       <div class="flex flex-wrap items-center gap-4">
-        <PrimaryButton data-testid="execution-primary-action" :loading="loading" :disabled="disabled || !canSubmit" @click="$emit('submit')">
+        <PrimaryButton
+          data-testid="execution-primary-action"
+          :loading="loading"
+          :disabled="disabled || !canSubmit"
+          @click="$emit('submit')"
+        >
           {{ model.primaryActionLabel }}
         </PrimaryButton>
         <p v-if="model.helperText" class="text-sm text-slate-500">{{ model.helperText }}</p>
@@ -63,13 +98,13 @@
 
     <div v-else class="mt-6 space-y-5">
       <label class="block">
-        <span class="text-sm font-semibold text-slate-950">一句话总结你这一步真正学会了什么</span>
+        <span class="text-sm font-semibold text-slate-950">一句话收住这个知识点</span>
         <textarea
           data-testid="execution-closure-summary"
           :value="closureSummary"
           rows="4"
           class="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-5 py-4 text-sm leading-7 text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-          placeholder="例如：我已经能说清这个机制为什么成立，以及它最容易错在哪里。"
+          placeholder="例如：我已经能说清这个知识点为什么要这样做。"
           @input="$emit('update:closureSummary', ($event.target as HTMLTextAreaElement).value)"
         />
       </label>
@@ -82,7 +117,7 @@
             :value="closurePoint1"
             type="text"
             class="mt-3 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-            placeholder="这一步最关键的判断"
+            placeholder="这一点最关键的判断"
             @input="$emit('update:closurePoint1', ($event.target as HTMLInputElement).value)"
           />
         </label>
@@ -93,26 +128,26 @@
             :value="closurePoint2"
             type="text"
             class="mt-3 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-            placeholder="最容易混淆或最该记住的地方"
+            placeholder="最容易漏掉但最该记住的地方"
             @input="$emit('update:closurePoint2', ($event.target as HTMLInputElement).value)"
           />
         </label>
       </div>
 
       <label class="block">
-        <span class="text-sm font-semibold text-slate-950">下一步你准备怎么继续</span>
+        <span class="text-sm font-semibold text-slate-950">下一个知识点你想怎么接</span>
         <input
           data-testid="execution-closure-next"
           :value="closureNext"
           type="text"
           class="mt-3 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-          placeholder="例如：换一个相近例子，再独立走一遍。"
+          placeholder="例如：换一个相近例子，再独立做一遍。"
           @input="$emit('update:closureNext', ($event.target as HTMLInputElement).value)"
         />
       </label>
 
       <details class="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-        <summary class="cursor-pointer text-sm font-medium text-slate-900">更多完成信息</summary>
+        <summary class="cursor-pointer text-sm font-medium text-slate-900">需要时再补充</summary>
         <div class="mt-4 space-y-4 border-t border-slate-200 pt-4">
           <label class="block">
             <span class="text-sm font-semibold text-slate-950">完成状态</span>
@@ -127,12 +162,12 @@
             </select>
           </label>
           <label class="block">
-            <span class="text-sm font-semibold text-slate-950">补充反思</span>
+            <span class="text-sm font-semibold text-slate-950">补充记录</span>
             <textarea
               :value="learnerReflection"
               rows="3"
               class="mt-3 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-              placeholder="记录这一步里最有帮助的做法。"
+              placeholder="记下这一步里最有帮助的做法。"
               @input="$emit('update:learnerReflection', ($event.target as HTMLTextAreaElement).value)"
             />
           </label>

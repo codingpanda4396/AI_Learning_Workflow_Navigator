@@ -2,15 +2,13 @@
   <section class="space-y-4">
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
-          Learning Protocol
-        </p>
+        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-primary">4 Steps</p>
         <h2 class="mt-2 text-xl font-semibold text-text-primary">
-          本轮 AI 会这样带你学
+          这一轮会分 4 步走
         </h2>
       </div>
       <p class="max-w-2xl text-sm leading-6 text-text-secondary">
-        这四段不是换名字，而是换教学策略。系统会根据阶段切换提问方式、纠偏力度和通过标准。
+        先知道顺序就够了，不用现在把全部内容都看完。
       </p>
     </div>
 
@@ -53,23 +51,23 @@ const props = defineProps<{
 const items: { code: PlanStageCode; title: string; strategy: string }[] = [
   {
     code: 'STRUCTURE',
-    title: '先搭结构',
-    strategy: '先让你说出整体图景，再补关键节点，让你先看到这块知识在全局里的位置。',
+    title: '先搭起来',
+    strategy: '先把这块内容放进整体框架里。',
   },
   {
     code: 'UNDERSTANDING',
-    title: '再问为什么',
-    strategy: '先追问机制和因果，再澄清关键概念，不会一上来就把定义整段讲完。',
+    title: '再讲明白',
+    strategy: '先把为什么会这样讲清楚。',
   },
   {
     code: 'TRAINING',
-    title: '再做最小练习',
-    strategy: '先让你自己判断，再按错误类型给最小提示，帮助你把理解变成动作。',
+    title: '再动手练',
+    strategy: '先做一小题或一小步，把理解变成动作。',
   },
   {
     code: 'REFLECTION',
-    title: '最后收束漏洞',
-    strategy: '先让你自己总结哪里还不稳，再给修正建议，明确下一轮从哪里继续。',
+    title: '最后检查',
+    strategy: '最后看哪里已经站稳，哪里还要再补。',
   },
 ]
 

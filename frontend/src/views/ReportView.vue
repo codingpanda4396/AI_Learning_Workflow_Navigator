@@ -1,17 +1,17 @@
-<template>
+﻿<template>
   <PageContainer>
     <AppTopBar current="report" />
     <main class="mx-auto max-w-3xl px-6 py-8">
       <div class="mb-8">
         <h1 class="text-2xl font-bold text-text-primary md:text-3xl">
-          学习报告
+          {{ REPORT_COPY.title }}
         </h1>
         <p class="mt-2 text-text-secondary">
-          本轮学习总结与下一步建议
+          {{ REPORT_COPY.subtitle }}
         </p>
       </div>
 
-      <LoadingState v-if="loading && !report" message="生成报告中..." />
+      <LoadingState v-if="loading && !report" :message="REPORT_COPY.loading" />
       <ErrorState v-else-if="error" :message="error">
         <template #action>
           <SecondaryButton @click="fetchReport">重试</SecondaryButton>
@@ -20,7 +20,7 @@
 
       <div v-else-if="report" class="space-y-6">
         <FormCard>
-          <SectionHeader>本轮结果</SectionHeader>
+          <SectionHeader>{{ REPORT_COPY.result }}</SectionHeader>
           <StatusBadge
             :label="resultStatusLabels[report.resultStatus] ?? report.resultStatus"
             :variant="report.resultStatus === 'ACHIEVED' ? 'success' : report.resultStatus === 'NOT_ACHIEVED' ? 'error' : 'warning'"
@@ -190,6 +190,7 @@ import {
 } from '@/types/labels'
 import type { NextActionTypeType } from '@/types/enums'
 import type { LearningReport, NextActionDecision } from '@/types/dto'
+import { REPORT_COPY } from '@/constants/uiCopy'
 
 const router = useRouter()
 const store = useWorkflowStore()
@@ -252,3 +253,5 @@ onMounted(() => {
   if (!report.value) fetchReport()
 })
 </script>
+
+

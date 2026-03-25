@@ -1,7 +1,7 @@
 <template>
   <router-view />
-  <!-- 执行页导师入口挂在 App 根级，避免 router-view 子树层叠/裁剪导致悬浮钮不可见 -->
-  <template v-if="isExecutionRoute">
+  <!-- 任务执行页已内嵌导师对话，不再挂全局浮层；其它路由保持原开关 -->
+  <template v-if="showAiTutorChrome">
     <AiTutorFloating />
     <AiTutorPanel />
   </template>
@@ -26,7 +26,10 @@ import AiTutorPanel from '@/components/ai-tutor/AiTutorPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
-const isExecutionRoute = computed(() => route.name === 'execution')
+const showAiTutorChrome = computed(() => {
+  if (route.name === 'task' || route.name === 'taskRun') return false
+  return route.name === 'execution'
+})
 useAuthStore().ensureReady()
 </script>
 

@@ -1,235 +1,163 @@
-<template>
+﻿<template>
   <PageContainer>
-    <TransitionOverlay v-if="transitionOverlay" message="正在进入诊断与规划..." />
+    <TransitionOverlay v-if="transitionOverlay" message="正在进入下一步..." />
     <AppTopBar current="goal" />
-    <main class="relative overflow-hidden">
+
+    <main class="relative overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_28%,#f8fafc_100%)]">
       <div
-        class="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(15,23,42,0.12),transparent)]"
+        class="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_70%_55%_at_50%_0%,rgba(15,23,42,0.08),transparent)]"
       />
 
-      <div class="relative mx-auto w-full max-w-4xl px-5 py-10 md:px-8 md:py-14">
-        <header class="space-y-6">
-          <div class="grid gap-4 xl:grid-cols-[1.05fr_0.95fr_0.7fr]">
-            <section
-              class="rounded-[32px] border border-slate-200/90 bg-[linear-gradient(145deg,#ffffff_0%,#f8fafc_46%,#eef2ff_100%)] px-6 py-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
-            >
-              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Guided Start</p>
-              <h1 class="mt-3 text-3xl font-semibold tracking-tight text-text-primary md:text-4xl">
-                这不是聊天入口，而是一轮被搭好的学习起点
-              </h1>
-              <p class="mt-4 max-w-xl text-sm leading-7 text-text-secondary md:text-[15px]">
-                很多学生会直接问答案，但真正难的是把问题拆小、讲清理解、再逐步校准。
-              </p>
-              <p class="mt-3 max-w-xl text-sm leading-7 text-slate-700">
-                系统会先把这套过程搭出来，你只需要沿着脚手架推进这一轮学习。
-              </p>
+      <div class="relative mx-auto flex w-full max-w-5xl flex-col gap-10 px-5 py-8 pb-40 md:px-8 md:py-12 md:pb-44">
+        <header class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+          <section
+            class="rounded-[32px] bg-white/70 px-2 py-3 md:px-3"
+          >
+            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-950 md:text-[42px] md:leading-[1.1]">
+              {{ GOAL_COPY.title }}
+            </h1>
+            <p class="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+              {{ GOAL_COPY.subtitle }}
+            </p>
+          </section>
 
-              <div class="mt-6 rounded-[24px] border border-white/70 bg-white/85 p-5 shadow-sm">
-                <p class="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">本轮入口</p>
-                <p class="mt-2 text-lg font-semibold text-text-primary">
-                  {{ selectedTopic.label }}
-                  <span class="px-2 text-slate-300">/</span>
-                  {{ selectedQuickStart?.label ?? '请选择起手方式' }}
-                </p>
-                <p v-if="selectedTopic.availability === 'live'" class="mt-3 text-sm leading-6 text-text-secondary">
-                  {{ topicOneLiner }}
-                </p>
-                <p v-else class="mt-3 text-sm text-slate-400">该知识点将在后续扩展中开放，请先选择已点亮主题。</p>
-                <div class="mt-5 flex flex-wrap items-center gap-3">
-                  <div
-                    v-if="recommendedForTopic && selectedTopic.availability === 'live'"
-                    class="rounded-2xl bg-slate-50 px-4 py-2 text-xs text-slate-500"
-                  >
-                    推荐起手：<span class="font-medium text-slate-700">{{ recommendedForTopic.label }}</span>
-                  </div>
-                  <PrimaryButton
-                    class="justify-center px-5 py-3 text-sm font-semibold shadow-[0_12px_24px_rgba(15,23,42,0.15)]"
-                    :loading="loading"
-                    :disabled="ctaDisabled"
-                    @click="onSubmit"
-                  >
-                    {{ ctaLabel }}
-                  </PrimaryButton>
-                </div>
-              </div>
-            </section>
+          <aside class="rounded-[24px] border border-slate-200/70 bg-white/82 p-5 shadow-[0_16px_36px_rgba(15,23,42,0.05)]">
+            <p class="text-sm font-medium text-slate-500">继续上次学习</p>
 
-            <section class="rounded-[32px] border border-slate-200/90 bg-white/90 px-6 py-6 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Quick Start</p>
-                  <h2 class="mt-2 text-xl font-semibold text-text-primary">系统会怎么带你走</h2>
-                </div>
-                <p class="text-xs text-slate-400">4 个阶段 / 1 条主线</p>
-              </div>
-              <div class="mt-5 grid gap-3 sm:grid-cols-2">
-                <article
-                  v-for="stage in stageCards"
-                  :key="stage.code"
-                  class="rounded-[22px] border p-4"
-                  :class="stageCardClass(stage.code)"
-                >
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    {{ stage.title }}
-                  </p>
-                  <p class="mt-2 text-sm font-semibold text-text-primary">{{ stage.label }}</p>
-                  <p class="mt-2 text-sm leading-6 text-text-secondary">{{ stage.learnerFriendlyCopy.launch }}</p>
-                </article>
-              </div>
-            </section>
+            <template v-if="auth.isAuthenticated && auth.recentLearningEntry?.sessionId">
+              <p class="mt-3 text-base font-semibold text-slate-950">{{ continueLabel }}</p>
+              <SecondaryButton class="mt-5 w-full justify-center" @click="continueLatest">
+                继续学习
+              </SecondaryButton>
+            </template>
 
-            <aside
-              class="rounded-[32px] border border-slate-200/90 bg-slate-950 px-5 py-5 text-white shadow-[0_18px_48px_rgba(15,23,42,0.18)]"
-            >
-              <template v-if="auth.isAuthenticated && auth.user">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">当前账号</p>
-                <p class="mt-3 text-xl font-semibold">{{ auth.user.displayName }}</p>
-                <p class="mt-2 text-sm leading-6 text-slate-300">
-                  这一轮的目标、诊断、规划与执行证据都会绑定到当前账号。
-                </p>
+            <template v-else-if="auth.isAuthenticated">
+              <p class="mt-3 text-base font-semibold text-slate-950">还没有上次进度</p>
+              <p class="mt-2 text-sm leading-6 text-slate-600">这次开始后，这里会保留你的最近一轮学习。</p>
+            </template>
 
-                <button
-                  v-if="auth.recentLearningEntry?.sessionId"
-                  type="button"
-                  class="mt-5 w-full rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-left transition hover:bg-white/12"
-                  @click="continueLatest"
-                >
-                  <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Continue</p>
-                  <p class="mt-2 text-sm font-medium text-white">继续上次学习</p>
-                  <p class="mt-1 text-xs text-slate-400">{{ continueLabel }}</p>
-                </button>
-              </template>
-
-              <template v-else>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">登录后可用</p>
-                <p class="mt-3 text-xl font-semibold">保存这一轮学习链路</p>
-                <p class="mt-2 text-sm leading-6 text-slate-300">
-                  登录后开始，系统才会把你的规划、执行过程和报告沉淀下来。
-                </p>
-                <router-link
-                  to="/auth/login"
-                  class="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-                >
-                  登录开始
-                </router-link>
-              </template>
-            </aside>
-          </div>
+            <template v-else>
+              <p class="mt-3 text-base font-semibold text-slate-950">登录后可继续上次学习</p>
+              <p class="mt-2 text-sm leading-6 text-slate-600">学习记录会自动保留在账号里。</p>
+              <SecondaryButton class="mt-5 w-full justify-center" @click="goToLogin">
+                登录
+              </SecondaryButton>
+            </template>
+          </aside>
         </header>
 
-        <section class="mt-8 grid gap-3 md:grid-cols-3">
-          <article
-            v-for="item in misuseComparisons"
-            :key="item.wrong"
-            class="rounded-[24px] border border-slate-200/80 bg-white/90 px-5 py-5 shadow-sm"
-          >
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">常见情况</p>
-            <p class="mt-2 text-sm font-semibold text-slate-500">{{ item.wrong }}</p>
-            <p class="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">这里会换成</p>
-            <p class="mt-2 text-sm leading-6 text-text-primary">{{ item.better }}</p>
-          </article>
-        </section>
-
-        <section class="mt-12 space-y-4">
-          <div class="flex items-baseline justify-between gap-3">
-            <h2 class="text-base font-semibold text-text-primary">知识点</h2>
-            <p class="text-xs text-slate-400">408 个学科入口持续扩展中</p>
+        <section class="space-y-4">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-semibold text-slate-950">学科</h2>
+            </div>
+            <p class="hidden text-sm text-slate-400 md:block">408 四个核心学科</p>
           </div>
-          <p class="text-xs text-slate-400">亮色主题可直接开始；灰色主题代表后续将接入更大的学科覆盖。</p>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <article
+          <div class="grid gap-4 md:grid-cols-2">
+            <button
               v-for="subject in HOME_SUBJECTS"
               :key="subject.key"
-              class="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div class="flex items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <h3 class="text-[15px] font-semibold text-text-primary">{{ subject.label }}</h3>
-                  <p class="mt-0.5 text-xs text-slate-500">{{ subject.caption }}</p>
-                </div>
-              </div>
-              <div class="mt-3 flex flex-wrap gap-2">
-                <button
-                  v-for="topicKey in subject.topicKeys"
-                  :key="topicKey"
-                  type="button"
-                  class="rounded-full border px-3 py-1.5 text-xs font-medium transition-all"
-                  :class="chipClass(topicKey)"
-                  @click="selectTopic(topicKey)"
-                >
-                  {{ getHomeTopic(topicKey).label }}
-                </button>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section class="mt-12 space-y-4">
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 class="text-base font-semibold text-text-primary">起手方式</h2>
-            <p
-              v-if="selectedTopic.availability === 'live' && recommendedForTopic"
-              class="text-xs text-slate-400"
-            >
-              推荐：{{ recommendedForTopic.label }}
-            </p>
-          </div>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            <button
-              v-for="item in HOME_QUICK_STARTS"
-              :key="item.key"
               type="button"
-              class="rounded-2xl border p-4 text-left transition-all"
-              :class="
-                selectedQuickStartKey === item.key
-                  ? 'border-slate-950 bg-slate-950 text-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]'
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
-              "
-              @click="selectedQuickStartKey = item.key"
+              class="group rounded-[28px] border p-5 text-left transition-all duration-200"
+              :class="subjectCardClass(subject.key)"
+              @click="selectSubject(subject.key)"
             >
-              <div class="flex items-start justify-between gap-2">
+              <div class="flex items-start justify-between gap-4">
                 <div>
-                  <p
-                    class="text-[15px] font-semibold"
-                    :class="selectedQuickStartKey === item.key ? 'text-white' : 'text-text-primary'"
+                  <h3
+                    class="text-xl font-semibold"
+                    :class="selectedSubjectKey === subject.key ? 'text-white' : 'text-slate-950'"
                   >
-                    {{ item.label }}
-                  </p>
+                    {{ subject.label }}
+                  </h3>
                   <p
-                    class="mt-1 text-xs leading-relaxed"
-                    :class="selectedQuickStartKey === item.key ? 'text-slate-300' : 'text-text-secondary'"
+                    class="mt-3 text-sm leading-6"
+                    :class="selectedSubjectKey === subject.key ? 'text-slate-200' : 'text-slate-600'"
                   >
-                    {{ item.subtitle }}
+                    {{ subject.description }}
                   </p>
                 </div>
                 <span
-                  class="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 transition-colors"
+                  class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold"
                   :class="
-                    selectedQuickStartKey === item.key
-                      ? 'border-white bg-white'
-                      : 'border-slate-300 bg-white'
+                    selectedSubjectKey === subject.key
+                      ? 'border-slate-950 bg-slate-950 text-white'
+                      : 'border-slate-200 bg-white text-slate-400'
                   "
-                />
+                >
+                  {{ subject.topicKeys.length }}
+                </span>
               </div>
+
+              <p
+                class="mt-5 text-sm font-medium"
+                :class="selectedSubjectKey === subject.key ? 'text-slate-300' : 'text-slate-500'"
+              >
+                代表知识点
+              </p>
+              <p
+                class="mt-2 text-sm"
+                :class="selectedSubjectKey === subject.key ? 'text-white' : 'text-slate-700'"
+              >
+                {{ subject.cardHint }}
+              </p>
             </button>
           </div>
         </section>
 
-        <div class="mt-12 space-y-4 border-t border-slate-100 pt-10">
+        <section class="space-y-4">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 class="text-xl font-semibold text-slate-950">知识点</h2>
+            </div>
+            <div class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">
+              当前学科：{{ selectedSubject.label }}
+            </div>
+          </div>
+
+          <div class="rounded-[28px] bg-white/72 p-1">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <button
+                v-for="topic in selectedSubjectTopics"
+                :key="topic.key"
+                type="button"
+                class="rounded-[24px] border p-4 text-left transition-all duration-200"
+                :class="topicCardClass(topic.key)"
+                @click="selectTopic(topic.key)"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-base font-semibold">{{ topic.label }}</p>
+                  <span
+                    class="h-3.5 w-3.5 shrink-0 rounded-full transition-colors"
+                    :class="selectedTopicKey === topic.key ? 'bg-white/90 ring-4 ring-white/20' : 'bg-slate-200'"
+                  />
+                </div>
+                <p class="mt-3 text-sm leading-6" :class="selectedTopicKey === topic.key ? 'text-slate-200' : 'text-slate-600'">
+                  {{ topic.description }}
+                </p>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/80 bg-white/95 backdrop-blur">
+        <div class="mx-auto flex w-full max-w-5xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-slate-500">当前选择</p>
+            <p class="mt-1 truncate text-base font-semibold text-slate-950">{{ selectionSummary }}</p>
+            <p class="mt-1 text-sm text-slate-500">系统将自动为你安排本轮起点</p>
+          </div>
+
           <PrimaryButton
-            class="w-full justify-center py-3.5 text-base font-semibold shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
+            class="w-full justify-center px-6 py-3 text-base font-semibold shadow-[0_14px_28px_rgba(15,23,42,0.14)] md:w-auto"
             :loading="loading"
             :disabled="ctaDisabled"
             @click="onSubmit"
           >
             {{ ctaLabel }}
           </PrimaryButton>
-          <p class="text-center text-xs text-slate-400">选好之后点此开始，将进入诊断与规划。</p>
-          <p class="text-center text-[11px] text-slate-300">
-            {{ HOME_TOPIC_SLOT_COUNT }} 个展示位 / {{ HOME_LIVE_TOPIC_COUNT }} 个可学 / 408+ 可扩展
-          </p>
         </div>
       </div>
     </main>
@@ -242,26 +170,28 @@ import { useRouter } from 'vue-router'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PrimaryButton from '@/components/ui/PrimaryButton.vue'
+import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import TransitionOverlay from '@/components/ui/TransitionOverlay.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkflowStore } from '@/stores/workflow'
 import { createGoal } from '@/api/goals'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
+import { GOAL_COPY } from '@/constants/uiCopy'
 import {
   buildHomeGoalRequest,
+  getHomeSubject,
+  getHomeSubjectByTopic,
   getHomeTopic,
+  getHomeTopicsBySubject,
+  HOME_DEFAULT_SUBJECT_KEY,
   HOME_DEFAULT_TOPIC_KEY,
-  HOME_LIVE_TOPIC_COUNT,
-  HOME_QUICK_STARTS,
   HOME_SUBJECTS,
-  HOME_TOPIC_SLOT_COUNT,
 } from '@/constants/homeQuickStart'
-import { HOME_MISUSE_COMPARISONS, stageList } from '@/constants/guidanceConfig'
 
 const STORAGE_KEYS = {
+  subject: 'goal_selected_subject',
   topic: 'goal_selected_topic',
-  quickStart: 'goal_selected_quickstart',
 } as const
 
 function getStored(key: string) {
@@ -284,50 +214,27 @@ const router = useRouter()
 const auth = useAuthStore()
 const store = useWorkflowStore()
 
-const fallbackTopic = HOME_DEFAULT_TOPIC_KEY
-const initialTopicKey = getStored(STORAGE_KEYS.topic) ?? fallbackTopic
-const initialTopic = getHomeTopic(initialTopicKey)
+const initialTopicKey = getStored(STORAGE_KEYS.topic) ?? HOME_DEFAULT_TOPIC_KEY
+const initialSubjectKey =
+  getStored(STORAGE_KEYS.subject) ?? getHomeSubjectByTopic(initialTopicKey)?.key ?? HOME_DEFAULT_SUBJECT_KEY
+
+const selectedSubjectKey = ref(initialSubjectKey)
 const selectedTopicKey = ref(initialTopicKey)
-const selectedQuickStartKey = ref<(typeof HOME_QUICK_STARTS)[number]['key']>(
-  (getStored(STORAGE_KEYS.quickStart) as (typeof HOME_QUICK_STARTS)[number]['key'] | null) ??
-    initialTopic.recommendedIntent ??
-    'structure'
-)
 const transitionOverlay = ref(false)
 const loading = ref(false)
 
+const selectedSubject = computed(() => getHomeSubject(selectedSubjectKey.value))
+const selectedSubjectTopics = computed(() => getHomeTopicsBySubject(selectedSubjectKey.value))
 const selectedTopic = computed(() => getHomeTopic(selectedTopicKey.value))
-const selectedQuickStart = computed(() =>
-  HOME_QUICK_STARTS.find((item) => item.key === selectedQuickStartKey.value) ?? null
-)
-
-const recommendedForTopic = computed(() => {
-  const ri = selectedTopic.value.recommendedIntent
-  if (!ri) return null
-  return HOME_QUICK_STARTS.find((x) => x.key === ri) ?? null
-})
-
-const topicOneLiner = computed(() => {
-  const topic = selectedTopic.value
-  return topic.availability === 'live' ? topic.previewBody : ''
-})
-const stageCards = stageList()
-const misuseComparisons = HOME_MISUSE_COMPARISONS
-
+const autoStartIntent = computed(() => selectedTopic.value.recommendedIntent ?? 'structure')
 const continueLabel = computed(() => {
   const entry = auth.recentLearningEntry
   if (!entry?.sessionId) return ''
-  return entry.sessionStatus === 'COMPLETED' ? '回到这轮报告页，查看结果与下一步建议。' : '回到最近一轮执行进度，继续任务脚手架。'
+  return entry.sessionStatus === 'COMPLETED' ? '继续上次：回到这轮学习结果' : '继续上次：回到刚才的学习进度'
 })
-
-const ctaDisabled = computed(
-  () => selectedTopic.value.availability !== 'live' || !selectedQuickStart.value
-)
-
-const ctaLabel = computed(() => {
-  if (selectedTopic.value.availability !== 'live') return '该知识点尚未开放'
-  return auth.isAuthenticated ? '开始这一轮学习' : '登录后开始这一轮'
-})
+const selectionSummary = computed(() => `${selectedSubject.value.label} / ${selectedTopic.value.label}`)
+const ctaDisabled = computed(() => false)
+const ctaLabel = computed(() => (auth.isAuthenticated ? '开始学习' : '登录后开始'))
 
 onMounted(async () => {
   if (!auth.isAuthenticated) return
@@ -338,51 +245,43 @@ onMounted(async () => {
   }
 })
 
+watch(selectedSubjectKey, (value) => {
+  setStored(STORAGE_KEYS.subject, value)
+  const nextTopics = getHomeSubject(value).topicKeys
+  if (!nextTopics.includes(selectedTopicKey.value)) {
+    selectedTopicKey.value = nextTopics[0]
+  }
+})
+
 watch(selectedTopicKey, (value) => {
   setStored(STORAGE_KEYS.topic, value)
-  const topic = getHomeTopic(value)
-  if (topic.availability === 'live' && topic.recommendedIntent) {
-    selectedQuickStartKey.value = topic.recommendedIntent
+
+  const subject = getHomeSubjectByTopic(value)
+  if (subject && subject.key !== selectedSubjectKey.value) {
+    selectedSubjectKey.value = subject.key
   }
 })
 
-watch(selectedQuickStartKey, (value) => {
-  setStored(STORAGE_KEYS.quickStart, value)
-})
-
-function chipClass(topicKey: string) {
-  const topic = getHomeTopic(topicKey)
-  const isSelected = selectedTopicKey.value === topicKey
-
-  if (topic.availability === 'live') {
-    if (isSelected) {
-      return 'border-slate-950 bg-slate-950 text-white shadow-sm'
-    }
-    return 'border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300'
-  }
-
-  if (isSelected) {
-    return 'border-slate-300 bg-slate-100 text-slate-500'
-  }
-
-  return 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+function selectSubject(subjectKey: string) {
+  selectedSubjectKey.value = subjectKey
 }
 
 function selectTopic(topicKey: string) {
   selectedTopicKey.value = topicKey
 }
 
-function stageCardClass(code: string) {
-  if (code === 'STRUCTURE') {
-    return 'border-sky-200/80 bg-[linear-gradient(145deg,#ffffff_0%,#f0f9ff_100%)]'
+function subjectCardClass(subjectKey: string) {
+  if (selectedSubjectKey.value === subjectKey) {
+    return 'border-slate-900 bg-slate-900 text-white shadow-[0_24px_50px_rgba(15,23,42,0.14)]'
   }
-  if (code === 'UNDERSTANDING') {
-    return 'border-indigo-200/80 bg-[linear-gradient(145deg,#ffffff_0%,#eef2ff_100%)]'
+  return 'border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]'
+}
+
+function topicCardClass(topicKey: string) {
+  if (selectedTopicKey.value === topicKey) {
+    return 'border-slate-950 bg-slate-950 text-white shadow-[0_18px_36px_rgba(15,23,42,0.14)]'
   }
-  if (code === 'TRAINING') {
-    return 'border-emerald-200/80 bg-[linear-gradient(145deg,#ffffff_0%,#ecfdf5_100%)]'
-  }
-  return 'border-amber-200/80 bg-[linear-gradient(145deg,#ffffff_0%,#fffbeb_100%)]'
+  return 'border-slate-200 bg-white text-slate-950 hover:border-slate-300 hover:bg-slate-50'
 }
 
 function delay(ms: number) {
@@ -391,9 +290,15 @@ function delay(ms: number) {
   })
 }
 
+async function goToLogin() {
+  auth.setPendingRedirect('/goal')
+  await router.push('/auth/login')
+}
+
 async function continueLatest() {
   const entry = auth.recentLearningEntry
   if (!entry?.sessionId) return
+
   store.goalId = entry.goalId ?? null
   store.diagnosisId = entry.diagnosisId ?? null
   store.planId = entry.planId ?? null
@@ -414,18 +319,9 @@ async function continueLatest() {
 }
 
 async function onSubmit() {
-  if (ctaDisabled.value || !selectedQuickStart.value) {
-    if (selectedTopic.value.availability !== 'live') {
-      showToast('请先选择已点亮的知识点')
-      return
-    }
-    showToast('请选择起手方式')
-    return
-  }
-
   if (!auth.isAuthenticated) {
     auth.setPendingRedirect('/goal')
-    showToast('登录后即可开始这一轮学习')
+    showToast('登录后就能开始这一轮')
     await router.push('/auth/login')
     return
   }
@@ -435,7 +331,7 @@ async function onSubmit() {
   const started = Date.now()
 
   try {
-    const payload = buildHomeGoalRequest(selectedTopicKey.value, selectedQuickStart.value.key)
+    const payload = buildHomeGoalRequest(selectedTopicKey.value, autoStartIntent.value)
     const data = await createGoal(payload)
     store.goalId = data.goalId
     store.structuredGoal = data.structuredGoal
@@ -455,3 +351,4 @@ async function onSubmit() {
   }
 }
 </script>
+
