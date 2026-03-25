@@ -20,6 +20,13 @@ import java.util.List;
 public class TaskScaffoldResponse {
     private String taskId;
     private String taskType;
+    private String knowledgeKey;
+    private String packId;
+    private String knowledgeType;
+    private String scaffoldType;
+    private List<String> starterPrompts;
+    private String checkpointMode;
+    private String visualHintType;
     /** 任务级认知意图（可选） */
     private String taskLevelLearningIntent;
     private String learningObjective;

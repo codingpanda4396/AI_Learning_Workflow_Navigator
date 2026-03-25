@@ -190,6 +190,12 @@ export interface PlanPreviewData {
   status: string
   previewOnly: boolean
   committed: boolean
+  knowledgeKey?: string
+  packId?: string
+  knowledgeType?: 'COMPARE' | 'SEQUENCE' | 'CHOICE' | 'MECHANISM'
+  displayMode?: string
+  phaseHighlights?: string[]
+  commonMisconceptions?: string[]
   goal?: string
   recommendedEntry: RecommendedEntry
   recommendedStrategy: RecommendedStrategy
@@ -301,6 +307,13 @@ export interface CognitiveUnitItem {
 export interface TaskScaffoldResponse {
   taskId: string
   taskType: string
+  knowledgeKey?: string
+  packId?: string
+  knowledgeType?: 'COMPARE' | 'SEQUENCE' | 'CHOICE' | 'MECHANISM'
+  scaffoldType?: string
+  starterPrompts?: string[]
+  checkpointMode?: string
+  visualHintType?: string
   /** 任务级认知意图（与 learningObjective 同源时可并存） */
   taskLevelLearningIntent?: string
   learningObjective: string

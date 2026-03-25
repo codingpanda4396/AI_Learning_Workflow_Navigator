@@ -20,6 +20,12 @@ public class PlanPreviewData {
     private String status;
     private boolean previewOnly;
     private boolean committed;
+    private String knowledgeKey;
+    private String packId;
+    private String knowledgeType;
+    private String displayMode;
+    private List<String> phaseHighlights;
+    private List<String> commonMisconceptions;
     private String goal;
     private RecommendedEntry recommendedEntry;
     private RecommendedStrategy recommendedStrategy;
