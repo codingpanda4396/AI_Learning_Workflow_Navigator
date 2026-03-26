@@ -35,4 +35,6 @@ public class TaskScaffold {
     private Integer suggestedExploreTurns;
     private Integer suggestedCheckpointCount;
     private LocalDateTime createdAt;
+    /** 学习脚手架引擎（动作卡、校验状态）；可选，向后兼容。 */
+    private LearningScaffoldEngineState learningScaffoldEngineState;
 }

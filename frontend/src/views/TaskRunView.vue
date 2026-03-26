@@ -14,51 +14,78 @@
         </template>
       </EmptyState>
 
-      <section v-else-if="task" class="space-y-5 pb-28">
-        <StageProgressHeader
+      <section v-else-if="task" class="space-y-4 pb-28">
+        <ExecutionHeader
           :topic-name="workbenchTopicName"
           :phase-progress="pageModel.workbench.phaseProgress"
           :task-status-label="pageModel.workbench.taskStatusLabel"
-          :strategy-line="pageModel.header.strategyLine"
         />
 
-        <section class="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
+        <section class="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
           <div
-            class="space-y-6 lg:col-span-8"
+            class="space-y-5 lg:col-span-8"
             :data-phase="pageModel.workbench.emphasisPhase"
           >
-            <CurrentTaskCard
+            <PrimaryTaskCard
               :model="pageModel.workbench.currentTask"
               :emphasis-phase="pageModel.workbench.emphasisPhase"
             />
 
-            <template v-if="useDrivingSeatLayout">
-              <ScaffoldActionCard
+            <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
+
+            <template v-if="useStructureEngineUi">
+              <div
+                v-if="scaffoldEngine.loading"
+                class="rounded-2xl border border-slate-200 bg-white/80 p-8 text-center text-sm text-slate-600"
+              >
+                正在加载 {{ scaffoldStageLabel(scaffoldEngine.stage?.stageKey) }}…
+              </div>
+              <div
+                v-else-if="scaffoldEngine.error"
+                class="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-800"
+              >
+                {{ scaffoldEngine.error }}
+              </div>
+              <LearningActionCardPanel
+                v-else-if="scaffoldEngine.stage"
+                :stage-key="scaffoldEngine.stage.stageKey"
+                :phase-label="scaffoldStageLabel(scaffoldEngine.stage.stageKey)"
+                :stage-title="scaffoldEngine.stage.stageTitle"
+                :stage-goal="scaffoldEngine.stage.stageGoal"
+                :stage-description="scaffoldEngine.stage.stageDescription"
+                :card="scaffoldEngine.currentCard"
+                v-model:draft-value="structureEngineDraft"
+                :loading="scaffoldEngine.loading"
+                :submitting="scaffoldEngine.submitting"
+                :last-result="scaffoldEngine.lastResult"
+                :input-label="scaffoldEngine.currentCard?.userOutputLabel || '我的回答'"
+                @submit="onStructureSubmit"
+              />
+            </template>
+
+            <template v-else-if="useDrivingSeatLayout">
+              <ScaffoldGuideCard
                 :product="pageModel.workbench.scaffoldProduct"
                 :cards="pageModel.scaffoldCards"
                 :phase-prompt-chips="pageModel.tutorConsole.phasePromptChips"
+                :topic-observation-bullets="pageModel.workbench.topicHints.bullets"
                 :sending="mainActionLoading"
                 @send-card="onSendScaffoldCard"
                 @prefill-card="onPrefillScaffoldCard"
                 @prefill-chip="onPrefillPhaseChip"
               />
 
-              <UserExpressionPanel
+              <ExpressionWorkspace
                 :chat-turns="chatTurns"
                 :draft-value="draftInput"
-                :input-label="pageModel.mainAction.inputLabel || '你想补充的'"
+                :input-label="pageModel.mainAction.inputLabel || '我的表达'"
                 :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
                 :input-placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
-                :primary-action-label="pageModel.mainAction.primaryActionLabel"
                 :sending="mainActionLoading"
-                :can-submit-chat="canSubmitDrivingChat"
                 :show-restate="showRestateSection"
                 :show-advance="showAdvanceSection"
                 :micro-check-labels="microCheckLabels"
                 :checks="microChecks"
-                :can-advance="canAdvanceDriving"
-                :advancing="advancing"
-                advance-label="我已经搭好这个点的框架，进入下一步"
                 :restate-what="restateWhat"
                 :restate-problem="restateProblem"
                 :restate-relate="restateRelate"
@@ -68,8 +95,7 @@
                 @update:restate-what="restateWhat = $event"
                 @update:restate-problem="restateProblem = $event"
                 @update:restate-relate="restateRelate = $event"
-                @submit-chat="handlePrimaryAction"
-                @advance="onAdvanceDrivingSeat"
+                @save-draft="saveDraftExplicit"
                 @stuck="onStuckFromPanel"
               />
             </template>
@@ -98,52 +124,35 @@
               @submit="handlePrimaryAction"
             />
 
-            <FeedbackPanel :model="pageModel.feedback" @action="handleFeedbackAction" />
-
-            <ExecutionHelpCollapse
-              :sections="pageModel.helpSections"
-              :transcript="useDrivingSeatLayout ? [] : transcriptItems"
+            <FeedbackSummary
+              v-if="!useStructureEngineUi"
+              :class="feedbackEmphasisClass"
+              :model="pageModel.feedback"
+              @action="handleFeedbackAction"
             />
           </div>
 
-          <aside class="space-y-4 lg:col-span-4">
-            <WhyThisStepCard :model="pageModel.workbench.whyThisStep" />
-            <StageRuleCard :model="pageModel.workbench.stageRules" />
-            <TopicSpecialHintCard :model="pageModel.workbench.topicHints" />
-            <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
-            <section
-              v-if="pageModel.progressRail.stuckActions.length"
-              class="rounded-2xl border border-amber-100 bg-amber-50/40 p-4"
-            >
-              <p class="text-xs font-semibold uppercase tracking-wide text-amber-900/90">
-                {{ pageModel.progressRail.stuckSectionTitle }}
-              </p>
-              <ul class="mt-3 space-y-2">
-                <li v-for="(action, i) in pageModel.progressRail.stuckActions" :key="i">
-                  <button
-                    type="button"
-                    class="w-full rounded-xl border border-amber-200/90 bg-white px-3 py-2 text-left text-sm text-slate-800 transition hover:border-primary/40 hover:bg-primary/5"
-                    :data-testid="`stuck-action-${i}`"
-                    @click="onStuckAction(action)"
-                  >
-                    {{ action }}
-                  </button>
-                </li>
-              </ul>
-            </section>
+          <aside class="space-y-3 lg:col-span-4">
+            <template v-if="useStructureEngineUi">
+              <StructureStageHints :card="scaffoldEngine.currentCard" />
+              <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
+            </template>
+            <template v-else>
+              <StepReasonCard :model="pageModel.workbench.whyThisStep" />
+              <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
+            </template>
           </aside>
         </section>
 
-        <BottomActionBar
+        <StickyActionBar
           :primary-label="bottomPrimaryLabel"
           :primary-loading="mainActionLoading"
           :primary-disabled="bottomPrimaryDisabled"
-          :show-advance="useDrivingSeatLayout && showAdvanceSection"
+          :show-advance="useDrivingSeatLayout && showAdvanceSection && !useStructureEngineUi"
           :can-advance="canAdvanceDriving"
           :advancing="advancing"
           advance-label="进入下一阶段"
           @save-draft="saveDraftExplicit"
-          @open-tutor="openAiTutorPanel"
           @primary="handlePrimaryAction"
           @advance="onAdvanceDrivingSeat"
         />
@@ -157,18 +166,18 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
-import BottomActionBar from '@/components/task-run/BottomActionBar.vue'
-import CurrentTaskCard from '@/components/task-run/CurrentTaskCard.vue'
-import ExecutionHelpCollapse from '@/components/task-run/ExecutionHelpCollapse.vue'
+import ExecutionHeader from '@/components/task-run/ExecutionHeader.vue'
 import ExecutionMainActionCard from '@/components/task-run/ExecutionMainActionCard.vue'
-import FeedbackPanel from '@/components/task-run/FeedbackPanel.vue'
-import ScaffoldActionCard from '@/components/task-run/ScaffoldActionCard.vue'
-import StageProgressHeader from '@/components/task-run/StageProgressHeader.vue'
+import ExpressionWorkspace from '@/components/task-run/ExpressionWorkspace.vue'
+import FeedbackSummary from '@/components/task-run/FeedbackSummary.vue'
+import PrimaryTaskCard from '@/components/task-run/PrimaryTaskCard.vue'
+import ScaffoldGuideCard from '@/components/task-run/ScaffoldGuideCard.vue'
 import StageProgressMiniCard from '@/components/task-run/StageProgressMiniCard.vue'
-import StageRuleCard from '@/components/task-run/StageRuleCard.vue'
-import TopicSpecialHintCard from '@/components/task-run/TopicSpecialHintCard.vue'
-import UserExpressionPanel from '@/components/task-run/UserExpressionPanel.vue'
-import WhyThisStepCard from '@/components/task-run/WhyThisStepCard.vue'
+import StepReasonCard from '@/components/task-run/StepReasonCard.vue'
+import StickyActionBar from '@/components/task-run/StickyActionBar.vue'
+import LearningActionCardPanel from '@/components/task-run/LearningActionCardPanel.vue'
+import ReflectionSummaryCard from '@/components/task-run/ReflectionSummaryCard.vue'
+import StructureStageHints from '@/components/task-run/StructureStageHints.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
@@ -206,6 +215,8 @@ import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
 import { buildExecutionPageModel, createEmptyWorkbenchModel } from '@/utils/buildExecutionPageModel'
 import { buildTaskGuidedSteps, getCurrentGuidedStepId } from '@/utils/taskGuidedSteps'
 import { useKnowledgePack } from '@/composables/useKnowledgePack'
+import { scaffoldStageLabel, useLearningScaffoldEngine } from '@/composables/useLearningScaffoldEngine'
+import type { ReflectionSummary } from '@/types/scaffoldEngine'
 
 interface ChatTurn {
   role: 'USER' | 'ASSISTANT'
@@ -249,6 +260,40 @@ const completeForm = ref<{
 }>({
   completionStatus: TaskCompletionStatus.COMPLETED,
   learnerReflection: '',
+})
+
+const structureEngineDraft = ref('')
+
+const structureEngineEnabled = computed(
+  () =>
+    !!scaffold.value?.packId &&
+    scaffold.value.packId === 'ds_dfs_bfs' &&
+    taskState.value === 'ORIENT'
+)
+
+const scaffoldEngine = useLearningScaffoldEngine({
+  taskId: () => task.value?.taskId,
+  sessionId: () => store.sessionId ?? null,
+  enabled: () => structureEngineEnabled.value,
+})
+
+const useStructureEngineUi = computed(
+  () => structureEngineEnabled.value && !scaffoldEngine.scaffoldEngineComplete
+)
+
+/** 脚手架完成后从 GET scaffold 恢复；末卡当帧可从 lastResult 兜底 */
+const reflectionSummaryForWorkbench = computed((): ReflectionSummary | null => {
+  const fromApi = scaffold.value?.reflectionSummary
+  if (fromApi?.record) return fromApi
+  const lr = scaffoldEngine.lastResult
+  if (lr?.reflectionRecord && lr.stageComplete) {
+    return {
+      record: lr.reflectionRecord,
+      insight: lr.reflectionInsight,
+      systemObservation: undefined,
+    }
+  }
+  return null
 })
 
 const restateWhat = ref('')
@@ -448,23 +493,23 @@ const workbenchTopicName = computed(() => {
 
 const bottomPrimaryLabel = computed(() => {
   if (pageModel.value.mainAction.mode === 'closure') return '完成本任务'
-  return pageModel.value.mainAction.primaryActionLabel || '提交本轮'
+  if (useDrivingSeatLayout.value) return '提交本轮表达'
+  return pageModel.value.mainAction.primaryActionLabel || '提交本轮表达'
+})
+
+const feedbackEmphasisClass = computed(() => {
+  const ph = pageModel.value.workbench.emphasisPhase
+  if (ph === 'REFLECTION' || ph === 'TRAINING') return 'ring-2 ring-emerald-200/60'
+  return ''
 })
 
 const bottomPrimaryDisabled = computed(() => {
   if (mainActionLoading.value) return true
   if (pageModel.value.mainAction.mode === 'closure') return false
+  if (useStructureEngineUi.value) return !structureEngineDraft.value.trim()
   if (useDrivingSeatLayout.value) return !canSubmitDrivingChat.value
   return !canSubmitMainAction.value
 })
-
-const transcriptItems = computed(() =>
-  chatTurns.value.map((item) => ({
-    role: item.role,
-    speaker: item.role === 'USER' ? '你的回答' : '反馈',
-    content: item.content,
-  }))
-)
 
 const canSubmitDrivingChat = computed(() => {
   const mode = pageModel.value?.mainAction.mode
@@ -473,6 +518,9 @@ const canSubmitDrivingChat = computed(() => {
 })
 
 const mainActionLoading = computed(() => {
+  if (useStructureEngineUi.value) {
+    return !!(scaffoldEngine.loading || scaffoldEngine.submitting)
+  }
   if (useDrivingSeatLayout.value) {
     return (
       sending.value ||
@@ -518,6 +566,7 @@ function resetClosureFields() {
 
 function resetInteractionDraft() {
   draftInput.value = ''
+  structureEngineDraft.value = ''
   latestFeedback.value = null
   restateWhat.value = ''
   restateProblem.value = ''
@@ -552,19 +601,6 @@ function saveDraftExplicit() {
   if (!id) return
   localStorage.setItem(draftStorageKey(id), draftInput.value)
   showToast('草稿已保存')
-}
-
-function openAiTutorPanel() {
-  if (!task.value) return
-  aiTutorStore.setContext({
-    stepId: task.value.taskId,
-    step: guidedStepPosition.value.current,
-    knowledgeKey: knowledgePack.value?.id ?? 'unknown',
-    knowledgeLabel: knowledgePack.value?.tutor.focusLabel ?? task.value.title,
-    phaseCode: pageModel.value.header.phaseCode ?? 'STRUCTURE',
-    phaseLabel: pageModel.value.header.phaseDisplayZh ?? '',
-  })
-  aiTutorStore.openPanel()
 }
 
 function onStuckFromPanel() {
@@ -982,7 +1018,42 @@ async function onComplete() {
   }
 }
 
+async function onStructureSubmit() {
+  const res = await scaffoldEngine.submit(structureEngineDraft.value)
+  if (!res) return
+  if (res.validation.passed) {
+    structureEngineDraft.value = ''
+  }
+  if (res.stageComplete) {
+    if (task.value?.taskId) {
+      await loadScaffold(task.value.taskId)
+    }
+    if (scaffoldEngine.scaffoldEngineComplete) {
+      showToast('脚手架完成，可进入探索对话。')
+      await fetchTask()
+    } else {
+      const sk = res.stageKey ?? scaffoldEngine.stage?.stageKey
+      const hint =
+        sk === 'STRUCTURE'
+          ? '结构建立完成，进入机制理解。'
+          : sk === 'UNDERSTANDING'
+            ? '机制理解完成，进入表达内化。'
+            : sk === 'TRAINING'
+              ? '表达内化完成，进入反思。'
+              : sk === 'REFLECTION'
+                ? '反思收敛完成，可进入探索对话。'
+                : '本阶段完成，进入下一阶段。'
+      showToast(hint)
+    }
+    return
+  }
+}
+
 async function handlePrimaryAction() {
+  if (useStructureEngineUi.value) {
+    await onStructureSubmit()
+    return
+  }
   const mode = pageModel.value?.mainAction.mode
   if (mode === 'closure') {
     await onComplete()

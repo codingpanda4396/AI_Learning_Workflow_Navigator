@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import navigator.api.dto.scaffold.ReflectionSummary;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -49,6 +50,8 @@ public class TaskScaffoldResponse {
      * Sprint 3.1: 最近对话/事件记录（用于刷新恢复 UI）。
      */
     private List<RecentMessageItem> recentMessages;
+    /** Phase 4：脚手架反思沉淀（DFS/BFS 等启用引擎时可选） */
+    private ReflectionSummary reflectionSummary;
 
     @Data
     @Builder

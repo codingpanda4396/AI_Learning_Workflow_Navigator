@@ -12,6 +12,9 @@ import navigator.api.dto.TaskExecutionSummaryData;
 import navigator.api.dto.TaskMessageRequest;
 import navigator.api.dto.TaskMessageResponse;
 import navigator.api.dto.TaskScaffoldResponse;
+import navigator.api.dto.scaffold.ReflectionInsight;
+import navigator.api.dto.scaffold.ReflectionRecord;
+import navigator.api.dto.scaffold.ReflectionSummary;
 import navigator.application.FixedSampleData;
 import navigator.application.guard.EntityLookupGuard;
 import navigator.application.guard.SessionStateGuard;
@@ -26,6 +29,7 @@ import navigator.domain.enums.LearningActionType;
 import navigator.domain.enums.LearningGuidancePhase;
 import navigator.domain.enums.TaskExecutionState;
 import navigator.domain.model.CognitiveUnit;
+import navigator.domain.model.LearningScaffoldEngineState;
 import navigator.domain.model.GuidanceDecision;
 import navigator.domain.model.TaskMessageMetadata;
 import navigator.domain.model.LearningPlanPreview;
@@ -437,7 +441,44 @@ public class TaskExecutionFlowService {
                         .detectedAction(m.getDetectedAction())
                         .createdAt(m.getCreatedAt())
                         .build()).toList())
+                .reflectionSummary(mapReflectionSummary(s))
                 .build();
+    }
+
+    private static ReflectionSummary mapReflectionSummary(TaskScaffold s) {
+        if (s == null) {
+            return null;
+        }
+        LearningScaffoldEngineState eng = s.getLearningScaffoldEngineState();
+        if (eng == null || eng.getReflectionRecord() == null) {
+            return null;
+        }
+        ReflectionRecord rec = eng.getReflectionRecord();
+        ReflectionInsight ins = eng.getReflectionInsight();
+        return ReflectionSummary.builder()
+                .record(rec)
+                .insight(ins)
+                .systemObservation(buildReflectionObservation(ins, rec))
+                .build();
+    }
+
+    private static String buildReflectionObservation(ReflectionInsight ins, ReflectionRecord rec) {
+        if (ins == null) {
+            return rec != null && rec.getFutureStrategy() != null
+                    ? "下一步建议：" + rec.getFutureStrategy()
+                    : "反思沉淀已就绪。";
+        }
+        StringBuilder sb = new StringBuilder();
+        if (ins.getMostDifficultActionId() != null && !ins.getMostDifficultActionId().isBlank()) {
+            sb.append("训练中耗时较多的是：").append(ins.getMostDifficultActionId()).append("。");
+        }
+        if (ins.getRepeatedErrorTypes() != null && !ins.getRepeatedErrorTypes().isEmpty()) {
+            sb.append(" 反复出现的问题类型：").append(String.join("、", ins.getRepeatedErrorTypes())).append("。");
+        }
+        if (sb.isEmpty()) {
+            return "本轮训练合计 " + ins.getTotalAttempts() + " 次提交，已形成可迁移规则与能力命名。";
+        }
+        return sb.toString();
     }
 
     private KnowledgePackMetadata.PackMeta resolvePackMeta(String sessionId) {

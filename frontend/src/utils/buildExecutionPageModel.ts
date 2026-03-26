@@ -18,7 +18,6 @@ import type {
 import type { KnowledgePack } from '@/types/knowledgePack'
 import { useKnowledgePack } from '@/composables/useKnowledgePack'
 import { enrichExecutionSpec } from '@/utils/enrichExecutionSpec'
-import { getKnowledgeDemoConfig } from '@/constants/KnowledgeConfig'
 import type { KnowledgeDemoStageCode } from '@/constants/KnowledgeConfig'
 import {
   mergePhaseCopyWithFallback,
@@ -82,11 +81,11 @@ const STEP_COPY: Record<
   ORIENT: {
     stageLabel: 'STRUCTURE',
     eyebrow: 'STRUCTURE',
-    title: '用一句话说清它是什么',
-    description: '直觉即可。',
-    inputLabel: '写一句',
-    inputPlaceholder: '例如：我觉得它主要是在解决……，如果没有它，通常会……',
-    primaryActionLabel: '发给导师',
+    title: '先搭知识骨架',
+    description: '先别急着记细节。',
+    inputLabel: '我的表达',
+    inputPlaceholder: '先写一句：它是什么、在帮什么忙……',
+    primaryActionLabel: '提交本轮表达',
     helperText: '',
     defaultChips: [
       {
@@ -109,11 +108,11 @@ const STEP_COPY: Record<
   EXPLORE: {
     stageLabel: 'UNDERSTANDING',
     eyebrow: 'UNDERSTANDING',
-    title: '再补一句关键理解',
-    description: '只补一处。',
-    inputLabel: '补上一句',
-    inputPlaceholder: '例如：它之所以要这样做，是因为……',
-    primaryActionLabel: '发给导师',
+    title: '把机制讲清楚',
+    description: '你现在最需要讲清的是因果与过程。',
+    inputLabel: '我的表达',
+    inputPlaceholder: '例如：它为什么这样工作？少了哪一步会出问题？',
+    primaryActionLabel: '提交本轮表达',
     helperText: '',
     defaultChips: [
       {
@@ -136,11 +135,11 @@ const STEP_COPY: Record<
   SELF_EXPLAIN: {
     stageLabel: 'TRAINING',
     eyebrow: 'TRAINING',
-    title: '用自己的话串一遍',
-    description: '三四句即可。',
-    inputLabel: '写下你的表述',
-    inputPlaceholder: '例如：它是什么、为什么需要它、少了它会怎样……',
-    primaryActionLabel: '提交复述',
+    title: '用自己的话写完整',
+    description: '表达 → 纠错 → 重构。',
+    inputLabel: '我的表达',
+    inputPlaceholder: '它是什么、为什么需要、哪里最容易错……',
+    primaryActionLabel: '提交本轮表达',
     helperText: '',
     defaultChips: [
       {
@@ -163,11 +162,11 @@ const STEP_COPY: Record<
   REMEDIAL: {
     stageLabel: 'TRAINING',
     eyebrow: 'TRAINING',
-    title: '补上缺的那一句',
-    description: '只补关键点。',
-    inputLabel: '把这句话补上',
-    inputPlaceholder: '例如：我刚才没说清的是……，补上后应该是……',
-    primaryActionLabel: '补好并提交',
+    title: '只补这一处',
+    description: '对照反馈，补上缺口。',
+    inputLabel: '我的表达',
+    inputPlaceholder: '补上刚才缺的那一句判断或因果……',
+    primaryActionLabel: '提交本轮表达',
     helperText: '',
     defaultChips: [
       {
@@ -190,20 +189,20 @@ const STEP_COPY: Record<
   CHECK: {
     stageLabel: 'REFLECTION',
     eyebrow: 'REFLECTION',
-    title: '独立答这一题',
-    description: '写清依据。',
-    inputLabel: '你的答案',
-    inputPlaceholder: '用一两句话直接回答即可。',
-    primaryActionLabel: '提交检查',
+    title: '独立作答',
+    description: '写清依据，不抄书。',
+    inputLabel: '我的表达',
+    inputPlaceholder: '一两句话 + 你的判断依据。',
+    primaryActionLabel: '提交本轮表达',
     helperText: '',
     defaultChips: [],
   },
   PASS: {
     stageLabel: 'REFLECTION',
     eyebrow: 'REFLECTION',
-    title: '一句总结 + 两个要点',
-    description: '带走即可。',
-    primaryActionLabel: '我已经搭好这个点的框架，进入下一个',
+    title: '收束带走',
+    description: '一句总结，两个要点。',
+    primaryActionLabel: '完成本任务',
     helperText: '',
     defaultChips: [],
   },
@@ -256,19 +255,19 @@ function buildRoundCompletionCriteria(
 
   const defaults: Record<string, string[]> = {
     ORIENT: [
-      '能一句话说清它是什么',
-      '能说出它在解决什么问题',
-      '能说出它和某个相关概念的一点关系',
+      '一句话：它是什么',
+      '它在解决什么问题',
+      '和相邻概念的一点关系',
     ],
     EXPLORE: [
-      '能补上当前最关键的一处因果或机制',
-      '能举一个最小例子',
-      '能说清还没想透的一个点',
+      '补上最关键的一处因果或机制',
+      '一个最小例子',
+      '一个你还不稳的点',
     ],
-    SELF_EXPLAIN: ['能用自己的话串起来', '能说出为什么成立', '能说出容易漏掉的判断'],
-    REMEDIAL: ['把刚才缺的那一句补上', '能对照导师反馈自检', '能继续往下推进'],
-    CHECK: ['能独立写出判断', '依据能对准当前知识点', '不依赖照抄原文'],
-    PASS: ['有一句带得走的总结', '有两个下次还能用的要点', '知道下一步练什么'],
+    SELF_EXPLAIN: ['用自己的话串起来', '为什么成立', '容易漏的判断'],
+    REMEDIAL: ['缺口已补上', '能对照反馈自检', '可以继续推进'],
+    CHECK: ['判断独立', '依据对准本点', '不照抄原文'],
+    PASS: ['一句总结', '两个可复用要点', '下一步练什么'],
   }
   const fb = defaults[state] ?? defaults.ORIENT
   const fromTask = (task.completionCriteria ?? []).map((item) => trimText(item)).filter(Boolean).slice(0, 2)
@@ -456,12 +455,12 @@ function buildNextStepPreview(
 }
 
 const FALLBACK_PHASE_COPY: PhaseWorkbenchCopy = {
-  whatToOutput: ['用你自己的话写出这一轮的最小可检产出'],
-  recommendedSteps: ['先写结论，再补一句依据或例子'],
-  avoid: ['不要空答', '不要整段粘贴'],
-  whyNow: '按规划顺序推进，当前步是在堆能力栈。',
-  skipRisk: '跳过会在后面以更高成本暴露缺口。',
-  expectedGain: '你能独立复述这一轮要交付什么。',
+  whatToOutput: ['一小段能自检的表述'],
+  recommendedSteps: ['先结论，再一句依据或例子'],
+  avoid: ['空答', '整段粘贴'],
+  whyNow: '规划里这一步正在补你的能力栈。',
+  skipRisk: '后面会用更高成本暴露缺口。',
+  expectedGain: '你能说清这一轮交付了什么。',
 }
 
 function isKnowledgePackId(id: string | null | undefined): id is KnowledgePackId {
@@ -645,7 +644,6 @@ export function buildExecutionPageModel(
     knowledgeKey: input.plan?.knowledgeKey,
     packId: input.plan?.packId,
   })
-  const knowledgeDemo = getKnowledgeDemoConfig(pack?.id ?? null)
   const copy = STEP_COPY[state]
   const knowledgePoints = buildKnowledgePoints(input.task, input.progress, input.planTasks)
   const activePoint =
@@ -717,9 +715,7 @@ export function buildExecutionPageModel(
     header: {
       phaseCode: copy.stageLabel,
       phaseDisplayZh: enriched.stageDisplay,
-      strategyLine: knowledgeDemo
-        ? `策略：${knowledgeDemo.plan.strategy}`
-        : undefined,
+      strategyLine: undefined,
       anchorActionLine:
         clipFirstLine(enriched.currentDirective, 120) || clipFirstLine(enriched.roundGoal, 120),
       heroTitle: enriched.knowledgePointName,

@@ -25,8 +25,7 @@ const DELIVERABLE_BY_STATE: Record<string, string> = {
   PASS: '产出：一句总结 + 两个可复用要点',
 }
 
-const INPUT_PLACEHOLDER_SOFT =
-  '先随便说，不要求完整，我会根据你的回答继续引导'
+const INPUT_PLACEHOLDER_SOFT = '不确定也没关系，先写一版。'
 
 function trimText(text?: string | null) {
   return text?.trim() || ''

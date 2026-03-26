@@ -54,10 +54,9 @@ export const TOPIC_OBSERVATION_BULLETS: Record<KnowledgePackId, string[]> = {
     '流量/拥塞：别和「握手」混为一谈',
   ],
   os_process_thread: [
-    '资源：进程是资源容器，线程共享进程空间',
-    '调度：线程是常见调度单位',
+    '资源：进程是容器，线程共享进程空间',
+    '调度与执行：线程多为调度单位',
     '成本：线程切换通常轻于进程切换',
-    '通信：管道/共享内存等要能对上场景',
   ],
   arch_cache_locality: [
     '为什么需要缓存：CPU–内存速度差',

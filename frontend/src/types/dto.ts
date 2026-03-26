@@ -9,6 +9,7 @@ import type {
   TaskCompletionStatusType,
   NextActionTypeType,
 } from './enums'
+import type { ReflectionSummary } from './scaffoldEngine'
 
 // --- 1. 目标相关 ---
 export interface CreateGoalRequest {
@@ -339,6 +340,8 @@ export interface TaskScaffoldResponse {
     detectedAction?: string
     createdAt?: string
   }[]
+  /** Phase 4：脚手架反思沉淀（DFS/BFS） */
+  reflectionSummary?: ReflectionSummary
 }
 
 export interface RecommendedUserActionItem {
