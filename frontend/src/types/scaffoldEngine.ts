@@ -11,6 +11,28 @@ export interface LearningActionCard {
   nextActionHint?: string
 }
 
+export interface StructureSkeletonBlock {
+  module: string
+  prerequisites: string[]
+  connections: string[]
+  deferTopics: string[]
+}
+
+export interface StructureSkeletonResult {
+  skeleton: StructureSkeletonBlock
+  structureGenerationCount: number
+  structureLightInteractionCount: number
+  structureExploredPromptKeys: string[]
+  canCompleteStructure: boolean
+  lastPromptKey: string
+}
+
+export interface CompleteStructureStageResult {
+  structureStageComplete: boolean
+  nextStageKey: string
+  nextActionId: string
+}
+
 export interface StageScaffold {
   stageKey: string
   stageTitle: string
@@ -27,6 +49,11 @@ export interface StageScaffold {
   completedStageKeys?: string[]
   reflectionRecord?: ReflectionRecord
   reflectionInsight?: ReflectionInsight
+  structureExploredPromptKeys?: string[]
+  structureGenerationCount?: number
+  structureLightInteractionCount?: number
+  structureCanComplete?: boolean
+  structureLastPromptKey?: string
 }
 
 export interface ActionRuntime {

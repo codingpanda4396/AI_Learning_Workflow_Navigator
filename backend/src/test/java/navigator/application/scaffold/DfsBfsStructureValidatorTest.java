@@ -12,14 +12,14 @@ class DfsBfsStructureValidatorTest {
 
     @Test
     void rejectsShortInput() {
-        ValidationResult r = validator.validate(ctx("dfs_bfs_structure_problem", "太短"));
+        ValidationResult r = validator.validate(ctx("dfs_bfs_structure_position", "太短"));
         assertFalse(r.isPassed());
         assertTrue("INSUFFICIENT_CONTENT".equals(r.getErrorType()));
     }
 
     @Test
     void rejectsBoundaryComplexity() {
-        ValidationResult r = validator.validate(ctx("dfs_bfs_structure_problem",
+        ValidationResult r = validator.validate(ctx("dfs_bfs_structure_position",
                 "DFS和BFS是图上的两种遍历方式，时间复杂度一般是O(V+E)，这里我想先讲清它们各自解决什么问题。"));
         assertFalse(r.isPassed());
         assertTrue("BOUNDARY_VIOLATION".equals(r.getErrorType()));
@@ -27,7 +27,7 @@ class DfsBfsStructureValidatorTest {
 
     @Test
     void acceptsStructuralAnswer() {
-        ValidationResult r = validator.validate(ctx("dfs_bfs_structure_problem",
+        ValidationResult r = validator.validate(ctx("dfs_bfs_structure_position",
                 "它们主要帮助我在图或树结构里决定「先往深处走」还是「一层层铺开」，用来判断可达关系或分层信息，先停留在用途层面。"));
         assertTrue(r.isPassed());
     }

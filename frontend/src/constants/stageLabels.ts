@@ -27,3 +27,11 @@ export function phaseCodeToShortZh(code: string | undefined | null): string {
   const k = code as WorkbenchPhaseCode
   return PHASE_DISPLAY_SHORT_ZH[k] ?? code
 }
+
+/** 顶栏阶段条展示（与四阶段顺序一致，UNDERSTANDING 用「理解机制」） */
+export const PHASE_STRIP_LABELS_ZH: Record<WorkbenchPhaseCode, string> = {
+  STRUCTURE: '结构建立',
+  UNDERSTANDING: '理解机制',
+  TRAINING: '表达训练',
+  REFLECTION: '反思收敛',
+}

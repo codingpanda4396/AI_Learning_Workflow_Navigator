@@ -544,8 +544,8 @@ function buildWorkbenchModel(
       overallRatio,
       stepLabel: `${input.guidedStepCurrent}/${input.guidedStepTotal}`,
       taskIndexLabel: input.progress
-        ? `任务 ${input.progress.currentIndex}/${input.progress.totalTasks}`
-        : '任务 1/1',
+        ? `任务 ${input.progress.currentIndex} / ${input.progress.totalTasks}`
+        : '任务 1 / 1',
     },
     taskStatus: ts.status,
     taskStatusLabel: ts.label,

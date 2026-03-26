@@ -2,8 +2,12 @@ package navigator.api.controller;
 
 import jakarta.validation.Valid;
 import navigator.api.GlobalResponse;
+import navigator.api.dto.scaffold.CompleteStructureStageRequest;
+import navigator.api.dto.scaffold.CompleteStructureStageResult;
 import navigator.api.dto.scaffold.LearningScaffoldActionResult;
 import navigator.api.dto.scaffold.StageScaffold;
+import navigator.api.dto.scaffold.StructureSkeletonRequest;
+import navigator.api.dto.scaffold.StructureSkeletonResult;
 import navigator.api.dto.scaffold.SubmitLearningScaffoldActionRequest;
 import navigator.application.scaffold.LearningScaffoldEngineService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,5 +54,19 @@ public class LearningScaffoldController {
             @PathVariable String taskId,
             @Valid @RequestBody SubmitLearningScaffoldActionRequest request) {
         return GlobalResponse.ok(learningScaffoldEngineService.submitAction(taskId, request));
+    }
+
+    @PostMapping("/{taskId}/learning-scaffold/structure/skeleton")
+    public GlobalResponse<StructureSkeletonResult> generateStructureSkeleton(
+            @PathVariable String taskId,
+            @Valid @RequestBody StructureSkeletonRequest request) {
+        return GlobalResponse.ok(learningScaffoldEngineService.generateStructureSkeleton(taskId, request));
+    }
+
+    @PostMapping("/{taskId}/learning-scaffold/structure/complete")
+    public GlobalResponse<CompleteStructureStageResult> completeStructureStage(
+            @PathVariable String taskId,
+            @Valid @RequestBody CompleteStructureStageRequest request) {
+        return GlobalResponse.ok(learningScaffoldEngineService.completeStructureStage(taskId, request));
     }
 }

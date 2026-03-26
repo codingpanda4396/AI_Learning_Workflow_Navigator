@@ -1,5 +1,10 @@
 import { request } from './request'
-import type { LearningScaffoldActionResult, StageScaffold } from '@/types/scaffoldEngine'
+import type {
+  CompleteStructureStageResult,
+  LearningScaffoldActionResult,
+  StageScaffold,
+  StructureSkeletonResult,
+} from '@/types/scaffoldEngine'
 
 export async function getLearningScaffoldStage(
   taskId: string,
@@ -31,6 +36,28 @@ export async function submitLearningScaffoldAction(
 ): Promise<LearningScaffoldActionResult> {
   const { data } = await request.post<LearningScaffoldActionResult>(
     `/api/tasks/${taskId}/learning-scaffold/action`,
+    body
+  )
+  return data
+}
+
+export async function postStructureSkeleton(
+  taskId: string,
+  body: { sessionId: string; promptKey: string; followUpKind?: string }
+): Promise<StructureSkeletonResult> {
+  const { data } = await request.post<StructureSkeletonResult>(
+    `/api/tasks/${taskId}/learning-scaffold/structure/skeleton`,
+    body
+  )
+  return data
+}
+
+export async function postCompleteStructureStage(
+  taskId: string,
+  body: { sessionId: string; optionalOneLiner?: string }
+): Promise<CompleteStructureStageResult> {
+  const { data } = await request.post<CompleteStructureStageResult>(
+    `/api/tasks/${taskId}/learning-scaffold/structure/complete`,
     body
   )
   return data

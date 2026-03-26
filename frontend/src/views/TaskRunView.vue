@@ -14,142 +14,174 @@
         </template>
       </EmptyState>
 
-      <section v-else-if="task" class="space-y-4 pb-28">
+      <section v-else-if="task" :class="useStructureEngineUi ? 'space-y-5 pb-12' : 'space-y-4 pb-28'">
         <ExecutionHeader
           :topic-name="workbenchTopicName"
+          :title-override="useStructureEngineUi ? STRUCTURE_PHASE_COPY.mainTitle : undefined"
           :phase-progress="pageModel.workbench.phaseProgress"
           :task-status-label="pageModel.workbench.taskStatusLabel"
+          :compact="useStructureEngineUi"
+          :subtitle-line="useStructureEngineUi ? structureHeaderSubtitle : undefined"
         />
 
-        <section class="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
+        <template v-if="useStructureEngineUi">
+          <div
+            v-if="scaffoldEngine.loading && !scaffoldEngine.stage"
+            class="rounded-2xl border border-slate-200 bg-white/80 p-8 text-center text-sm text-slate-600"
+          >
+            {{ TASKRUN_COPY.scaffoldLoadingPrefix }}
+            {{ scaffoldStageLabel('STRUCTURE') }}{{ TASKRUN_COPY.scaffoldLoadingSuffix }}
+          </div>
+          <div
+            v-else-if="scaffoldEngine.error"
+            class="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-800"
+          >
+            {{ scaffoldEngine.error }}
+          </div>
+          <section
+            v-else-if="scaffoldEngine.stage?.stageKey === 'STRUCTURE'"
+            class="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start"
+            :data-phase="pageModel.workbench.emphasisPhase"
+          >
+            <div class="min-w-0 lg:col-span-5">
+              <StructureScaffoldActionGrid
+                :eyebrow="STRUCTURE_PHASE_COPY.eyebrow"
+                :section-title="STRUCTURE_PHASE_COPY.scaffoldTitle"
+                :section-hint="STRUCTURE_PHASE_COPY.scaffoldHint"
+                :cards="DFS_BFS_SCAFFOLD_CARDS"
+                :learn-label="STRUCTURE_PHASE_COPY.learnCta"
+                :disabled="structureSkeletonBarLoading"
+                @learn="onStructureCardLearn"
+              />
+            </div>
+            <div class="flex min-w-0 flex-col gap-4 lg:col-span-7">
+              <StructureSkeletonPanel
+                :loading="structureSkeleton.loading"
+                :error="structureSkeleton.error"
+                :skeleton="structureSkeleton.skeleton"
+                :empty-message="STRUCTURE_PHASE_COPY.emptySkeleton"
+                :loading-message="STRUCTURE_PHASE_COPY.loadingSkeleton"
+                :labels="STRUCTURE_PHASE_COPY.skeletonLabels"
+              />
+              <StructureLightFeedbackBar
+                :disabled="structureSkeletonBarLoading"
+                :has-skeleton="!!structureSkeleton.skeleton"
+                :labels="STRUCTURE_PHASE_COPY.feedback"
+                @got-next="onStructureGotNext"
+                @clarify="onStructureClarify"
+                @adjacent="onStructureAdjacent"
+              />
+              <StructureOptionalReflectionField
+                v-model="structureOptionalOneLiner"
+                :label="STRUCTURE_PHASE_COPY.optionalLineLabel"
+                :placeholder="STRUCTURE_PHASE_COPY.optionalPlaceholder"
+                :disabled="structureSkeletonBarLoading"
+              />
+            </div>
+          </section>
+        </template>
+
+        <section v-else class="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
           <div
             class="space-y-5 lg:col-span-8"
             :data-phase="pageModel.workbench.emphasisPhase"
           >
-            <PrimaryTaskCard
-              :model="pageModel.workbench.currentTask"
-              :emphasis-phase="pageModel.workbench.emphasisPhase"
-            />
-
-            <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
-
-            <template v-if="useStructureEngineUi">
-              <div
-                v-if="scaffoldEngine.loading"
-                class="rounded-2xl border border-slate-200 bg-white/80 p-8 text-center text-sm text-slate-600"
-              >
-                {{ TASKRUN_COPY.scaffoldLoadingPrefix }}
-                {{ scaffoldStageLabel(scaffoldEngine.stage?.stageKey) }}{{ TASKRUN_COPY.scaffoldLoadingSuffix }}
-              </div>
-              <div
-                v-else-if="scaffoldEngine.error"
-                class="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-800"
-              >
-                {{ scaffoldEngine.error }}
-              </div>
-              <LearningActionCardPanel
-                v-else-if="scaffoldEngine.stage"
-                :stage-key="scaffoldEngine.stage.stageKey"
-                :phase-label="scaffoldStageLabel(scaffoldEngine.stage.stageKey)"
-                :stage-title="scaffoldEngine.stage.stageTitle"
-                :stage-goal="scaffoldEngine.stage.stageGoal"
-                :stage-description="scaffoldEngine.stage.stageDescription"
-                :card="scaffoldEngine.currentCard"
-                v-model:draft-value="structureEngineDraft"
-                :loading="scaffoldEngine.loading"
-                :submitting="scaffoldEngine.submitting"
-                :last-result="scaffoldEngine.lastResult"
-                :input-label="scaffoldEngine.currentCard?.userOutputLabel || TASKRUN_COPY.defaultMyAnswer"
-                @submit="onStructureSubmit"
-              />
-            </template>
-
-            <template v-else-if="useDrivingSeatLayout">
-              <ScaffoldGuideCard
-                :product="pageModel.workbench.scaffoldProduct"
-                :cards="pageModel.scaffoldCards"
-                :phase-prompt-chips="pageModel.tutorConsole.phasePromptChips"
-                :topic-observation-bullets="pageModel.workbench.topicHints.bullets"
-                :sending="mainActionLoading"
-                @send-card="onSendScaffoldCard"
-                @prefill-card="onPrefillScaffoldCard"
-                @prefill-chip="onPrefillPhaseChip"
-              />
-
-              <ExpressionWorkspace
-                :chat-turns="chatTurns"
-                :draft-value="draftInput"
-                :input-label="pageModel.mainAction.inputLabel || TASKRUN_COPY.defaultMyExpression"
-                :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
-                :input-placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
-                :sending="mainActionLoading"
-                :show-restate="showRestateSection"
-                :show-advance="showAdvanceSection"
-                :micro-check-labels="microCheckLabels"
-                :checks="microChecks"
-                :restate-what="restateWhat"
-                :restate-problem="restateProblem"
-                :restate-relate="restateRelate"
+              <PrimaryTaskCard
+                :model="pageModel.workbench.currentTask"
                 :emphasis-phase="pageModel.workbench.emphasisPhase"
-                @update:draft-value="draftInput = $event"
-                @update:checks="microChecks = $event"
-                @update:restate-what="restateWhat = $event"
-                @update:restate-problem="restateProblem = $event"
-                @update:restate-relate="restateRelate = $event"
-                @save-draft="saveDraftExplicit"
-                @stuck="onStuckFromPanel"
               />
-            </template>
 
-            <ExecutionMainActionCard
-              v-else
-              :model="pageModel.mainAction"
-              :draft-value="draftInput"
-              :loading="mainActionLoading"
-              :disabled="mainActionDisabled"
-              :can-submit="canSubmitMainAction"
-              :closure-summary="closureSummary"
-              :closure-point1="closurePoint1"
-              :closure-point2="closurePoint2"
-              :closure-next="closureNext"
-              :learner-reflection="completeForm.learnerReflection"
-              :completion-status="completeForm.completionStatus"
-              @update:draft-value="draftInput = $event"
-              @update:closure-summary="closureSummary = $event"
-              @update:closure-point1="closurePoint1 = $event"
-              @update:closure-point2="closurePoint2 = $event"
-              @update:closure-next="closureNext = $event"
-              @update:learner-reflection="completeForm.learnerReflection = $event"
-              @update:completion-status="completeForm.completionStatus = $event as TaskCompletionStatusType"
-              @use-chip="fillDraftInput"
-              @submit="handlePrimaryAction"
-            />
+              <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
 
-            <FeedbackSummary
-              v-if="!useStructureEngineUi"
-              :class="feedbackEmphasisClass"
-              :model="pageModel.feedback"
-              @action="handleFeedbackAction"
-            />
+              <template v-if="useDrivingSeatLayout">
+                <ScaffoldGuideCard
+                  :product="pageModel.workbench.scaffoldProduct"
+                  :cards="pageModel.scaffoldCards"
+                  :phase-prompt-chips="pageModel.tutorConsole.phasePromptChips"
+                  :topic-observation-bullets="pageModel.workbench.topicHints.bullets"
+                  :sending="mainActionLoading"
+                  @send-card="onSendScaffoldCard"
+                  @prefill-card="onPrefillScaffoldCard"
+                  @prefill-chip="onPrefillPhaseChip"
+                />
+
+                <ExpressionWorkspace
+                  :chat-turns="chatTurns"
+                  :draft-value="draftInput"
+                  :input-label="pageModel.mainAction.inputLabel || TASKRUN_COPY.defaultMyExpression"
+                  :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
+                  :input-placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
+                  :sending="mainActionLoading"
+                  :show-restate="showRestateSection"
+                  :show-advance="showAdvanceSection"
+                  :micro-check-labels="microCheckLabels"
+                  :checks="microChecks"
+                  :restate-what="restateWhat"
+                  :restate-problem="restateProblem"
+                  :restate-relate="restateRelate"
+                  :emphasis-phase="pageModel.workbench.emphasisPhase"
+                  @update:draft-value="draftInput = $event"
+                  @update:checks="microChecks = $event"
+                  @update:restate-what="restateWhat = $event"
+                  @update:restate-problem="restateProblem = $event"
+                  @update:restate-relate="restateRelate = $event"
+                  @save-draft="saveDraftExplicit"
+                  @stuck="onStuckFromPanel"
+                />
+              </template>
+
+              <ExecutionMainActionCard
+                v-else
+                :model="pageModel.mainAction"
+                :draft-value="draftInput"
+                :loading="mainActionLoading"
+                :disabled="mainActionDisabled"
+                :can-submit="canSubmitMainAction"
+                :closure-summary="closureSummary"
+                :closure-point1="closurePoint1"
+                :closure-point2="closurePoint2"
+                :closure-next="closureNext"
+                :learner-reflection="completeForm.learnerReflection"
+                :completion-status="completeForm.completionStatus"
+                @update:draft-value="draftInput = $event"
+                @update:closure-summary="closureSummary = $event"
+                @update:closure-point1="closurePoint1 = $event"
+                @update:closure-point2="closurePoint2 = $event"
+                @update:closure-next="closureNext = $event"
+                @update:learner-reflection="completeForm.learnerReflection = $event"
+                @update:completion-status="completeForm.completionStatus = $event as TaskCompletionStatusType"
+                @use-chip="fillDraftInput"
+                @submit="handlePrimaryAction"
+              />
+
+              <FeedbackSummary
+                :class="feedbackEmphasisClass"
+                :model="pageModel.feedback"
+                @action="handleFeedbackAction"
+              />
           </div>
 
-          <aside class="space-y-3 lg:col-span-4">
-            <template v-if="useStructureEngineUi">
-              <StructureStageHints :card="scaffoldEngine.currentCard" />
-              <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
-            </template>
-            <template v-else>
-              <StepReasonCard :model="pageModel.workbench.whyThisStep" />
-              <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
-            </template>
+          <aside v-if="!useStructureEngineUi" class="space-y-3 lg:col-span-4">
+            <StepReasonCard :model="pageModel.workbench.whyThisStep" />
+            <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
           </aside>
         </section>
 
         <StickyActionBar
+          v-if="useStructureEngineUi"
+          :primary-label="STRUCTURE_PHASE_COPY.primaryComplete"
+          :primary-loading="structureStickyLoading"
+          :primary-disabled="structurePrimaryBarDisabled"
+          :show-advance="false"
+          @save-draft="saveStructureOptionalDraft"
+          @primary="onStructureCompleteStage"
+        />
+        <StickyActionBar
+          v-else
           :primary-label="bottomPrimaryLabel"
           :primary-loading="mainActionLoading"
           :primary-disabled="bottomPrimaryDisabled"
-          :show-advance="useDrivingSeatLayout && showAdvanceSection && !useStructureEngineUi"
+          :show-advance="useDrivingSeatLayout && showAdvanceSection"
           :can-advance="canAdvanceDriving"
           :advancing="advancing"
           :advance-label="TASKRUN_COPY.advancePhase"
@@ -176,9 +208,11 @@ import ScaffoldGuideCard from '@/components/task-run/ScaffoldGuideCard.vue'
 import StageProgressMiniCard from '@/components/task-run/StageProgressMiniCard.vue'
 import StepReasonCard from '@/components/task-run/StepReasonCard.vue'
 import StickyActionBar from '@/components/task-run/StickyActionBar.vue'
-import LearningActionCardPanel from '@/components/task-run/LearningActionCardPanel.vue'
 import ReflectionSummaryCard from '@/components/task-run/ReflectionSummaryCard.vue'
-import StructureStageHints from '@/components/task-run/StructureStageHints.vue'
+import StructureLightFeedbackBar from '@/components/task-run/StructureLightFeedbackBar.vue'
+import StructureOptionalReflectionField from '@/components/task-run/StructureOptionalReflectionField.vue'
+import StructureScaffoldActionGrid from '@/components/task-run/StructureScaffoldActionGrid.vue'
+import StructureSkeletonPanel from '@/components/task-run/StructureSkeletonPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
@@ -194,6 +228,10 @@ import {
   postTaskMessage,
 } from '@/api/task'
 import { TASKRUN_COPY } from '@/constants/uiCopy'
+import {
+  DFS_BFS_SCAFFOLD_CARDS,
+  STRUCTURE_PHASE_COPY,
+} from '@/constants/dfsBfsStructureWorkbenchCopy'
 import { fallbackGuidanceForState, tutorPromptFor } from '@/constants/taskRunUi'
 import { showToast } from '@/stores/toast'
 import { useAiTutorStore } from '@/stores/aiTutor'
@@ -218,6 +256,7 @@ import { buildExecutionPageModel, createEmptyWorkbenchModel } from '@/utils/buil
 import { buildTaskGuidedSteps, getCurrentGuidedStepId } from '@/utils/taskGuidedSteps'
 import { useKnowledgePack } from '@/composables/useKnowledgePack'
 import { scaffoldStageLabel, useLearningScaffoldEngine } from '@/composables/useLearningScaffoldEngine'
+import { useStructureSkeletonFlow } from '@/composables/useStructureSkeletonFlow'
 import type { ReflectionSummary } from '@/types/scaffoldEngine'
 
 interface ChatTurn {
@@ -264,7 +303,8 @@ const completeForm = ref<{
   learnerReflection: '',
 })
 
-const structureEngineDraft = ref('')
+const structureOptionalOneLiner = ref('')
+const structureCompleting = ref(false)
 
 const structureEngineEnabled = computed(
   () =>
@@ -280,7 +320,29 @@ const scaffoldEngine = useLearningScaffoldEngine({
 })
 
 const useStructureEngineUi = computed(
-  () => structureEngineEnabled.value && !scaffoldEngine.scaffoldEngineComplete
+  () =>
+    structureEngineEnabled.value &&
+    !scaffoldEngine.scaffoldEngineComplete &&
+    scaffoldEngine.stage?.stageKey === 'STRUCTURE'
+)
+
+const structureSkeleton = useStructureSkeletonFlow({
+  taskId: () => task.value?.taskId,
+  sessionId: () => store.sessionId ?? null,
+  enabled: () => useStructureEngineUi.value,
+  reloadStage: () => scaffoldEngine.loadStage(),
+})
+
+const structureSkeletonBarLoading = computed(
+  () => scaffoldEngine.loading || structureSkeleton.loading || structureCompleting.value
+)
+
+const structureStickyLoading = structureSkeletonBarLoading
+
+const structureCanProceed = computed(() => scaffoldEngine.stage?.structureCanComplete === true)
+
+const structurePrimaryBarDisabled = computed(
+  () => !structureCanProceed.value || structureSkeletonBarLoading.value
 )
 
 /** 脚手架完成后从 GET scaffold 恢复；末卡当帧可从 lastResult 兜底 */
@@ -493,6 +555,11 @@ const workbenchTopicName = computed(() => {
   )
 })
 
+const structureHeaderSubtitle = computed(() => {
+  const idx = pageModel.value.workbench.phaseProgress.taskIndexLabel
+  return `${STRUCTURE_PHASE_COPY.subtitle} · ${idx}`
+})
+
 const bottomPrimaryLabel = computed(() => {
   if (pageModel.value.mainAction.mode === 'closure') return '完成本任务'
   if (useDrivingSeatLayout.value) return '提交本轮表达'
@@ -508,7 +575,6 @@ const feedbackEmphasisClass = computed(() => {
 const bottomPrimaryDisabled = computed(() => {
   if (mainActionLoading.value) return true
   if (pageModel.value.mainAction.mode === 'closure') return false
-  if (useStructureEngineUi.value) return !structureEngineDraft.value.trim()
   if (useDrivingSeatLayout.value) return !canSubmitDrivingChat.value
   return !canSubmitMainAction.value
 })
@@ -520,9 +586,6 @@ const canSubmitDrivingChat = computed(() => {
 })
 
 const mainActionLoading = computed(() => {
-  if (useStructureEngineUi.value) {
-    return !!(scaffoldEngine.loading || scaffoldEngine.submitting)
-  }
   if (useDrivingSeatLayout.value) {
     return (
       sending.value ||
@@ -568,7 +631,7 @@ function resetClosureFields() {
 
 function resetInteractionDraft() {
   draftInput.value = ''
-  structureEngineDraft.value = ''
+  structureOptionalOneLiner.value = ''
   latestFeedback.value = null
   restateWhat.value = ''
   restateProblem.value = ''
@@ -588,6 +651,10 @@ function draftStorageKey(taskId: string) {
   return `task-exec-draft-${taskId}`
 }
 
+function structureOptionalStorageKey(taskId: string) {
+  return `task-structure-optional-${taskId}`
+}
+
 let draftPersistTimer: ReturnType<typeof setTimeout> | null = null
 watch(draftInput, (v) => {
   const id = task.value?.taskId
@@ -602,6 +669,13 @@ function saveDraftExplicit() {
   const id = task.value?.taskId
   if (!id) return
   localStorage.setItem(draftStorageKey(id), draftInput.value)
+  showToast('草稿已保存')
+}
+
+function saveStructureOptionalDraft() {
+  const id = task.value?.taskId
+  if (!id) return
+  localStorage.setItem(structureOptionalStorageKey(id), structureOptionalOneLiner.value)
   showToast('草稿已保存')
 }
 
@@ -807,6 +881,8 @@ async function loadScaffold(taskId: string) {
     syncRuntimeFromScaffold(data)
     const saved = localStorage.getItem(draftStorageKey(taskId))
     if (saved) draftInput.value = saved
+    const optSaved = localStorage.getItem(structureOptionalStorageKey(taskId))
+    if (optSaved) structureOptionalOneLiner.value = optSaved
     chatTurns.value = (data.recentMessages || [])
       .filter(isUiChatMessage)
       .map((message) => ({
@@ -1020,42 +1096,42 @@ async function onComplete() {
   }
 }
 
-async function onStructureSubmit() {
-  const res = await scaffoldEngine.submit(structureEngineDraft.value)
-  if (!res) return
-  if (res.validation.passed) {
-    structureEngineDraft.value = ''
-  }
-  if (res.stageComplete) {
+async function onStructureCardLearn(promptKey: string) {
+  await structureSkeleton.fetchSkeleton(promptKey)
+}
+
+async function onStructureClarify() {
+  const k = structureSkeleton.lastPromptKey || scaffoldEngine.stage?.structureLastPromptKey
+  if (!k) return
+  await structureSkeleton.fetchSkeleton(k, 'CLARIFY')
+}
+
+async function onStructureAdjacent() {
+  const k = structureSkeleton.lastPromptKey || scaffoldEngine.stage?.structureLastPromptKey
+  if (!k) return
+  await structureSkeleton.fetchSkeleton(k, 'ADJACENT')
+}
+
+function onStructureGotNext() {
+  structureSkeleton.clearPanel()
+}
+
+async function onStructureCompleteStage() {
+  structureCompleting.value = true
+  try {
+    const res = await structureSkeleton.completeStage(structureOptionalOneLiner.value)
+    if (!res) return
+    showToast('结构建立完成，进入机制理解。')
     if (task.value?.taskId) {
       await loadScaffold(task.value.taskId)
     }
-    if (scaffoldEngine.scaffoldEngineComplete) {
-      showToast('脚手架完成，可进入探索对话。')
-      await fetchTask()
-    } else {
-      const sk = res.stageKey ?? scaffoldEngine.stage?.stageKey
-      const hint =
-        sk === 'STRUCTURE'
-          ? '结构建立完成，进入机制理解。'
-          : sk === 'UNDERSTANDING'
-            ? '机制理解完成，进入表达内化。'
-            : sk === 'TRAINING'
-              ? '表达内化完成，进入反思。'
-              : sk === 'REFLECTION'
-                ? '反思收敛完成，可进入探索对话。'
-                : '本阶段完成，进入下一阶段。'
-      showToast(hint)
-    }
-    return
+    await fetchTask()
+  } finally {
+    structureCompleting.value = false
   }
 }
 
 async function handlePrimaryAction() {
-  if (useStructureEngineUi.value) {
-    await onStructureSubmit()
-    return
-  }
   const mode = pageModel.value?.mainAction.mode
   if (mode === 'closure') {
     await onComplete()

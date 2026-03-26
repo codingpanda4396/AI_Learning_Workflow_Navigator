@@ -34,4 +34,12 @@ public class StageScaffold {
     private List<String> completedStageKeys = new ArrayList<>();
     private ReflectionRecord reflectionRecord;
     private ReflectionInsight reflectionInsight;
+
+    /** STRUCTURE 脚手架：已探索的 promptKey */
+    @Builder.Default
+    private List<String> structureExploredPromptKeys = new ArrayList<>();
+    private Integer structureGenerationCount;
+    private Integer structureLightInteractionCount;
+    private Boolean structureCanComplete;
+    private String structureLastPromptKey;
 }

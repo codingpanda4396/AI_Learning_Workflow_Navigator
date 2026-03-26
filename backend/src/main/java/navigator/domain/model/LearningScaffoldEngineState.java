@@ -34,4 +34,18 @@ public class LearningScaffoldEngineState {
     /** REFLECTION 阶段全部完成后由汇编器写入 */
     private ReflectionRecord reflectionRecord;
     private ReflectionInsight reflectionInsight;
+
+    /** STRUCTURE：已点过并生成过骨架的 promptKey（顺序保留） */
+    @Builder.Default
+    private List<String> structureExploredPromptKeys = new ArrayList<>();
+    /** STRUCTURE：成功生成骨架的次数 */
+    @Builder.Default
+    private int structureGenerationCount = 0;
+    /** STRUCTURE：轻反馈次数（再解释 / 相邻关系等） */
+    @Builder.Default
+    private int structureLightInteractionCount = 0;
+    /** STRUCTURE：最近一次脚手架卡 */
+    private String structureLastPromptKey;
+    /** STRUCTURE：完成阶段时可选的一句话 */
+    private String structureOptionalReflection;
 }

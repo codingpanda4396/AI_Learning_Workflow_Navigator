@@ -3,10 +3,15 @@ package navigator.application.scaffold;
 import navigator.api.BusinessErrorCode;
 import navigator.api.BusinessException;
 import navigator.api.dto.scaffold.ActionRuntime;
+import navigator.api.dto.scaffold.CompleteStructureStageRequest;
+import navigator.api.dto.scaffold.CompleteStructureStageResult;
 import navigator.api.dto.scaffold.LearningScaffoldActionResult;
 import navigator.api.dto.scaffold.ReflectionInsight;
 import navigator.api.dto.scaffold.ReflectionRecord;
 import navigator.api.dto.scaffold.StageScaffold;
+import navigator.api.dto.scaffold.StructureSkeletonBlock;
+import navigator.api.dto.scaffold.StructureSkeletonRequest;
+import navigator.api.dto.scaffold.StructureSkeletonResult;
 import navigator.api.dto.scaffold.SubmitLearningScaffoldActionRequest;
 import navigator.api.dto.scaffold.TrainingFeedback;
 import navigator.api.dto.scaffold.TutorResponse;
@@ -49,6 +54,7 @@ public class LearningScaffoldEngineService {
     private final DfsBfsReflectionEvaluator dfsBfsReflectionEvaluator;
     private final ReflectionTutorComposer reflectionTutorComposer;
     private final ReflectionAssembler reflectionAssembler;
+    private final StructureSkeletonComposer structureSkeletonComposer;
 
     public LearningScaffoldEngineService(TaskExecutionFlowService taskExecutionFlowService,
                                          InMemoryStore store,
@@ -62,7 +68,8 @@ public class LearningScaffoldEngineService {
                                          TrainingTutorComposer trainingTutorComposer,
                                          DfsBfsReflectionEvaluator dfsBfsReflectionEvaluator,
                                          ReflectionTutorComposer reflectionTutorComposer,
-                                         ReflectionAssembler reflectionAssembler) {
+                                         ReflectionAssembler reflectionAssembler,
+                                         StructureSkeletonComposer structureSkeletonComposer) {
         this.taskExecutionFlowService = taskExecutionFlowService;
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
@@ -76,6 +83,7 @@ public class LearningScaffoldEngineService {
         this.dfsBfsReflectionEvaluator = dfsBfsReflectionEvaluator;
         this.reflectionTutorComposer = reflectionTutorComposer;
         this.reflectionAssembler = reflectionAssembler;
+        this.structureSkeletonComposer = structureSkeletonComposer;
     }
 
     public StageScaffold getStage(String sessionId, String taskId, String stageKeyParam) {
@@ -101,6 +109,100 @@ public class LearningScaffoldEngineService {
 
         persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         return mergeProgress(buildStageForKey(stageKey), eng);
+    }
+
+    public StructureSkeletonResult generateStructureSkeleton(String taskId, StructureSkeletonRequest request) {
+        String sessionId = request.getSessionId();
+        sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
+        entityLookupGuard.requireTaskInSession(sessionId, taskId);
+        taskExecutionFlowService.getScaffold(sessionId, taskId);
+        KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
+        if (pack == null || !DfsBfsStructureValidator.PACK_ID.equals(pack.packId())) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎");
+        }
+        TaskExecutionRuntime rt = requireRuntime(sessionId, taskId);
+        ensureEngineState(rt.getScaffold());
+        LearningScaffoldEngineState eng = rt.getScaffold().getLearningScaffoldEngineState();
+        Objects.requireNonNull(eng);
+        normalizeEngineState(eng);
+        if (!DfsBfsStructureValidator.STAGE_KEY.equals(eng.getCurrentStageKey())) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前不在结构建立阶段");
+        }
+        String promptKey = request.getPromptKey().trim();
+        if (!DfsBfsStructureScaffoldDefinition.isValidPromptKey(promptKey)) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "无效的 promptKey");
+        }
+        String follow = request.getFollowUpKind() != null ? request.getFollowUpKind().trim() : "";
+        StructureSkeletonBlock block = structureSkeletonComposer.compose(promptKey, follow.isEmpty() ? null : follow);
+
+        if (eng.getStructureExploredPromptKeys() == null) {
+            eng.setStructureExploredPromptKeys(new ArrayList<>());
+        }
+        if (!eng.getStructureExploredPromptKeys().contains(promptKey)) {
+            eng.getStructureExploredPromptKeys().add(promptKey);
+        }
+        eng.setStructureGenerationCount(eng.getStructureGenerationCount() + 1);
+        eng.setStructureLastPromptKey(promptKey);
+        String fk = follow.toUpperCase();
+        if ("CLARIFY".equals(fk) || "ADJACENT".equals(fk)) {
+            eng.setStructureLightInteractionCount(eng.getStructureLightInteractionCount() + 1);
+        }
+        eng.setCurrentActionId(promptKey);
+        rt.getScaffold().setLearningScaffoldEngineState(eng);
+        persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
+
+        return StructureSkeletonResult.builder()
+                .skeleton(block)
+                .structureGenerationCount(eng.getStructureGenerationCount())
+                .structureLightInteractionCount(eng.getStructureLightInteractionCount())
+                .structureExploredPromptKeys(new ArrayList<>(eng.getStructureExploredPromptKeys()))
+                .canCompleteStructure(canCompleteStructure(eng))
+                .lastPromptKey(promptKey)
+                .build();
+    }
+
+    public CompleteStructureStageResult completeStructureStage(String taskId, CompleteStructureStageRequest request) {
+        String sessionId = request.getSessionId();
+        sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
+        entityLookupGuard.requireTaskInSession(sessionId, taskId);
+        taskExecutionFlowService.getScaffold(sessionId, taskId);
+        KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
+        if (pack == null || !DfsBfsStructureValidator.PACK_ID.equals(pack.packId())) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎");
+        }
+        TaskExecutionRuntime rt = requireRuntime(sessionId, taskId);
+        ensureEngineState(rt.getScaffold());
+        LearningScaffoldEngineState eng = rt.getScaffold().getLearningScaffoldEngineState();
+        Objects.requireNonNull(eng);
+        normalizeEngineState(eng);
+        if (!DfsBfsStructureValidator.STAGE_KEY.equals(eng.getCurrentStageKey())) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前不在结构建立阶段");
+        }
+        if (!canCompleteStructure(eng)) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT,
+                    "请先至少生成一次骨架，并完成一次轻反馈；或探索至少两张脚手架卡。");
+        }
+        String one = request.getOptionalOneLiner() != null ? request.getOptionalOneLiner().trim() : "";
+        eng.setStructureOptionalReflection(one.isEmpty() ? null : one);
+        appendCompletedStage(eng, DfsBfsStructureValidator.STAGE_KEY);
+        eng.setCurrentStageKey(DfsBfsUnderstandingScaffoldDefinition.STAGE_KEY);
+        eng.setCurrentActionId(DfsBfsUnderstandingScaffoldDefinition.orderedActionIds().get(0));
+        syncLegacyBooleans(eng);
+        rt.getScaffold().setLearningScaffoldEngineState(eng);
+        persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
+
+        return CompleteStructureStageResult.builder()
+                .structureStageComplete(true)
+                .nextStageKey(eng.getCurrentStageKey())
+                .nextActionId(eng.getCurrentActionId())
+                .build();
+    }
+
+    private static boolean canCompleteStructure(LearningScaffoldEngineState eng) {
+        int gen = eng.getStructureGenerationCount();
+        int light = eng.getStructureLightInteractionCount();
+        int explored = eng.getStructureExploredPromptKeys() != null ? eng.getStructureExploredPromptKeys().size() : 0;
+        return gen >= 1 && (light >= 1 || explored >= 2);
     }
 
     public LearningScaffoldActionResult submitAction(String taskId, SubmitLearningScaffoldActionRequest request) {
@@ -288,7 +390,11 @@ public class LearningScaffoldEngineService {
         if (DfsBfsStructureValidator.STAGE_KEY.equals(stageKey)) {
             List<String> order = DfsBfsStructureScaffoldDefinition.orderedActionIds();
             int idx = order.indexOf(actionId);
-            if (idx >= 0 && idx < order.size() - 1) {
+            if (idx < 0) {
+                throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT,
+                        "未知的 STRUCTURE 动作卡: " + actionId);
+            }
+            if (idx < order.size() - 1) {
                 eng.setCurrentActionId(order.get(idx + 1));
                 return false;
             }
@@ -354,6 +460,20 @@ public class LearningScaffoldEngineService {
         eng.setUnderstandingStageComplete(list.contains(DfsBfsUnderstandingScaffoldDefinition.STAGE_KEY));
     }
 
+    private static void normalizeStructureLegacyActionIds(LearningScaffoldEngineState eng) {
+        if (eng == null || !DfsBfsStructureValidator.STAGE_KEY.equals(eng.getCurrentStageKey())) {
+            return;
+        }
+        String aid = eng.getCurrentActionId();
+        if (DfsBfsStructureScaffoldDefinition.ACTION_PROBLEM.equals(aid)
+                || DfsBfsStructureScaffoldDefinition.ACTION_DIFF.equals(aid)) {
+            eng.setCurrentActionId(DfsBfsStructureScaffoldDefinition.ACTION_POSITION);
+        }
+        if (eng.getStructureExploredPromptKeys() == null) {
+            eng.setStructureExploredPromptKeys(new ArrayList<>());
+        }
+    }
+
     /** 旧版 REFLECTION 占位单卡 → 迁移到四卡首张 */
     private static void normalizeReflectionActionIds(LearningScaffoldEngineState eng) {
         if (eng == null || !DfsBfsReflectionScaffoldDefinition.STAGE_KEY.equals(eng.getCurrentStageKey())) {
@@ -379,6 +499,7 @@ public class LearningScaffoldEngineService {
         }
         syncLegacyBooleans(eng);
         normalizeReflectionActionIds(eng);
+        normalizeStructureLegacyActionIds(eng);
 
         // Phase 2 遗留：UNDERSTANDING 已完成但仍停在 UNDERSTANDING → 迁到 TRAINING
         if (eng.isUnderstandingStageComplete()
@@ -422,13 +543,16 @@ public class LearningScaffoldEngineService {
     }
 
     private static String nextHintStructure(String actionId) {
-        if (DfsBfsStructureScaffoldDefinition.ACTION_PROBLEM.equals(actionId)) {
-            return "下一张：说明 DFS/BFS 在知识体系中的位置。";
-        }
         if (DfsBfsStructureScaffoldDefinition.ACTION_POSITION.equals(actionId)) {
-            return "下一张：用对比句说清核心差异。";
+            return "下一张：前置概念。";
         }
-        return "进入 UNDERSTANDING：说明 DFS 如何一步步探索。";
+        if (DfsBfsStructureScaffoldDefinition.ACTION_PREREQ.equals(actionId)) {
+            return "下一张：后续连接。";
+        }
+        if (DfsBfsStructureScaffoldDefinition.ACTION_NEXT.equals(actionId)) {
+            return "下一张：本轮先不展开的细节。";
+        }
+        return "进入机制理解：说明 DFS 如何一步步探索。";
     }
 
     private ValidationResult validateForStage(String stageKey, StructureValidationContext ctx) {
@@ -467,6 +591,16 @@ public class LearningScaffoldEngineService {
         stage.setCompletedStageKeys(new ArrayList<>(keys));
         stage.setReflectionRecord(eng.getReflectionRecord());
         stage.setReflectionInsight(eng.getReflectionInsight());
+        if (eng.getStructureExploredPromptKeys() != null) {
+            stage.setStructureExploredPromptKeys(new ArrayList<>(eng.getStructureExploredPromptKeys()));
+        } else {
+            stage.setStructureExploredPromptKeys(new ArrayList<>());
+        }
+        stage.setStructureGenerationCount(eng.getStructureGenerationCount());
+        stage.setStructureLightInteractionCount(eng.getStructureLightInteractionCount());
+        boolean inStructure = DfsBfsStructureValidator.STAGE_KEY.equals(eng.getCurrentStageKey());
+        stage.setStructureCanComplete(inStructure && canCompleteStructure(eng));
+        stage.setStructureLastPromptKey(eng.getStructureLastPromptKey());
         return stage;
     }
 
@@ -510,7 +644,7 @@ public class LearningScaffoldEngineService {
         }
         LearningScaffoldEngineState eng = LearningScaffoldEngineState.builder()
                 .currentStageKey(DfsBfsStructureValidator.STAGE_KEY)
-                .currentActionId(DfsBfsStructureScaffoldDefinition.ACTION_PROBLEM)
+                .currentActionId(DfsBfsStructureScaffoldDefinition.ACTION_POSITION)
                 .structureStageComplete(false)
                 .understandingStageComplete(false)
                 .completedStageKeys(new ArrayList<>())
