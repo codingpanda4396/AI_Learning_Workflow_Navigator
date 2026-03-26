@@ -4,37 +4,39 @@
 本仓库是一个 AI 学习工作流系统，不是通用聊天产品。
 核心闭环是：目标 -> 诊断 -> 规划 -> 执行 -> 报告。
 
-## Competition scope
-当前迭代只优化面向演示的前端页面：
-- 目标页
-- 规划页
-- 执行页
+# Project Working Agreement
 
-## Design principles
-- 避免“聊天壳子”感
-- 避免后台管理面板感
-- 让用户一眼看懂学习工作流
-- 突出四个阶段：STRUCTURE / UNDERSTANDING / TRAINING / REFLECTION
+## Product identity
+This project is an AI-guided learning workflow product, not a generic chatbot UI.
+Every page must help the user know:
+- where they are
+- what to do now
+- why this step matters
+- what comes next
 
-## Implementation constraints
-- 优先采用纯前端改动
-- 为了演示效果可自由使用 mock 数据
-- 非必要不要重定义后端契约
-- 文案保持简短、产品化
+## UI priorities
+- Reduce cognitive load first
+- One page, one primary action
+- Scaffold is the product highlight
+- Current task must dominate the first screen
+- Explanatory text must not overpower guidance
 
-## Goal page rules
-- 优先提供快速开始
-- 不要把自由文本输入作为主交互
-- 展示 408 个学科以及未来扩展能力，并以灰态呈现
+## Design consistency
+- Reuse shared visual tokens and components
+- Avoid ad-hoc colors, spacing, radius, and shadows
+- Keep page hierarchy clear and stable across flows
 
-## Planning page rules
-- 必须可视化四阶段学习流程
-- 规划不是文字说明，而是学习编排
+## Copywriting
+- Use short, directive, product-style Chinese copy
+- Avoid “AI explanation tone”
+- Avoid long business-logic explanations
+- Buttons should start with clear verbs
 
-## Execution page rules
-- AI Tutor 是受约束的教学助手，不是开放式聊天
-- 任务脚手架才是中心，不是对话历史
+## Engineering workflow
+- For complex UI refactors, inspect existing structure first, then propose a concise plan, then implement
+- Reuse before creating new abstractions
+- After changes, self-check hierarchy, copy, responsiveness, loading, empty, and error states
 
-## Validation
-- 每次实现后都必须运行 build
-- 前端改动优先做可视化验证
+## Special attention
+The task execution page is the core showcase page.
+It must make the scaffold feel like a real guided learning system rather than a chat wrapper.
