@@ -27,7 +27,7 @@
           class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           @click="router.push('/plan')"
         >
-          回规划
+          {{ EXECUTION_COPY.backToPlan }}
         </button>
       </div>
     </div>
@@ -58,16 +58,16 @@
         "
       >
         <span
-          class="text-[10px] font-bold uppercase leading-none tracking-wide"
-          :class="p === currentPhase ? 'text-primary' : 'text-slate-400'"
+          class="w-full truncate text-center text-[10px] font-medium leading-tight sm:hidden"
+          :class="p === currentPhase ? 'text-primary' : 'text-slate-500'"
         >
-          {{ p.slice(0, 3) }}
+          {{ phaseCodeToShortZh(p) }}
         </span>
         <span
-          class="hidden w-full truncate text-[11px] font-medium leading-tight sm:block"
+          class="hidden w-full truncate text-center text-[11px] font-medium leading-tight sm:block"
           :class="p === currentPhase ? 'text-slate-900' : 'text-slate-500'"
         >
-          {{ phaseShortZh(p) }}
+          {{ phaseCodeToFullZh(p) }}
         </span>
       </div>
     </div>
@@ -77,7 +77,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import type { WorkbenchPhaseCode, WorkbenchPhaseProgressModel } from '@/types/taskExecutionWorkbench'
+import { phaseCodeToFullZh, phaseCodeToShortZh } from '@/constants/stageLabels'
+import { EXECUTION_COPY } from '@/constants/uiCopy'
+import type { WorkbenchPhaseProgressModel } from '@/types/taskExecutionWorkbench'
 
 const router = useRouter()
 
@@ -102,13 +104,4 @@ const statusPillClass = computed(() => {
   return 'bg-slate-100 text-slate-700 ring-1 ring-slate-200/80'
 })
 
-function phaseShortZh(code: WorkbenchPhaseCode): string {
-  const m: Record<WorkbenchPhaseCode, string> = {
-    STRUCTURE: '结构',
-    UNDERSTANDING: '机制',
-    TRAINING: '表达',
-    REFLECTION: '反思',
-  }
-  return m[code] ?? code
-}
 </script>

@@ -6,13 +6,10 @@
     <!-- 第一层：阶段 + 当前唯一动作锚点 -->
     <div class="flex flex-wrap items-center gap-2">
       <span
-        v-if="model.phaseCode"
-        class="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-primary"
+        v-if="phaseBadge"
+        class="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
       >
-        {{ model.phaseCode }}
-      </span>
-      <span v-if="model.phaseDisplayZh" class="text-sm font-semibold text-slate-800">
-        {{ model.phaseDisplayZh }}
+        {{ phaseBadge }}
       </span>
       <span
         v-if="model.strategyLine"
@@ -97,6 +94,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { phaseCodeToFullZh } from '@/constants/stageLabels'
 import type { ExecutionGuideHeaderModel, ExecutionOperationConsoleModel } from '@/types/executionGuide'
 import type { KnowledgePointExecutionTemplate } from '@/types/knowledgePack'
 
@@ -113,6 +111,13 @@ const TYPE_LABELS: Record<KnowledgePointExecutionTemplate, string> = {
   STRUCTURE: '结构对象',
   PROBLEM: '题目应用',
 }
+
+const phaseBadge = computed(() => {
+  const zh = props.model.phaseDisplayZh?.trim()
+  if (zh) return zh
+  const code = props.model.phaseCode?.trim()
+  return code ? phaseCodeToFullZh(code) : ''
+})
 
 const oc = computed<ExecutionOperationConsoleModel>(() => {
   const m = props.model.operationConsole

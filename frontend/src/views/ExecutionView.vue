@@ -1,10 +1,10 @@
-﻿<template>
+<template>
   <PageContainer>
     <AppTopBar current="task" />
     <main class="mx-auto max-w-3xl px-6 py-12">
       <div class="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-card">
-        <p class="text-sm font-semibold uppercase tracking-[0.24em] text-primary">
-          Redirecting
+        <p class="text-sm font-semibold tracking-wide text-primary">
+          {{ EXECUTION_COPY.redirectKicker }}
         </p>
         <h1 class="mt-3 text-2xl font-semibold text-text-primary">
           {{ EXECUTION_COPY.redirectTitle }}

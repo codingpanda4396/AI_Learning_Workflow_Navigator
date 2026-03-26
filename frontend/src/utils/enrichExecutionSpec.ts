@@ -8,13 +8,7 @@ import type {
   RecommendedUserActionItem,
   TaskScaffoldResponse,
 } from '@/types/dto'
-
-const STAGE_DISPLAY_ZH: Record<string, string> = {
-  STRUCTURE: '结构建立',
-  UNDERSTANDING: '机制理解',
-  TRAINING: '应用训练',
-  REFLECTION: '反思校准',
-}
+import { phaseCodeToFullZh } from '@/constants/stageLabels'
 
 const DELIVERABLE_BY_STATE: Record<string, string> = {
   ORIENT: '产出：一句能站住脚的框架（是什么 / 解决什么）',
@@ -305,6 +299,6 @@ export function enrichExecutionSpec(input: EnrichExecutionSpecInput): EnrichedEx
 
 /** 由调用方传入 stageLabel（STRUCTURE 等），再映射为中文阶段名 */
 export function stageDisplayFromMachineLabel(stageLabel: string | undefined): string {
-  if (!stageLabel) return '结构建立'
-  return STAGE_DISPLAY_ZH[stageLabel] || stageLabel
+  if (!stageLabel) return phaseCodeToFullZh('STRUCTURE')
+  return phaseCodeToFullZh(stageLabel) || stageLabel
 }

@@ -35,36 +35,36 @@
                 class="flex-1 rounded-full px-4 py-2 text-center text-sm font-medium transition"
                 :class="mode === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
               >
-                登录
+                {{ AUTH_COPY.tabLogin }}
               </router-link>
               <router-link
                 :to="{ name: 'register', query: route.query }"
                 class="flex-1 rounded-full px-4 py-2 text-center text-sm font-medium transition"
                 :class="mode === 'register' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'"
               >
-                注册
+                {{ AUTH_COPY.tabRegister }}
               </router-link>
             </div>
 
             <form class="mt-6 space-y-4" @submit.prevent="submit">
               <div class="space-y-2">
-                <label class="text-sm font-medium text-slate-700">账号名</label>
+                <label class="text-sm font-medium text-slate-700">{{ AUTH_COPY.labelUsername }}</label>
                 <input
                   v-model.trim="form.username"
                   type="text"
                   autocomplete="username"
                   class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
-                  placeholder="3-32 位，支持 a-z / 0-9 / _"
+                  :placeholder="AUTH_COPY.placeholderUsername"
                 />
               </div>
               <div class="space-y-2">
-                <label class="text-sm font-medium text-slate-700">密码</label>
+                <label class="text-sm font-medium text-slate-700">{{ AUTH_COPY.labelPassword }}</label>
                 <input
                   v-model="form.password"
                   type="password"
                   autocomplete="current-password"
                   class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-900"
-                  placeholder="至少 6 位"
+                  :placeholder="AUTH_COPY.placeholderPassword"
                 />
               </div>
 
@@ -77,7 +77,7 @@
                 class="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                 :disabled="loading"
               >
-                {{ loading ? '处理中...' : mode === 'login' ? AUTH_COPY.submitLogin : AUTH_COPY.submitRegister }}
+                {{ loading ? AUTH_COPY.processing : mode === 'login' ? AUTH_COPY.submitLogin : AUTH_COPY.submitRegister }}
               </button>
             </form>
           </section>
@@ -115,7 +115,7 @@ const highlights = AUTH_COPY.highlights
 
 async function submit() {
   if (!form.username || !form.password) {
-    showToast('请输入账号名和密码')
+    showToast(AUTH_COPY.toastMissingCredentials)
     return
   }
   try {

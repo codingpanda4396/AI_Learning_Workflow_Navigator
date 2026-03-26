@@ -79,7 +79,7 @@ export const MOCK_WORKBENCH_BY_PHASE: Record<WorkbenchPhaseCode, Partial<TaskExe
   },
   TRAINING: {
     currentTask: {
-      phaseDisplayZh: '应用训练',
+      phaseDisplayZh: '表达训练',
       phaseCode: 'TRAINING',
       taskTitle: '写完整、再被纠错',
       coreActionLine: '用表达暴露真问题',
@@ -91,7 +91,7 @@ export const MOCK_WORKBENCH_BY_PHASE: Record<WorkbenchPhaseCode, Partial<TaskExe
   },
   REFLECTION: {
     currentTask: {
-      phaseDisplayZh: '反思校准',
+      phaseDisplayZh: '反思收敛',
       phaseCode: 'REFLECTION',
       taskTitle: '从错误抽规律',
       coreActionLine: '写一条下次可执行策略',

@@ -1,17 +1,13 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { getLearningScaffoldStage, submitLearningScaffoldAction } from '@/api/learningScaffold'
+import { phaseCodeToFullZh } from '@/constants/stageLabels'
 import type { LearningScaffoldActionResult, StageScaffold } from '@/types/scaffoldEngine'
 
 /** 四阶段展示名（与后端 stageKey 对齐） */
 export function scaffoldStageLabel(stageKey: string | undefined): string {
   if (!stageKey) return '脚手架'
-  const map: Record<string, string> = {
-    STRUCTURE: 'STRUCTURE · 结构建立',
-    UNDERSTANDING: 'UNDERSTANDING · 机制理解',
-    TRAINING: 'TRAINING · 训练',
-    REFLECTION: 'REFLECTION · 反思',
-  }
-  return map[stageKey] ?? stageKey
+  const zh = phaseCodeToFullZh(stageKey)
+  return zh || stageKey
 }
 
 export function useLearningScaffoldEngine(opts: {

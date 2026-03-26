@@ -1,46 +1,40 @@
 <template>
   <PageContainer>
-    <TransitionOverlay v-if="transitionOverlay" message="正在进入下一步..." />
+    <TransitionOverlay v-if="transitionOverlay" :message="GOAL_COPY.transition" />
     <AppTopBar current="goal" />
 
-    <main class="relative overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_28%,#f8fafc_100%)]">
-      <div
-        class="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_70%_55%_at_50%_0%,rgba(15,23,42,0.08),transparent)]"
-      />
-
+    <main class="relative overflow-hidden bg-background">
       <div class="relative mx-auto flex w-full max-w-5xl flex-col gap-10 px-5 py-8 pb-40 md:px-8 md:py-12 md:pb-44">
         <header class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-          <section
-            class="rounded-[32px] bg-white/70 px-2 py-3 md:px-3"
-          >
-            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-950 md:text-[42px] md:leading-[1.1]">
+          <section class="rounded-card bg-white/80 px-2 py-3 shadow-card md:px-3">
+            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-text-primary md:text-[42px] md:leading-[1.1]">
               {{ GOAL_COPY.title }}
             </h1>
-            <p class="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+            <p class="mt-4 max-w-2xl text-base leading-7 text-text-secondary">
               {{ GOAL_COPY.subtitle }}
             </p>
           </section>
 
-          <aside class="rounded-[24px] border border-slate-200/70 bg-white/82 p-5 shadow-[0_16px_36px_rgba(15,23,42,0.05)]">
-            <p class="text-sm font-medium text-slate-500">继续上次学习</p>
+          <aside class="rounded-card border border-border bg-white/90 p-5 shadow-card">
+            <p class="text-sm font-medium text-text-secondary">{{ GOAL_COPY.continueTitle }}</p>
 
             <template v-if="auth.isAuthenticated && auth.recentLearningEntry?.sessionId">
-              <p class="mt-3 text-base font-semibold text-slate-950">{{ continueLabel }}</p>
+              <p class="mt-3 text-base font-semibold text-text-primary">{{ continueLabel }}</p>
               <SecondaryButton class="mt-5 w-full justify-center" @click="continueLatest">
-                继续学习
+                {{ GOAL_COPY.continueCta }}
               </SecondaryButton>
             </template>
 
             <template v-else-if="auth.isAuthenticated">
-              <p class="mt-3 text-base font-semibold text-slate-950">还没有上次进度</p>
-              <p class="mt-2 text-sm leading-6 text-slate-600">这次开始后，这里会保留你的最近一轮学习。</p>
+              <p class="mt-3 text-base font-semibold text-text-primary">{{ GOAL_COPY.continueEmpty }}</p>
+              <p class="mt-2 text-sm leading-6 text-text-secondary">{{ GOAL_COPY.noProgressBody }}</p>
             </template>
 
             <template v-else>
-              <p class="mt-3 text-base font-semibold text-slate-950">登录后可继续上次学习</p>
-              <p class="mt-2 text-sm leading-6 text-slate-600">学习记录会自动保留在账号里。</p>
+              <p class="mt-3 text-base font-semibold text-text-primary">{{ GOAL_COPY.continueLoginTitle }}</p>
+              <p class="mt-2 text-sm leading-6 text-text-secondary">{{ GOAL_COPY.continueLoginHint }}</p>
               <SecondaryButton class="mt-5 w-full justify-center" @click="goToLogin">
-                登录
+                {{ GOAL_COPY.loginCta }}
               </SecondaryButton>
             </template>
           </aside>
@@ -49,9 +43,9 @@
         <section class="space-y-4">
           <div class="flex items-center justify-between gap-4">
             <div>
-              <h2 class="text-xl font-semibold text-slate-950">学科</h2>
+              <h2 class="text-xl font-semibold text-text-primary">{{ GOAL_COPY.subjectSection }}</h2>
             </div>
-            <p class="hidden text-sm text-slate-400 md:block">每科仅开放 1 个演示主题，其余为占位</p>
+            <p class="hidden text-sm text-text-secondary md:block">{{ GOAL_COPY.demoHint }}</p>
           </div>
 
           <div class="grid gap-4 md:grid-cols-2">
@@ -67,13 +61,13 @@
                 <div>
                   <h3
                     class="text-xl font-semibold"
-                    :class="selectedSubjectKey === subject.key ? 'text-white' : 'text-slate-950'"
+                    :class="selectedSubjectKey === subject.key ? 'text-white' : 'text-text-primary'"
                   >
                     {{ subject.label }}
                   </h3>
                   <p
                     class="mt-3 text-sm leading-6"
-                    :class="selectedSubjectKey === subject.key ? 'text-slate-200' : 'text-slate-600'"
+                    :class="selectedSubjectKey === subject.key ? 'text-slate-200' : 'text-text-secondary'"
                   >
                     {{ subject.description }}
                   </p>
@@ -94,7 +88,7 @@
                 class="mt-5 text-sm font-medium"
                 :class="selectedSubjectKey === subject.key ? 'text-slate-300' : 'text-slate-500'"
               >
-                代表知识点
+                {{ GOAL_COPY.representativePoints }}
               </p>
               <p
                 class="mt-2 text-sm"
@@ -109,14 +103,14 @@
         <section class="space-y-4">
           <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 class="text-xl font-semibold text-slate-950">知识点</h2>
+              <h2 class="text-xl font-semibold text-text-primary">{{ GOAL_COPY.topicSection }}</h2>
             </div>
-            <div class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">
-              当前学科：{{ selectedSubject.label }}
+            <div class="rounded-full border border-border bg-white px-4 py-2 text-sm text-text-secondary">
+              {{ GOAL_COPY.currentSubjectPrefix }}{{ selectedSubject.label }}
             </div>
           </div>
 
-          <div class="rounded-[28px] bg-white/72 p-1">
+          <div class="rounded-card border border-border/60 bg-white/80 p-1 shadow-card">
             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <button
                 v-for="topic in selectedSubjectTopics"
@@ -132,7 +126,7 @@
                     v-if="!isHomeTopicConfigured(topic.key)"
                     class="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-400"
                   >
-                    即将开放
+                    {{ GOAL_COPY.comingSoon }}
                   </span>
                   <span
                     v-else
@@ -149,16 +143,16 @@
         </section>
       </div>
 
-      <div class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/80 bg-white/95 backdrop-blur">
+      <div class="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-white/95 backdrop-blur">
         <div class="mx-auto flex w-full max-w-5xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8">
           <div class="min-w-0">
-            <p class="text-sm font-medium text-slate-500">当前选择</p>
-            <p class="mt-1 truncate text-base font-semibold text-slate-950">{{ selectionSummary }}</p>
-            <p class="mt-1 text-sm text-slate-500">系统将自动为你安排本轮起点</p>
+            <p class="text-sm font-medium text-text-secondary">{{ GOAL_COPY.footerTitle }}</p>
+            <p class="mt-1 truncate text-base font-semibold text-text-primary">{{ selectionSummary }}</p>
+            <p class="mt-1 text-sm text-text-secondary">{{ GOAL_COPY.footerHint }}</p>
           </div>
 
           <PrimaryButton
-            class="w-full justify-center px-6 py-3 text-base font-semibold shadow-[0_14px_28px_rgba(15,23,42,0.14)] md:w-auto"
+            class="w-full justify-center px-6 py-3 text-base font-semibold shadow-card md:w-auto"
             :loading="loading"
             :disabled="ctaDisabled"
             @click="onSubmit"
@@ -254,11 +248,11 @@ const autoStartIntent = computed(() => selectedTopic.value.recommendedIntent ?? 
 const continueLabel = computed(() => {
   const entry = auth.recentLearningEntry
   if (!entry?.sessionId) return ''
-  return entry.sessionStatus === 'COMPLETED' ? '继续上次：回到这轮学习结果' : '继续上次：回到刚才的学习进度'
+  return entry.sessionStatus === 'COMPLETED' ? GOAL_COPY.continueResult : GOAL_COPY.continueProgress
 })
 const selectionSummary = computed(() => `${selectedSubject.value.label} / ${selectedTopic.value.label}`)
 const ctaDisabled = computed(() => !isHomeTopicConfigured(selectedTopicKey.value))
-const ctaLabel = computed(() => (auth.isAuthenticated ? '开始学习' : '登录后开始'))
+const ctaLabel = computed(() => (auth.isAuthenticated ? GOAL_COPY.ctaStart : GOAL_COPY.ctaLogin))
 
 onMounted(async () => {
   if (!auth.isAuthenticated) return
@@ -357,7 +351,7 @@ async function continueLatest() {
 async function onSubmit() {
   if (!auth.isAuthenticated) {
     auth.setPendingRedirect('/goal')
-    showToast('登录后就能开始这一轮')
+    showToast(GOAL_COPY.toastStart)
     await router.push('/auth/login')
     return
   }

@@ -1,15 +1,12 @@
 <template>
   <PageContainer>
-    <TransitionOverlay
-      v-if="submitTransitionOverlay"
-      message="我正在根据你的回答整理思路，马上就好…"
-    />
+    <TransitionOverlay v-if="submitTransitionOverlay" :message="DIAGNOSIS_COPY.transition" />
     <AppTopBar current="diagnosis" />
     <main class="mx-auto max-w-2xl px-6 py-8">
-      <LoadingState v-if="loading && !sessionReady" message="正在准备快速定位…" />
+      <LoadingState v-if="loading && !sessionReady" :message="DIAGNOSIS_COPY.loading" />
       <ErrorState v-else-if="error" :message="error">
         <template #action>
-          <SecondaryButton @click="fetchSession">重试</SecondaryButton>
+          <SecondaryButton @click="fetchSession">{{ DIAGNOSIS_COPY.retry }}</SecondaryButton>
         </template>
       </ErrorState>
 
@@ -32,7 +29,6 @@
             </p>
           </div>
           <p class="mt-3 text-sm font-medium leading-snug text-text-primary">
-            <span aria-hidden="true">👉</span>
             {{ DIAGNOSIS_COPY.intro }}
           </p>
         </template>
@@ -71,9 +67,9 @@
             </FormCard>
 
             <FormCard v-else class="space-y-3">
-              <p class="text-sm font-semibold text-primary">第 1 题</p>
+              <p class="text-sm font-semibold text-primary">{{ DIAGNOSIS_COPY.qPrefix }} 1 {{ DIAGNOSIS_COPY.qSuffix }}</p>
               <h3 class="text-base font-medium text-text-primary">
-                你对这个内容现在大概处于什么状态？
+                {{ DIAGNOSIS_COPY.qFoundation }}
               </h3>
               <div class="space-y-2 pt-1">
                 <label
@@ -99,9 +95,9 @@
             </FormCard>
 
             <FormCard class="space-y-3">
-              <p class="text-sm font-semibold text-primary">第 2 题</p>
+              <p class="text-sm font-semibold text-primary">{{ DIAGNOSIS_COPY.qPrefix }} 2 {{ DIAGNOSIS_COPY.qSuffix }}</p>
               <h3 class="text-base font-medium text-text-primary">
-                你现在最大的困难更像哪一种？
+                {{ DIAGNOSIS_COPY.qBlocker }}
               </h3>
               <div class="space-y-2 pt-1">
                 <label
@@ -127,9 +123,9 @@
             </FormCard>
 
             <FormCard class="space-y-3">
-              <p class="text-sm font-semibold text-primary">第 3 题</p>
+              <p class="text-sm font-semibold text-primary">{{ DIAGNOSIS_COPY.qPrefix }} 3 {{ DIAGNOSIS_COPY.qSuffix }}</p>
               <h3 class="text-base font-medium text-text-primary">
-                你这次想怎么推进？
+                {{ DIAGNOSIS_COPY.q3 }}
               </h3>
               <div class="space-y-2 pt-1">
                 <label
@@ -281,7 +277,7 @@ function delay(ms: number) {
 async function onSubmit() {
   if (topicDemoConfig.value) {
     if (!topicDiag.value) {
-      showToast('请选择第 1 题')
+      showToast(DIAGNOSIS_COPY.toastSelectQ1)
       return
     }
     ui.value.foundation = mapTopicDiagnosisToFoundation(
@@ -289,20 +285,20 @@ async function onSubmit() {
       topicDiag.value
     )
   } else if (!ui.value.foundation) {
-    showToast('请选择第 1 题')
+    showToast(DIAGNOSIS_COPY.toastSelectQ1)
     return
   }
   if (!ui.value.blocker) {
-    showToast('请选择第 2 题')
+    showToast(DIAGNOSIS_COPY.toastSelectQ2)
     return
   }
   if (!ui.value.pace) {
-    showToast('请选择第 3 题')
+    showToast(DIAGNOSIS_COPY.toastSelectQ3)
     return
   }
   const ans = mapQuickDiagnosisToAnswers(ui.value)
   if (!ans?.length || !store.diagnosisId) {
-    showToast('提交失败，请重试')
+    showToast(DIAGNOSIS_COPY.toastSubmitFail)
     return
   }
   submitting.value = true

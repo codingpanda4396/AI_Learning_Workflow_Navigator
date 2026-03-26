@@ -28,6 +28,7 @@ import {
   WORKBENCH_PHASE_SEQUENCE,
   type PhaseWorkbenchCopy,
 } from '@/constants/executionWorkbenchContent'
+import { phaseCodeToFullZh } from '@/constants/stageLabels'
 import type { KnowledgePackId } from '@/types/knowledgePack'
 import type {
   TaskExecutionWorkbenchModel,
@@ -80,7 +81,7 @@ const STEP_COPY: Record<
 > = {
   ORIENT: {
     stageLabel: 'STRUCTURE',
-    eyebrow: 'STRUCTURE',
+    eyebrow: '结构建立',
     title: '先搭知识骨架',
     description: '先别急着记细节。',
     inputLabel: '我的表达',
@@ -107,7 +108,7 @@ const STEP_COPY: Record<
   },
   EXPLORE: {
     stageLabel: 'UNDERSTANDING',
-    eyebrow: 'UNDERSTANDING',
+    eyebrow: '机制理解',
     title: '把机制讲清楚',
     description: '你现在最需要讲清的是因果与过程。',
     inputLabel: '我的表达',
@@ -134,7 +135,7 @@ const STEP_COPY: Record<
   },
   SELF_EXPLAIN: {
     stageLabel: 'TRAINING',
-    eyebrow: 'TRAINING',
+    eyebrow: '表达训练',
     title: '用自己的话写完整',
     description: '表达 → 纠错 → 重构。',
     inputLabel: '我的表达',
@@ -161,7 +162,7 @@ const STEP_COPY: Record<
   },
   REMEDIAL: {
     stageLabel: 'TRAINING',
-    eyebrow: 'TRAINING',
+    eyebrow: '表达训练',
     title: '只补这一处',
     description: '对照反馈，补上缺口。',
     inputLabel: '我的表达',
@@ -188,7 +189,7 @@ const STEP_COPY: Record<
   },
   CHECK: {
     stageLabel: 'REFLECTION',
-    eyebrow: 'REFLECTION',
+    eyebrow: '反思收敛',
     title: '独立作答',
     description: '写清依据，不抄书。',
     inputLabel: '我的表达',
@@ -199,7 +200,7 @@ const STEP_COPY: Record<
   },
   PASS: {
     stageLabel: 'REFLECTION',
-    eyebrow: 'REFLECTION',
+    eyebrow: '反思收敛',
     title: '收束带走',
     description: '一句总结，两个要点。',
     primaryActionLabel: '完成本任务',
@@ -675,7 +676,7 @@ export function buildExecutionPageModel(
       : buildRoundCompletionCriteria(state, input.task, input.scaffold)
 
   const metaParts = [
-    copy.stageLabel,
+    phaseCodeToFullZh(copy.stageLabel),
     input.progress ? `任务 ${input.progress.currentIndex}/${input.progress.totalTasks}` : null,
     activePoint ? `知识点 ${activePoint.index}/4` : null,
   ].filter(Boolean) as string[]
@@ -723,7 +724,7 @@ export function buildExecutionPageModel(
       completionCriteria,
       metaLine,
       title: activePoint?.title || input.task.title,
-      stageLabel: `当前阶段：${enriched.stageDisplay}（${copy.stageLabel}）`,
+      stageLabel: `当前阶段：${enriched.stageDisplay}`,
       stepLabel: `${input.guidedStepCurrent}/${input.guidedStepTotal}`,
       estimatedTime: enriched.estimatedTimeLabel,
       subtitle:

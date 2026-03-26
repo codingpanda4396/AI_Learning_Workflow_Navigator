@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <PageContainer>
     <AppTopBar current="report" />
     <main class="mx-auto max-w-3xl px-6 py-8">
@@ -14,7 +14,7 @@
       <LoadingState v-if="loading && !report" :message="REPORT_COPY.loading" />
       <ErrorState v-else-if="error" :message="error">
         <template #action>
-          <SecondaryButton @click="fetchReport">重试</SecondaryButton>
+          <SecondaryButton @click="fetchReport">{{ REPORT_COPY.retry }}</SecondaryButton>
         </template>
       </ErrorState>
 
@@ -28,86 +28,86 @@
         </FormCard>
 
         <FormCard v-if="report.goalReview">
-          <SectionHeader>目标回顾</SectionHeader>
+          <SectionHeader>{{ REPORT_COPY.goalReview }}</SectionHeader>
           <p class="text-text-primary">{{ report.goalReview }}</p>
         </FormCard>
 
         <FormCard v-if="report.completedProgress?.length">
-          <SectionHeader>已完成进展</SectionHeader>
+          <SectionHeader>{{ REPORT_COPY.completedProgress }}</SectionHeader>
           <ul class="list-disc space-y-1 pl-5 text-text-secondary">
             <li v-for="(p, i) in report.completedProgress" :key="i">{{ p }}</li>
           </ul>
         </FormCard>
 
         <FormCard v-if="report.unresolvedIssues?.length">
-          <SectionHeader>待解决问题</SectionHeader>
+          <SectionHeader>{{ REPORT_COPY.unresolvedIssues }}</SectionHeader>
           <ul class="list-disc space-y-1 pl-5 text-amber-700">
             <li v-for="(u, i) in report.unresolvedIssues" :key="i">{{ u }}</li>
           </ul>
         </FormCard>
 
         <FormCard v-if="report.evidenceSummary?.length">
-          <SectionHeader>证据摘要</SectionHeader>
+          <SectionHeader>{{ REPORT_COPY.evidenceSummary }}</SectionHeader>
           <ul class="list-disc space-y-1 pl-5 text-text-secondary">
             <li v-for="(e, i) in report.evidenceSummary" :key="i">{{ e }}</li>
           </ul>
         </FormCard>
 
         <FormCard v-if="report.summaryText">
-          <SectionHeader>总结</SectionHeader>
+          <SectionHeader>{{ REPORT_COPY.summarySection }}</SectionHeader>
           <p class="text-text-primary">{{ report.summaryText }}</p>
         </FormCard>
 
         <FormCard
           v-if="report.learningMethodProfile && report.learningMethodProfile.questioningQuality !== 'UNKNOWN'"
         >
-          <SectionHeader>学习方法表现</SectionHeader>
+          <SectionHeader>{{ REPORT_COPY.learningMethod }}</SectionHeader>
           <p class="mb-3 text-sm text-text-secondary">
-            基于任务内的提问、自我解释与微检查等行为汇总。
+            {{ REPORT_COPY.learningMethodHint }}
           </p>
           <ul class="space-y-2 text-sm text-text-primary">
             <li>
-              <span class="text-text-secondary">提问质量：</span>
+              <span class="text-text-secondary">{{ REPORT_COPY.methodQuestioning }}</span>
               {{ methodQualityLabel(report.learningMethodProfile.questioningQuality) }}
             </li>
             <li>
-              <span class="text-text-secondary">自我解释：</span>
+              <span class="text-text-secondary">{{ REPORT_COPY.methodSelfExplain }}</span>
               {{
                 report.learningMethodProfile.selfExplanationPerformed
-                  ? report.learningMethodProfile.selfExplanationQuality || '已提交'
-                  : '未检测到'
+                  ? report.learningMethodProfile.selfExplanationQuality || REPORT_COPY.submitted
+                  : REPORT_COPY.notDetected
               }}
             </li>
             <li>
-              <span class="text-text-secondary">微检查：</span>
+              <span class="text-text-secondary">{{ REPORT_COPY.methodCheck }}</span>
               {{
                 report.learningMethodProfile.checkPassed === true
-                  ? '通过'
+                  ? REPORT_COPY.passed
                   : report.learningMethodProfile.checkPassed === false
-                    ? '部分未通过'
+                    ? REPORT_COPY.partialFail
                     : '—'
               }}
             </li>
             <li v-if="report.learningMethodProfile.positiveSignals?.length">
-              <span class="text-text-secondary">正向信号：</span>
+              <span class="text-text-secondary">{{ REPORT_COPY.methodPositive }}</span>
               {{ report.learningMethodProfile.positiveSignals.join('；') }}
             </li>
             <li
               v-if="report.learningMethodProfile.antiPatternObserved?.length"
               class="text-amber-800"
             >
-              <span class="text-text-secondary">需注意：</span>
+              <span class="text-text-secondary">{{ REPORT_COPY.methodAnti }}</span>
               {{ report.learningMethodProfile.antiPatternObserved.join('；') }}
             </li>
             <li v-if="report.learningMethodProfile.nextMethodAdvice?.length">
-              <span class="text-text-secondary">下一轮建议：</span>
+              <span class="text-text-secondary">{{ REPORT_COPY.methodNextAdvice }}</span>
               {{ report.learningMethodProfile.nextMethodAdvice.join(' ') }}
             </li>
           </ul>
         </FormCard>
 
         <FormCard v-if="nextAction">
-          <SectionHeader>下一步建议</SectionHeader>
+          <SectionHeader>{{ REPORT_COPY.nextActionSection }}</SectionHeader>
           <p class="font-medium text-primary">
             {{ nextActionTypeLabels[nextAction.actionType] ?? nextAction.actionType }}
           </p>
@@ -118,14 +118,14 @@
             v-if="nextAction.requiresReplan"
             class="mt-2 text-sm text-amber-700"
           >
-            建议重新规划学习路径
+            {{ REPORT_COPY.replanBanner }}
           </p>
         </FormCard>
 
         <FormCard>
-          <SectionHeader>确认下一步</SectionHeader>
+          <SectionHeader>{{ REPORT_COPY.confirmCardTitle }}</SectionHeader>
           <p class="mb-4 text-sm text-text-secondary">
-            请选择你打算执行的下一步动作
+            {{ REPORT_COPY.confirmCardHint }}
           </p>
           <div class="flex flex-wrap gap-2">
             <button
@@ -149,10 +149,10 @@
               :disabled="!selectedAction"
               @click="onConfirm"
             >
-              确认并继续
+              {{ REPORT_COPY.confirmSubmit }}
             </PrimaryButton>
             <SecondaryButton @click="router.push('/goal')">
-              重新开始
+              {{ REPORT_COPY.restart }}
             </SecondaryButton>
           </div>
         </FormCard>
@@ -237,9 +237,9 @@ async function onConfirm() {
   confirming.value = true
   try {
     const data = await confirmNextAction(store.sessionId, selectedAction.value)
-    nextHint.value = data.nextHint ?? '已确认下一步'
+    nextHint.value = data.nextHint ?? REPORT_COPY.nextHintDefault
     if (data.requiresReplan) {
-      showToast('建议重新规划，请从目标输入重新开始')
+      showToast(REPORT_COPY.toastReplan)
     }
   } catch (err) {
     showToast(getErrorMessage(err))

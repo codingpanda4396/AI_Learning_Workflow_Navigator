@@ -5,13 +5,10 @@
   >
     <div class="flex flex-wrap items-center gap-2">
       <span
-        v-if="model.phaseCode"
-        class="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-primary"
+        v-if="phaseBadge"
+        class="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
       >
-        {{ model.phaseCode }}
-      </span>
-      <span v-if="model.phaseDisplayZh" class="text-sm font-semibold text-slate-800">
-        {{ model.phaseDisplayZh }}
+        {{ phaseBadge }}
       </span>
     </div>
 
@@ -170,12 +167,14 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import PrimaryButton from '@/components/ui/PrimaryButton.vue'
+import { phaseCodeToFullZh } from '@/constants/stageLabels'
 import { taskCompletionStatusLabels } from '@/types/labels'
 import type { TaskCompletionStatusType } from '@/types/enums'
 import type { ExecutionGuideActionModel } from '@/types/executionGuide'
 
-defineProps<{
+const props = defineProps<{
   model: ExecutionGuideActionModel
   draftValue: string
   loading?: boolean
@@ -188,6 +187,13 @@ defineProps<{
   learnerReflection: string
   completionStatus: TaskCompletionStatusType
 }>()
+
+const phaseBadge = computed(() => {
+  const zh = props.model.phaseDisplayZh?.trim()
+  if (zh) return zh
+  const code = props.model.phaseCode?.trim()
+  return code ? phaseCodeToFullZh(code) : ''
+})
 
 defineEmits<{
   'update:draftValue': [value: string]

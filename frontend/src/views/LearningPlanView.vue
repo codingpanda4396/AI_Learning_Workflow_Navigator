@@ -1,6 +1,6 @@
 <template>
   <PageContainer>
-    <div class="min-h-screen bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f8fafc_32%,#f8fafc_100%)]">
+    <div class="min-h-screen bg-background">
       <AppTopBar current="plan" />
       <main class="mx-auto flex w-full max-w-3xl flex-col px-4 pb-10 pt-4 md:max-w-4xl md:px-6 lg:px-8">
         <LoadingState v-if="loading && !plan" :message="PLAN_COPY.loading" />

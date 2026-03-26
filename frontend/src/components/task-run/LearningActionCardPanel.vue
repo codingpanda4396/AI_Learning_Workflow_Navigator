@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { phaseCodeToFullZh } from '@/constants/stageLabels'
 import type { LearningActionCard as Card } from '@/types/scaffoldEngine'
 import type { LearningScaffoldActionResult } from '@/types/scaffoldEngine'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
@@ -7,7 +8,7 @@ import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 const props = defineProps<{
   /** 后端 stageKey，如 TRAINING */
   stageKey?: string
-  /** 顶部阶段标签，如「STRUCTURE · 结构建立」 */
+  /** 顶部阶段标签（优先） */
   phaseLabel?: string
   stageTitle: string
   stageGoal: string
@@ -19,7 +20,11 @@ const props = defineProps<{
   inputLabel: string
 }>()
 
-const headerEyebrow = computed(() => props.phaseLabel ?? `STRUCTURE · ${props.stageTitle}`)
+const headerEyebrow = computed(() => {
+  if (props.phaseLabel?.trim()) return props.phaseLabel.trim()
+  const zh = props.stageKey ? phaseCodeToFullZh(props.stageKey) : ''
+  return zh ? `${zh} · ${props.stageTitle}` : props.stageTitle
+})
 
 const aspectFeedback = computed(() => {
   const v = props.lastResult?.validation

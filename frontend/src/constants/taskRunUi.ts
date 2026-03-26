@@ -4,12 +4,12 @@ export const TASK_STATE_META: Record<
   string,
   { label: string; variant: 'default' | 'success' | 'warning' | 'error' }
 > = {
-  ORIENT: { label: 'ORIENT / 定位任务', variant: 'default' },
-  EXPLORE: { label: 'EXPLORE / 推进探索', variant: 'default' },
-  SELF_EXPLAIN: { label: 'SELF_EXPLAIN / 自我解释', variant: 'default' },
-  CHECK: { label: 'CHECK / 微检查', variant: 'warning' },
-  REMEDIAL: { label: 'REMEDIAL / 修补薄弱点', variant: 'warning' },
-  PASS: { label: 'PASS / 可以收束', variant: 'success' },
+  ORIENT: { label: '定位任务', variant: 'default' },
+  EXPLORE: { label: '推进探索', variant: 'default' },
+  SELF_EXPLAIN: { label: '自我解释', variant: 'default' },
+  CHECK: { label: '微检查', variant: 'warning' },
+  REMEDIAL: { label: '补薄弱点', variant: 'warning' },
+  PASS: { label: '可收束', variant: 'success' },
 }
 
 export const GUIDANCE_PHASE_LABELS: Record<string, string> = {

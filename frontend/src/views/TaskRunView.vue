@@ -2,15 +2,15 @@
   <PageContainer>
     <AppTopBar current="task" />
     <main class="mx-auto max-w-[1260px] px-4 py-6 md:px-6 lg:px-8">
-      <LoadingState v-if="loading && !task" message="正在打开当前任务..." />
+      <LoadingState v-if="loading && !task" :message="TASKRUN_COPY.loading" />
       <ErrorState v-else-if="error" :message="error">
         <template #action>
-          <SecondaryButton @click="fetchTask">重试</SecondaryButton>
+          <SecondaryButton @click="fetchTask">{{ TASKRUN_COPY.retry }}</SecondaryButton>
         </template>
       </ErrorState>
-      <EmptyState v-else-if="!task && !loading" message="当前没有任务">
+      <EmptyState v-else-if="!task && !loading" :message="TASKRUN_COPY.empty">
         <template #action>
-          <SecondaryButton @click="router.push('/report')">查看结果</SecondaryButton>
+          <SecondaryButton @click="router.push('/report')">{{ TASKRUN_COPY.viewReport }}</SecondaryButton>
         </template>
       </EmptyState>
 
@@ -38,7 +38,8 @@
                 v-if="scaffoldEngine.loading"
                 class="rounded-2xl border border-slate-200 bg-white/80 p-8 text-center text-sm text-slate-600"
               >
-                正在加载 {{ scaffoldStageLabel(scaffoldEngine.stage?.stageKey) }}…
+                {{ TASKRUN_COPY.scaffoldLoadingPrefix }}
+                {{ scaffoldStageLabel(scaffoldEngine.stage?.stageKey) }}{{ TASKRUN_COPY.scaffoldLoadingSuffix }}
               </div>
               <div
                 v-else-if="scaffoldEngine.error"
@@ -58,7 +59,7 @@
                 :loading="scaffoldEngine.loading"
                 :submitting="scaffoldEngine.submitting"
                 :last-result="scaffoldEngine.lastResult"
-                :input-label="scaffoldEngine.currentCard?.userOutputLabel || '我的回答'"
+                :input-label="scaffoldEngine.currentCard?.userOutputLabel || TASKRUN_COPY.defaultMyAnswer"
                 @submit="onStructureSubmit"
               />
             </template>
@@ -78,7 +79,7 @@
               <ExpressionWorkspace
                 :chat-turns="chatTurns"
                 :draft-value="draftInput"
-                :input-label="pageModel.mainAction.inputLabel || '我的表达'"
+                :input-label="pageModel.mainAction.inputLabel || TASKRUN_COPY.defaultMyExpression"
                 :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
                 :input-placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
                 :sending="mainActionLoading"
@@ -151,7 +152,7 @@
           :show-advance="useDrivingSeatLayout && showAdvanceSection && !useStructureEngineUi"
           :can-advance="canAdvanceDriving"
           :advancing="advancing"
-          advance-label="进入下一阶段"
+          :advance-label="TASKRUN_COPY.advancePhase"
           @save-draft="saveDraftExplicit"
           @primary="handlePrimaryAction"
           @advance="onAdvanceDrivingSeat"
@@ -192,6 +193,7 @@ import {
   postSelfExplanation,
   postTaskMessage,
 } from '@/api/task'
+import { TASKRUN_COPY } from '@/constants/uiCopy'
 import { fallbackGuidanceForState, tutorPromptFor } from '@/constants/taskRunUi'
 import { showToast } from '@/stores/toast'
 import { useAiTutorStore } from '@/stores/aiTutor'
