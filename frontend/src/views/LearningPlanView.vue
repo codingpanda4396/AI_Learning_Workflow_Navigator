@@ -19,6 +19,8 @@
             :headline="actionPanel.hero.headline"
             :subline="actionPanel.hero.subline"
             :current-problem-label="actionPanel.hero.currentProblemLabel"
+            :problem-line="actionPanel.hero.problemLine"
+            :strategy-line="actionPanel.hero.strategyLine"
             :recommended-stage-label-zh="actionPanel.hero.recommendedStageLabelZh"
             :recommended-stage-label-en="actionPanel.hero.recommendedStageLabelEn"
             :total-estimated-label="actionPanel.hero.totalEstimatedLabel"

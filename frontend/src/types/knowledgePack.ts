@@ -8,6 +8,9 @@ export type KnowledgePackId =
 
 export type KnowledgeType = 'COMPARE' | 'SEQUENCE' | 'CHOICE' | 'MECHANISM'
 
+/** 执行页知识点脚手架模板（与后端 knowledgeType 独立，用于 UI 特化） */
+export type KnowledgePointExecutionTemplate = 'CONCEPT' | 'PROCESS' | 'STRUCTURE' | 'PROBLEM'
+
 export type PlanningPackStep = {
   flowTitle: string
   flowSubtitle: string
@@ -36,11 +39,15 @@ export type PlanningPack = {
 
 export type ExecutionPack = {
   starterPrompts: string[]
+  /** 执行页模板类型；未设置时由前端根据 knowledgeType / taskType 推断 */
+  executionTemplate?: KnowledgePointExecutionTemplate
   scaffoldCards: Array<{
     id: string
     title: string
     hint: string
     prompt: string
+    /** 主按钮动作文案，如「开始搭骨架」 */
+    actionLabel?: string
   }>
   phaseHero: Partial<Record<'ORIENT' | 'EXPLORE' | 'SELF_EXPLAIN' | 'CHECK' | 'REMEDIAL' | 'PASS', string>>
   phaseObjective: Partial<Record<'ORIENT' | 'EXPLORE' | 'SELF_EXPLAIN' | 'CHECK' | 'REMEDIAL' | 'PASS', string>>
@@ -62,6 +69,8 @@ export type CheckpointPack = {
 export type KnowledgePack = {
   id: KnowledgePackId
   knowledgeType: KnowledgeType
+  /** 显式执行模板（演示包建议都填） */
+  executionTemplate: KnowledgePointExecutionTemplate
   planning: PlanningPack
   execution: ExecutionPack
   tutor: TutorPack

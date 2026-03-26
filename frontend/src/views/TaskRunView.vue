@@ -14,43 +14,65 @@
         </template>
       </EmptyState>
 
-      <section v-else-if="task" class="space-y-6">
-        <ExecutionTaskHeader
-          :model="pageModel.header"
-          :show-scaffold-hints="useDrivingSeat"
+      <section v-else-if="task" class="space-y-5 pb-28">
+        <StageProgressHeader
+          :topic-name="workbenchTopicName"
+          :phase-progress="pageModel.workbench.phaseProgress"
+          :task-status-label="pageModel.workbench.taskStatusLabel"
+          :strategy-line="pageModel.header.strategyLine"
         />
 
-        <section class="grid gap-6 lg:grid-cols-[minmax(0,1fr),320px] lg:items-start">
-          <div class="space-y-6">
-            <ExecutionDrivingSeat
-              v-if="useDrivingSeat"
-              :cards="pageModel.scaffoldCards"
-              :chat-turns="chatTurns"
-              :draft-value="draftInput"
-              :input-label="pageModel.mainAction.inputLabel || '你想补充的'"
-              :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
-              :primary-action-label="pageModel.mainAction.primaryActionLabel"
-              :sending="sending"
-              :can-submit-chat="canSubmitDrivingChat"
-              :show-restate="showRestateSection"
-              :show-advance="showAdvanceSection"
-              :micro-check-labels="microCheckLabels"
-              :checks="microChecks"
-              :can-advance="canAdvanceDriving"
-              :advancing="advancing"
-              advance-label="我已经搭好这个点的框架，进入下一步"
-              :restate-what="restateWhat"
-              :restate-problem="restateProblem"
-              :restate-relate="restateRelate"
-              @update:draft-value="draftInput = $event"
-              @update:checks="microChecks = $event"
-              @update:restate-what="restateWhat = $event"
-              @update:restate-problem="restateProblem = $event"
-              @update:restate-relate="restateRelate = $event"
-              @send-card="onSendScaffoldCard"
-              @submit-chat="sendMessage"
-              @advance="onAdvanceDrivingSeat"
+        <section class="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
+          <div
+            class="space-y-6 lg:col-span-8"
+            :data-phase="pageModel.workbench.emphasisPhase"
+          >
+            <CurrentTaskCard
+              :model="pageModel.workbench.currentTask"
+              :emphasis-phase="pageModel.workbench.emphasisPhase"
             />
+
+            <template v-if="useDrivingSeatLayout">
+              <ScaffoldActionCard
+                :product="pageModel.workbench.scaffoldProduct"
+                :cards="pageModel.scaffoldCards"
+                :phase-prompt-chips="pageModel.tutorConsole.phasePromptChips"
+                :sending="mainActionLoading"
+                @send-card="onSendScaffoldCard"
+                @prefill-card="onPrefillScaffoldCard"
+                @prefill-chip="onPrefillPhaseChip"
+              />
+
+              <UserExpressionPanel
+                :chat-turns="chatTurns"
+                :draft-value="draftInput"
+                :input-label="pageModel.mainAction.inputLabel || '你想补充的'"
+                :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
+                :input-placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
+                :primary-action-label="pageModel.mainAction.primaryActionLabel"
+                :sending="mainActionLoading"
+                :can-submit-chat="canSubmitDrivingChat"
+                :show-restate="showRestateSection"
+                :show-advance="showAdvanceSection"
+                :micro-check-labels="microCheckLabels"
+                :checks="microChecks"
+                :can-advance="canAdvanceDriving"
+                :advancing="advancing"
+                advance-label="我已经搭好这个点的框架，进入下一步"
+                :restate-what="restateWhat"
+                :restate-problem="restateProblem"
+                :restate-relate="restateRelate"
+                :emphasis-phase="pageModel.workbench.emphasisPhase"
+                @update:draft-value="draftInput = $event"
+                @update:checks="microChecks = $event"
+                @update:restate-what="restateWhat = $event"
+                @update:restate-problem="restateProblem = $event"
+                @update:restate-relate="restateRelate = $event"
+                @submit-chat="handlePrimaryAction"
+                @advance="onAdvanceDrivingSeat"
+                @stuck="onStuckFromPanel"
+              />
+            </template>
 
             <ExecutionMainActionCard
               v-else
@@ -76,35 +98,77 @@
               @submit="handlePrimaryAction"
             />
 
-            <ExecutionSystemFeedback
-              :model="pageModel.feedback"
-              @action="handleFeedbackAction"
-            />
+            <FeedbackPanel :model="pageModel.feedback" @action="handleFeedbackAction" />
 
             <ExecutionHelpCollapse
               :sections="pageModel.helpSections"
-              :transcript="useDrivingSeat ? [] : transcriptItems"
+              :transcript="useDrivingSeatLayout ? [] : transcriptItems"
             />
           </div>
 
-          <ExecutionProgressRail :model="pageModel.progressRail" />
+          <aside class="space-y-4 lg:col-span-4">
+            <WhyThisStepCard :model="pageModel.workbench.whyThisStep" />
+            <StageRuleCard :model="pageModel.workbench.stageRules" />
+            <TopicSpecialHintCard :model="pageModel.workbench.topicHints" />
+            <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
+            <section
+              v-if="pageModel.progressRail.stuckActions.length"
+              class="rounded-2xl border border-amber-100 bg-amber-50/40 p-4"
+            >
+              <p class="text-xs font-semibold uppercase tracking-wide text-amber-900/90">
+                {{ pageModel.progressRail.stuckSectionTitle }}
+              </p>
+              <ul class="mt-3 space-y-2">
+                <li v-for="(action, i) in pageModel.progressRail.stuckActions" :key="i">
+                  <button
+                    type="button"
+                    class="w-full rounded-xl border border-amber-200/90 bg-white px-3 py-2 text-left text-sm text-slate-800 transition hover:border-primary/40 hover:bg-primary/5"
+                    :data-testid="`stuck-action-${i}`"
+                    @click="onStuckAction(action)"
+                  >
+                    {{ action }}
+                  </button>
+                </li>
+              </ul>
+            </section>
+          </aside>
         </section>
+
+        <BottomActionBar
+          :primary-label="bottomPrimaryLabel"
+          :primary-loading="mainActionLoading"
+          :primary-disabled="bottomPrimaryDisabled"
+          :show-advance="useDrivingSeatLayout && showAdvanceSection"
+          :can-advance="canAdvanceDriving"
+          :advancing="advancing"
+          advance-label="进入下一阶段"
+          @save-draft="saveDraftExplicit"
+          @open-tutor="openAiTutorPanel"
+          @primary="handlePrimaryAction"
+          @advance="onAdvanceDrivingSeat"
+        />
       </section>
     </main>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
-import ExecutionDrivingSeat from '@/components/task-run/ExecutionDrivingSeat.vue'
+import BottomActionBar from '@/components/task-run/BottomActionBar.vue'
+import CurrentTaskCard from '@/components/task-run/CurrentTaskCard.vue'
 import ExecutionHelpCollapse from '@/components/task-run/ExecutionHelpCollapse.vue'
 import ExecutionMainActionCard from '@/components/task-run/ExecutionMainActionCard.vue'
-import ExecutionProgressRail from '@/components/task-run/ExecutionProgressRail.vue'
-import ExecutionSystemFeedback from '@/components/task-run/ExecutionSystemFeedback.vue'
-import ExecutionTaskHeader from '@/components/task-run/ExecutionTaskHeader.vue'
+import FeedbackPanel from '@/components/task-run/FeedbackPanel.vue'
+import ScaffoldActionCard from '@/components/task-run/ScaffoldActionCard.vue'
+import StageProgressHeader from '@/components/task-run/StageProgressHeader.vue'
+import StageProgressMiniCard from '@/components/task-run/StageProgressMiniCard.vue'
+import StageRuleCard from '@/components/task-run/StageRuleCard.vue'
+import TopicSpecialHintCard from '@/components/task-run/TopicSpecialHintCard.vue'
+import UserExpressionPanel from '@/components/task-run/UserExpressionPanel.vue'
+import WhyThisStepCard from '@/components/task-run/WhyThisStepCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
@@ -121,6 +185,7 @@ import {
 } from '@/api/task'
 import { fallbackGuidanceForState, tutorPromptFor } from '@/constants/taskRunUi'
 import { showToast } from '@/stores/toast'
+import { useAiTutorStore } from '@/stores/aiTutor'
 import { useWorkflowStore } from '@/stores/workflow'
 import type {
   CheckpointResponse,
@@ -138,7 +203,7 @@ import type {
 } from '@/types/executionGuide'
 import { TaskCompletionStatus, type TaskCompletionStatusType } from '@/types/enums'
 import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
-import { buildExecutionPageModel } from '@/utils/buildExecutionPageModel'
+import { buildExecutionPageModel, createEmptyWorkbenchModel } from '@/utils/buildExecutionPageModel'
 import { buildTaskGuidedSteps, getCurrentGuidedStepId } from '@/utils/taskGuidedSteps'
 import { useKnowledgePack } from '@/composables/useKnowledgePack'
 
@@ -151,6 +216,7 @@ interface ChatTurn {
 const route = useRoute()
 const router = useRouter()
 const store = useWorkflowStore()
+const aiTutorStore = useAiTutorStore()
 
 const loading = ref(true)
 const completing = ref(false)
@@ -207,6 +273,9 @@ const EMPTY_PAGE_MODEL: ExecutionPageViewModel = {
   currentStepIndex: 1,
   currentStepTitle: '',
   header: {
+    phaseCode: '',
+    phaseDisplayZh: '',
+    anchorActionLine: '',
     heroTitle: '',
     heroSubtitle: '',
     completionCriteria: [],
@@ -219,9 +288,18 @@ const EMPTY_PAGE_MODEL: ExecutionPageViewModel = {
     trackTitle: '',
     trackSubtitle: '',
     knowledgePoints: [],
+    operationConsole: {
+      knowledgePointName: '',
+      knowledgePointType: 'CONCEPT',
+      roundGoal: '',
+      completionStandardLines: [],
+      estimatedTimeLabel: '',
+    },
   },
   mainAction: {
     mode: 'guided-input',
+    phaseCode: '',
+    phaseDisplayZh: '',
     eyebrow: '',
     title: '',
     description: '',
@@ -244,56 +322,28 @@ const EMPTY_PAGE_MODEL: ExecutionPageViewModel = {
     actions: [],
   },
   progressRail: {
-    progressSectionTitle: '',
-    progressLines: [],
-    criteriaSectionTitle: '',
-    completionLines: [],
+    stageSectionTitle: '',
+    stageLabel: '',
+    deliverableSectionTitle: '',
+    deliverableLine: '',
+    stuckSectionTitle: '',
+    stuckActions: [],
     nextSectionTitle: '',
     nextPreview: '',
     knowledgeOutline: [],
   },
   helpSections: [],
   scaffoldCards: [],
+  tutorConsole: {
+    currentDirective: '',
+    inputPlaceholderSoft: '',
+    stageDisplay: '',
+    currentDeliverable: '',
+    stuckActions: [],
+    phasePromptChips: [],
+  },
+  workbench: createEmptyWorkbenchModel(),
 }
-
-const pageModel = computed<ExecutionPageViewModel>(() => {
-  if (!task.value) {
-    return EMPTY_PAGE_MODEL
-  }
-  return buildExecutionPageModel({
-    task: task.value,
-    progress: progress.value,
-    planTasks: store.planPreview?.tasks ?? [],
-    scaffold: scaffold.value,
-    taskState: taskState.value,
-    guidedStepCurrent: guidedStepPosition.value.current,
-    guidedStepTotal: guidedStepPosition.value.total,
-    currentGuidance: currentGuidance.value,
-    recommendedUserActions: recommendedUserActions.value,
-    latestFeedback: latestFeedback.value,
-    checkpointQuestion: checkpointQuestion.value,
-    selfExplainMissingPoints: selfExplainMissingPoints.value,
-    legacyComplete: legacyComplete.value,
-    structuredGoal: store.structuredGoal,
-    plan: store.planPreview,
-  })
-})
-
-const knowledgePack = computed(() =>
-  useKnowledgePack({
-    scaffold: scaffold.value,
-    structuredGoal: store.structuredGoal,
-    plan: store.planPreview,
-  })
-)
-
-const transcriptItems = computed(() =>
-  chatTurns.value.map((item) => ({
-    role: item.role,
-    speaker: item.role === 'USER' ? '你的回答' : '反馈',
-    content: item.content,
-  }))
-)
 
 function countChatPairs(turns: ChatTurn[]): number {
   let n = 0
@@ -303,11 +353,22 @@ function countChatPairs(turns: ChatTurn[]): number {
   return n
 }
 
-const useDrivingSeat = computed(
-  () => !!task.value && (taskState.value === 'ORIENT' || taskState.value === 'EXPLORE')
-)
+/** 与 mainAction.mode !== 'closure' 对齐：不依赖 pageModel，避免与 canAdvance 循环 */
+const useDrivingSeatLayout = computed(() => {
+  if (!task.value) return false
+  if (legacyComplete.value) return false
+  return taskState.value !== 'PASS'
+})
 
 const chatPairs = computed(() => countChatPairs(chatTurns.value))
+
+const knowledgePack = computed(() =>
+  useKnowledgePack({
+    scaffold: scaffold.value,
+    structuredGoal: store.structuredGoal,
+    plan: store.planPreview,
+  })
+)
 
 const microCheckLabels = computed(() => {
   const fromPack = knowledgePack.value?.execution.microCheckLabels ?? []
@@ -330,11 +391,15 @@ watch(
 )
 
 const showRestateSection = computed(
-  () => useDrivingSeat.value && chatPairs.value >= 1
+  () =>
+    useDrivingSeatLayout.value &&
+    (taskState.value === 'ORIENT' || taskState.value === 'EXPLORE') &&
+    chatPairs.value >= 1
 )
 
 const showAdvanceSection = computed(
-  () => useDrivingSeat.value && taskState.value === 'EXPLORE' && chatPairs.value >= 1
+  () =>
+    useDrivingSeatLayout.value && taskState.value === 'EXPLORE' && chatPairs.value >= 1
 )
 
 const canAdvanceDriving = computed(() => {
@@ -347,10 +412,75 @@ const canAdvanceDriving = computed(() => {
   )
 })
 
-const canSubmitDrivingChat = computed(() => !!draftInput.value.trim())
+const pageModel = computed<ExecutionPageViewModel>(() => {
+  if (!task.value) {
+    return EMPTY_PAGE_MODEL
+  }
+  return buildExecutionPageModel({
+    task: task.value,
+    progress: progress.value,
+    planTasks: store.planPreview?.tasks ?? [],
+    scaffold: scaffold.value,
+    taskState: taskState.value,
+    guidedStepCurrent: guidedStepPosition.value.current,
+    guidedStepTotal: guidedStepPosition.value.total,
+    currentGuidance: currentGuidance.value,
+    recommendedUserActions: recommendedUserActions.value,
+    latestFeedback: latestFeedback.value,
+    checkpointQuestion: checkpointQuestion.value,
+    selfExplainMissingPoints: selfExplainMissingPoints.value,
+    legacyComplete: legacyComplete.value,
+    structuredGoal: store.structuredGoal,
+    plan: store.planPreview,
+    canAdvanceDriving: canAdvanceDriving.value,
+  })
+})
+
+const workbenchTopicName = computed(() => {
+  const w = pageModel.value.workbench.topicHints.topicDisplayName?.trim()
+  if (w) return w
+  return (
+    pageModel.value.header.operationConsole?.knowledgePointName ||
+    pageModel.value.header.title ||
+    '当前任务'
+  )
+})
+
+const bottomPrimaryLabel = computed(() => {
+  if (pageModel.value.mainAction.mode === 'closure') return '完成本任务'
+  return pageModel.value.mainAction.primaryActionLabel || '提交本轮'
+})
+
+const bottomPrimaryDisabled = computed(() => {
+  if (mainActionLoading.value) return true
+  if (pageModel.value.mainAction.mode === 'closure') return false
+  if (useDrivingSeatLayout.value) return !canSubmitDrivingChat.value
+  return !canSubmitMainAction.value
+})
+
+const transcriptItems = computed(() =>
+  chatTurns.value.map((item) => ({
+    role: item.role,
+    speaker: item.role === 'USER' ? '你的回答' : '反馈',
+    content: item.content,
+  }))
+)
+
+const canSubmitDrivingChat = computed(() => {
+  const mode = pageModel.value?.mainAction.mode
+  if (mode === 'closure') return false
+  return !!draftInput.value.trim()
+})
 
 const mainActionLoading = computed(() => {
-  if (useDrivingSeat.value) return sending.value || advancing.value
+  if (useDrivingSeatLayout.value) {
+    return (
+      sending.value ||
+      advancing.value ||
+      submittingCheckpoint.value ||
+      submittingSelf.value
+    )
+  }
   const mode = pageModel.value?.mainAction.mode
   if (mode === 'closure') return completing.value
   if (taskState.value === 'CHECK') return submittingCheckpoint.value
@@ -403,6 +533,66 @@ function fillDraftInput(text: string) {
     : value
 }
 
+function draftStorageKey(taskId: string) {
+  return `task-exec-draft-${taskId}`
+}
+
+let draftPersistTimer: ReturnType<typeof setTimeout> | null = null
+watch(draftInput, (v) => {
+  const id = task.value?.taskId
+  if (!id) return
+  if (draftPersistTimer) clearTimeout(draftPersistTimer)
+  draftPersistTimer = setTimeout(() => {
+    localStorage.setItem(draftStorageKey(id), v)
+  }, 450)
+})
+
+function saveDraftExplicit() {
+  const id = task.value?.taskId
+  if (!id) return
+  localStorage.setItem(draftStorageKey(id), draftInput.value)
+  showToast('草稿已保存')
+}
+
+function openAiTutorPanel() {
+  if (!task.value) return
+  aiTutorStore.setContext({
+    stepId: task.value.taskId,
+    step: guidedStepPosition.value.current,
+    knowledgeKey: knowledgePack.value?.id ?? 'unknown',
+    knowledgeLabel: knowledgePack.value?.tutor.focusLabel ?? task.value.title,
+    phaseCode: pageModel.value.header.phaseCode ?? 'STRUCTURE',
+    phaseLabel: pageModel.value.header.phaseDisplayZh ?? '',
+  })
+  aiTutorStore.openPanel()
+}
+
+function onStuckFromPanel() {
+  const actions = pageModel.value.progressRail.stuckActions
+  if (actions.length) {
+    onStuckAction(actions[0]!)
+    return
+  }
+  fillDraftInput('我卡住了：请用最短路径给我下一步线索。')
+}
+
+function onStuckAction(action: string) {
+  const focus = task.value?.title || scaffold.value?.learningObjective || '当前任务'
+  if (action === '看例子') {
+    fillDraftInput(tutorPromptFor('minimal_example', focus))
+    return
+  }
+  if (action === '看对比') {
+    fillDraftInput(tutorPromptFor('concept_compare', focus))
+    return
+  }
+  if (action === '请求简化') {
+    fillDraftInput('请用更短、更少的术语，把上一步压缩成两三句说给我。')
+    return
+  }
+  fillDraftInput(action)
+}
+
 function buildMessageFeedback(
   userInput: string,
   response: TaskMessageResponse
@@ -425,12 +615,18 @@ function buildMessageFeedback(
   )
   return {
     visible: true,
-    title: '当前反馈',
+    title: '本轮反馈',
     mastered: `你已经说出了一个有效切口：${mastered}`,
+    strengths: `你抓住了：${mastered}`,
     gap: `现在最该补的是：${gap}`,
+    keyIssues: [gap].filter(Boolean).slice(0, 2),
+    errorTags: response.taskState === 'EXPLORE' ? ['因果链'] : ['结构'],
+    nextRestateAsk: nextStep,
     nextStep,
+    primaryCta: 'apply_suggestion',
     actions: [
       { id: 'apply_suggestion', label: '补一句' },
+      { id: 'restate', label: '重新表达' },
       { id: 'show_example', label: '看例子' },
     ],
   }
@@ -440,21 +636,27 @@ function buildSelfExplainFeedback(
   response: SelfExplanationResponse
 ): ExecutionGuideFeedbackModel {
   const weak = response.evaluation === 'WEAK'
+  const miss =
+    response.missingPoints?.[0] || '还差一句「为什么成立」或「少了会怎样」。'
   return {
     visible: true,
-    title: '当前反馈',
+    title: '本轮反馈',
     mastered: weak
       ? '方向对了，先补这一处。'
       : '这一步已经讲清主要关系了。',
-    gap: weak
-      ? response.missingPoints?.[0] || '还差一句“为什么成立”或“少了会怎样”。'
-      : '这一步可以进入检查。',
+    strengths: weak ? '主线方向对，缺一处关键点。' : '关键关系已经讲顺。',
+    gap: weak ? miss : '这一步可以进入检查。',
+    keyIssues: weak ? [miss] : [],
+    errorTags: weak ? ['表述缺口'] : [],
+    nextRestateAsk: weak ? response.nextAction || '按这一点重写一小段。' : '直接答检查题。',
     nextStep: weak
       ? response.nextAction || '按这一点继续写。'
       : '直接答检查题。',
+    primaryCta: weak ? 'apply_suggestion' : 'restate',
     actions: weak
       ? [
           { id: 'apply_suggestion', label: '补一句' },
+          { id: 'restate', label: '重新表达' },
           { id: 'show_example', label: '看例子' },
         ]
       : [],
@@ -465,19 +667,30 @@ function buildCheckpointFeedback(
   response: CheckpointResponse
 ): ExecutionGuideFeedbackModel {
   const passed = response.result !== 'FAIL'
+  const reason = response.reason || '答案里还没有说清最关键的判断依据。'
   return {
     visible: true,
-    title: '当前反馈',
+    title: '本轮反馈',
     mastered: passed
       ? '这道检查题已经答出来了。'
       : '前面已经够了，只差这一个判断。',
-    gap: passed
-      ? '这一步过了。'
-      : response.reason || '答案里还没有说清最关键的判断依据。',
+    strengths: passed ? '判断与依据对齐。' : '方向接近，差一句依据。',
+    gap: passed ? '这一步过了。' : reason,
+    keyIssues: passed ? [] : [reason],
+    errorTags: passed ? [] : ['判断依据'],
+    nextRestateAsk: passed
+      ? '收住这一步，再继续。'
+      : response.suggestedRemedialAction || '用一句话写清你的判断依据，再试一次。',
     nextStep: passed
       ? '收住这一步，再继续。'
       : response.suggestedRemedialAction || '回到主卡，补上当前暴露出的关键缺口。',
-    actions: passed ? [] : [{ id: 'apply_suggestion', label: '补一句' }],
+    primaryCta: passed ? 'restate' : 'apply_suggestion',
+    actions: passed
+      ? []
+      : [
+          { id: 'apply_suggestion', label: '补一句' },
+          { id: 'restate', label: '重新表达' },
+        ],
   }
 }
 
@@ -554,6 +767,8 @@ async function loadScaffold(taskId: string) {
     scaffold.value = data
     legacyComplete.value = false
     syncRuntimeFromScaffold(data)
+    const saved = localStorage.getItem(draftStorageKey(taskId))
+    if (saved) draftInput.value = saved
     chatTurns.value = (data.recentMessages || [])
       .filter(isUiChatMessage)
       .map((message) => ({
@@ -607,8 +822,41 @@ async function sendMessage() {
   await sendMessageWithContent(draftInput.value)
 }
 
+function openAiTutorAfterScaffold() {
+  if (!task.value) return
+  aiTutorStore.setContext({
+    stepId: task.value.taskId,
+    step: guidedStepPosition.value.current,
+    knowledgeKey: knowledgePack.value?.id ?? 'unknown',
+    knowledgeLabel: knowledgePack.value?.tutor.focusLabel ?? task.value.title,
+    phaseCode: pageModel.value.header.phaseCode ?? 'STRUCTURE',
+    phaseLabel: pageModel.value.header.phaseDisplayZh ?? '',
+  })
+  aiTutorStore.openPanel()
+}
+
+async function onPrefillPhaseChip(line: string) {
+  draftInput.value = line
+  await nextTick()
+  openAiTutorAfterScaffold()
+}
+
 async function onSendScaffoldCard(prompt: string) {
-  await sendMessageWithContent(prompt)
+  if (taskState.value === 'ORIENT' || taskState.value === 'EXPLORE') {
+    await sendMessageWithContent(prompt)
+    openAiTutorAfterScaffold()
+    return
+  }
+  await onPrefillScaffoldCard(prompt)
+}
+
+async function onPrefillScaffoldCard(prompt: string) {
+  draftInput.value = prompt
+  await nextTick()
+  const el = document.querySelector<HTMLTextAreaElement>('[data-testid="driving-seat-input"]')
+  el?.focus()
+  el?.setSelectionRange(el.value.length, el.value.length)
+  openAiTutorAfterScaffold()
 }
 
 async function onAdvanceDrivingSeat() {
@@ -754,6 +1002,18 @@ async function handlePrimaryAction() {
 function handleFeedbackAction(actionId: string) {
   if (actionId === 'apply_suggestion') {
     fillDraftInput(latestFeedback.value?.gap || latestFeedback.value?.nextStep || '')
+    return
+  }
+  if (actionId === 'restate') {
+    const hint =
+      latestFeedback.value?.nextRestateAsk ||
+      latestFeedback.value?.nextStep ||
+      latestFeedback.value?.gap ||
+      ''
+    draftInput.value = hint ? `${hint}\n\n` : ''
+    void nextTick(() => {
+      document.querySelector<HTMLTextAreaElement>('[data-testid="driving-seat-input"]')?.focus()
+    })
     return
   }
   if (actionId === 'show_example') {

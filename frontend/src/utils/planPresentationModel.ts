@@ -9,6 +9,7 @@ import type {
   ShowcaseMindImageHint,
 } from '@/constants/showcaseKnowledgeConfig'
 import { useKnowledgePack } from '@/composables/useKnowledgePack'
+import { getKnowledgeDemoConfig } from '@/constants/KnowledgeConfig'
 import type { PlanningPackStep } from '@/types/knowledgePack'
 import { STAGE_GUIDE_META } from '@/constants/guidanceConfig'
 import type {
@@ -995,6 +996,10 @@ export type PlanActionHeroView = {
   headline: string
   subline: string
   currentProblemLabel: string
+  /** 演示四知识点：当前问题（与 KnowledgeConfig 对齐） */
+  problemLine?: string
+  /** 演示四知识点：策略一句话 */
+  strategyLine?: string
   recommendedStageCode: PlanStageCode
   recommendedStageLabelZh: string
   recommendedStageLabelEn: string
@@ -1237,6 +1242,7 @@ export function buildPlanActionPanelView(
   if (!plan) return null
 
   const pack = useKnowledgePack({ plan, structuredGoal: ctx.structuredGoal })
+  const demoConfig = getKnowledgeDemoConfig(pack?.id ?? null)
   const topic = resolveTopicLabel(plan, ctx)
   const recommendedStageCode = inferRecommendedStageCode(plan, ctx)
   const currentStageCode = currentStageCodeFromContext(plan, ctx)
@@ -1270,6 +1276,8 @@ export function buildPlanActionPanelView(
       pack?.planning.hero.subtitle ||
       buildHeroSubline(currentProblemLabel, recommendedStageCode),
     currentProblemLabel,
+    problemLine: demoConfig ? `当前问题：${demoConfig.plan.problem}` : undefined,
+    strategyLine: demoConfig ? `策略：${demoConfig.plan.strategy}` : undefined,
     recommendedStageCode,
     recommendedStageLabelZh: STAGE_ZH_LABEL[recommendedStageCode],
     recommendedStageLabelEn: STAGE_EN_LABEL[recommendedStageCode],

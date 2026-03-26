@@ -3,71 +3,45 @@
     data-testid="execution-main-action"
     class="overflow-hidden rounded-[32px] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,1),_rgba(248,250,252,0.96))] p-5 shadow-card md:p-7"
   >
-    <div class="max-w-3xl">
-      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ model.eyebrow }}</p>
-      <h2 class="mt-3 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
+    <div class="flex flex-wrap items-center gap-2">
+      <span
+        v-if="model.phaseCode"
+        class="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-primary"
+      >
+        {{ model.phaseCode }}
+      </span>
+      <span v-if="model.phaseDisplayZh" class="text-sm font-semibold text-slate-800">
+        {{ model.phaseDisplayZh }}
+      </span>
+    </div>
+
+    <div class="mt-4 max-w-3xl">
+      <h2 class="text-xl font-semibold tracking-tight text-slate-950 md:text-2xl">
         {{ model.title }}
       </h2>
-      <p class="mt-3 text-sm leading-6 text-slate-600 md:text-base">
+      <p v-if="model.description?.trim()" class="mt-2 text-sm leading-6 text-slate-600">
         {{ model.description }}
       </p>
     </div>
 
-    <section
-      v-if="model.focusTitle || model.focusObjective || model.focusReason || model.focusTips?.length"
-      class="mt-6 grid gap-4 rounded-[28px] border border-sky-100 bg-[linear-gradient(135deg,_rgba(240,249,255,0.95),_rgba(255,255,255,0.98))] p-5 md:grid-cols-[minmax(0,1.2fr),minmax(0,0.8fr)]"
-    >
-      <article>
-        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-          {{ model.focusLabel || '当前知识点' }}
-        </p>
-        <h3 v-if="model.focusTitle" class="mt-3 text-xl font-semibold text-slate-950">
-          {{ model.focusTitle }}
-        </h3>
-        <p v-if="model.focusObjective" class="mt-3 text-sm leading-6 text-slate-700">
-          {{ model.focusObjective }}
-        </p>
-      </article>
-
-      <article class="rounded-[22px] border border-white/80 bg-white/85 p-4">
-        <p class="text-sm font-semibold text-slate-950">现在先做</p>
-        <p v-if="model.focusReason" class="mt-2 text-sm leading-6 text-slate-700">
-          {{ model.focusReason }}
-        </p>
-        <ul
-          v-if="model.focusTips?.length"
-          class="mt-3 list-disc space-y-1.5 pl-5 text-sm leading-6 text-slate-700"
-        >
-          <li v-for="(tip, index) in model.focusTips" :key="`${index}-${tip}`">
-            {{ tip }}
-          </li>
-        </ul>
-      </article>
-    </section>
-
     <div v-if="model.mode === 'guided-input'" class="mt-6 space-y-5">
-      <label class="block">
-        <span class="text-sm font-semibold text-slate-950">{{ model.inputLabel }}</span>
-        <textarea
-          data-testid="execution-main-input"
-          :value="draftValue"
-          rows="7"
-          class="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-5 py-4 text-sm leading-7 text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-          :placeholder="model.inputPlaceholder"
-          :disabled="disabled"
-          @input="$emit('update:draftValue', ($event.target as HTMLTextAreaElement).value)"
-        />
-      </label>
+      <div
+        v-if="model.directive"
+        class="rounded-[20px] border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm font-medium leading-7 text-slate-900"
+        data-testid="execution-main-directive"
+      >
+        {{ model.directive }}
+      </div>
 
-      <div v-if="model.chips.length" class="space-y-3">
-        <p class="text-sm font-semibold text-slate-950">这样开头</p>
-        <div class="flex flex-wrap gap-2">
+      <div v-if="model.chips.length" class="space-y-2">
+        <p class="text-sm font-semibold text-slate-950">一键填入开头</p>
+        <div class="flex flex-col gap-2">
           <button
             v-for="chip in model.chips"
             :key="chip.id"
             type="button"
             :data-testid="`execution-chip-${chip.id}`"
-            class="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 transition hover:border-primary/40 hover:bg-primary/5"
+            class="w-full rounded-[20px] border-2 border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:border-primary hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="disabled"
             @click="$emit('use-chip', chip.fill)"
           >
@@ -76,12 +50,23 @@
         </div>
       </div>
 
-      <div class="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-        <p class="text-sm font-semibold text-slate-950">写到这里就能继续</p>
-        <p class="mt-2 text-sm leading-6 text-slate-700">
-          {{ model.passHint || '先把当前知识点的最小判断写出来，写到能看出你的理解就够了。' }}
-        </p>
-      </div>
+      <label class="block">
+        <span class="text-sm font-semibold text-slate-950">{{ model.inputLabel }}</span>
+        <textarea
+          data-testid="execution-main-input"
+          :value="draftValue"
+          rows="5"
+          class="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-5 py-4 text-sm leading-7 text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+          :placeholder="model.inputPlaceholder"
+          :disabled="disabled"
+          @input="$emit('update:draftValue', ($event.target as HTMLTextAreaElement).value)"
+        />
+      </label>
+
+      <details v-if="model.passHint" class="rounded-[20px] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+        <summary class="cursor-pointer font-medium text-slate-900">写到哪算过关</summary>
+        <p class="mt-2 leading-6">{{ model.passHint }}</p>
+      </details>
 
       <div class="flex flex-wrap items-center gap-4">
         <PrimaryButton

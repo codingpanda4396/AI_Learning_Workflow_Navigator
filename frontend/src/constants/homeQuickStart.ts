@@ -1,6 +1,21 @@
 import type { CreateGoalRequest } from '@/types/dto'
 import { PreferenceTag } from '@/types/enums'
 import type { PreferenceTagType } from '@/types/enums'
+import type { KnowledgePackId } from '@/types/knowledgePack'
+
+/**
+ * 与 `KNOWLEDGE_PACKS` / 诊断演示包一致：仅这些主题具备完整学习编排，其余首页入口为占位展示。
+ */
+export const HOME_CONFIGURED_TOPIC_KEYS = new Set<KnowledgePackId>([
+  'os_process_thread',
+  'net_tcp_handshake',
+  'ds_dfs_bfs',
+  'arch_cache_locality',
+])
+
+export function isHomeTopicConfigured(topicKey: string): boolean {
+  return HOME_CONFIGURED_TOPIC_KEYS.has(topicKey as KnowledgePackId)
+}
 
 export type QuickStartIntentKey = 'structure' | 'mechanism' | 'practice' | 'reflection'
 

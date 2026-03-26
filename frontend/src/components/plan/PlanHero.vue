@@ -19,6 +19,17 @@
           <p class="max-w-2xl text-sm leading-7 text-slate-600 md:text-[15px]">
             {{ subline }}
           </p>
+          <div
+            v-if="problemLine || strategyLine"
+            class="space-y-2 rounded-2xl border border-slate-900/10 bg-slate-950/[0.03] px-4 py-3"
+          >
+            <p v-if="problemLine" class="text-sm font-semibold leading-6 text-slate-900">
+              {{ problemLine }}
+            </p>
+            <p v-if="strategyLine" class="text-sm font-medium leading-6 text-sky-800">
+              {{ strategyLine }}
+            </p>
+          </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -83,6 +94,8 @@ defineProps<{
   headline: string
   subline: string
   currentProblemLabel: string
+  problemLine?: string
+  strategyLine?: string
   recommendedStageLabelZh: string
   recommendedStageLabelEn: string
   totalEstimatedLabel: string

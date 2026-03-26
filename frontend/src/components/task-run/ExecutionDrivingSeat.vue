@@ -1,61 +1,85 @@
 <template>
   <section data-testid="execution-driving-seat" class="space-y-8">
+    <!-- 核心：脚手架 = 主入口 -->
     <div>
-      <h2 class="text-lg font-semibold tracking-tight text-slate-950">先选一种开始方式</h2>
-      <p class="mt-1 text-sm leading-6 text-slate-600">
-        不用自己想第一句话，点一下就会把这段话发给导师。
-      </p>
-      <div class="mt-5 grid gap-4 md:grid-cols-3">
-        <article
+      <p class="text-sm font-semibold text-slate-950">选择一种方式开始</p>
+      <p class="mt-1 text-xs text-slate-500">点按钮即开始；需要补全时会在下方输入框继续写。</p>
+      <div class="mt-4 flex flex-col gap-3">
+        <button
           v-for="card in cards"
           :key="card.id"
-          class="flex flex-col rounded-[24px] border-2 border-slate-200 bg-[linear-gradient(180deg,_#fff,_#f8fafc)] p-5 shadow-sm transition hover:border-primary/45 hover:shadow-md"
+          type="button"
+          :disabled="sending"
+          class="group flex w-full flex-col rounded-[22px] border-2 border-slate-200 bg-white px-5 py-4 text-left shadow-sm transition hover:border-primary hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+          @click="onScaffoldClick(card)"
         >
-          <h3 class="text-base font-semibold text-slate-950">{{ card.title }}</h3>
-          <p class="mt-2 flex-1 text-sm leading-6 text-slate-600">{{ card.hint }}</p>
-          <PrimaryButton
-            class="mt-5 w-full"
-            :disabled="sending"
-            :loading="false"
-            @click="$emit('send-card', card.prompt)"
+          <span class="text-base font-semibold text-slate-950">{{ card.actionLabel }}</span>
+          <span
+            v-if="card.hint?.trim()"
+            class="mt-1 text-sm leading-6 text-slate-600"
           >
-            用这个开始
-          </PrimaryButton>
-        </article>
+            {{ card.hint }}
+          </span>
+        </button>
+      </div>
+      <div
+        v-if="phasePromptChips?.length"
+        class="mt-4 flex flex-wrap gap-2"
+      >
+        <button
+          v-for="(line, i) in phasePromptChips"
+          :key="i"
+          type="button"
+          :disabled="sending"
+          class="max-w-full rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-left text-xs font-medium leading-snug text-slate-800 transition hover:border-primary hover:bg-white disabled:opacity-60"
+          @click="$emit('prefill-chip', line)"
+        >
+          {{ line }}
+        </button>
       </div>
     </div>
 
+    <!-- 执行区：输入 -->
     <div
       class="rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,1),_rgba(248,250,252,0.96))] p-5 shadow-card md:p-7"
     >
-      <h2 class="text-lg font-semibold text-slate-950">和导师接着聊</h2>
-      <p class="mt-1 text-sm text-slate-600">对话记录在下面，输入框始终可用。</p>
+      <h2 class="text-lg font-semibold tracking-tight text-slate-950">你的尝试</h2>
 
-      <div
-        v-if="chatTurns.length"
-        class="mt-5 max-h-72 space-y-3 overflow-y-auto rounded-[20px] border border-slate-100 bg-slate-50/50 p-4"
-      >
-        <div
-          v-for="(t, i) in chatTurns"
-          :key="i"
-          class="rounded-[18px] border px-4 py-3"
-          :class="
-            t.role === 'ASSISTANT'
-              ? 'border-primary/20 bg-primary/5'
-              : 'border-slate-200 bg-white'
-          "
+      <details class="mt-3">
+        <summary
+          class="cursor-pointer text-xs font-medium text-slate-500 hover:text-slate-800"
         >
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            {{ t.role === 'USER' ? '你' : '导师' }}
-          </p>
-          <p class="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800">
-            {{ t.content }}
-          </p>
+          对话记录（{{ chatTurns.length }}）
+        </summary>
+        <div
+          v-if="chatTurns.length"
+          class="mt-3 max-h-40 space-y-3 overflow-y-auto rounded-[20px] border border-slate-100 bg-slate-50/50 p-3"
+        >
+          <div
+            v-for="(t, i) in chatTurns"
+            :key="i"
+            class="rounded-[18px] border px-3 py-2.5 text-sm"
+            :class="
+              t.role === 'ASSISTANT'
+                ? 'border-primary/20 bg-primary/5'
+                : 'border-slate-200 bg-white'
+            "
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              {{ t.role === 'USER' ? '你' : '导师' }}
+            </p>
+            <p class="mt-1.5 whitespace-pre-wrap leading-7 text-slate-800">
+              {{ t.content }}
+            </p>
+          </div>
         </div>
-      </div>
-      <p v-else class="mt-5 rounded-[20px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-500">
-        还没有消息。先点上面一张卡片，或直接在下面输入。
-      </p>
+        <p
+          v-else
+          class="mt-3 rounded-[16px] border border-dashed border-slate-200 px-3 py-3 text-center text-xs text-slate-500"
+        >
+          还没有记录。点上方按钮，或直接在下面输入后提交。
+        </p>
+      </details>
 
       <label class="mt-5 block">
         <span class="text-sm font-semibold text-slate-950">{{ inputLabel }}</span>
@@ -64,7 +88,7 @@
           :value="draftValue"
           rows="4"
           class="mt-2 w-full rounded-[22px] border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-          :placeholder="inputPlaceholder"
+          :placeholder="inputPlaceholderSoft || inputPlaceholder"
           :disabled="sending"
           @input="$emit('update:draftValue', ($event.target as HTMLTextAreaElement).value)"
         />
@@ -85,10 +109,8 @@
       v-if="showRestate"
       class="rounded-[28px] border border-amber-200/80 bg-amber-50/35 p-5 shadow-sm md:p-7"
     >
-      <h2 class="text-lg font-semibold text-slate-950">现在轮到你：用自己的话说一遍</h2>
-      <p class="mt-2 text-sm leading-6 text-slate-600">
-        分开写三行就够。不需要一次说对，先把你的理解写出来。
-      </p>
+      <h2 class="text-lg font-semibold tracking-tight text-slate-950">用自己的话再写三行</h2>
+      <p class="mt-1 text-sm text-slate-600">不要求一次说对。</p>
       <div class="mt-5 space-y-4">
         <label class="block">
           <span class="text-sm font-medium text-slate-800">它是什么</span>
@@ -167,10 +189,13 @@ interface Turn {
 
 const props = defineProps<{
   cards: ExecutionScaffoldCardModel[]
+  /** 本阶段线索短句（点击填入输入框） */
+  phasePromptChips?: string[]
   chatTurns: Turn[]
   draftValue: string
   inputLabel: string
   inputPlaceholder: string
+  inputPlaceholderSoft?: string
   primaryActionLabel: string
   sending: boolean
   canSubmitChat: boolean
@@ -188,6 +213,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'send-card': [prompt: string]
+  'prefill-card': [prompt: string]
+  'prefill-chip': [text: string]
   'submit-chat': []
   advance: []
   'update:draftValue': [value: string]
@@ -196,6 +223,14 @@ const emit = defineEmits<{
   'update:restateRelate': [value: string]
   'update:checks': [value: boolean[]]
 }>()
+
+function onScaffoldClick(card: ExecutionScaffoldCardModel) {
+  if (card.behavior === 'prefill') {
+    emit('prefill-card', card.prompt)
+    return
+  }
+  emit('send-card', card.prompt)
+}
 
 function toggleCheck(index: number) {
   const next = [...props.checks]

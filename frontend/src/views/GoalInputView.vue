@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <PageContainer>
     <TransitionOverlay v-if="transitionOverlay" message="正在进入下一步..." />
     <AppTopBar current="goal" />
@@ -51,7 +51,7 @@
             <div>
               <h2 class="text-xl font-semibold text-slate-950">学科</h2>
             </div>
-            <p class="hidden text-sm text-slate-400 md:block">408 四个核心学科</p>
+            <p class="hidden text-sm text-slate-400 md:block">每科仅开放 1 个演示主题，其余为占位</p>
           </div>
 
           <div class="grid gap-4 md:grid-cols-2">
@@ -129,11 +129,18 @@
                 <div class="flex items-center justify-between gap-3">
                   <p class="text-base font-semibold">{{ topic.label }}</p>
                   <span
+                    v-if="!isHomeTopicConfigured(topic.key)"
+                    class="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-400"
+                  >
+                    即将开放
+                  </span>
+                  <span
+                    v-else
                     class="h-3.5 w-3.5 shrink-0 rounded-full transition-colors"
                     :class="selectedTopicKey === topic.key ? 'bg-white/90 ring-4 ring-white/20' : 'bg-slate-200'"
                   />
                 </div>
-                <p class="mt-3 text-sm leading-6" :class="selectedTopicKey === topic.key ? 'text-slate-200' : 'text-slate-600'">
+                <p class="mt-3 text-sm leading-6" :class="topicDescClass(topic.key)">
                   {{ topic.description }}
                 </p>
               </button>
@@ -185,8 +192,8 @@ import {
   getHomeTopic,
   getHomeTopicsBySubject,
   HOME_DEFAULT_SUBJECT_KEY,
-  HOME_DEFAULT_TOPIC_KEY,
   HOME_SUBJECTS,
+  isHomeTopicConfigured,
 } from '@/constants/homeQuickStart'
 
 const STORAGE_KEYS = {
@@ -214,9 +221,26 @@ const router = useRouter()
 const auth = useAuthStore()
 const store = useWorkflowStore()
 
-const initialTopicKey = getStored(STORAGE_KEYS.topic) ?? HOME_DEFAULT_TOPIC_KEY
+function firstConfiguredTopicInSubject(subjectKey: string): string {
+  const keys = getHomeSubject(subjectKey).topicKeys
+  const hit = keys.find((k) => isHomeTopicConfigured(k))
+  return hit ?? keys[0]
+}
+
+const storedSubjectKey = getStored(STORAGE_KEYS.subject)
+const storedTopicKey = getStored(STORAGE_KEYS.topic)
+
+const initialTopicKey = (() => {
+  if (storedTopicKey && isHomeTopicConfigured(storedTopicKey)) {
+    const subj = getHomeSubjectByTopic(storedTopicKey)
+    if (subj) return storedTopicKey
+  }
+  const subjKey = storedSubjectKey ?? HOME_DEFAULT_SUBJECT_KEY
+  return firstConfiguredTopicInSubject(subjKey)
+})()
+
 const initialSubjectKey =
-  getStored(STORAGE_KEYS.subject) ?? getHomeSubjectByTopic(initialTopicKey)?.key ?? HOME_DEFAULT_SUBJECT_KEY
+  getHomeSubjectByTopic(initialTopicKey)?.key ?? storedSubjectKey ?? HOME_DEFAULT_SUBJECT_KEY
 
 const selectedSubjectKey = ref(initialSubjectKey)
 const selectedTopicKey = ref(initialTopicKey)
@@ -233,7 +257,7 @@ const continueLabel = computed(() => {
   return entry.sessionStatus === 'COMPLETED' ? '继续上次：回到这轮学习结果' : '继续上次：回到刚才的学习进度'
 })
 const selectionSummary = computed(() => `${selectedSubject.value.label} / ${selectedTopic.value.label}`)
-const ctaDisabled = computed(() => false)
+const ctaDisabled = computed(() => !isHomeTopicConfigured(selectedTopicKey.value))
 const ctaLabel = computed(() => (auth.isAuthenticated ? '开始学习' : '登录后开始'))
 
 onMounted(async () => {
@@ -248,8 +272,9 @@ onMounted(async () => {
 watch(selectedSubjectKey, (value) => {
   setStored(STORAGE_KEYS.subject, value)
   const nextTopics = getHomeSubject(value).topicKeys
-  if (!nextTopics.includes(selectedTopicKey.value)) {
-    selectedTopicKey.value = nextTopics[0]
+  const cur = selectedTopicKey.value
+  if (!nextTopics.includes(cur) || !isHomeTopicConfigured(cur)) {
+    selectedTopicKey.value = firstConfiguredTopicInSubject(value)
   }
 })
 
@@ -267,6 +292,7 @@ function selectSubject(subjectKey: string) {
 }
 
 function selectTopic(topicKey: string) {
+  if (!isHomeTopicConfigured(topicKey)) return
   selectedTopicKey.value = topicKey
 }
 
@@ -278,10 +304,20 @@ function subjectCardClass(subjectKey: string) {
 }
 
 function topicCardClass(topicKey: string) {
+  const configured = isHomeTopicConfigured(topicKey)
+  if (!configured) {
+    return 'pointer-events-none cursor-not-allowed border-dashed border-slate-200 bg-slate-50/90 text-slate-400 opacity-80'
+  }
   if (selectedTopicKey.value === topicKey) {
     return 'border-slate-950 bg-slate-950 text-white shadow-[0_18px_36px_rgba(15,23,42,0.14)]'
   }
   return 'border-slate-200 bg-white text-slate-950 hover:border-slate-300 hover:bg-slate-50'
+}
+
+function topicDescClass(topicKey: string) {
+  const configured = isHomeTopicConfigured(topicKey)
+  if (!configured) return 'text-slate-400'
+  return selectedTopicKey.value === topicKey ? 'text-slate-200' : 'text-slate-600'
 }
 
 function delay(ms: number) {

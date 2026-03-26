@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <PageContainer>
     <TransitionOverlay
       v-if="submitTransitionOverlay"
@@ -39,7 +39,38 @@
 
         <template #primary>
           <form class="space-y-5" @submit.prevent="onSubmit">
-            <FormCard class="space-y-3">
+            <FormCard v-if="topicDemoConfig" class="space-y-3">
+              <p class="text-sm font-semibold text-primary">第 1 题</p>
+              <h3 class="text-base font-medium text-text-primary">
+                {{ topicDemoConfig.diagnosisQuestion.question }}
+              </h3>
+              <div class="space-y-2 pt-1">
+                <label
+                  v-for="opt in topicDemoConfig.diagnosisQuestion.options"
+                  :key="opt.value"
+                  class="flex cursor-pointer items-start gap-3 rounded-input border p-3 text-sm transition-colors"
+                  :class="
+                    topicDiag === opt.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  "
+                >
+                  <input
+                    v-model="topicDiag"
+                    type="radio"
+                    name="topic-diag"
+                    :value="opt.value"
+                    class="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary"
+                  />
+                  <span class="text-text-primary"
+                    ><span class="font-semibold text-primary/90">{{ opt.value }}.</span>
+                    {{ opt.label }}</span
+                  >
+                </label>
+              </div>
+            </FormCard>
+
+            <FormCard v-else class="space-y-3">
               <p class="text-sm font-semibold text-primary">第 1 题</p>
               <h3 class="text-base font-medium text-text-primary">
                 你对这个内容现在大概处于什么状态？
@@ -158,6 +189,12 @@ import {
   type PaceUiId,
   type QuickDiagnosisUiState,
 } from '@/utils/diagnosisSubmitMapper'
+import { mapTopicDiagnosisToFoundation } from '@/utils/diagnosisTopicMapper'
+import { resolveKnowledgePackId } from '@/composables/useKnowledgePack'
+import { getKnowledgeDemoConfig } from '@/constants/KnowledgeConfig'
+import type { KnowledgeDemoConfig } from '@/constants/KnowledgeConfig'
+import type { DiagnosisOptionValue } from '@/constants/KnowledgeConfig'
+import type { KnowledgePackId } from '@/types/knowledgePack'
 import { SESSION_KEY_PLAN_DIAGNOSIS_RECAP } from '@/utils/diagnosisRecapCopy'
 import { workflowTopicLabelFromStructuredGoal } from '@/utils/workflowTopicLabel'
 import { DIAGNOSIS_COPY } from '@/constants/uiCopy'
@@ -179,6 +216,19 @@ const ui = ref<QuickDiagnosisUiState>({
   foundation: null,
   blocker: null,
   pace: null,
+})
+
+const topicDiag = ref<DiagnosisOptionValue | null>(null)
+
+const topicPackId = computed((): KnowledgePackId | null => {
+  const id = resolveKnowledgePackId({ structuredGoal: store.structuredGoal })
+  return id
+})
+
+const topicDemoConfig = computed((): KnowledgeDemoConfig | null => {
+  const id = topicPackId.value
+  if (!id) return null
+  return getKnowledgeDemoConfig(id)
 })
 
 const sessionReady = computed(
@@ -214,6 +264,7 @@ async function fetchSession() {
     store.diagnosisId = data.diagnosisId
     store.sessionId = data.sessionId
     ui.value = { foundation: null, blocker: null, pace: null }
+    topicDiag.value = null
   } catch (err) {
     error.value = getErrorMessage(err)
   } finally {
@@ -228,7 +279,16 @@ function delay(ms: number) {
 }
 
 async function onSubmit() {
-  if (!ui.value.foundation) {
+  if (topicDemoConfig.value) {
+    if (!topicDiag.value) {
+      showToast('请选择第 1 题')
+      return
+    }
+    ui.value.foundation = mapTopicDiagnosisToFoundation(
+      topicPackId.value!,
+      topicDiag.value
+    )
+  } else if (!ui.value.foundation) {
     showToast('请选择第 1 题')
     return
   }

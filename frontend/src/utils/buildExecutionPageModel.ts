@@ -11,12 +11,30 @@ import type {
   ExecutionGuideActionModel,
   ExecutionGuideFeedbackModel,
   ExecutionGuideHelpSection,
-  ExecutionGuideProgressRailModel,
   ExecutionKnowledgePointModel,
   ExecutionPageViewModel,
   ExecutionScaffoldCardModel,
 } from '@/types/executionGuide'
+import type { KnowledgePack } from '@/types/knowledgePack'
 import { useKnowledgePack } from '@/composables/useKnowledgePack'
+import { enrichExecutionSpec } from '@/utils/enrichExecutionSpec'
+import { getKnowledgeDemoConfig } from '@/constants/KnowledgeConfig'
+import type { KnowledgeDemoStageCode } from '@/constants/KnowledgeConfig'
+import {
+  mergePhaseCopyWithFallback,
+  STAGE_RULES_BY_PHASE,
+  TOPIC_DISPLAY_NAME,
+  TOPIC_OBSERVATION_BULLETS,
+  TOPIC_VISUAL_VARIANT,
+  WORKBENCH_PHASE_SEQUENCE,
+  type PhaseWorkbenchCopy,
+} from '@/constants/executionWorkbenchContent'
+import type { KnowledgePackId } from '@/types/knowledgePack'
+import type {
+  TaskExecutionWorkbenchModel,
+  WorkbenchPhaseCode,
+  WorkbenchTaskStatus,
+} from '@/types/taskExecutionWorkbench'
 
 interface BuildExecutionPageModelInput {
   task: CurrentTaskItem
@@ -34,6 +52,8 @@ interface BuildExecutionPageModelInput {
   legacyComplete: boolean
   structuredGoal?: StructuredLearningGoal | null
   plan?: { knowledgeKey?: string; packId?: string } | null
+  /** 驾驶席：微检查通过且可推进 */
+  canAdvanceDriving?: boolean
 }
 
 const STEP_TIMES: Record<string, string> = {
@@ -61,13 +81,13 @@ const STEP_COPY: Record<
 > = {
   ORIENT: {
     stageLabel: 'STRUCTURE',
-    eyebrow: '先搭骨架，别急着啃细节',
-    title: '先别急着抠细节，用一句话说说你觉得它是干什么的',
-    description: '不需要一次说对，先把直觉写出来，导师会帮你收紧。',
-    inputLabel: '先写一句',
+    eyebrow: 'STRUCTURE',
+    title: '用一句话说清它是什么',
+    description: '直觉即可。',
+    inputLabel: '写一句',
     inputPlaceholder: '例如：我觉得它主要是在解决……，如果没有它，通常会……',
     primaryActionLabel: '发给导师',
-    helperText: '写一句就够，后面可以再用上面的卡片追问。',
+    helperText: '',
     defaultChips: [
       {
         id: 'orient-problem',
@@ -88,13 +108,13 @@ const STEP_COPY: Record<
   },
   EXPLORE: {
     stageLabel: 'UNDERSTANDING',
-    eyebrow: '只吃透眼前这一点',
-    title: '顺着刚才的对话，再补上一句关键理解',
-    description: '今天不用学完全部，先把当前这一点讲清楚。',
+    eyebrow: 'UNDERSTANDING',
+    title: '再补一句关键理解',
+    description: '只补一处。',
     inputLabel: '补上一句',
     inputPlaceholder: '例如：它之所以要这样做，是因为……',
     primaryActionLabel: '发给导师',
-    helperText: '每次只补一处，别贪多。',
+    helperText: '',
     defaultChips: [
       {
         id: 'explore-why',
@@ -115,13 +135,13 @@ const STEP_COPY: Record<
   },
   SELF_EXPLAIN: {
     stageLabel: 'TRAINING',
-    eyebrow: '现在轮到你开口',
+    eyebrow: 'TRAINING',
     title: '用自己的话串一遍',
-    description: '三四句就够，把关系讲顺即可。',
+    description: '三四句即可。',
     inputLabel: '写下你的表述',
     inputPlaceholder: '例如：它是什么、为什么需要它、少了它会怎样……',
     primaryActionLabel: '提交复述',
-    helperText: '能说顺比说全更重要。',
+    helperText: '',
     defaultChips: [
       {
         id: 'self-what',
@@ -142,13 +162,13 @@ const STEP_COPY: Record<
   },
   REMEDIAL: {
     stageLabel: 'TRAINING',
-    eyebrow: '只补这一处缺口',
-    title: '把刚才漏掉的那一句补上',
-    description: '不用重写整段，只补关键点。',
+    eyebrow: 'TRAINING',
+    title: '补上缺的那一句',
+    description: '只补关键点。',
     inputLabel: '把这句话补上',
     inputPlaceholder: '例如：我刚才没说清的是……，补上后应该是……',
     primaryActionLabel: '补好并提交',
-    helperText: '只补这一处。',
+    helperText: '',
     defaultChips: [
       {
         id: 'remedial-gap',
@@ -169,22 +189,22 @@ const STEP_COPY: Record<
   },
   CHECK: {
     stageLabel: 'REFLECTION',
-    eyebrow: '最后一道小题',
-    title: '自己答一下这道题',
-    description: '写清你的判断依据即可。',
+    eyebrow: 'REFLECTION',
+    title: '独立答这一题',
+    description: '写清依据。',
     inputLabel: '你的答案',
     inputPlaceholder: '用一两句话直接回答即可。',
     primaryActionLabel: '提交检查',
-    helperText: '能独立答出来就够了。',
+    helperText: '',
     defaultChips: [],
   },
   PASS: {
     stageLabel: 'REFLECTION',
-    eyebrow: '把这一点收成能带走的话',
-    title: '写一句总结，再带走两个关键判断',
-    description: '下次打开还能接着用，而不是留在这一次输入里。',
+    eyebrow: 'REFLECTION',
+    title: '一句总结 + 两个要点',
+    description: '带走即可。',
     primaryActionLabel: '我已经搭好这个点的框架，进入下一个',
-    helperText: '过关了再往下走。',
+    helperText: '',
     defaultChips: [],
   },
 }
@@ -203,6 +223,15 @@ function truncate(text: string, max = 48) {
   return `${text.slice(0, max - 1)}…`
 }
 
+function clipFirstLine(text: string, max = 80) {
+  const line = text
+    .split(/\n/)
+    .map((s) => s.trim())
+    .find(Boolean)
+  if (!line) return ''
+  return truncate(line, max)
+}
+
 function summarizeLine(...candidates: Array<string | undefined>) {
   const picked = candidates.map(trimText).find(Boolean) || ''
   return picked ? truncate(picked.replace(/\s+/g, ' '), 56) : ''
@@ -212,47 +241,6 @@ function statusForKnowledgePoint(index: number, currentIndex: number, totalTasks
   if (index + 1 < currentIndex) return 'done' as const
   if (index + 1 === Math.min(currentIndex, totalTasks)) return 'active' as const
   return 'upcoming' as const
-}
-
-const STAGE_RAIL_LABEL: Record<string, string> = {
-  STRUCTURE: '搭框架',
-  UNDERSTANDING: '讲过程',
-  TRAINING: '练表达',
-  REFLECTION: '微检查与复盘',
-}
-
-function buildScaffoldCards(
-  focus: string,
-  scaffold: TaskScaffoldResponse | null,
-  packCards?: ExecutionScaffoldCardModel[]
-): ExecutionScaffoldCardModel[] {
-  if (packCards?.length) return packCards.slice(0, 3)
-  const f = trimText(focus) || '这个知识点'
-  const templates = scaffold?.recommendedAskTemplates?.filter(Boolean).slice(0, 3) ?? []
-  const base: ExecutionScaffoldCardModel[] = [
-    {
-      id: 'scaffold-frame',
-      title: '先搭框架',
-      hint: '三句话搭骨架：是什么、解决什么、和相邻概念的关系。先不展开细节。',
-      prompt: `关于「${f}」，请先用 3 句话帮我搭建这个知识点的框架：它是什么、它解决什么问题、它和相邻概念有什么关系。先不要展开太多细节。`,
-    },
-    {
-      id: 'scaffold-example',
-      title: '先看最小例子',
-      hint: '用足够简单的例子，先把直觉建立起来。',
-      prompt: `关于「${f}」，请用一个最小例子说明这个知识点到底在干什么，例子要足够简单，让我能先建立直觉。`,
-    },
-    {
-      id: 'scaffold-expose',
-      title: '先暴露我的理解',
-      hint: '你先说一句话，导师只点最关键的问题，不直接给标准答案。',
-      prompt: `关于「${f}」，我先说一句我的理解，你只指出最关键的问题，不要直接给标准答案。我目前的理解是：`,
-    },
-  ]
-  return base.map((card, index) => ({
-    ...card,
-    prompt: templates[index] || card.prompt,
-  }))
 }
 
 function buildRoundCompletionCriteria(
@@ -285,29 +273,6 @@ function buildRoundCompletionCriteria(
   const fb = defaults[state] ?? defaults.ORIENT
   const fromTask = (task.completionCriteria ?? []).map((item) => trimText(item)).filter(Boolean).slice(0, 2)
   return [...fromTask, ...fb].filter(Boolean).slice(0, 3)
-}
-
-function buildHeroSubtitle(state: string, activePoint: ExecutionKnowledgePointModel | undefined): string {
-  const name = activePoint?.title ? `「${activePoint.title}」` : '眼前这个点'
-  if (state === 'ORIENT') {
-    return `先别急着学细。选一个上面的问法，或自己写一句，把 ${name} 的骨架搭出来。`
-  }
-  if (state === 'EXPLORE') {
-    return `顺着导师的反馈，再补一句：${name} 里最卡你的那一处。`
-  }
-  if (state === 'SELF_EXPLAIN') {
-    return `现在轮到你：把 ${name} 用自己的话讲顺。`
-  }
-  if (state === 'REMEDIAL') {
-    return `先补上刚才露出来的缺口，再往下走。`
-  }
-  if (state === 'CHECK') {
-    return `不看提示，独立写答案。`
-  }
-  if (state === 'PASS') {
-    return `把这一点收成下次还能用的话，然后进入下一个。`
-  }
-  return `先专注 ${name}。`
 }
 
 function buildKnowledgePoints(
@@ -350,7 +315,11 @@ function buildActionModel(
   task: CurrentTaskItem,
   scaffold: TaskScaffoldResponse | null,
   recommendedUserActions: RecommendedUserActionItem[],
-  activePoint: ExecutionKnowledgePointModel | undefined
+  activePoint: ExecutionKnowledgePointModel | undefined,
+  directive: string,
+  inputPlaceholderSoft: string,
+  stageCode: string,
+  stageDisplayZh: string
 ): ExecutionGuideActionModel {
   const copy = STEP_COPY[state]
   const scaffoldPrompts =
@@ -380,11 +349,14 @@ function buildActionModel(
 
   return {
     mode: state === 'PASS' ? 'closure' : 'guided-input',
+    phaseCode: stageCode,
+    phaseDisplayZh: stageDisplayZh,
     eyebrow: copy.eyebrow,
     title: copy.title,
     description: copy.description,
+    directive,
     inputLabel: copy.inputLabel,
-    inputPlaceholder: copy.inputPlaceholder,
+    inputPlaceholder: inputPlaceholderSoft || copy.inputPlaceholder,
     primaryActionLabel: copy.primaryActionLabel,
     helperText: copy.helperText,
     passHint: scaffold?.completionSignals?.[0],
@@ -404,48 +376,17 @@ function buildActionModel(
   }
 }
 
-function buildHelpSections(
-  task: CurrentTaskItem,
-  scaffold: TaskScaffoldResponse | null,
-  guidance: CurrentGuidanceBlock | null
-): ExecutionGuideHelpSection[] {
-  const sections: ExecutionGuideHelpSection[] = []
-
-  if (scaffold?.whyThisTask || task.whyThisTask) {
-    sections.push({
-      id: 'why-now',
-      title: '为什么现在先做这个知识点',
-      body: scaffold?.whyThisTask || task.whyThisTask,
-    })
-  }
-
+function buildHelpSections(guidance: CurrentGuidanceBlock | null): ExecutionGuideHelpSection[] {
   if (guidance?.bullets?.length) {
-    sections.push({
-      id: 'guidance',
-      title: guidance.title || '当前重点',
-      bullets: guidance.bullets,
-    })
+    return [
+      {
+        id: 'guidance',
+        title: guidance.title || '当前提示',
+        bullets: guidance.bullets.slice(0, 3),
+      },
+    ]
   }
-
-  if (scaffold?.completionSignals?.length || task.completionCriteria?.length) {
-    sections.push({
-      id: 'signals',
-      title: '做到这里就可以继续',
-      bullets: (scaffold?.completionSignals?.length
-        ? scaffold.completionSignals
-        : task.completionCriteria) ?? [],
-    })
-  }
-
-  if (scaffold?.antiPatterns?.length) {
-    sections.push({
-      id: 'anti-patterns',
-      title: '如果还卡住，先避开这些',
-      bullets: scaffold.antiPatterns,
-    })
-  }
-
-  return sections
+  return []
 }
 
 function buildFeedback(
@@ -491,50 +432,206 @@ function buildFeedback(
   }
 }
 
-function buildProgressRail(
+function buildNextStepPreview(
   knowledgePoints: ExecutionKnowledgePointModel[],
-  activePoint: ExecutionKnowledgePointModel | undefined,
   state: string,
-  completionLines: string[]
-): ExecutionGuideProgressRailModel {
-  const stageKey = STEP_COPY[state].stageLabel
-  const stageZh = STAGE_RAIL_LABEL[stageKey] || '推进中'
+  pack: KnowledgePack | null
+): string {
   const nextPoint = knowledgePoints.find((item) => item.status === 'upcoming')
-  const remaining = knowledgePoints.filter((item) => item.status === 'upcoming').length
-
-  const progressLines: string[] = [
-    `当前阶段：${stageZh}`,
-    activePoint ? `当前知识点：${activePoint.title}` : '当前知识点：进行中',
-  ]
-  if (remaining > 0) {
-    progressLines.push(`这一轮还剩 ${remaining} 个点没吃透（先啃眼前这个）`)
-  } else {
-    progressLines.push('这一轮就剩眼前这个点')
-  }
-
-  let nextPreview = '完成当前点后，系统会带你收束或进入下一任务。'
+  let nextPreview = '完成当前动作后，进入下一小步或收束。'
   if (state === 'ORIENT' || state === 'EXPLORE') {
     nextPreview = nextPoint
-      ? `下一步会进入「${nextPoint.title}」；先把当前点吃透。`
-      : '先把骨架搭稳，再进入更深一点的理解。'
+      ? `下一步会推进「${nextPoint.title}」；先把眼前这一步做完。`
+      : '先把当前这一步做完，再进入更深一点的理解。'
   } else if (state === 'SELF_EXPLAIN' || state === 'REMEDIAL') {
-    nextPreview = '接下来是一道轻量检查题，确认你能独立判断。'
+    nextPreview = '接下来是一道轻量检查，确认你能独立判断。'
   } else if (state === 'CHECK') {
-    nextPreview = '答对后收束本点，带走总结与要点。'
+    nextPreview = pack?.checkpoint.checkpointPrompt
+      ? `完成后进入收束：${clipFirstLine(pack.checkpoint.checkpointPrompt, 80)}`
+      : '答对后收束本点，带走一句总结与要点。'
   } else if (state === 'PASS') {
-    nextPreview = nextPoint
-      ? `提交后进入「${nextPoint.title}」。`
-      : '提交后进入报告或下一任务。'
+    nextPreview = nextPoint ? `提交后进入「${nextPoint.title}」。` : '提交后进入报告或下一任务。'
   }
+  return nextPreview
+}
+
+const FALLBACK_PHASE_COPY: PhaseWorkbenchCopy = {
+  whatToOutput: ['用你自己的话写出这一轮的最小可检产出'],
+  recommendedSteps: ['先写结论，再补一句依据或例子'],
+  avoid: ['不要空答', '不要整段粘贴'],
+  whyNow: '按规划顺序推进，当前步是在堆能力栈。',
+  skipRisk: '跳过会在后面以更高成本暴露缺口。',
+  expectedGain: '你能独立复述这一轮要交付什么。',
+}
+
+function isKnowledgePackId(id: string | null | undefined): id is KnowledgePackId {
+  return (
+    id === 'os_process_thread' ||
+    id === 'net_tcp_handshake' ||
+    id === 'ds_dfs_bfs' ||
+    id === 'arch_cache_locality'
+  )
+}
+
+function computeWorkbenchTaskStatus(
+  taskState: string,
+  latestFeedback: ExecutionGuideFeedbackModel | null,
+  canAdvanceDriving: boolean
+): { status: WorkbenchTaskStatus; label: string } {
+  const labels: Record<WorkbenchTaskStatus, string> = {
+    running: '进行中',
+    submitted: '已提交',
+    needs_fix: '待修正',
+    can_advance: '可进入下一阶段',
+  }
+  if (canAdvanceDriving) return { status: 'can_advance', label: labels.can_advance }
+  if (
+    taskState === 'REMEDIAL' ||
+    (latestFeedback?.visible && (latestFeedback.keyIssues?.length ?? 0) > 0)
+  ) {
+    return { status: 'needs_fix', label: labels.needs_fix }
+  }
+  if (latestFeedback?.visible) return { status: 'submitted', label: labels.submitted }
+  return { status: 'running', label: labels.running }
+}
+
+function buildWorkbenchModel(
+  input: BuildExecutionPageModelInput,
+  opts: {
+    pack: KnowledgePack | null
+    phaseCode: WorkbenchPhaseCode
+    stageDisplayZh: string
+    copyTitle: string
+    currentDirective: string
+    completionCriteria: string[]
+    knowledgePointName: string
+    roundGoal: string
+    scaffoldCards: ExecutionScaffoldCardModel[]
+    nextPreview: string
+  }
+): TaskExecutionWorkbenchModel {
+  const packId = opts.pack?.id && isKnowledgePackId(opts.pack.id) ? opts.pack.id : null
+  const phaseKey = opts.phaseCode as KnowledgeDemoStageCode
+  const merged = mergePhaseCopyWithFallback(packId, phaseKey, FALLBACK_PHASE_COPY)
+  const firstCard = opts.scaffoldCards[0]
+  const startLabel = firstCard?.actionLabel?.trim() || '从推荐动作开始'
+
+  const totalTasks = Math.max(input.progress?.totalTasks ?? 4, 1)
+  const idx = Math.min(Math.max(input.progress?.currentIndex ?? 1, 1), totalTasks)
+  const stepFrac = input.guidedStepCurrent / Math.max(input.guidedStepTotal, 1)
+  const overallRatio = Math.min(1, (idx - 1) / totalTasks + stepFrac / totalTasks)
+
+  const ts = computeWorkbenchTaskStatus(
+    input.taskState,
+    input.latestFeedback,
+    input.canAdvanceDriving ?? false
+  )
+
+  const topicName = packId ? TOPIC_DISPLAY_NAME[packId] : opts.knowledgePointName
+  const bullets = packId
+    ? TOPIC_OBSERVATION_BULLETS[packId]
+    : ['先写清判断依据', '再用最小例子检验', '最后收束成一句话']
+  const visual = packId ? TOPIC_VISUAL_VARIANT[packId] : 'hierarchy'
+
+  const core =
+    clipFirstLine(opts.currentDirective, 120) || clipFirstLine(opts.roundGoal, 120) || opts.copyTitle
 
   return {
-    progressSectionTitle: '本轮进度',
-    progressLines,
-    criteriaSectionTitle: '本轮完成标准',
-    completionLines,
-    nextSectionTitle: '下一步预告',
-    nextPreview,
-    knowledgeOutline: knowledgePoints,
+    packId,
+    phaseProgress: {
+      phases: WORKBENCH_PHASE_SEQUENCE,
+      currentPhase: opts.phaseCode,
+      overallRatio,
+      stepLabel: `${input.guidedStepCurrent}/${input.guidedStepTotal}`,
+      taskIndexLabel: input.progress
+        ? `任务 ${input.progress.currentIndex}/${input.progress.totalTasks}`
+        : '任务 1/1',
+    },
+    taskStatus: ts.status,
+    taskStatusLabel: ts.label,
+    scaffoldProduct: {
+      whatToOutput: merged.whatToOutput,
+      recommendedSteps: merged.recommendedSteps,
+      avoid: merged.avoid,
+      startActionLabel: startLabel,
+      startBehavior: firstCard?.behavior,
+    },
+    whyThisStep: {
+      whyNow: merged.whyNow,
+      skipRisk: merged.skipRisk,
+      expectedGain: merged.expectedGain,
+    },
+    stageRules: {
+      rules: STAGE_RULES_BY_PHASE[phaseKey] ?? STAGE_RULES_BY_PHASE.STRUCTURE,
+    },
+    topicHints: {
+      topicDisplayName: topicName,
+      bullets,
+      visualVariant: visual,
+    },
+    stageMini: {
+      roundLabel: `第 ${input.guidedStepCurrent} / ${input.guidedStepTotal} 轮`,
+      actionsDone: input.guidedStepCurrent,
+      actionsTarget: input.guidedStepTotal,
+      untilNextPhase: opts.nextPreview,
+      passedGate: input.canAdvanceDriving ?? false,
+    },
+    currentTask: {
+      phaseDisplayZh: opts.stageDisplayZh,
+      phaseCode: opts.phaseCode,
+      taskTitle: opts.copyTitle,
+      coreActionLine: core,
+      completionLines: opts.completionCriteria.slice(0, 3),
+    },
+    emphasisPhase: opts.phaseCode,
+  }
+}
+
+/** 供 TaskRunView 空态占位 */
+export function createEmptyWorkbenchModel(): TaskExecutionWorkbenchModel {
+  return {
+    packId: null,
+    phaseProgress: {
+      phases: WORKBENCH_PHASE_SEQUENCE,
+      currentPhase: 'STRUCTURE',
+      overallRatio: 0,
+      stepLabel: '0/0',
+      taskIndexLabel: '任务 0/0',
+    },
+    taskStatus: 'running',
+    taskStatusLabel: '进行中',
+    scaffoldProduct: {
+      whatToOutput: FALLBACK_PHASE_COPY.whatToOutput,
+      recommendedSteps: FALLBACK_PHASE_COPY.recommendedSteps,
+      avoid: FALLBACK_PHASE_COPY.avoid,
+      startActionLabel: '开始',
+    },
+    whyThisStep: {
+      whyNow: '',
+      skipRisk: '',
+      expectedGain: '',
+    },
+    stageRules: { rules: STAGE_RULES_BY_PHASE.STRUCTURE },
+    topicHints: {
+      topicDisplayName: '',
+      bullets: [],
+      visualVariant: 'hierarchy',
+    },
+    stageMini: {
+      roundLabel: '',
+      actionsDone: 0,
+      actionsTarget: 0,
+      untilNextPhase: '',
+      passedGate: false,
+    },
+    currentTask: {
+      phaseDisplayZh: '',
+      phaseCode: 'STRUCTURE',
+      taskTitle: '',
+      coreActionLine: '',
+      completionLines: [],
+    },
+    emphasisPhase: 'STRUCTURE',
   }
 }
 
@@ -548,17 +645,37 @@ export function buildExecutionPageModel(
     knowledgeKey: input.plan?.knowledgeKey,
     packId: input.plan?.packId,
   })
+  const knowledgeDemo = getKnowledgeDemoConfig(pack?.id ?? null)
   const copy = STEP_COPY[state]
   const knowledgePoints = buildKnowledgePoints(input.task, input.progress, input.planTasks)
   const activePoint =
     knowledgePoints.find((item) => item.status === 'active') || knowledgePoints[0]
 
-  const focusTitle =
-    activePoint?.title || summarizeLine(input.task.title, '当前知识点') || '当前知识点'
+  let enriched = enrichExecutionSpec({
+    task: input.task,
+    scaffold: input.scaffold,
+    pack,
+    taskState: input.taskState,
+    legacyComplete: input.legacyComplete,
+    checkpointQuestion: input.checkpointQuestion,
+    activeKnowledgePointTitle: activePoint?.title || input.task.title,
+    recommendedUserActions: input.recommendedUserActions,
+    stageMachineLabel: copy.stageLabel,
+    stepTimes: STEP_TIMES,
+  })
+
+  if (state === 'CHECK' && pack) {
+    enriched = {
+      ...enriched,
+      completionStandardLines: pack.checkpoint.checkpointRubric.slice(0, 2),
+    }
+  }
+
   const completionCriteria =
-    state === 'CHECK' && pack
-      ? pack.checkpoint.checkpointRubric.slice(0, 3)
+    enriched.completionStandardLines.length >= 2
+      ? enriched.completionStandardLines
       : buildRoundCompletionCriteria(state, input.task, input.scaffold)
+
   const metaParts = [
     copy.stageLabel,
     input.progress ? `任务 ${input.progress.currentIndex}/${input.progress.totalTasks}` : null,
@@ -566,34 +683,53 @@ export function buildExecutionPageModel(
   ].filter(Boolean) as string[]
   const metaLine = metaParts.join(' · ')
 
-  const scaffoldCards = buildScaffoldCards(
-    focusTitle,
-    input.scaffold,
-    pack?.execution.scaffoldCards
-  )
-  const progressRail = buildProgressRail(
-    knowledgePoints,
-    activePoint,
-    state,
-    completionCriteria
-  )
+  const scaffoldCards = enriched.scaffoldCards
+  const nextPreview = buildNextStepPreview(knowledgePoints, state, pack)
+
+  const progressRail = {
+    stageSectionTitle: '当前阶段',
+    stageLabel: enriched.stageDisplay,
+    deliverableSectionTitle: '当前这一步要产出',
+    deliverableLine: enriched.currentDeliverable,
+    stuckSectionTitle: '卡住时怎么做',
+    stuckActions: enriched.stuckActions,
+    nextSectionTitle: '下一步预告',
+    nextPreview,
+    knowledgeOutline: knowledgePoints,
+  }
+
+  const workbench = buildWorkbenchModel(input, {
+    pack,
+    phaseCode: copy.stageLabel as WorkbenchPhaseCode,
+    stageDisplayZh: enriched.stageDisplay,
+    copyTitle: copy.title,
+    currentDirective: enriched.currentDirective,
+    completionCriteria,
+    knowledgePointName: enriched.knowledgePointName,
+    roundGoal: enriched.roundGoal,
+    scaffoldCards,
+    nextPreview,
+  })
 
   return {
     currentStepIndex: input.guidedStepCurrent,
     currentStepTitle: copy.title,
     header: {
-      heroTitle: pack
-        ? `${pack.tutor.focusLabel} · ${focusTitle}`
-        : `这轮只解决一个问题：${focusTitle}`,
-      heroSubtitle:
-        pack?.execution.phaseHero[state as keyof typeof pack.execution.phaseHero] ||
-        buildHeroSubtitle(state, activePoint),
+      phaseCode: copy.stageLabel,
+      phaseDisplayZh: enriched.stageDisplay,
+      strategyLine: knowledgeDemo
+        ? `策略：${knowledgeDemo.plan.strategy}`
+        : undefined,
+      anchorActionLine:
+        clipFirstLine(enriched.currentDirective, 120) || clipFirstLine(enriched.roundGoal, 120),
+      heroTitle: enriched.knowledgePointName,
+      heroSubtitle: enriched.roundGoal,
       completionCriteria,
       metaLine,
       title: activePoint?.title || input.task.title,
-      stageLabel: `${copy.stageLabel} · 执行中`,
+      stageLabel: `当前阶段：${enriched.stageDisplay}（${copy.stageLabel}）`,
       stepLabel: `${input.guidedStepCurrent}/${input.guidedStepTotal}`,
-      estimatedTime: STEP_TIMES[state],
+      estimatedTime: enriched.estimatedTimeLabel,
       subtitle:
         pack?.execution.phaseObjective[
           state as keyof typeof pack.execution.phaseObjective
@@ -609,13 +745,24 @@ export function buildExecutionPageModel(
         ? `当前第 ${activePoint.index} 个点，完成后再往后走。`
         : '按知识点逐个推进。',
       knowledgePoints,
+      operationConsole: {
+        knowledgePointName: enriched.knowledgePointName,
+        knowledgePointType: enriched.knowledgePointType,
+        roundGoal: enriched.roundGoal,
+        completionStandardLines: enriched.completionStandardLines,
+        estimatedTimeLabel: enriched.estimatedTimeLabel,
+      },
     },
     mainAction: buildActionModel(
       state,
       input.task,
       input.scaffold,
       input.recommendedUserActions,
-      activePoint
+      activePoint,
+      enriched.currentDirective,
+      enriched.inputPlaceholderSoft,
+      copy.stageLabel,
+      enriched.stageDisplay
     ),
     feedback: buildFeedback(
       input.latestFeedback,
@@ -623,14 +770,17 @@ export function buildExecutionPageModel(
       input.checkpointQuestion,
       input.selfExplainMissingPoints
     ),
-    progressRail: {
-      ...progressRail,
-      nextPreview:
-        state === 'CHECK' && pack
-          ? pack.checkpoint.checkpointPrompt
-          : progressRail.nextPreview,
-    },
-    helpSections: buildHelpSections(input.task, input.scaffold, input.currentGuidance),
+    progressRail,
+    helpSections: buildHelpSections(input.currentGuidance),
     scaffoldCards,
+    tutorConsole: {
+      currentDirective: enriched.currentDirective,
+      inputPlaceholderSoft: enriched.inputPlaceholderSoft,
+      stageDisplay: enriched.stageDisplay,
+      currentDeliverable: enriched.currentDeliverable,
+      stuckActions: enriched.stuckActions,
+      phasePromptChips: enriched.phasePromptChips,
+    },
+    workbench,
   }
 }

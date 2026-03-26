@@ -5,22 +5,36 @@
   >
     <section>
       <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {{ model.progressSectionTitle }}
+        {{ model.stageSectionTitle }}
       </p>
-      <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-        <li v-for="(line, i) in model.progressLines" :key="`p-${i}`">
-          {{ line }}
-        </li>
-      </ul>
+      <p class="mt-2 text-sm font-semibold leading-6 text-slate-900">
+        {{ model.stageLabel }}
+      </p>
     </section>
 
     <section class="rounded-[20px] border border-slate-100 bg-slate-50/80 p-4">
       <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {{ model.criteriaSectionTitle }}
+        {{ model.deliverableSectionTitle }}
       </p>
-      <ul class="mt-3 list-disc space-y-1.5 pl-4 text-sm leading-6 text-slate-700">
-        <li v-for="(line, i) in model.completionLines" :key="`c-${i}`">
-          {{ line }}
+      <p class="mt-2 text-sm leading-6 text-slate-800">
+        {{ model.deliverableLine }}
+      </p>
+    </section>
+
+    <section class="rounded-[20px] border border-amber-100 bg-amber-50/40 p-4">
+      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-900/90">
+        {{ model.stuckSectionTitle }}
+      </p>
+      <ul class="mt-3 space-y-2">
+        <li v-for="(action, i) in model.stuckActions" :key="`stuck-${i}`">
+          <button
+            type="button"
+            class="w-full rounded-[14px] border border-amber-200/90 bg-white px-3 py-2 text-left text-sm text-slate-800 transition hover:border-primary/40 hover:bg-primary/5"
+            :data-testid="`stuck-action-${i}`"
+            @click="$emit('stuck-action', action)"
+          >
+            {{ action }}
+          </button>
         </li>
       </ul>
     </section>
@@ -51,5 +65,9 @@ import type { ExecutionGuideProgressRailModel } from '@/types/executionGuide'
 
 defineProps<{
   model: ExecutionGuideProgressRailModel
+}>()
+
+defineEmits<{
+  'stuck-action': [action: string]
 }>()
 </script>
