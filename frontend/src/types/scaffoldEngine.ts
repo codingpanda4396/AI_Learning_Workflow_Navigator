@@ -2,11 +2,16 @@ export interface LearningActionCard {
   actionId: string
   title: string
   goal: string
+  singleAction?: string
   instructions: string
+  systemPrompt?: string
+  llmRole?: string
   userOutputLabel: string
   allowedPrompts: string[]
   forbiddenPrompts: string[]
+  forbiddenActions?: string[]
   passCriteria: string[]
+  completionCriteria?: string[]
   exampleOutput?: string
   nextActionHint?: string
 }
@@ -37,6 +42,7 @@ export interface StageScaffold {
   stageKey: string
   stageTitle: string
   stageGoal: string
+  phaseGoal?: string
   stageDescription: string
   actionCards: LearningActionCard[]
   validatorType: string

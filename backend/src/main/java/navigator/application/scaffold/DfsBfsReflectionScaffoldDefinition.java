@@ -6,7 +6,7 @@ import navigator.api.dto.scaffold.StageScaffold;
 import java.util.List;
 
 /**
- * DFS/BFS REFLECTION：四卡收敛，错误 → 根因 → 规律 → 能力。
+ * DFS/BFS reflection stage cards.
  */
 public final class DfsBfsReflectionScaffoldDefinition {
 
@@ -27,91 +27,133 @@ public final class DfsBfsReflectionScaffoldDefinition {
     public static StageScaffold buildStage() {
         return StageScaffold.builder()
                 .stageKey(STAGE_KEY)
-                .stageTitle("反思收敛")
-                .stageGoal("把训练里暴露的问题压成可带走的认知资产：错误、根因、判断规则、能力命名与下一步策略。")
-                .stageDescription("每张卡只追问一个点；不通过时会给一条轻量提示，请改写到够具体为止。")
+                .stageTitle("反思收束")
+                .stageGoal("把这次暴露出的错误压成以后可复用的判断规则。")
+                .phaseGoal("我要把这次暴露出的错误压成以后可复用的判断规则。")
+                .stageDescription("每张卡只回答一个点，系统只打回空话、泛话和定义复读。")
                 .validatorType("REFLECTION_RULES")
                 .tutorMode("REFLECTION_CONSTRAINED")
                 .actionCards(List.of(
                         LearningActionCard.builder()
                                 .actionId(ACTION_ERROR_RECALL)
-                                .title("回顾一下，你前面最容易犯的一个错误是什么？")
-                                .goal("指出一个与 DFS/BFS 表达或理解相关的具体错误，而不是泛泛说「我不太会」。")
-                                .instructions("写 2～6 句：说清楚「错在哪」；可对比你当时怎么想。")
-                                .userOutputLabel("我的典型错误")
+                                .title("我最容易犯的一个错")
+                                .goal("回忆一个具体错误，而不是写空泛总结。")
+                                .singleAction("写出一个与这轮 DFS / BFS 训练直接相关的具体错误。")
+                                .instructions("用 2-3 句写清『错在哪』。")
+                                .systemPrompt("不要写『我理解更深了』。请写一个具体被抓到的错误。")
+                                .llmRole("反思压缩器")
+                                .userOutputLabel("典型错误")
                                 .allowedPrompts(List.of(
-                                        "我曾把…当成…",
-                                        "我写的时候漏说了…"
+                                        "我曾把……当成……",
+                                        "我写的时候漏掉了……"
                                 ))
                                 .forbiddenPrompts(List.of(
-                                        "空泛：我不太会 / 理解不深",
-                                        "只写一句口号"
+                                        "不要写『我不太会』这类空话",
+                                        "不要只写一句口号"
+                                ))
+                                .forbiddenActions(List.of(
+                                        "禁止空泛总结",
+                                        "禁止只写『我不会 / 我不太懂』而不指出具体错误"
                                 ))
                                 .passCriteria(List.of(
-                                        "具体错误描述",
-                                        "与前面学习过程相关"
+                                        "错误描述具体",
+                                        "与本轮训练相关"
                                 ))
-                                .nextActionHint("下一张：这个错误为什么会发生。")
+                                .completionCriteria(List.of(
+                                        "错误描述具体，且与本轮训练相关"
+                                ))
+                                .nextActionHint("下一张：这个错为什么会发生。")
                                 .build(),
                         LearningActionCard.builder()
                                 .actionId(ACTION_ROOT_CAUSE)
-                                .title("这个错误为什么会发生？")
-                                .goal("说出根因：背定义、机制不清、因果链断、表达模糊等，并对应上一张的错误。")
-                                .instructions("写 2～6 句：用「因为…所以…」或「根因是…」。")
+                                .title("这个错为什么会发生")
+                                .goal("把错误对应到真正的根因，而不是空因。")
+                                .singleAction("用一句根因句说明：这个错为什么会发生。")
+                                .instructions("优先使用『因为……所以……』或『根因是……』。")
+                                .systemPrompt("不要写『粗心』『基础不好』这种空因。请对应上一张的错误，把根因写出来。")
+                                .llmRole("反思压缩器")
                                 .userOutputLabel("错误根因")
                                 .allowedPrompts(List.of(
-                                        "根因是我只会背…",
-                                        "因果链在…断了"
+                                        "根因是我只会背……",
+                                        "因果链在……断了"
                                 ))
                                 .forbiddenPrompts(List.of(
-                                        "重复上一张原句不改",
-                                        "只说「粗心」"
+                                        "不要把上一张原话重复一遍",
+                                        "不要只写『粗心』"
+                                ))
+                                .forbiddenActions(List.of(
+                                        "禁止把『错误』原句原样重复",
+                                        "禁止写空因"
                                 ))
                                 .passCriteria(List.of(
-                                        "至少一个清晰原因",
-                                        "能对应典型错误"
+                                        "根因清楚",
+                                        "根因能对应上一张错误"
                                 ))
-                                .nextActionHint("下一张：形成可迁移的判断规则。")
+                                .completionCriteria(List.of(
+                                        "根因不是『粗心』『基础不好』这种空因"
+                                ))
+                                .nextActionHint("下一张：以后看到什么情况优先想到 DFS / BFS。")
                                 .build(),
                         LearningActionCard.builder()
                                 .actionId(ACTION_DECISION_RULE)
-                                .title("以后你怎么判断该优先想到 DFS 还是 BFS？")
-                                .goal("用「遇到什么情况 → 优先想哪种搜索」写规则，而不是复述定义。")
-                                .instructions("写 3～8 句：尽量包含条件词（当/如果/优先）并同时提到两种思路的特征。")
-                                .userOutputLabel("我的判断规则")
+                                .title("以后看到什么情况优先想到 DFS / BFS")
+                                .goal("形成能迁移的判断规则，而不是复读定义。")
+                                .singleAction("写成条件句：遇到什么情况时，我优先想到 DFS 或 BFS。")
+                                .instructions("尽量写成『遇到……时，我优先……，因为……』。")
+                                .systemPrompt("不要复读定义。请写成『遇到____时，我优先____，因为____』。")
+                                .llmRole("反思压缩器")
+                                .userOutputLabel("判断规则")
                                 .allowedPrompts(List.of(
-                                        "当问题强调层次扩展…",
-                                        "如果需要先处理更近的…"
+                                        "当问题强调层次扩展……",
+                                        "如果需要先处理更近的……"
                                 ))
                                 .forbiddenPrompts(List.of(
-                                        "只写「DFS 深度 BFS 广度」",
-                                        "纯背术语无场景"
+                                        "不要只写『DFS 深度 BFS 广度』",
+                                        "不要没有场景条件"
+                                ))
+                                .forbiddenActions(List.of(
+                                        "禁止复读定义",
+                                        "禁止不带条件和场景的空规则"
                                 ))
                                 .passCriteria(List.of(
-                                        "可迁移规则",
-                                        "场景/特征 → 方法"
+                                        "规则包含条件",
+                                        "规则包含方法映射"
                                 ))
-                                .nextActionHint("下一张：给这次能力命名。")
+                                .completionCriteria(List.of(
+                                        "判断规则包含条件与方法映射"
+                                ))
+                                .nextActionHint("最后一张：我这次真正获得的能力是什么。")
                                 .build(),
                         LearningActionCard.builder()
                                 .actionId(ACTION_CAPABILITY_NAME)
-                                .title("你这次真正获得的能力是什么？")
-                                .goal("用一句可复用的能力表述收尾，而不是「学会了 DFS/BFS」。")
-                                .instructions("写 2～5 句：能力要具体到能解释机制、对比或因果链。")
-                                .userOutputLabel("我获得的能力")
+                                .title("我这次真正获得的能力是什么")
+                                .goal("把能力写成能检验、可复用的句子。")
+                                .singleAction("用『我能……』写出一条可检验的能力表述。")
+                                .instructions("能力必须具体到判断、解释、对比或因果链。")
+                                .systemPrompt("不要写『学会了 DFS/BFS』。请写你以后能独立做出的判断。")
+                                .llmRole("反思压缩器")
+                                .userOutputLabel("获得的能力")
                                 .allowedPrompts(List.of(
-                                        "我能根据…判断…",
-                                        "我能把…的因果链讲清楚"
+                                        "我能根据……判断……",
+                                        "我能把……的因果链讲清楚"
                                 ))
                                 .forbiddenPrompts(List.of(
-                                        "泛泛：学会了 DFS/BFS",
-                                        "只列知识点名词"
+                                        "不要写知识点名词",
+                                        "不要写泛化鸡汤"
+                                ))
+                                .forbiddenActions(List.of(
+                                        "禁止把『能力』写成知识点名词",
+                                        "禁止脱离本轮训练内容写泛化鸡汤"
                                 ))
                                 .passCriteria(List.of(
-                                        "具体能力表述",
-                                        "可复用、可检验"
+                                        "以『我能……』开头",
+                                        "能力可检验、可复用"
                                 ))
-                                .nextActionHint("完成后将生成反思沉淀并进入探索。")
+                                .completionCriteria(List.of(
+                                        "能力表述以『我能……』开头，并可被检验",
+                                        "最终可沉淀为报告页中的一条『下次可复用规则』"
+                                ))
+                                .nextActionHint("完成后生成反思沉淀。")
                                 .build()
                 ))
                 .build();

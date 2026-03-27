@@ -16,6 +16,8 @@ public class StageScaffold {
     private String stageKey;
     private String stageTitle;
     private String stageGoal;
+    /** 用户视角的一句话目标，供执行页主卡直接展示 */
+    private String phaseGoal;
     private String stageDescription;
     private List<LearningActionCard> actionCards;
     private String validatorType;

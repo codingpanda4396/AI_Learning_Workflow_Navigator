@@ -14,23 +14,23 @@
         </template>
       </EmptyState>
 
-      <section v-else-if="task" :class="useStructureEngineUi ? 'space-y-5 pb-12' : 'space-y-4 pb-28'">
+      <section v-else-if="task" :class="useScaffoldEngineUi ? 'space-y-5 pb-12' : 'space-y-4 pb-28'">
         <ExecutionHeader
           :topic-name="workbenchTopicName"
-          :title-override="useStructureEngineUi ? STRUCTURE_PHASE_COPY.mainTitle : undefined"
+          :title-override="useScaffoldEngineUi ? scaffoldEngine.stage?.stageTitle || STRUCTURE_PHASE_COPY.mainTitle : undefined"
           :phase-progress="pageModel.workbench.phaseProgress"
           :task-status-label="pageModel.workbench.taskStatusLabel"
-          :compact="useStructureEngineUi"
-          :subtitle-line="useStructureEngineUi ? structureHeaderSubtitle : undefined"
+          :compact="useScaffoldEngineUi"
+          :subtitle-line="useScaffoldEngineUi ? scaffoldHeaderSubtitle : undefined"
         />
 
-        <template v-if="useStructureEngineUi">
+        <template v-if="useScaffoldEngineUi">
           <div
             v-if="scaffoldEngine.loading && !scaffoldEngine.stage"
             class="rounded-2xl border border-slate-200 bg-white/80 p-8 text-center text-sm text-slate-600"
           >
             {{ TASKRUN_COPY.scaffoldLoadingPrefix }}
-            {{ scaffoldStageLabel('STRUCTURE') }}{{ TASKRUN_COPY.scaffoldLoadingSuffix }}
+            {{ scaffoldStageLabel(currentScaffoldStageKey) }}{{ TASKRUN_COPY.scaffoldLoadingSuffix }}
           </div>
           <div
             v-else-if="scaffoldEngine.error"
@@ -38,46 +38,37 @@
           >
             {{ scaffoldEngine.error }}
           </div>
-          <section
-            v-else-if="scaffoldEngine.stage?.stageKey === 'STRUCTURE'"
-            class="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start"
-            :data-phase="pageModel.workbench.emphasisPhase"
-          >
-            <div class="min-w-0 lg:col-span-5">
-              <StructureScaffoldActionGrid
-                :eyebrow="STRUCTURE_PHASE_COPY.eyebrow"
-                :section-title="STRUCTURE_PHASE_COPY.scaffoldTitle"
-                :section-hint="STRUCTURE_PHASE_COPY.scaffoldHint"
-                :cards="DFS_BFS_SCAFFOLD_CARDS"
-                :learn-label="STRUCTURE_PHASE_COPY.learnCta"
-                :disabled="structureSkeletonBarLoading"
-                @learn="onStructureCardLearn"
+          <section v-else class="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
+            <div class="space-y-5 lg:col-span-8" :data-phase="currentScaffoldStageKey">
+              <PrimaryTaskCard
+                :model="pageModel.workbench.currentTask"
+                :emphasis-phase="scaffoldEmphasisPhase"
               />
+
+              <LearningActionCardPanel
+                v-if="scaffoldEngine.stage"
+                v-model:draft-value="draftInput"
+                :stage-key="scaffoldEngine.stage.stageKey"
+                :phase-label="scaffoldStageLabel(scaffoldEngine.stage.stageKey)"
+                :stage-title="scaffoldEngine.stage.stageTitle"
+                :stage-goal="scaffoldEngine.stage.stageGoal"
+                :phase-goal="scaffoldEngine.stage.phaseGoal"
+                :stage-description="scaffoldEngine.stage.stageDescription"
+                :card="scaffoldEngine.currentCard"
+                :loading="scaffoldEngine.loading"
+                :submitting="scaffoldEngine.submitting"
+                :last-result="scaffoldEngine.lastResult"
+                :input-label="scaffoldEngine.currentCard?.userOutputLabel || '本轮输出'"
+                @submit="handleScaffoldActionSubmit"
+              />
+
+              <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
             </div>
-            <div class="flex min-w-0 flex-col gap-4 lg:col-span-7">
-              <StructureSkeletonPanel
-                :loading="structureSkeleton.loading"
-                :error="structureSkeleton.error"
-                :skeleton="structureSkeleton.skeleton"
-                :empty-message="STRUCTURE_PHASE_COPY.emptySkeleton"
-                :loading-message="STRUCTURE_PHASE_COPY.loadingSkeleton"
-                :labels="STRUCTURE_PHASE_COPY.skeletonLabels"
-              />
-              <StructureLightFeedbackBar
-                :disabled="structureSkeletonBarLoading"
-                :has-skeleton="!!structureSkeleton.skeleton"
-                :labels="STRUCTURE_PHASE_COPY.feedback"
-                @got-next="onStructureGotNext"
-                @clarify="onStructureClarify"
-                @adjacent="onStructureAdjacent"
-              />
-              <StructureOptionalReflectionField
-                v-model="structureOptionalOneLiner"
-                :label="STRUCTURE_PHASE_COPY.optionalLineLabel"
-                :placeholder="STRUCTURE_PHASE_COPY.optionalPlaceholder"
-                :disabled="structureSkeletonBarLoading"
-              />
-            </div>
+
+            <aside class="space-y-3 lg:col-span-4">
+              <StepReasonCard :model="pageModel.workbench.whyThisStep" />
+              <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
+            </aside>
           </section>
         </template>
 
@@ -161,23 +152,14 @@
               />
           </div>
 
-          <aside v-if="!useStructureEngineUi" class="space-y-3 lg:col-span-4">
+          <aside v-if="!useScaffoldEngineUi" class="space-y-3 lg:col-span-4">
             <StepReasonCard :model="pageModel.workbench.whyThisStep" />
             <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
           </aside>
         </section>
 
         <StickyActionBar
-          v-if="useStructureEngineUi"
-          :primary-label="STRUCTURE_PHASE_COPY.primaryComplete"
-          :primary-loading="structureStickyLoading"
-          :primary-disabled="structurePrimaryBarDisabled"
-          :show-advance="false"
-          @save-draft="saveStructureOptionalDraft"
-          @primary="onStructureCompleteStage"
-        />
-        <StickyActionBar
-          v-else
+          v-if="!useScaffoldEngineUi"
           :primary-label="bottomPrimaryLabel"
           :primary-loading="mainActionLoading"
           :primary-disabled="bottomPrimaryDisabled"
@@ -200,6 +182,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import ExecutionHeader from '@/components/task-run/ExecutionHeader.vue'
+import LearningActionCardPanel from '@/components/task-run/LearningActionCardPanel.vue'
 import ExecutionMainActionCard from '@/components/task-run/ExecutionMainActionCard.vue'
 import ExpressionWorkspace from '@/components/task-run/ExpressionWorkspace.vue'
 import FeedbackSummary from '@/components/task-run/FeedbackSummary.vue'
@@ -209,10 +192,6 @@ import StageProgressMiniCard from '@/components/task-run/StageProgressMiniCard.v
 import StepReasonCard from '@/components/task-run/StepReasonCard.vue'
 import StickyActionBar from '@/components/task-run/StickyActionBar.vue'
 import ReflectionSummaryCard from '@/components/task-run/ReflectionSummaryCard.vue'
-import StructureLightFeedbackBar from '@/components/task-run/StructureLightFeedbackBar.vue'
-import StructureOptionalReflectionField from '@/components/task-run/StructureOptionalReflectionField.vue'
-import StructureScaffoldActionGrid from '@/components/task-run/StructureScaffoldActionGrid.vue'
-import StructureSkeletonPanel from '@/components/task-run/StructureSkeletonPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
@@ -228,10 +207,7 @@ import {
   postTaskMessage,
 } from '@/api/task'
 import { TASKRUN_COPY } from '@/constants/uiCopy'
-import {
-  DFS_BFS_SCAFFOLD_CARDS,
-  STRUCTURE_PHASE_COPY,
-} from '@/constants/dfsBfsStructureWorkbenchCopy'
+import { STRUCTURE_PHASE_COPY } from '@/constants/dfsBfsStructureWorkbenchCopy'
 import { fallbackGuidanceForState, tutorPromptFor } from '@/constants/taskRunUi'
 import { showToast } from '@/stores/toast'
 import { useAiTutorStore } from '@/stores/aiTutor'
@@ -251,12 +227,12 @@ import type {
   ExecutionPageViewModel,
 } from '@/types/executionGuide'
 import { TaskCompletionStatus, type TaskCompletionStatusType } from '@/types/enums'
+import type { WorkbenchPhaseCode } from '@/types/taskExecutionWorkbench'
 import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
 import { buildExecutionPageModel, createEmptyWorkbenchModel } from '@/utils/buildExecutionPageModel'
 import { buildTaskGuidedSteps, getCurrentGuidedStepId } from '@/utils/taskGuidedSteps'
 import { useKnowledgePack } from '@/composables/useKnowledgePack'
 import { scaffoldStageLabel, useLearningScaffoldEngine } from '@/composables/useLearningScaffoldEngine'
-import { useStructureSkeletonFlow } from '@/composables/useStructureSkeletonFlow'
 import type { ReflectionSummary } from '@/types/scaffoldEngine'
 
 interface ChatTurn {
@@ -305,6 +281,19 @@ const completeForm = ref<{
 
 const structureOptionalOneLiner = ref('')
 const structureCompleting = ref(false)
+const structureSkeleton = {
+  loading: false,
+  error: null as string | null,
+  skeleton: null as unknown,
+  lastPromptKey: '',
+  async fetchSkeleton(_promptKey: string, _followUpKind?: string) {
+    return null
+  },
+  clearPanel() {},
+  async completeStage(_optionalOneLiner?: string) {
+    return null
+  },
+}
 
 const structureEngineEnabled = computed(
   () =>
@@ -319,31 +308,17 @@ const scaffoldEngine = useLearningScaffoldEngine({
   enabled: () => structureEngineEnabled.value,
 })
 
-const useStructureEngineUi = computed(
-  () =>
-    structureEngineEnabled.value &&
-    !scaffoldEngine.scaffoldEngineComplete &&
-    scaffoldEngine.stage?.stageKey === 'STRUCTURE'
+const useScaffoldEngineUi = computed(
+  () => structureEngineEnabled.value && !scaffoldEngine.scaffoldEngineComplete && !!scaffoldEngine.stage
 )
-
-const structureSkeleton = useStructureSkeletonFlow({
-  taskId: () => task.value?.taskId,
-  sessionId: () => store.sessionId ?? null,
-  enabled: () => useStructureEngineUi.value,
-  reloadStage: () => scaffoldEngine.loadStage(),
+const currentScaffoldStageKey = computed(() => scaffoldEngine.stage?.stageKey || 'STRUCTURE')
+const scaffoldEmphasisPhase = computed<WorkbenchPhaseCode>(() => {
+  const stageKey = scaffoldEngine.stage?.stageKey
+  if (stageKey === 'STRUCTURE' || stageKey === 'UNDERSTANDING' || stageKey === 'TRAINING' || stageKey === 'REFLECTION') {
+    return stageKey
+  }
+  return pageModel.value.workbench.emphasisPhase
 })
-
-const structureSkeletonBarLoading = computed(
-  () => scaffoldEngine.loading || structureSkeleton.loading || structureCompleting.value
-)
-
-const structureStickyLoading = structureSkeletonBarLoading
-
-const structureCanProceed = computed(() => scaffoldEngine.stage?.structureCanComplete === true)
-
-const structurePrimaryBarDisabled = computed(
-  () => !structureCanProceed.value || structureSkeletonBarLoading.value
-)
 
 /** 脚手架完成后从 GET scaffold 恢复；末卡当帧可从 lastResult 兜底 */
 const reflectionSummaryForWorkbench = computed((): ReflectionSummary | null => {
@@ -555,7 +530,7 @@ const workbenchTopicName = computed(() => {
   )
 })
 
-const structureHeaderSubtitle = computed(() => {
+const scaffoldHeaderSubtitle = computed(() => {
   const idx = pageModel.value.workbench.phaseProgress.taskIndexLabel
   return `${STRUCTURE_PHASE_COPY.subtitle} · ${idx}`
 })
@@ -631,7 +606,6 @@ function resetClosureFields() {
 
 function resetInteractionDraft() {
   draftInput.value = ''
-  structureOptionalOneLiner.value = ''
   latestFeedback.value = null
   restateWhat.value = ''
   restateProblem.value = ''
@@ -993,6 +967,18 @@ async function onAdvanceDrivingSeat() {
   }
 }
 
+async function handleScaffoldActionSubmit() {
+  const content = draftInput.value.trim()
+  if (!content) return
+  const result = await scaffoldEngine.submit(content)
+  if (!result) return
+  draftInput.value = ''
+  if (task.value?.taskId) {
+    await loadScaffold(task.value.taskId)
+  }
+  await fetchTask()
+}
+
 async function submitSelfExplanation() {
   if (!store.sessionId || !task.value) return
   const content = draftInput.value.trim()
@@ -1130,6 +1116,13 @@ async function onStructureCompleteStage() {
     structureCompleting.value = false
   }
 }
+
+void saveStructureOptionalDraft
+void onStructureCardLearn
+void onStructureClarify
+void onStructureAdjacent
+void onStructureGotNext
+void onStructureCompleteStage
 
 async function handlePrimaryAction() {
   const mode = pageModel.value?.mainAction.mode
