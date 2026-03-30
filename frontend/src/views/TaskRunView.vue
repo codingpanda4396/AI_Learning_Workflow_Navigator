@@ -1,7 +1,7 @@
 <template>
   <PageContainer>
     <AppTopBar current="task" />
-    <main class="mx-auto max-w-[1260px] px-4 py-6 md:px-6 lg:px-8">
+    <main class="mx-auto max-w-[1280px] px-4 py-6 md:px-6 lg:px-8">
       <LoadingState v-if="loading && !task" :message="TASKRUN_COPY.loading" />
       <ErrorState v-else-if="error" :message="error">
         <template #action>
@@ -14,157 +14,76 @@
         </template>
       </EmptyState>
 
-      <section v-else-if="task" :class="useScaffoldEngineUi ? 'space-y-5 pb-12' : 'space-y-4 pb-28'">
+      <section v-else-if="task" class="space-y-5 pb-28">
         <ExecutionHeader
           :topic-name="workbenchTopicName"
-          :title-override="scaffoldExecutionHeaderTitleOverride"
-          :subtitle-line="scaffoldExecutionHeaderSubtitleLine"
-          :phase-progress="pageModel.workbench.phaseProgress"
+          :phase-progress="headerPhaseProgress"
           :task-status-label="pageModel.workbench.taskStatusLabel"
-          :compact="useScaffoldEngineUi"
+          :subtitle-line="headerSubtitleLine"
+          compact
         />
 
-        <template v-if="useScaffoldEngineUi">
-          <div
-            v-if="scaffoldEngine.loading && !scaffoldEngine.stage"
-            class="rounded-2xl border border-slate-200 bg-white/80 p-8 text-center text-sm text-slate-600"
-          >
-            {{ TASKRUN_COPY.scaffoldLoadingPrefix }}
-            {{ scaffoldStageLabel(currentScaffoldStageKey) }}{{ TASKRUN_COPY.scaffoldLoadingSuffix }}
-          </div>
-          <div
-            v-else-if="scaffoldEngine.error"
-            class="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-800"
-          >
-            {{ scaffoldEngine.error }}
-          </div>
-          <section v-else class="space-y-6">
-            <div
-              v-if="scaffoldEngine.stage && !scaffoldEngine.currentCard"
-              class="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900"
-            >
-              {{ TASKRUN_COPY.scaffoldNoAction }}
-            </div>
-            <ScaffoldSingleTaskWorkbench
-              v-else-if="scaffoldEngine.stage && scaffoldEngine.currentCard"
-              v-model:draft-value="draftInput"
-              :stage-key="scaffoldEngine.stage.stageKey"
-              :stage-title="scaffoldEngine.stage.stageTitle"
-              :stage-goal="scaffoldEngine.stage.stageGoal"
-              :phase-goal="scaffoldEngine.stage.phaseGoal"
-              :stage-description="scaffoldEngine.stage.stageDescription"
-              :card="scaffoldEngine.currentCard"
-              :phase-label="scaffoldStageLabel(scaffoldEngine.stage.stageKey)"
-              :loading="scaffoldEngine.loading"
-              :submitting="scaffoldEngine.submitting"
-              :last-result="scaffoldEngine.lastResult"
-              :why-this-step="pageModel.workbench.whyThisStep"
-              :stage-mini="pageModel.workbench.stageMini"
-              :phase-progress="pageModel.workbench.phaseProgress"
-              :pack-id="scaffold?.packId ?? null"
-              :input-label="scaffoldEngine.currentCard?.userOutputLabel || '本轮输出'"
-              @submit="handleScaffoldActionSubmit"
-              @continue-next="scrollScaffoldMainIntoView"
-            />
-            <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
-          </section>
-        </template>
-
-        <section v-else class="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
-          <div
-            class="space-y-5 lg:col-span-8"
-            :data-phase="pageModel.workbench.emphasisPhase"
-          >
-              <PrimaryTaskCard
-                :model="pageModel.workbench.currentTask"
-                :emphasis-phase="pageModel.workbench.emphasisPhase"
-              />
-
-              <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
-
-              <template v-if="useDrivingSeatLayout">
-                <ScaffoldGuideCard
-                  :product="pageModel.workbench.scaffoldProduct"
-                  :cards="pageModel.scaffoldCards"
-                  :phase-prompt-chips="pageModel.tutorConsole.phasePromptChips"
-                  :topic-observation-bullets="pageModel.workbench.topicHints.bullets"
-                  :sending="mainActionLoading"
-                  @send-card="onSendScaffoldCard"
-                  @prefill-card="onPrefillScaffoldCard"
-                  @prefill-chip="onPrefillPhaseChip"
-                />
-
-                <ExpressionWorkspace
-                  :chat-turns="chatTurns"
-                  :draft-value="draftInput"
-                  :input-label="pageModel.mainAction.inputLabel || TASKRUN_COPY.defaultMyExpression"
-                  :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
-                  :input-placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
-                  :sending="mainActionLoading"
-                  :show-restate="showRestateSection"
-                  :show-advance="showAdvanceSection"
-                  :micro-check-labels="microCheckLabels"
-                  :checks="microChecks"
-                  :restate-what="restateWhat"
-                  :restate-problem="restateProblem"
-                  :restate-relate="restateRelate"
-                  :emphasis-phase="pageModel.workbench.emphasisPhase"
-                  @update:draft-value="draftInput = $event"
-                  @update:checks="microChecks = $event"
-                  @update:restate-what="restateWhat = $event"
-                  @update:restate-problem="restateProblem = $event"
-                  @update:restate-relate="restateRelate = $event"
-                  @save-draft="saveDraftExplicit"
-                  @stuck="onStuckFromPanel"
-                />
-              </template>
-
-              <ExecutionMainActionCard
-                v-else
-                :model="pageModel.mainAction"
-                :draft-value="draftInput"
-                :loading="mainActionLoading"
-                :disabled="mainActionDisabled"
-                :can-submit="canSubmitMainAction"
-                :closure-summary="closureSummary"
-                :closure-point1="closurePoint1"
-                :closure-point2="closurePoint2"
-                :closure-next="closureNext"
-                :learner-reflection="completeForm.learnerReflection"
-                :completion-status="completeForm.completionStatus"
-                @update:draft-value="draftInput = $event"
-                @update:closure-summary="closureSummary = $event"
-                @update:closure-point1="closurePoint1 = $event"
-                @update:closure-point2="closurePoint2 = $event"
-                @update:closure-next="closureNext = $event"
-                @update:learner-reflection="completeForm.learnerReflection = $event"
-                @update:completion-status="completeForm.completionStatus = $event as TaskCompletionStatusType"
-                @use-chip="fillDraftInput"
-                @submit="handlePrimaryAction"
-              />
-
-              <FeedbackSummary
-                :class="feedbackEmphasisClass"
-                :model="pageModel.feedback"
-                @action="handleFeedbackAction"
-              />
-          </div>
-
-          <aside v-if="!useScaffoldEngineUi" class="space-y-3 lg:col-span-4">
-            <StepReasonCard :model="pageModel.workbench.whyThisStep" />
-            <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
+        <div class="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+          <aside class="space-y-4 lg:sticky lg:top-6">
+            <ExecutionProgressRail :model="pageModel.progressRail" @stuck-action="onStuckAction" />
           </aside>
-        </section>
+
+          <div class="space-y-5" :data-phase="pageModel.workbench.emphasisPhase">
+            <PrimaryTaskCard
+              :model="pageModel.workbench.currentTask"
+              :emphasis-phase="pageModel.workbench.emphasisPhase"
+            />
+
+            <ScaffoldGuideCard
+              :sections="pageModel.workbench.guideSections"
+              :topic-observation-bullets="pageModel.workbench.topicHints.bullets"
+              :sending="mainActionLoading"
+              @prefill-chip="onPrefillGuideText"
+            />
+
+            <ExpressionWorkspace
+              :chat-turns="chatTurns"
+              :draft-value="draftInput"
+              :input-label="pageModel.mainAction.inputLabel || TASKRUN_COPY.defaultMyExpression"
+              :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
+              :input-placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
+              :sending="mainActionLoading"
+              :micro-check-labels="microCheckLabels"
+              :checks="microChecks"
+              :emphasis-phase="pageModel.workbench.emphasisPhase"
+              :show-advance="showAdvanceSection"
+              :helper-text="pageModel.workbench.expressionLayout.helperText"
+              :low-friction-prompt="pageModel.workbench.expressionLayout.lowFrictionPrompt"
+              :structured-fields="pageModel.workbench.expressionLayout.fields"
+              :structured-inputs="structuredInputs"
+              @update:draft-value="draftInput = $event"
+              @update:structured-inputs="structuredInputs = $event"
+              @update:checks="microChecks = $event"
+              @save-draft="saveDraftExplicit"
+              @stuck="onStuckFromPanel"
+            />
+
+            <FeedbackSummary
+              :class="feedbackEmphasisClass"
+              :model="pageModel.feedback"
+              :schema="pageModel.workbench.feedbackSchema"
+              @action="handleFeedbackAction"
+            />
+
+            <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
+          </div>
+        </div>
 
         <StickyActionBar
-          v-if="!useScaffoldEngineUi"
+          :hint-label="pageModel.scaffoldCards[0]?.actionLabel || scaffoldHintLabel"
           :primary-label="bottomPrimaryLabel"
           :primary-loading="mainActionLoading"
           :primary-disabled="bottomPrimaryDisabled"
-          :show-advance="useDrivingSeatLayout && showAdvanceSection"
+          :show-advance="showAdvanceSection"
           :can-advance="canAdvanceDriving"
           :advancing="advancing"
-          :advance-label="TASKRUN_COPY.advancePhase"
+          :advance-label="scaffold?.actionBar?.nextActionLabel || TASKRUN_COPY.advancePhase"
+          @hint="handleHintAction"
           @save-draft="saveDraftExplicit"
           @primary="handlePrimaryAction"
           @advance="onAdvanceDrivingSeat"
@@ -175,21 +94,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import ExecutionHeader from '@/components/task-run/ExecutionHeader.vue'
-import ScaffoldSingleTaskWorkbench from '@/components/task-run/ScaffoldSingleTaskWorkbench.vue'
-import ExecutionMainActionCard from '@/components/task-run/ExecutionMainActionCard.vue'
+import ExecutionProgressRail from '@/components/task-run/ExecutionProgressRail.vue'
 import ExpressionWorkspace from '@/components/task-run/ExpressionWorkspace.vue'
 import FeedbackSummary from '@/components/task-run/FeedbackSummary.vue'
 import PrimaryTaskCard from '@/components/task-run/PrimaryTaskCard.vue'
-import ScaffoldGuideCard from '@/components/task-run/ScaffoldGuideCard.vue'
-import StageProgressMiniCard from '@/components/task-run/StageProgressMiniCard.vue'
-import StepReasonCard from '@/components/task-run/StepReasonCard.vue'
-import StickyActionBar from '@/components/task-run/StickyActionBar.vue'
 import ReflectionSummaryCard from '@/components/task-run/ReflectionSummaryCard.vue'
+import ScaffoldGuideCard from '@/components/task-run/ScaffoldGuideCard.vue'
+import StickyActionBar from '@/components/task-run/StickyActionBar.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorState from '@/components/ui/ErrorState.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
@@ -219,16 +135,11 @@ import type {
   TaskMessageResponse,
   TaskScaffoldResponse,
 } from '@/types/dto'
-import type {
-  ExecutionGuideFeedbackModel,
-  ExecutionPageViewModel,
-} from '@/types/executionGuide'
+import type { ExecutionGuideFeedbackModel, ExecutionPageViewModel } from '@/types/executionGuide'
 import { TaskCompletionStatus, type TaskCompletionStatusType } from '@/types/enums'
 import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
 import { buildExecutionPageModel, createEmptyWorkbenchModel } from '@/utils/buildExecutionPageModel'
 import { buildTaskGuidedSteps, getCurrentGuidedStepId } from '@/utils/taskGuidedSteps'
-import { useKnowledgePack } from '@/composables/useKnowledgePack'
-import { scaffoldStageLabel, useLearningScaffoldEngine } from '@/composables/useLearningScaffoldEngine'
 import type { ReflectionSummary } from '@/types/scaffoldEngine'
 
 interface ChatTurn {
@@ -262,7 +173,9 @@ const recommendedUserActions = ref<RecommendedUserActionItem[]>([])
 const selfExplainMissingPoints = ref<string[]>([])
 const chatTurns = ref<ChatTurn[]>([])
 const draftInput = ref('')
+const structuredInputs = ref<string[]>([])
 const latestFeedback = ref<ExecutionGuideFeedbackModel | null>(null)
+const microChecks = ref<boolean[]>([false, false, false])
 const closureSummary = ref('')
 const closurePoint1 = ref('')
 const closurePoint2 = ref('')
@@ -274,68 +187,6 @@ const completeForm = ref<{
   completionStatus: TaskCompletionStatus.COMPLETED,
   learnerReflection: '',
 })
-
-const structureOptionalOneLiner = ref('')
-const structureCompleting = ref(false)
-const structureSkeleton = {
-  loading: false,
-  error: null as string | null,
-  skeleton: null as unknown,
-  lastPromptKey: '',
-  async fetchSkeleton(_promptKey: string, _followUpKind?: string) {
-    return null
-  },
-  clearPanel() {},
-  async completeStage(_optionalOneLiner?: string) {
-    return null
-  },
-}
-
-const structureEngineEnabled = computed(
-  () =>
-    !!scaffold.value?.packId &&
-    scaffold.value.packId === 'ds_dfs_bfs' &&
-    taskState.value === 'ORIENT'
-)
-
-const scaffoldEngine = useLearningScaffoldEngine({
-  taskId: () => task.value?.taskId,
-  sessionId: () => store.sessionId ?? null,
-  enabled: () => structureEngineEnabled.value,
-})
-
-const useScaffoldEngineUi = computed(
-  () => structureEngineEnabled.value && !scaffoldEngine.scaffoldEngineComplete && !!scaffoldEngine.stage
-)
-const currentScaffoldStageKey = computed(() => scaffoldEngine.stage?.stageKey || 'STRUCTURE')
-
-const scaffoldExecutionHeaderTitleOverride = computed(() =>
-  useScaffoldEngineUi.value && currentScaffoldStageKey.value === 'STRUCTURE' ? '结构建立' : undefined
-)
-const scaffoldExecutionHeaderSubtitleLine = computed(() =>
-  useScaffoldEngineUi.value && currentScaffoldStageKey.value === 'STRUCTURE'
-    ? '先确认它属于哪一类'
-    : undefined
-)
-/** 脚手架完成后从 GET scaffold 恢复；末卡当帧可从 lastResult 兜底 */
-const reflectionSummaryForWorkbench = computed((): ReflectionSummary | null => {
-  const fromApi = scaffold.value?.reflectionSummary
-  if (fromApi?.record) return fromApi
-  const lr = scaffoldEngine.lastResult
-  if (lr?.reflectionRecord && lr.stageComplete) {
-    return {
-      record: lr.reflectionRecord,
-      insight: lr.reflectionInsight,
-      systemObservation: undefined,
-    }
-  }
-  return null
-})
-
-const restateWhat = ref('')
-const restateProblem = ref('')
-const restateRelate = ref('')
-const microChecks = ref<boolean[]>([false, false, false])
 
 const guidedStepsList = computed(() => buildTaskGuidedSteps(legacyComplete.value, scaffold.value))
 const guidedStepId = computed(() =>
@@ -426,77 +277,8 @@ const EMPTY_PAGE_MODEL: ExecutionPageViewModel = {
   workbench: createEmptyWorkbenchModel(),
 }
 
-function countChatPairs(turns: ChatTurn[]): number {
-  let n = 0
-  for (let i = 0; i < turns.length - 1; i++) {
-    if (turns[i]!.role === 'USER' && turns[i + 1]!.role === 'ASSISTANT') n++
-  }
-  return n
-}
-
-/** 与 mainAction.mode !== 'closure' 对齐：不依赖 pageModel，避免与 canAdvance 循环 */
-const useDrivingSeatLayout = computed(() => {
-  if (!task.value) return false
-  if (legacyComplete.value) return false
-  return taskState.value !== 'PASS'
-})
-
-const chatPairs = computed(() => countChatPairs(chatTurns.value))
-
-const knowledgePack = computed(() =>
-  useKnowledgePack({
-    scaffold: scaffold.value,
-    structuredGoal: store.structuredGoal,
-    plan: store.planPreview,
-  })
-)
-
-const microCheckLabels = computed(() => {
-  const fromPack = knowledgePack.value?.execution.microCheckLabels ?? []
-  if (fromPack.length >= 2) return fromPack.slice(0, 3)
-  const raw = scaffold.value?.selfCheckTemplates?.filter((s) => s?.trim()).slice(0, 3) ?? []
-  if (raw.length >= 2) return raw
-  return [
-    '我能说出这个概念大概在解决什么',
-    '我能说出一个最小例子或场景',
-    '我能说出它和相邻概念的一点关系',
-  ]
-})
-
-watch(
-  microCheckLabels,
-  (labels) => {
-    microChecks.value = labels.map(() => false)
-  },
-  { immediate: true }
-)
-
-const showRestateSection = computed(
-  () =>
-    useDrivingSeatLayout.value &&
-    (taskState.value === 'ORIENT' || taskState.value === 'EXPLORE') &&
-    chatPairs.value >= 1
-)
-
-const showAdvanceSection = computed(
-  () =>
-    useDrivingSeatLayout.value && taskState.value === 'EXPLORE' && chatPairs.value >= 1
-)
-
-const canAdvanceDriving = computed(() => {
-  if (!microChecks.value.length || !microChecks.value.every(Boolean)) return false
-  if (!showRestateSection.value) return true
-  return (
-    restateWhat.value.trim().length >= 2 &&
-    restateProblem.value.trim().length >= 2 &&
-    restateRelate.value.trim().length >= 2
-  )
-})
-
 const pageModel = computed<ExecutionPageViewModel>(() => {
-  if (!task.value) {
-    return EMPTY_PAGE_MODEL
-  }
+  if (!task.value) return EMPTY_PAGE_MODEL
   return buildExecutionPageModel({
     task: task.value,
     progress: progress.value,
@@ -517,21 +299,83 @@ const pageModel = computed<ExecutionPageViewModel>(() => {
   })
 })
 
+const reflectionSummaryForWorkbench = computed((): ReflectionSummary | null => scaffold.value?.reflectionSummary ?? null)
+
+const headerPhaseProgress = computed(() => {
+  const api = scaffold.value?.phaseProgress
+  if (api?.phases?.length) {
+    return {
+      phases: api.phases as typeof pageModel.value.workbench.phaseProgress.phases,
+      currentPhase: api.currentPhase as typeof pageModel.value.workbench.phaseProgress.currentPhase,
+      overallRatio: api.overallRatio,
+      taskIndexLabel: api.taskIndexLabel,
+      stepLabel: api.stepLabel,
+    }
+  }
+  return pageModel.value.workbench.phaseProgress
+})
+
+const headerSubtitleLine = computed(() => {
+  const card = scaffold.value?.currentTaskCard
+  if (!card) return undefined
+  return `${card.phaseDisplay} · ${card.currentAction}`
+})
+
 const workbenchTopicName = computed(() => {
   const w = pageModel.value.workbench.topicHints.topicDisplayName?.trim()
   if (w) return w
-  return (
-    pageModel.value.header.operationConsole?.knowledgePointName ||
-    pageModel.value.header.title ||
-    '当前任务'
-  )
+  return pageModel.value.header.operationConsole?.knowledgePointName || pageModel.value.header.title || '当前任务'
 })
+
+const microCheckLabels = computed(() => {
+  const raw = scaffold.value?.selfCheckTemplates?.filter((s) => s?.trim()).slice(0, 3) ?? []
+  if (raw.length >= 2) return raw
+  return ['我能定位它在解决什么', '我能说出关键机制或依据', '我能用一句话收束这一步']
+})
+
+watch(
+  microCheckLabels,
+  (labels) => {
+    microChecks.value = labels.map(() => false)
+  },
+  { immediate: true }
+)
+
+watch(
+  () => pageModel.value.workbench.expressionLayout.fields,
+  (fields) => {
+    structuredInputs.value = fields.map((_, index) => structuredInputs.value[index] ?? '')
+  },
+  { immediate: true }
+)
+
+watch(
+  structuredInputs,
+  (parts) => {
+    const fields = pageModel.value.workbench.expressionLayout.fields
+    const merged = parts
+      .map((value, index) => {
+        const trimmed = value.trim()
+        if (!trimmed) return ''
+        const label = fields[index]?.label || `字段 ${index + 1}`
+        return `${label}：${trimmed}`
+      })
+      .filter(Boolean)
+      .join('\n')
+    if (merged) draftInput.value = merged
+  },
+  { deep: true }
+)
+
+const showAdvanceSection = computed(() => taskState.value === 'EXPLORE' && chatTurns.value.length >= 1)
+const canAdvanceDriving = computed(() => microChecks.value.length > 0 && microChecks.value.every(Boolean))
 
 const bottomPrimaryLabel = computed(() => {
   if (pageModel.value.mainAction.mode === 'closure') return '完成本任务'
-  if (useDrivingSeatLayout.value) return '提交本轮表达'
-  return pageModel.value.mainAction.primaryActionLabel || '提交本轮表达'
+  return scaffold.value?.actionBar?.submitActionLabel || pageModel.value.mainAction.primaryActionLabel || '提交本轮表达'
 })
+
+const scaffoldHintLabel = computed(() => scaffold.value?.actionBar?.hintActionLabel || '查看提示')
 
 const feedbackEmphasisClass = computed(() => {
   const ph = pageModel.value.workbench.emphasisPhase
@@ -539,86 +383,42 @@ const feedbackEmphasisClass = computed(() => {
   return ''
 })
 
-const bottomPrimaryDisabled = computed(() => {
-  if (mainActionLoading.value) return true
-  if (pageModel.value.mainAction.mode === 'closure') return false
-  if (useDrivingSeatLayout.value) return !canSubmitDrivingChat.value
-  return !canSubmitMainAction.value
-})
-
-const canSubmitDrivingChat = computed(() => {
-  const mode = pageModel.value?.mainAction.mode
-  if (mode === 'closure') return false
-  return !!draftInput.value.trim()
-})
-
 const mainActionLoading = computed(() => {
-  if (useDrivingSeatLayout.value) {
-    return (
-      sending.value ||
-      advancing.value ||
-      submittingCheckpoint.value ||
-      submittingSelf.value
-    )
-  }
-  const mode = pageModel.value?.mainAction.mode
+  const mode = pageModel.value.mainAction.mode
   if (mode === 'closure') return completing.value
   if (taskState.value === 'CHECK') return submittingCheckpoint.value
-  if (taskState.value === 'SELF_EXPLAIN' || taskState.value === 'REMEDIAL') {
-    return submittingSelf.value
-  }
+  if (taskState.value === 'SELF_EXPLAIN' || taskState.value === 'REMEDIAL') return submittingSelf.value
   return sending.value
 })
 
-const mainActionDisabled = computed(() => mainActionLoading.value)
-const canSubmitMainAction = computed(() => {
-  const mode = pageModel.value?.mainAction.mode
-  if (mode === 'closure') return true
-  return !!draftInput.value.trim()
+const bottomPrimaryDisabled = computed(() => {
+  if (mainActionLoading.value) return true
+  if (pageModel.value.mainAction.mode === 'closure') return false
+  return !draftInput.value.trim()
 })
 
-function firstLine(text: string, fallback: string) {
-  const line = text
-    .split(/\n/)
-    .map((item) => item.trim())
-    .find(Boolean)
-  return line || fallback
-}
-
-function resetClosureFields() {
-  closureSummary.value = ''
-  closurePoint1.value = ''
-  closurePoint2.value = ''
-  closureNext.value = ''
-  completeForm.value = {
-    completionStatus: TaskCompletionStatus.COMPLETED,
-    learnerReflection: '',
-  }
-}
-
-function resetInteractionDraft() {
-  draftInput.value = ''
-  latestFeedback.value = null
-  restateWhat.value = ''
-  restateProblem.value = ''
-  restateRelate.value = ''
-  microChecks.value = microCheckLabels.value.map(() => false)
-}
-
-function fillDraftInput(text: string) {
-  const value = text.trim()
-  if (!value) return
-  draftInput.value = draftInput.value.trim()
-    ? `${draftInput.value.trim()}\n${value}`
-    : value
-}
+watch(
+  [task, () => pageModel.value.workbench.tutorAssist, () => pageModel.value.workbench.currentTask.currentAction],
+  () => {
+    if (!task.value) return
+    aiTutorStore.setContext({
+      stepId: task.value.taskId,
+      step: guidedStepPosition.value.current,
+      knowledgeKey: scaffold.value?.packId || store.planPreview?.knowledgeKey || 'unknown',
+      knowledgeLabel: workbenchTopicName.value,
+      phaseCode: pageModel.value.header.phaseCode || 'STRUCTURE',
+      phaseLabel: pageModel.value.header.phaseDisplayZh || '',
+      currentAction: pageModel.value.workbench.currentTask.currentAction,
+      floatingLabel: pageModel.value.workbench.tutorAssist.floatingLabel,
+      panelTitle: pageModel.value.workbench.tutorAssist.panelTitle,
+      quickQuestions: pageModel.value.workbench.tutorAssist.quickQuestions,
+    })
+  },
+  { immediate: true }
+)
 
 function draftStorageKey(taskId: string) {
   return `task-exec-draft-${taskId}`
-}
-
-function structureOptionalStorageKey(taskId: string) {
-  return `task-structure-optional-${taskId}`
 }
 
 let draftPersistTimer: ReturnType<typeof setTimeout> | null = null
@@ -638,11 +438,125 @@ function saveDraftExplicit() {
   showToast('草稿已保存')
 }
 
-function saveStructureOptionalDraft() {
-  const id = task.value?.taskId
-  if (!id) return
-  localStorage.setItem(structureOptionalStorageKey(id), structureOptionalOneLiner.value)
-  showToast('草稿已保存')
+function firstLine(text: string, fallback: string) {
+  const line = text.split(/\n/).map((item) => item.trim()).find(Boolean)
+  return line || fallback
+}
+
+function feedbackFromBoard(
+  title: string,
+  board?: TaskMessageResponse['feedbackBoard']
+): ExecutionGuideFeedbackModel | null {
+  if (!board) return null
+  return {
+    visible: true,
+    title,
+    mastered: board.correct || '',
+    strengths: board.correct || '',
+    gap: board.missing || '',
+    keyIssues: board.missing ? [board.missing] : [],
+    errorTags: board.confused ? [board.confused] : [],
+    nextRestateAsk: board.nextFix || '',
+    nextStep: board.nextFix || '',
+    actions: board.actions ?? [],
+  }
+}
+
+function buildMessageFeedback(userInput: string, response: TaskMessageResponse): ExecutionGuideFeedbackModel {
+  const fromBoard = feedbackFromBoard('本轮反馈', response.feedbackBoard)
+  if (fromBoard) return fromBoard
+  return {
+    visible: true,
+    title: '本轮反馈',
+    mastered: `你已经开始围绕当前任务输出：${firstLine(userInput, '已提交当前表达。')}`,
+    strengths: `你已经开始围绕当前任务输出：${firstLine(userInput, '已提交当前表达。')}`,
+    gap: firstLine(response.nextSuggestedPrompts?.[0] || '', '再补一句关键因果或判断依据。'),
+    keyIssues: [firstLine(response.nextSuggestedPrompts?.[0] || '', '再补一句关键因果或判断依据。')],
+    errorTags: ['当前动作还没收束'],
+    nextRestateAsk: firstLine(response.nextSuggestedPrompts?.[0] || '', '顺着当前提示继续补一小段。'),
+    nextStep: firstLine(response.nextSuggestedPrompts?.[0] || '', '顺着当前提示继续补一小段。'),
+    actions: [
+      { id: 'apply_suggestion', label: '补这一处' },
+      { id: 'restate', label: '重新表达' },
+      { id: 'show_example', label: '看例子' },
+    ],
+  }
+}
+
+function buildSelfExplainFeedback(response: SelfExplanationResponse): ExecutionGuideFeedbackModel {
+  return (
+    feedbackFromBoard('本轮反馈', response.feedbackBoard) || {
+      visible: true,
+      title: '本轮反馈',
+      mastered: response.evaluation === 'WEAK' ? '方向对了，但还差关键补充。' : '这一步已经讲清主要关系了。',
+      strengths: response.evaluation === 'WEAK' ? '方向对了，但还差关键补充。' : '这一步已经讲清主要关系了。',
+      gap: firstLine(response.missingPoints?.[0] || '', '只补当前最关键的一句。'),
+      keyIssues: response.missingPoints?.slice(0, 2) || [],
+      errorTags: ['表达缺口'],
+      nextRestateAsk: response.nextAction || '只补当前缺口，再重新表达。',
+      nextStep: response.nextAction || '只补当前缺口，再重新表达。',
+      actions: [
+        { id: 'apply_suggestion', label: '补这一处' },
+        { id: 'restate', label: '重新表达' },
+      ],
+    }
+  )
+}
+
+function buildCheckpointFeedback(response: CheckpointResponse): ExecutionGuideFeedbackModel {
+  return (
+    feedbackFromBoard('本轮反馈', response.feedbackBoard) || {
+      visible: true,
+      title: '本轮反馈',
+      mastered: response.result === 'FAIL' ? '前面的准备已经够了。' : '这道检查题已经通过。',
+      strengths: response.result === 'FAIL' ? '前面的准备已经够了。' : '这道检查题已经通过。',
+      gap: response.reason || response.suggestedRemedialAction || '',
+      keyIssues: response.reason ? [response.reason] : [],
+      errorTags: response.result === 'FAIL' ? ['判断依据不够完整'] : [],
+      nextRestateAsk: response.suggestedRemedialAction || '回到主卡，把判断依据补成一句完整的话。',
+      nextStep: response.suggestedRemedialAction || '回到主卡，把判断依据补成一句完整的话。',
+      actions: response.result === 'FAIL' ? [{ id: 'apply_suggestion', label: '补这一处' }] : [],
+    }
+  )
+}
+
+function resetClosureFields() {
+  closureSummary.value = ''
+  closurePoint1.value = ''
+  closurePoint2.value = ''
+  closureNext.value = ''
+  completeForm.value = {
+    completionStatus: TaskCompletionStatus.COMPLETED,
+    learnerReflection: '',
+  }
+}
+
+function resetInteractionDraft() {
+  draftInput.value = ''
+  structuredInputs.value = []
+  latestFeedback.value = null
+}
+
+function fillDraftInput(text: string) {
+  const value = text.trim()
+  if (!value) return
+  draftInput.value = draftInput.value.trim() ? `${draftInput.value.trim()}\n${value}` : value
+}
+
+function handleHintAction() {
+  const firstHint =
+    pageModel.value.workbench.guideSections[0]?.standardHint ||
+    pageModel.value.tutorConsole.phasePromptChips?.[0] ||
+    pageModel.value.progressRail.stuckActions[0]
+  if (!firstHint) {
+    aiTutorStore.openPanel()
+    return
+  }
+  fillDraftInput(firstHint)
+}
+
+function onPrefillGuideText(text: string) {
+  fillDraftInput(text)
 }
 
 function onStuckFromPanel() {
@@ -651,7 +565,7 @@ function onStuckFromPanel() {
     onStuckAction(actions[0]!)
     return
   }
-  fillDraftInput('我卡住了：请用最短路径给我下一步线索。')
+  fillDraftInput('我卡住了：请给我下一步最短提示。')
 }
 
 function onStuckAction(action: string) {
@@ -665,111 +579,10 @@ function onStuckAction(action: string) {
     return
   }
   if (action === '请求简化') {
-    fillDraftInput('请用更短、更少的术语，把上一步压缩成两三句说给我。')
+    fillDraftInput('请用更短、更少术语的方式提示我这一步。')
     return
   }
   fillDraftInput(action)
-}
-
-function buildMessageFeedback(
-  userInput: string,
-  response: TaskMessageResponse
-): ExecutionGuideFeedbackModel {
-  const mastered = firstLine(
-    userInput,
-    '你已经开始写了。'
-  )
-  const gap = firstLine(
-    currentGuidance.value?.bullets?.[0] || response.nextSuggestedPrompts?.[0] || '',
-    response.taskState === 'EXPLORE'
-      ? '再补一句为什么。'
-      : '再补这一处就能继续。'
-  )
-  const nextStep = firstLine(
-    response.nextSuggestedPrompts?.[0] || recommendedUserActions.value[0]?.label || '',
-    response.taskState === 'EXPLORE'
-      ? '按这一点继续写。'
-      : '顺着这一点继续。'
-  )
-  return {
-    visible: true,
-    title: '本轮反馈',
-    mastered: `你已经说出了一个有效切口：${mastered}`,
-    strengths: `你抓住了：${mastered}`,
-    gap: `现在最该补的是：${gap}`,
-    keyIssues: [gap].filter(Boolean).slice(0, 2),
-    errorTags: response.taskState === 'EXPLORE' ? ['因果链'] : ['结构'],
-    nextRestateAsk: nextStep,
-    nextStep,
-    primaryCta: 'apply_suggestion',
-    actions: [
-      { id: 'apply_suggestion', label: '补一句' },
-      { id: 'restate', label: '重新表达' },
-      { id: 'show_example', label: '看例子' },
-    ],
-  }
-}
-
-function buildSelfExplainFeedback(
-  response: SelfExplanationResponse
-): ExecutionGuideFeedbackModel {
-  const weak = response.evaluation === 'WEAK'
-  const miss =
-    response.missingPoints?.[0] || '还差一句「为什么成立」或「少了会怎样」。'
-  return {
-    visible: true,
-    title: '本轮反馈',
-    mastered: weak
-      ? '方向对了，先补这一处。'
-      : '这一步已经讲清主要关系了。',
-    strengths: weak ? '主线方向对，缺一处关键点。' : '关键关系已经讲顺。',
-    gap: weak ? miss : '这一步可以进入检查。',
-    keyIssues: weak ? [miss] : [],
-    errorTags: weak ? ['表述缺口'] : [],
-    nextRestateAsk: weak ? response.nextAction || '按这一点重写一小段。' : '直接答检查题。',
-    nextStep: weak
-      ? response.nextAction || '按这一点继续写。'
-      : '直接答检查题。',
-    primaryCta: weak ? 'apply_suggestion' : 'restate',
-    actions: weak
-      ? [
-          { id: 'apply_suggestion', label: '补一句' },
-          { id: 'restate', label: '重新表达' },
-          { id: 'show_example', label: '看例子' },
-        ]
-      : [],
-  }
-}
-
-function buildCheckpointFeedback(
-  response: CheckpointResponse
-): ExecutionGuideFeedbackModel {
-  const passed = response.result !== 'FAIL'
-  const reason = response.reason || '答案里还没有说清最关键的判断依据。'
-  return {
-    visible: true,
-    title: '本轮反馈',
-    mastered: passed
-      ? '这道检查题已经答出来了。'
-      : '前面已经够了，只差这一个判断。',
-    strengths: passed ? '判断与依据对齐。' : '方向接近，差一句依据。',
-    gap: passed ? '这一步过了。' : reason,
-    keyIssues: passed ? [] : [reason],
-    errorTags: passed ? [] : ['判断依据'],
-    nextRestateAsk: passed
-      ? '收住这一步，再继续。'
-      : response.suggestedRemedialAction || '用一句话写清你的判断依据，再试一次。',
-    nextStep: passed
-      ? '收住这一步，再继续。'
-      : response.suggestedRemedialAction || '回到主卡，补上当前暴露出的关键缺口。',
-    primaryCta: passed ? 'restate' : 'apply_suggestion',
-    actions: passed
-      ? []
-      : [
-          { id: 'apply_suggestion', label: '补一句' },
-          { id: 'restate', label: '重新表达' },
-        ],
-  }
 }
 
 function applyFallbackGuidance() {
@@ -820,10 +633,7 @@ async function fetchTask() {
 
     store.currentTaskId = data.currentTask.taskId
     const routeTaskId = typeof route.params.taskId === 'string' ? route.params.taskId : ''
-    if (
-      route.name === 'task' ||
-      (route.name === 'taskRun' && routeTaskId && routeTaskId !== data.currentTask.taskId)
-    ) {
+    if (route.name === 'task' || (route.name === 'taskRun' && routeTaskId && routeTaskId !== data.currentTask.taskId)) {
       router.replace({ name: 'taskRun', params: { taskId: data.currentTask.taskId } })
     }
 
@@ -847,8 +657,6 @@ async function loadScaffold(taskId: string) {
     syncRuntimeFromScaffold(data)
     const saved = localStorage.getItem(draftStorageKey(taskId))
     if (saved) draftInput.value = saved
-    const optSaved = localStorage.getItem(structureOptionalStorageKey(taskId))
-    if (optSaved) structureOptionalOneLiner.value = optSaved
     chatTurns.value = (data.recentMessages || [])
       .filter(isUiChatMessage)
       .map((message) => ({
@@ -875,15 +683,8 @@ async function sendMessageWithContent(content: string): Promise<TaskMessageRespo
   sending.value = true
   try {
     const response = await postTaskMessage(task.value.taskId, store.sessionId, text)
-    chatTurns.value.push({
-      role: 'USER',
-      content: text,
-      detectedAction: response.detectedAction,
-    })
-    chatTurns.value.push({
-      role: 'ASSISTANT',
-      content: response.assistantReply,
-    })
+    chatTurns.value.push({ role: 'USER', content: text, detectedAction: response.detectedAction })
+    chatTurns.value.push({ role: 'ASSISTANT', content: response.assistantReply })
     draftInput.value = ''
     taskState.value = response.taskState
     if (response.taskState === 'EXPLORE') exploreRoundCount.value += 1
@@ -902,79 +703,19 @@ async function sendMessage() {
   await sendMessageWithContent(draftInput.value)
 }
 
-function openAiTutorAfterScaffold() {
-  if (!task.value) return
-  aiTutorStore.setContext({
-    stepId: task.value.taskId,
-    step: guidedStepPosition.value.current,
-    knowledgeKey: knowledgePack.value?.id ?? 'unknown',
-    knowledgeLabel: knowledgePack.value?.tutor.focusLabel ?? task.value.title,
-    phaseCode: pageModel.value.header.phaseCode ?? 'STRUCTURE',
-    phaseLabel: pageModel.value.header.phaseDisplayZh ?? '',
-  })
-  aiTutorStore.openPanel()
-}
-
-async function onPrefillPhaseChip(line: string) {
-  draftInput.value = line
-  await nextTick()
-  openAiTutorAfterScaffold()
-}
-
-async function onSendScaffoldCard(prompt: string) {
-  if (taskState.value === 'ORIENT' || taskState.value === 'EXPLORE') {
-    await sendMessageWithContent(prompt)
-    openAiTutorAfterScaffold()
-    return
-  }
-  await onPrefillScaffoldCard(prompt)
-}
-
-async function onPrefillScaffoldCard(prompt: string) {
-  draftInput.value = prompt
-  await nextTick()
-  const el = document.querySelector<HTMLTextAreaElement>('[data-testid="driving-seat-input"]')
-  el?.focus()
-  el?.setSelectionRange(el.value.length, el.value.length)
-  openAiTutorAfterScaffold()
-}
-
 async function onAdvanceDrivingSeat() {
   if (!canAdvanceDriving.value) return
   const body = [
-    `它是什么：${restateWhat.value.trim()}`,
-    `它解决什么问题：${restateProblem.value.trim()}`,
-    `它和谁有关：${restateRelate.value.trim()}`,
-    '',
-    '我认为当前知识点的最小框架已经搭好，请带我继续推进。',
+    ...structuredInputs.value.filter((item) => item.trim()),
+    '我认为当前阶段已经可以进入下一步，请继续推进。',
   ].join('\n')
   advancing.value = true
   try {
     const res = await sendMessageWithContent(body)
-    if (res) {
-      microChecks.value = microCheckLabels.value.map(() => false)
-    }
+    if (res) microChecks.value = microCheckLabels.value.map(() => false)
   } finally {
     advancing.value = false
   }
-}
-
-function scrollScaffoldMainIntoView() {
-  document
-    .querySelector('[data-testid="scaffold-single-main-card"]')
-    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
-async function handleScaffoldActionSubmit() {
-  const content = draftInput.value.trim()
-  if (!content) return
-  const result = await scaffoldEngine.submit(content)
-  if (!result) return
-  draftInput.value = ''
-  if (task.value?.taskId) {
-    await loadScaffold(task.value.taskId)
-  }
-  await fetchTask()
 }
 
 async function submitSelfExplanation() {
@@ -985,21 +726,14 @@ async function submitSelfExplanation() {
   submittingSelf.value = true
   try {
     const response = await postSelfExplanation(task.value.taskId, store.sessionId, content)
-    chatTurns.value.push({
-      role: 'USER',
-      content,
-    })
+    chatTurns.value.push({ role: 'USER', content })
     taskState.value = response.taskState
     checkpointQuestion.value = response.checkpointQuestion || ''
     selfExplainMissingPoints.value = response.missingPoints ?? []
     draftInput.value = ''
     latestFeedback.value = buildSelfExplainFeedback(response)
     await loadGuidance()
-    showToast(
-      response.evaluation === 'WEAK'
-        ? '先补这一处，再试一次。'
-        : '这一步可以继续了。'
-    )
+    showToast(response.evaluation === 'WEAK' ? '先补这一处，再试一次。' : '这一步可以继续了。')
   } catch (err) {
     showToast(getErrorMessage(err))
   } finally {
@@ -1015,19 +749,12 @@ async function submitCheckpoint() {
   submittingCheckpoint.value = true
   try {
     const response = await postCheckpoint(task.value.taskId, store.sessionId, answer)
-    chatTurns.value.push({
-      role: 'USER',
-      content: answer,
-    })
+    chatTurns.value.push({ role: 'USER', content: answer })
     taskState.value = response.taskState
     draftInput.value = ''
     latestFeedback.value = buildCheckpointFeedback(response)
     await loadGuidance()
-    showToast(
-      response.result === 'FAIL'
-        ? response.reason || '还差一点，补一句再试。'
-        : '这一步过了，继续收束。'
-    )
+    showToast(response.result === 'FAIL' ? response.reason || '还差一点，补一句再试。' : '这一步过了，继续收束。')
   } catch (err) {
     showToast(getErrorMessage(err))
   } finally {
@@ -1037,6 +764,11 @@ async function submitCheckpoint() {
 
 async function onComplete() {
   if (!store.sessionId || !task.value) return
+
+  if (!closureSummary.value.trim()) closureSummary.value = structuredInputs.value[0]?.trim() || draftInput.value.trim()
+  if (!closurePoint1.value.trim()) closurePoint1.value = structuredInputs.value[1]?.trim() || microCheckLabels.value[0] || ''
+  if (!closurePoint2.value.trim()) closurePoint2.value = structuredInputs.value[2]?.trim() || microCheckLabels.value[1] || ''
+  if (!closureNext.value.trim()) closureNext.value = pageModel.value.feedback.nextStep || '继续下一任务前先复盘这一步。'
 
   if (!legacyComplete.value) {
     if (closureSummary.value.trim().length < 10) {
@@ -1080,50 +812,8 @@ async function onComplete() {
   }
 }
 
-async function onStructureCardLearn(promptKey: string) {
-  await structureSkeleton.fetchSkeleton(promptKey)
-}
-
-async function onStructureClarify() {
-  const k = structureSkeleton.lastPromptKey || scaffoldEngine.stage?.structureLastPromptKey
-  if (!k) return
-  await structureSkeleton.fetchSkeleton(k, 'CLARIFY')
-}
-
-async function onStructureAdjacent() {
-  const k = structureSkeleton.lastPromptKey || scaffoldEngine.stage?.structureLastPromptKey
-  if (!k) return
-  await structureSkeleton.fetchSkeleton(k, 'ADJACENT')
-}
-
-function onStructureGotNext() {
-  structureSkeleton.clearPanel()
-}
-
-async function onStructureCompleteStage() {
-  structureCompleting.value = true
-  try {
-    const res = await structureSkeleton.completeStage(structureOptionalOneLiner.value)
-    if (!res) return
-    showToast('结构建立完成，进入机制理解。')
-    if (task.value?.taskId) {
-      await loadScaffold(task.value.taskId)
-    }
-    await fetchTask()
-  } finally {
-    structureCompleting.value = false
-  }
-}
-
-void saveStructureOptionalDraft
-void onStructureCardLearn
-void onStructureClarify
-void onStructureAdjacent
-void onStructureGotNext
-void onStructureCompleteStage
-
 async function handlePrimaryAction() {
-  const mode = pageModel.value?.mainAction.mode
+  const mode = pageModel.value.mainAction.mode
   if (mode === 'closure') {
     await onComplete()
     return
@@ -1145,24 +835,11 @@ function handleFeedbackAction(actionId: string) {
     return
   }
   if (actionId === 'restate') {
-    const hint =
-      latestFeedback.value?.nextRestateAsk ||
-      latestFeedback.value?.nextStep ||
-      latestFeedback.value?.gap ||
-      ''
-    draftInput.value = hint ? `${hint}\n\n` : ''
-    void nextTick(() => {
-      document.querySelector<HTMLTextAreaElement>('[data-testid="driving-seat-input"]')?.focus()
-    })
+    draftInput.value = latestFeedback.value?.nextRestateAsk || latestFeedback.value?.nextStep || ''
     return
   }
   if (actionId === 'show_example') {
-    fillDraftInput(
-      tutorPromptFor(
-        'minimal_example',
-        task.value?.title || scaffold.value?.learningObjective || '当前任务'
-      )
-    )
+    fillDraftInput(tutorPromptFor('minimal_example', task.value?.title || scaffold.value?.learningObjective || '当前任务'))
   }
 }
 

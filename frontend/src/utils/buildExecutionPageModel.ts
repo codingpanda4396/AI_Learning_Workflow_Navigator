@@ -577,11 +577,49 @@ function buildWorkbenchModel(
       passedGate: input.canAdvanceDriving ?? false,
     },
     currentTask: {
-      phaseDisplayZh: opts.stageDisplayZh,
-      phaseCode: opts.phaseCode,
-      taskTitle: opts.copyTitle,
-      coreActionLine: core,
-      completionLines: opts.completionCriteria.slice(0, 3),
+      phaseDisplayZh: input.scaffold?.currentTaskCard?.phaseDisplay || opts.stageDisplayZh,
+      phaseCode: (input.scaffold?.currentTaskCard?.phaseCode as WorkbenchPhaseCode | undefined) || opts.phaseCode,
+      currentAction: input.scaffold?.currentTaskCard?.currentAction || core,
+      coreActionLine: input.scaffold?.currentTaskCard?.currentAction || core,
+      taskTitle: input.scaffold?.currentTaskCard?.taskTitle || opts.copyTitle,
+      objective: input.scaffold?.currentTaskCard?.objective || merged.whatToOutput[0] || core,
+      whyNow: input.scaffold?.currentTaskCard?.whyNow || merged.whyNow,
+      outputRequirements: input.scaffold?.currentTaskCard?.outputRequirements || merged.whatToOutput,
+      completionLines:
+        input.scaffold?.currentTaskCard?.completionCriteria?.slice(0, 3) ||
+        opts.completionCriteria.slice(0, 3),
+    },
+    guideSections:
+      input.scaffold?.scaffoldGuide?.sections?.map((section) => ({
+        id: section.id,
+        title: section.title,
+        description: section.description,
+        lightHint: section.lightHint,
+        standardHint: section.standardHint,
+        strongHint: section.strongHint,
+      })) || [],
+    expressionLayout: {
+      helperText: input.scaffold?.expressionLayout?.helperText || '按当前阶段的结构填写，不必一次写对。',
+      lowFrictionPrompt:
+        input.scaffold?.expressionLayout?.lowFrictionPrompt || '先写一版，我们再一起修。',
+      fields:
+        input.scaffold?.expressionLayout?.fields?.map((field) => ({
+          id: field.id,
+          label: field.label,
+          placeholder: field.placeholder,
+          multiline: field.multiline,
+        })) || [],
+    },
+    feedbackSchema: {
+      correctTitle: input.scaffold?.feedbackSchema?.correctTitle || '你已经说对了什么',
+      missingTitle: input.scaffold?.feedbackSchema?.missingTitle || '你漏了什么',
+      confusedTitle: input.scaffold?.feedbackSchema?.confusedTitle || '你混淆了什么',
+      nextFixTitle: input.scaffold?.feedbackSchema?.nextFixTitle || '下一步该怎么修',
+    },
+    tutorAssist: {
+      floatingLabel: input.scaffold?.tutorAssist?.floatingLabel || '不懂这一步？',
+      panelTitle: input.scaffold?.tutorAssist?.panelTitle || '导师辅助',
+      quickQuestions: input.scaffold?.tutorAssist?.quickQuestions || [],
     },
     emphasisPhase: opts.phaseCode,
   }
@@ -627,9 +665,30 @@ export function createEmptyWorkbenchModel(): TaskExecutionWorkbenchModel {
     currentTask: {
       phaseDisplayZh: '',
       phaseCode: 'STRUCTURE',
-      taskTitle: '',
+      currentAction: '',
       coreActionLine: '',
+      taskTitle: '',
+      objective: '',
+      whyNow: '',
+      outputRequirements: [],
       completionLines: [],
+    },
+    guideSections: [],
+    expressionLayout: {
+      helperText: '',
+      lowFrictionPrompt: '',
+      fields: [],
+    },
+    feedbackSchema: {
+      correctTitle: '你已经说对了什么',
+      missingTitle: '你漏了什么',
+      confusedTitle: '你混淆了什么',
+      nextFixTitle: '下一步该怎么修',
+    },
+    tutorAssist: {
+      floatingLabel: '不懂这一步？',
+      panelTitle: '导师辅助',
+      quickQuestions: [],
     },
     emphasisPhase: 'STRUCTURE',
   }

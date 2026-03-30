@@ -57,9 +57,48 @@ export interface StageProgressMiniModel {
 export interface CurrentTaskCardModel {
   phaseDisplayZh: string
   phaseCode: WorkbenchPhaseCode
-  taskTitle: string
+  currentAction?: string
   coreActionLine: string
+  taskTitle: string
+  objective?: string
+  whyNow?: string
+  outputRequirements?: string[]
   completionLines: string[]
+}
+
+export interface WorkbenchGuideSectionModel {
+  id: string
+  title: string
+  description: string
+  lightHint: string
+  standardHint: string
+  strongHint: string
+}
+
+export interface WorkbenchExpressionFieldModel {
+  id: string
+  label: string
+  placeholder: string
+  multiline: boolean
+}
+
+export interface WorkbenchExpressionLayoutModel {
+  helperText: string
+  lowFrictionPrompt: string
+  fields: WorkbenchExpressionFieldModel[]
+}
+
+export interface WorkbenchFeedbackSchemaModel {
+  correctTitle: string
+  missingTitle: string
+  confusedTitle: string
+  nextFixTitle: string
+}
+
+export interface WorkbenchTutorAssistModel {
+  floatingLabel: string
+  panelTitle: string
+  quickQuestions: string[]
 }
 
 export interface TaskExecutionWorkbenchModel {
@@ -73,6 +112,10 @@ export interface TaskExecutionWorkbenchModel {
   topicHints: TopicSpecialHintModel
   stageMini: StageProgressMiniModel
   currentTask: CurrentTaskCardModel
+  guideSections: WorkbenchGuideSectionModel[]
+  expressionLayout: WorkbenchExpressionLayoutModel
+  feedbackSchema: WorkbenchFeedbackSchemaModel
+  tutorAssist: WorkbenchTutorAssistModel
   /** 主列 data-phase */
   emphasisPhase: WorkbenchPhaseCode
 }

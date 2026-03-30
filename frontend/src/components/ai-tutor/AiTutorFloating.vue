@@ -10,7 +10,7 @@
       @click="store.toggleVisible()"
     >
       <span class="text-base leading-none" aria-hidden="true">💬</span>
-      <span>导师</span>
+      <span>{{ store.context.floatingLabel || '不懂这一步？' }}</span>
     </button>
   </Teleport>
 </template>

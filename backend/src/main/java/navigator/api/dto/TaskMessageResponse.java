@@ -24,6 +24,7 @@ public class TaskMessageResponse {
     private String taskState;
     private List<String> nextSuggestedPrompts;
     private String fallbackMode;
+    private ExecutionFeedbackBoard feedbackBoard;
 
     private String guidanceIntent;
     private String guidancePhase;

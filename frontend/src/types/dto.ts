@@ -342,6 +342,60 @@ export interface TaskScaffoldResponse {
   }[]
   /** Phase 4：脚手架反思沉淀（DFS/BFS） */
   reflectionSummary?: ReflectionSummary
+  phaseProgress?: {
+    phases: string[]
+    currentPhase: string
+    overallRatio: number
+    taskIndexLabel: string
+    stepLabel: string
+  }
+  currentTaskCard?: {
+    phaseCode: string
+    phaseDisplay: string
+    currentAction: string
+    taskTitle: string
+    objective: string
+    whyNow: string
+    outputRequirements: string[]
+    completionCriteria: string[]
+  }
+  scaffoldGuide?: {
+    sections: {
+      id: string
+      title: string
+      description: string
+      lightHint: string
+      standardHint: string
+      strongHint: string
+    }[]
+    observationBullets: string[]
+  }
+  expressionLayout?: {
+    helperText: string
+    fields: {
+      id: string
+      label: string
+      placeholder: string
+      multiline: boolean
+    }[]
+    lowFrictionPrompt: string
+  }
+  feedbackSchema?: {
+    correctTitle: string
+    missingTitle: string
+    confusedTitle: string
+    nextFixTitle: string
+  }
+  actionBar?: {
+    hintActionLabel: string
+    submitActionLabel: string
+    nextActionLabel: string
+  }
+  tutorAssist?: {
+    floatingLabel: string
+    panelTitle: string
+    quickQuestions: string[]
+  }
 }
 
 export interface RecommendedUserActionItem {
@@ -370,6 +424,16 @@ export interface TaskMessageResponse {
   taskState: string
   nextSuggestedPrompts?: string[]
   fallbackMode?: string
+  feedbackBoard?: {
+    correct: string
+    missing: string
+    confused: string
+    nextFix: string
+    actions?: {
+      id: string
+      label: string
+    }[]
+  }
   guidancePhase?: string | null
   recommendedUserActions?: RecommendedUserActionItem[]
   whetherCanComplete?: boolean | null
@@ -381,6 +445,7 @@ export interface SelfExplanationResponse {
   nextAction?: string
   taskState: string
   checkpointQuestion?: string
+  feedbackBoard?: TaskMessageResponse['feedbackBoard']
 }
 
 export interface CheckpointResponse {
@@ -388,6 +453,7 @@ export interface CheckpointResponse {
   reason?: string
   suggestedRemedialAction?: string | null
   taskState: string
+  feedbackBoard?: TaskMessageResponse['feedbackBoard']
 }
 
 // --- 5. 报告与 Next Action ---

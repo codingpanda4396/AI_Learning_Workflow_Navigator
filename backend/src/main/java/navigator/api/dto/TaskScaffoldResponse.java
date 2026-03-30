@@ -52,6 +52,20 @@ public class TaskScaffoldResponse {
     private List<RecentMessageItem> recentMessages;
     /** Phase 4：脚手架反思沉淀（DFS/BFS 等启用引擎时可选） */
     private ReflectionSummary reflectionSummary;
+    /** 单任务工作台：阶段进度 */
+    private WorkbenchPhaseProgress phaseProgress;
+    /** 单任务工作台：当前任务主卡 */
+    private CurrentTaskCard currentTaskCard;
+    /** 单任务工作台：思考支架 */
+    private ScaffoldGuide scaffoldGuide;
+    /** 单任务工作台：结构化表达区 */
+    private ExpressionLayout expressionLayout;
+    /** 单任务工作台：反馈板 schema */
+    private FeedbackSchema feedbackSchema;
+    /** 单任务工作台：底部动作条 */
+    private ActionBar actionBar;
+    /** 单任务工作台：AI 导师辅助信息 */
+    private TutorAssist tutorAssist;
 
     @Data
     @Builder
@@ -99,5 +113,106 @@ public class TaskScaffoldResponse {
         private String failureSignal;
         private List<String> actionBullets;
         private List<ScaffoldPromptItem> prompts;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WorkbenchPhaseProgress {
+        private List<String> phases;
+        private String currentPhase;
+        private double overallRatio;
+        private String taskIndexLabel;
+        private String stepLabel;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CurrentTaskCard {
+        private String phaseCode;
+        private String phaseDisplay;
+        private String currentAction;
+        private String taskTitle;
+        private String objective;
+        private String whyNow;
+        private List<String> outputRequirements;
+        private List<String> completionCriteria;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class GuideSection {
+        private String id;
+        private String title;
+        private String description;
+        private String lightHint;
+        private String standardHint;
+        private String strongHint;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ScaffoldGuide {
+        private List<GuideSection> sections;
+        private List<String> observationBullets;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExpressionField {
+        private String id;
+        private String label;
+        private String placeholder;
+        private boolean multiline;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExpressionLayout {
+        private String helperText;
+        private List<ExpressionField> fields;
+        private String lowFrictionPrompt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FeedbackSchema {
+        private String correctTitle;
+        private String missingTitle;
+        private String confusedTitle;
+        private String nextFixTitle;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ActionBar {
+        private String hintActionLabel;
+        private String submitActionLabel;
+        private String nextActionLabel;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TutorAssist {
+        private String floatingLabel;
+        private String panelTitle;
+        private List<String> quickQuestions;
     }
 }

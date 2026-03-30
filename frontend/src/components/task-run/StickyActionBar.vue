@@ -6,6 +6,14 @@
     <div class="mx-auto flex max-w-[1260px] flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap items-center gap-2">
         <button
+          v-if="showHint"
+          type="button"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          @click="$emit('hint')"
+        >
+          {{ hintLabel }}
+        </button>
+        <button
           type="button"
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           :disabled="saving"
@@ -48,6 +56,8 @@ withDefaults(
     primaryLoading?: boolean
     primaryDisabled?: boolean
     saving?: boolean
+    showHint?: boolean
+    hintLabel?: string
     showAdvance?: boolean
     canAdvance?: boolean
     advancing?: boolean
@@ -57,6 +67,8 @@ withDefaults(
     primaryLoading: false,
     primaryDisabled: false,
     saving: false,
+    showHint: true,
+    hintLabel: '查看提示',
     showAdvance: false,
     canAdvance: false,
     advancing: false,
@@ -65,6 +77,7 @@ withDefaults(
 )
 
 defineEmits<{
+  hint: []
   'save-draft': []
   primary: []
   advance: []

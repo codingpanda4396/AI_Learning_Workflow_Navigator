@@ -13,6 +13,10 @@ export interface AiTutorContextState {
   phaseCode: string
   phaseLabel: string
   stepId: string
+  currentAction: string
+  floatingLabel: string
+  panelTitle: string
+  quickQuestions: string[]
 }
 
 export interface AiTutorMessage {
@@ -36,6 +40,10 @@ const defaultContext = (): AiTutorContextState => ({
   phaseCode: 'STRUCTURE',
   phaseLabel: '\u7ed3\u6784\u8ba4\u77e5',
   stepId: 'step1',
+  currentAction: '\u5f53\u524d\u52a8\u4f5c',
+  floatingLabel: '\u4e0d\u61c2\u8fd9\u4e00\u6b65\uff1f',
+  panelTitle: '\u5bfc\u5e08\u8f85\u52a9',
+  quickQuestions: [],
 })
 
 export const useAiTutorStore = defineStore('aiTutor', () => {
@@ -131,7 +139,8 @@ export const useAiTutorStore = defineStore('aiTutor', () => {
 
   function buildOpeningPrompt(label: string) {
     const display = label.trim() || '\u5f53\u524d\u77e5\u8bc6\u70b9'
-    return `\u6211\u4eec\u5148\u4e0d\u6025\u7740\u80cc\u5b9a\u4e49\u3002\u4f60\u89c9\u5f97${display}\u66f4\u50cf\u4ec0\u4e48\uff0c\u6216\u8005\u4f60\u8111\u4e2d\u4f1a\u51fa\u73b0\u4ec0\u4e48\u753b\u9762\uff1f`
+    const action = context.value.currentAction.trim() || '\u8fd9\u4e00\u6b65'
+    return `\u6211\u4eec\u5c31\u56f4\u7ed5\u300c${action}\u300d\u6765\u63a8\u8fdb\u3002\u5148\u522b\u6cdb\u5316\uff0c\u4f60\u89c9\u5f97 ${display} \u5728\u8fd9\u4e00\u6b65\u6700\u96be\u7684\u70b9\u662f\u4ec0\u4e48\uff1f`
   }
 
   function resetForStep(next: Partial<AiTutorContextState> & { stepId: string }) {

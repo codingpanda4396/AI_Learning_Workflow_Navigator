@@ -18,4 +18,5 @@ public class SelfExplanationResponse {
     private String taskState;
     /** 进入 CHECK 时的微检查题干 */
     private String checkpointQuestion;
+    private ExecutionFeedbackBoard feedbackBoard;
 }

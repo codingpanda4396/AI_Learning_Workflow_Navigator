@@ -6,6 +6,8 @@ import navigator.api.dto.CheckpointResponse;
 import navigator.api.dto.CompletionRequirementItem;
 import navigator.api.dto.CurrentGuidanceBlock;
 import navigator.api.dto.CurrentTaskGuidanceData;
+import navigator.api.dto.ExecutionFeedbackActionItem;
+import navigator.api.dto.ExecutionFeedbackBoard;
 import navigator.api.dto.RecommendedUserActionItem;
 import navigator.api.dto.SelfExplanationResponse;
 import navigator.api.dto.TaskExecutionSummaryData;
@@ -221,6 +223,7 @@ public class TaskExecutionFlowService {
                 .taskState(rt.getState().name())
                 .nextSuggestedPrompts(turn.getSuggestedFollowups())
                 .fallbackMode(turn.getFallbackMode())
+                .feedbackBoard(buildExploreFeedbackBoard(content, turn.getAssistantReply(), turn.getSuggestedFollowups()))
                 .guidanceIntent(gd.getIntent() != null ? gd.getIntent().name() : null)
                 .guidancePhase(rt.getGuidancePhase() != null ? rt.getGuidancePhase().name() : null)
                 .guidancePhaseRuleId(gd.getPhaseRuleId())
@@ -324,6 +327,13 @@ public class TaskExecutionFlowService {
                     .nextAction("MOVE_TO_CHECK")
                     .taskState(TaskExecutionState.CHECK.name())
                     .checkpointQuestion(rt.getCheckpointQuestion())
+                    .feedbackBoard(ExecutionFeedbackBoard.builder()
+                            .correct("你已经把这一步的主要关系讲出来了。")
+                            .missing("当前没有关键缺口。")
+                            .confused("如果还不稳，就用微检查题确认判断依据。")
+                            .nextFix("进入检查题，用一两句话独立作答。")
+                            .actions(List.of())
+                            .build())
                     .build();
         }
         rt.setSelfExplanationEvaluation("WEAK");
@@ -340,6 +350,13 @@ public class TaskExecutionFlowService {
                 .missingPoints(missingPoints)
                 .nextAction("REMEDIAL")
                 .taskState(TaskExecutionState.REMEDIAL.name())
+                .feedbackBoard(ExecutionFeedbackBoard.builder()
+                        .correct("主线方向是对的，先别整段重写。")
+                        .missing(firstOf(missingPoints, "还缺一句关键判断或因果。"))
+                        .confused("你现在最容易把方向对和表达完整混在一起。")
+                        .nextFix("只补当前暴露出的那个缺口，再重新表达。")
+                        .actions(defaultFixActions())
+                        .build())
                 .build();
     }
 
@@ -374,6 +391,13 @@ public class TaskExecutionFlowService {
                     .reason(eval.getReason() != null ? eval.getReason() : "回答覆盖基本要点，可标记任务完成")
                     .suggestedRemedialAction(null)
                     .taskState(TaskExecutionState.PASS.name())
+                    .feedbackBoard(ExecutionFeedbackBoard.builder()
+                            .correct("你已经能独立做出判断，并给出依据。")
+                            .missing("当前没有新的缺口。")
+                            .confused("接下来不需要继续发散，直接收束本任务。")
+                            .nextFix("进入本轮总结，写下一句总结和两个带走要点。")
+                            .actions(List.of())
+                            .build())
                     .build();
         }
         transition(sessionId, taskId, rt, TaskExecutionState.REMEDIAL, "checkpoint_fail");
@@ -392,6 +416,13 @@ public class TaskExecutionFlowService {
                 .reason(eval.getReason() != null ? eval.getReason() : "回答过短或未触及核心，建议回到探索再试")
                 .suggestedRemedialAction(remedialHint)
                 .taskState(TaskExecutionState.REMEDIAL.name())
+                .feedbackBoard(ExecutionFeedbackBoard.builder()
+                        .correct("前面的准备已经够了，现在只差判断依据。")
+                        .missing(remedialHint)
+                        .confused("你可能把结论和支持结论的依据混在了一起。")
+                        .nextFix("回到当前主卡，把判断依据补成一句完整的话。")
+                        .actions(defaultFixActions())
+                        .build())
                 .build();
     }
 
@@ -442,7 +473,275 @@ public class TaskExecutionFlowService {
                         .createdAt(m.getCreatedAt())
                         .build()).toList())
                 .reflectionSummary(mapReflectionSummary(s))
+                .phaseProgress(buildPhaseProgress(sessionId, rt))
+                .currentTaskCard(buildCurrentTaskCard(rt, s))
+                .scaffoldGuide(buildScaffoldGuide(s, packMeta))
+                .expressionLayout(buildExpressionLayout(rt.getState()))
+                .feedbackSchema(TaskScaffoldResponse.FeedbackSchema.builder()
+                        .correctTitle("你已经说对了什么")
+                        .missingTitle("你漏了什么")
+                        .confusedTitle("你混淆了什么")
+                        .nextFixTitle("下一步该怎么修")
+                        .build())
+                .actionBar(TaskScaffoldResponse.ActionBar.builder()
+                        .hintActionLabel("查看提示")
+                        .submitActionLabel("提交本轮表达")
+                        .nextActionLabel(rt.getState() == TaskExecutionState.PASS ? "完成本任务" : "进入下一步")
+                        .build())
+                .tutorAssist(buildTutorAssist(s, rt))
                 .build();
+    }
+
+    private TaskScaffoldResponse.WorkbenchPhaseProgress buildPhaseProgress(String sessionId, TaskExecutionRuntime rt) {
+        InMemoryStore.LearningSessionState session = store.getSessions().get(sessionId);
+        int totalTasks = 1;
+        int currentIndex = 1;
+        if (session != null && session.getTaskSequence() != null && !session.getTaskSequence().isEmpty()) {
+            totalTasks = session.getTaskSequence().size();
+            currentIndex = Math.min(session.getCurrentTaskIndex() + 1, totalTasks);
+        }
+        String phase = toWorkbenchPhase(rt.getState());
+        double phaseRatio = switch (rt.getState()) {
+            case ORIENT -> 0.18d;
+            case EXPLORE -> 0.38d;
+            case SELF_EXPLAIN, REMEDIAL -> 0.64d;
+            case CHECK -> 0.82d;
+            case PASS -> 1.0d;
+            default -> 0.18d;
+        };
+        double overall = Math.min(1.0d, ((currentIndex - 1) + phaseRatio) / totalTasks);
+        String stepLabel = switch (rt.getState()) {
+            case ORIENT -> "定位动作";
+            case EXPLORE -> "机制展开";
+            case SELF_EXPLAIN -> "自我解释";
+            case CHECK -> "微检查";
+            case REMEDIAL -> "针对修正";
+            case PASS -> "总结收束";
+            default -> "当前动作";
+        };
+        return TaskScaffoldResponse.WorkbenchPhaseProgress.builder()
+                .phases(List.of("STRUCTURE", "UNDERSTANDING", "TRAINING", "REFLECTION"))
+                .currentPhase(phase)
+                .overallRatio(overall)
+                .taskIndexLabel("任务 " + currentIndex + " / " + totalTasks)
+                .stepLabel(stepLabel)
+                .build();
+    }
+
+    private TaskScaffoldResponse.CurrentTaskCard buildCurrentTaskCard(TaskExecutionRuntime rt, TaskScaffold scaffold) {
+        String phaseCode = toWorkbenchPhase(rt.getState());
+        String phaseDisplay = toPhaseDisplay(phaseCode);
+        String action = switch (rt.getState()) {
+            case ORIENT -> "先定位它是什么";
+            case EXPLORE -> "先把关键机制讲清";
+            case SELF_EXPLAIN -> "用自己的话完整表达";
+            case CHECK -> "独立作答并写清依据";
+            case REMEDIAL -> "对准缺口补一句";
+            case PASS -> "收束成可带走的规则";
+            default -> "完成当前动作";
+        };
+        List<String> outputs = switch (phaseCode) {
+            case "STRUCTURE" -> List.of("写清它属于什么", "写清它在解决什么问题", "补一句和相邻概念的关系");
+            case "UNDERSTANDING" -> List.of("写出问题", "写出机制或过程", "写出会导致什么结果");
+            case "TRAINING" -> List.of("先用自己的话解释", "再用一个场景验证", "暴露自己还不稳的点");
+            default -> List.of("指出错因", "写下规则", "写出下次如何检查");
+        };
+        List<String> completion = scaffold.getCompletionSignals() != null && !scaffold.getCompletionSignals().isEmpty()
+                ? scaffold.getCompletionSignals().stream().limit(3).toList()
+                : outputs;
+        return TaskScaffoldResponse.CurrentTaskCard.builder()
+                .phaseCode(phaseCode)
+                .phaseDisplay(phaseDisplay)
+                .currentAction(action)
+                .taskTitle(scaffold.getLearningObjective())
+                .objective(firstOf(outputs, "先完成这一轮结构化表达。"))
+                .whyNow(defaultIfBlank(scaffold.getWhyThisTask(), "这是当前任务最关键的一步，先把这一点说稳。"))
+                .outputRequirements(outputs)
+                .completionCriteria(completion)
+                .build();
+    }
+
+    private TaskScaffoldResponse.ScaffoldGuide buildScaffoldGuide(TaskScaffold scaffold,
+                                                                 KnowledgePackMetadata.PackMeta packMeta) {
+        List<String> prompts = safeList(scaffold.getRecommendedAskTemplates());
+        List<TaskScaffoldResponse.GuideSection> sections = List.of(
+                TaskScaffoldResponse.GuideSection.builder()
+                        .id("think-first")
+                        .title("先想什么")
+                        .description(firstOf(prompts, "先确认它在解决什么问题。"))
+                        .lightHint("先别求全，只抓住定位。")
+                        .standardHint(firstOf(scaffold.getFallbackHints(), "先写一句它是什么、为什么需要它。"))
+                        .strongHint(firstOf(scaffold.getAntiPatterns(), "不要直接跳到长篇答案。"))
+                        .build(),
+                TaskScaffoldResponse.GuideSection.builder()
+                        .id("fill-gap")
+                        .title("再补什么")
+                        .description(firstOfSecond(prompts, "再补一条关键因果或边界。"))
+                        .lightHint("补最关键的一处，不要散。")
+                        .standardHint(firstOfSecond(scaffold.getRecommendedFollowupTemplates(), "想一想：少了它会怎样？"))
+                        .strongHint("用一个最小例子验证刚才的说法。")
+                        .build(),
+                TaskScaffoldResponse.GuideSection.builder()
+                        .id("land-output")
+                        .title("最后落到哪里")
+                        .description("把这一轮收束成可提交的结构化表达。")
+                        .lightHint("写完后回看：是否真的回答了本步目标。")
+                        .standardHint(firstOf(scaffold.getCompletionSignals(), "对照完成标准，补齐缺口。"))
+                        .strongHint("如果还不稳，就用导师抽屉追问当前动作，而不是发散聊天。")
+                        .build()
+        );
+        return TaskScaffoldResponse.ScaffoldGuide.builder()
+                .sections(sections)
+                .observationBullets(buildObservationBullets(packMeta))
+                .build();
+    }
+
+    private TaskScaffoldResponse.ExpressionLayout buildExpressionLayout(TaskExecutionState state) {
+        return switch (toWorkbenchPhase(state)) {
+            case "STRUCTURE" -> TaskScaffoldResponse.ExpressionLayout.builder()
+                    .helperText("先归位，再区分，再给一句最小定义。")
+                    .fields(List.of(
+                            field("position", "它属于什么", "先用一句话归类", false),
+                            field("problem", "它在解决什么问题", "写它在帮什么忙", true),
+                            field("compare", "它和谁最容易混", "补一句相邻概念对比", true)
+                    ))
+                    .lowFrictionPrompt("不确定也没关系，先写你目前最稳的一版。")
+                    .build();
+            case "UNDERSTANDING" -> TaskScaffoldResponse.ExpressionLayout.builder()
+                    .helperText("围绕问题、机制、结果来展开。")
+                    .fields(List.of(
+                            field("question", "问题", "它在处理什么问题", false),
+                            field("mechanism", "机制", "核心过程或因果链", true),
+                            field("result", "结果", "少了它会怎样", true)
+                    ))
+                    .lowFrictionPrompt("先写主线因果，不用一上来追求完整。")
+                    .build();
+            case "TRAINING" -> TaskScaffoldResponse.ExpressionLayout.builder()
+                    .helperText("先自己解释，再用场景验证。")
+                    .fields(List.of(
+                            field("explain", "用自己的话解释", "别照抄定义", true),
+                            field("example", "举一个场景", "用最小例子验证", true),
+                            field("unstable", "我还不稳的点", "暴露这一步最容易错的地方", true)
+                    ))
+                    .lowFrictionPrompt("能暴露缺口比写得漂亮更重要。")
+                    .build();
+            default -> TaskScaffoldResponse.ExpressionLayout.builder()
+                    .helperText("从错因里提炼规则。")
+                    .fields(List.of(
+                            field("mistake", "错因", "这一步最容易错在哪", true),
+                            field("rule", "规则", "下次如何判断", true),
+                            field("check", "下次检查", "再遇到时先看什么", true)
+                    ))
+                    .lowFrictionPrompt("收束成以后还能直接复用的判断句。")
+                    .build();
+        };
+    }
+
+    private TaskScaffoldResponse.ExpressionField field(String id, String label, String placeholder, boolean multiline) {
+        return TaskScaffoldResponse.ExpressionField.builder()
+                .id(id)
+                .label(label)
+                .placeholder(placeholder)
+                .multiline(multiline)
+                .build();
+    }
+
+    private TaskScaffoldResponse.TutorAssist buildTutorAssist(TaskScaffold scaffold, TaskExecutionRuntime rt) {
+        String phase = toPhaseDisplay(toWorkbenchPhase(rt.getState()));
+        String target = defaultIfBlank(scaffold.getLearningObjective(), "当前这一步");
+        return TaskScaffoldResponse.TutorAssist.builder()
+                .floatingLabel("不懂这一步？")
+                .panelTitle("导师辅助")
+                .quickQuestions(List.of(
+                        "帮我解释这一步要求",
+                        "给我一个更容易理解的提示",
+                        target + " 这个术语到底是什么意思"
+                ))
+                .build();
+    }
+
+    private ExecutionFeedbackBoard buildExploreFeedbackBoard(String userInput,
+                                                             String assistantReply,
+                                                             List<String> nextSuggestedPrompts) {
+        return ExecutionFeedbackBoard.builder()
+                .correct("你已经开始围绕当前任务输出，而不是停在空白状态。")
+                .missing(firstOf(nextSuggestedPrompts, "再补一句关键因果或判断依据。"))
+                .confused(shortAssistantLine(assistantReply))
+                .nextFix(firstOf(nextSuggestedPrompts, "顺着当前提示继续补一小段。"))
+                .actions(defaultFixActions())
+                .build();
+    }
+
+    private static List<ExecutionFeedbackActionItem> defaultFixActions() {
+        return List.of(
+                ExecutionFeedbackActionItem.builder().id("apply_suggestion").label("补这一处").build(),
+                ExecutionFeedbackActionItem.builder().id("restate").label("重新表达").build(),
+                ExecutionFeedbackActionItem.builder().id("show_example").label("看例子").build()
+        );
+    }
+
+    private static String toWorkbenchPhase(TaskExecutionState state) {
+        return switch (state) {
+            case ORIENT -> "STRUCTURE";
+            case EXPLORE -> "UNDERSTANDING";
+            case SELF_EXPLAIN, REMEDIAL -> "TRAINING";
+            case CHECK, PASS -> "REFLECTION";
+            default -> "STRUCTURE";
+        };
+    }
+
+    private static String toPhaseDisplay(String phaseCode) {
+        return switch (phaseCode) {
+            case "STRUCTURE" -> "结构建立";
+            case "UNDERSTANDING" -> "机制理解";
+            case "TRAINING" -> "表达训练";
+            case "REFLECTION" -> "反思收束";
+            default -> "结构建立";
+        };
+    }
+
+    private static List<String> buildObservationBullets(KnowledgePackMetadata.PackMeta packMeta) {
+        String key = packMeta != null ? packMeta.packId() : null;
+        if ("ds_dfs_bfs".equals(key)) {
+            return List.of("先分清搜索顺序", "再区分栈、队列与递归直觉", "最后再谈典型场景");
+        }
+        if ("net_tcp_handshake".equals(key)) {
+            return List.of("先看每一步在确认什么", "再看为什么不能少", "别和可靠传输混在一起");
+        }
+        if ("os_process_thread".equals(key)) {
+            return List.of("先看资源边界", "再看调度单位", "最后再比较切换成本");
+        }
+        if ("arch_cache_locality".equals(key)) {
+            return List.of("先看快慢矛盾", "再看局部性", "最后看为什么会命中或失效");
+        }
+        return List.of("先定位当前概念", "再补一条关键机制", "最后写成能提交的一版");
+    }
+
+    private static List<String> safeList(List<String> items) {
+        return items == null ? List.of() : items.stream().filter(s -> s != null && !s.isBlank()).toList();
+    }
+
+    private static String shortAssistantLine(String text) {
+        if (text == null || text.isBlank()) {
+            return "先对准当前动作，不要散到别的知识点。";
+        }
+        String normalized = text.replaceAll("\\s+", " ").trim();
+        return normalized.length() <= 72 ? normalized : normalized.substring(0, 72) + "…";
+    }
+
+    private static String firstOf(List<String> items, String fallback) {
+        if (items == null) return fallback;
+        return items.stream().filter(s -> s != null && !s.isBlank()).findFirst().orElse(fallback);
+    }
+
+    private static String firstOfSecond(List<String> items, String fallback) {
+        if (items == null || items.size() < 2) return fallback;
+        String value = items.get(1);
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static String defaultIfBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     private static ReflectionSummary mapReflectionSummary(TaskScaffold s) {

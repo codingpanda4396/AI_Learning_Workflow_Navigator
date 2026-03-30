@@ -20,10 +20,10 @@
             id="ai-tutor-panel-title"
             class="text-base font-semibold text-text-primary"
           >
-            导师
+            {{ store.context.panelTitle || '导师辅助' }}
           </h2>
           <p class="mt-1 text-xs text-text-secondary">
-            当前阶段：{{ store.context.phaseLabel }} · 当前知识：{{ store.context.knowledgeLabel }}
+            当前阶段：{{ store.context.phaseLabel }} · 当前动作：{{ store.context.currentAction }}
           </p>
         </div>
         <button
@@ -87,12 +87,9 @@ const store = useAiTutorStore()
 const scrollRef = ref<HTMLElement | null>(null)
 
 const quickQuestions = computed(() => {
+  if (store.context.quickQuestions.length) return store.context.quickQuestions
   const knowledge = store.context.knowledgeLabel || '这个知识点'
-  return [
-    `${knowledge}到底更像什么？`,
-    '我刚才的理解哪里还不够完整？',
-    '你能再换一种方式追问我吗？',
-  ]
+  return [`帮我解释 ${knowledge} 这一步要求`, '给我一个更容易理解的提示', '这个术语是什么意思']
 })
 
 async function scrollToBottom() {

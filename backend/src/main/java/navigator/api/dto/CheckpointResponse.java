@@ -14,4 +14,5 @@ public class CheckpointResponse {
     private String reason;
     private String suggestedRemedialAction;
     private String taskState;
+    private ExecutionFeedbackBoard feedbackBoard;
 }
