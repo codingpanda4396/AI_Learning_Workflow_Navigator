@@ -108,7 +108,7 @@ const props = withDefaults(
 
 const headerShellClass = computed(() =>
   props.compact
-    ? 'border-b border-slate-200/80 bg-[color-mix(in_srgb,var(--color-page-bg,#f8fafc)_96%,white)] px-1 py-3 md:px-2'
+    ? 'border-b border-slate-200/80 bg-[color-mix(in_srgb,var(--color-page-bg,#f8fafc)_96%,white)] px-1 py-2 md:px-2'
     : 'rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 shadow-sm md:px-4'
 )
 

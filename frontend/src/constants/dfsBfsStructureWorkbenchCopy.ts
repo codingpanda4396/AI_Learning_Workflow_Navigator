@@ -31,9 +31,9 @@ export const DFS_BFS_ACTION = {
 } as const
 
 export const STRUCTURE_PHASE_COPY = {
-  mainTitle: '先搭知识骨架',
-  subtitle:
-    '这一阶段先看位置、关系和边界，不要求你先会解释',
+  /** 与执行页线框稿一致；详细说明请用折叠区「查看这一步说明」 */
+  mainTitle: '现在先搭好知识骨架',
+  subtitle: '先定位置与边界，再谈细节。',
   eyebrow: '结构建立',
   scaffoldTitle: '脚手架动作',
   scaffoldHint: '先选一张卡，系统会生成这一块的知识骨架。',

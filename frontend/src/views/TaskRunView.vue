@@ -17,11 +17,11 @@
       <section v-else-if="task" :class="useScaffoldEngineUi ? 'space-y-5 pb-12' : 'space-y-4 pb-28'">
         <ExecutionHeader
           :topic-name="workbenchTopicName"
-          :title-override="useScaffoldEngineUi ? scaffoldEngine.stage?.stageTitle || STRUCTURE_PHASE_COPY.mainTitle : undefined"
+          :title-override="scaffoldExecutionHeaderTitleOverride"
+          :subtitle-line="scaffoldExecutionHeaderSubtitleLine"
           :phase-progress="pageModel.workbench.phaseProgress"
           :task-status-label="pageModel.workbench.taskStatusLabel"
           :compact="useScaffoldEngineUi"
-          :subtitle-line="useScaffoldEngineUi ? scaffoldHeaderSubtitle : undefined"
         />
 
         <template v-if="useScaffoldEngineUi">
@@ -38,37 +38,35 @@
           >
             {{ scaffoldEngine.error }}
           </div>
-          <section v-else class="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
-            <div class="space-y-5 lg:col-span-8" :data-phase="currentScaffoldStageKey">
-              <PrimaryTaskCard
-                :model="pageModel.workbench.currentTask"
-                :emphasis-phase="scaffoldEmphasisPhase"
-              />
-
-              <LearningActionCardPanel
-                v-if="scaffoldEngine.stage"
-                v-model:draft-value="draftInput"
-                :stage-key="scaffoldEngine.stage.stageKey"
-                :phase-label="scaffoldStageLabel(scaffoldEngine.stage.stageKey)"
-                :stage-title="scaffoldEngine.stage.stageTitle"
-                :stage-goal="scaffoldEngine.stage.stageGoal"
-                :phase-goal="scaffoldEngine.stage.phaseGoal"
-                :stage-description="scaffoldEngine.stage.stageDescription"
-                :card="scaffoldEngine.currentCard"
-                :loading="scaffoldEngine.loading"
-                :submitting="scaffoldEngine.submitting"
-                :last-result="scaffoldEngine.lastResult"
-                :input-label="scaffoldEngine.currentCard?.userOutputLabel || '本轮输出'"
-                @submit="handleScaffoldActionSubmit"
-              />
-
-              <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
+          <section v-else class="space-y-6">
+            <div
+              v-if="scaffoldEngine.stage && !scaffoldEngine.currentCard"
+              class="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900"
+            >
+              {{ TASKRUN_COPY.scaffoldNoAction }}
             </div>
-
-            <aside class="space-y-3 lg:col-span-4">
-              <StepReasonCard :model="pageModel.workbench.whyThisStep" />
-              <StageProgressMiniCard :model="pageModel.workbench.stageMini" />
-            </aside>
+            <ScaffoldSingleTaskWorkbench
+              v-else-if="scaffoldEngine.stage && scaffoldEngine.currentCard"
+              v-model:draft-value="draftInput"
+              :stage-key="scaffoldEngine.stage.stageKey"
+              :stage-title="scaffoldEngine.stage.stageTitle"
+              :stage-goal="scaffoldEngine.stage.stageGoal"
+              :phase-goal="scaffoldEngine.stage.phaseGoal"
+              :stage-description="scaffoldEngine.stage.stageDescription"
+              :card="scaffoldEngine.currentCard"
+              :phase-label="scaffoldStageLabel(scaffoldEngine.stage.stageKey)"
+              :loading="scaffoldEngine.loading"
+              :submitting="scaffoldEngine.submitting"
+              :last-result="scaffoldEngine.lastResult"
+              :why-this-step="pageModel.workbench.whyThisStep"
+              :stage-mini="pageModel.workbench.stageMini"
+              :phase-progress="pageModel.workbench.phaseProgress"
+              :pack-id="scaffold?.packId ?? null"
+              :input-label="scaffoldEngine.currentCard?.userOutputLabel || '本轮输出'"
+              @submit="handleScaffoldActionSubmit"
+              @continue-next="scrollScaffoldMainIntoView"
+            />
+            <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
           </section>
         </template>
 
@@ -182,7 +180,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import ExecutionHeader from '@/components/task-run/ExecutionHeader.vue'
-import LearningActionCardPanel from '@/components/task-run/LearningActionCardPanel.vue'
+import ScaffoldSingleTaskWorkbench from '@/components/task-run/ScaffoldSingleTaskWorkbench.vue'
 import ExecutionMainActionCard from '@/components/task-run/ExecutionMainActionCard.vue'
 import ExpressionWorkspace from '@/components/task-run/ExpressionWorkspace.vue'
 import FeedbackSummary from '@/components/task-run/FeedbackSummary.vue'
@@ -207,7 +205,6 @@ import {
   postTaskMessage,
 } from '@/api/task'
 import { TASKRUN_COPY } from '@/constants/uiCopy'
-import { STRUCTURE_PHASE_COPY } from '@/constants/dfsBfsStructureWorkbenchCopy'
 import { fallbackGuidanceForState, tutorPromptFor } from '@/constants/taskRunUi'
 import { showToast } from '@/stores/toast'
 import { useAiTutorStore } from '@/stores/aiTutor'
@@ -227,7 +224,6 @@ import type {
   ExecutionPageViewModel,
 } from '@/types/executionGuide'
 import { TaskCompletionStatus, type TaskCompletionStatusType } from '@/types/enums'
-import type { WorkbenchPhaseCode } from '@/types/taskExecutionWorkbench'
 import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
 import { buildExecutionPageModel, createEmptyWorkbenchModel } from '@/utils/buildExecutionPageModel'
 import { buildTaskGuidedSteps, getCurrentGuidedStepId } from '@/utils/taskGuidedSteps'
@@ -312,14 +308,15 @@ const useScaffoldEngineUi = computed(
   () => structureEngineEnabled.value && !scaffoldEngine.scaffoldEngineComplete && !!scaffoldEngine.stage
 )
 const currentScaffoldStageKey = computed(() => scaffoldEngine.stage?.stageKey || 'STRUCTURE')
-const scaffoldEmphasisPhase = computed<WorkbenchPhaseCode>(() => {
-  const stageKey = scaffoldEngine.stage?.stageKey
-  if (stageKey === 'STRUCTURE' || stageKey === 'UNDERSTANDING' || stageKey === 'TRAINING' || stageKey === 'REFLECTION') {
-    return stageKey
-  }
-  return pageModel.value.workbench.emphasisPhase
-})
 
+const scaffoldExecutionHeaderTitleOverride = computed(() =>
+  useScaffoldEngineUi.value && currentScaffoldStageKey.value === 'STRUCTURE' ? '结构建立' : undefined
+)
+const scaffoldExecutionHeaderSubtitleLine = computed(() =>
+  useScaffoldEngineUi.value && currentScaffoldStageKey.value === 'STRUCTURE'
+    ? '先确认它属于哪一类'
+    : undefined
+)
 /** 脚手架完成后从 GET scaffold 恢复；末卡当帧可从 lastResult 兜底 */
 const reflectionSummaryForWorkbench = computed((): ReflectionSummary | null => {
   const fromApi = scaffold.value?.reflectionSummary
@@ -528,11 +525,6 @@ const workbenchTopicName = computed(() => {
     pageModel.value.header.title ||
     '当前任务'
   )
-})
-
-const scaffoldHeaderSubtitle = computed(() => {
-  const idx = pageModel.value.workbench.phaseProgress.taskIndexLabel
-  return `${STRUCTURE_PHASE_COPY.subtitle} · ${idx}`
 })
 
 const bottomPrimaryLabel = computed(() => {
@@ -965,6 +957,12 @@ async function onAdvanceDrivingSeat() {
   } finally {
     advancing.value = false
   }
+}
+
+function scrollScaffoldMainIntoView() {
+  document
+    .querySelector('[data-testid="scaffold-single-main-card"]')
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 async function handleScaffoldActionSubmit() {

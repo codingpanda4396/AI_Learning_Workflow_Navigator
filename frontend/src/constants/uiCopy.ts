@@ -158,6 +158,7 @@ export const TASKRUN_COPY = {
   viewReport: '查看结果',
   scaffoldLoadingPrefix: '正在加载',
   scaffoldLoadingSuffix: '…',
+  scaffoldNoAction: '当前没有可执行的学习动作，请刷新后重试。',
   defaultMyAnswer: '我的回答',
   defaultMyExpression: '我的表达',
   advancePhase: '进入下一阶段',
