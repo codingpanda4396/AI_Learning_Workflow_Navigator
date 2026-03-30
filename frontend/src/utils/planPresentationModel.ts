@@ -815,7 +815,12 @@ function mapStagesByCode(plan: PlanPreviewData): Partial<Record<PlanStageCode, P
   return result
 }
 
-function mapTaskToStageCode(task: TaskBlueprint, index: number, total: number): PlanStageCode {
+/** 将单任务映射到四阶段之一（与规划页路径、任务分组一致） */
+export function mapTaskToStageCode(
+  task: TaskBlueprint,
+  index: number,
+  total: number
+): PlanStageCode {
   if (total === 4) return PLAN_STAGE_ORDER[index] ?? 'REFLECTION'
 
   const mapped = TASK_TYPE_STAGE_MAP[task.taskType]

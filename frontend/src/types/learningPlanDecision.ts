@@ -6,39 +6,40 @@ export type LearningPlanPathStageKey =
 
 export type LearningPlanDecisionViewModel = {
   hero: {
+    /** 例：当前起点 · STRUCTURE */
     eyebrow: string
+    /** 主标题，≤18 字 */
     title: string
-    decisionText: string
-    reasonText: string
-    outcomeText: string
+    /** 仅一句副标题 */
+    subtitle: string
+    chips: [string, string, string]
     ctaLabel: string
     ctaSubtext?: string
+    secondaryCtaLabel: string
   }
   reasoning: {
-    title: string
-    summary: string
+    accordionTitle: string
     bullets: Array<{
       label: string
       text: string
     }>
   }
   firstTask: {
-    title: string
-    taskName: string
-    reasonText: string
-    estimatedTimeText: string
-    benefitText: string
+    headline: string
+    goalLine: string
+    deliverableLine: string
+    errorReminder: string
+    enterTaskLabel: string
   }
   pathPreview: {
     title: string
-    summary: string
     stages: Array<{
       key: LearningPlanPathStageKey
       label: string
-      description: string
+      /** 折叠时在轨道中展示的一句 */
+      railLine: string
       stateLabel: string
       active: boolean
     }>
   }
-  contrast: string
 }

@@ -3,6 +3,7 @@ import {
   pickTopicLine,
 } from '@/constants/learningPlanTopicDecision'
 import { getPhaseWorkbenchCopy } from '@/constants/executionWorkbenchContent'
+import { STAGE_GUIDE_META } from '@/constants/guidanceConfig'
 import { resolveKnowledgePackId } from '@/composables/useKnowledgePack'
 import type {
   DiagnosisEvidenceSummary,
@@ -10,13 +11,17 @@ import type {
   LearnerProfileSnapshot,
   PlanPreviewData,
   StructuredLearningGoal,
+  TaskBlueprint,
 } from '@/types/dto'
 import type { KnowledgePackId } from '@/types/knowledgePack'
 import type {
   LearningPlanDecisionViewModel,
   LearningPlanPathStageKey,
 } from '@/types/learningPlanDecision'
-import { inferRecommendedStageCode } from '@/utils/planPresentationModel'
+import {
+  inferRecommendedStageCode,
+  mapTaskToStageCode,
+} from '@/utils/planPresentationModel'
 import type { PlanStageCode, PlanViewModelContext } from '@/utils/planPresentationModel'
 import { workflowTopicLabelFromStructuredGoal } from '@/utils/workflowTopicLabel'
 
@@ -28,26 +33,20 @@ type GapKind =
   | 'foundation'
   | 'generic'
 
-const PATH_STAGE_COPY: Record<
-  LearningPlanPathStageKey,
-  { label: string; description: string }
-> = {
-  STRUCTURE: {
-    label: 'STRUCTURE',
-    description: '先搭骨架，知道知识点怎么站位。',
-  },
-  UNDERSTANDING: {
-    label: 'UNDERSTANDING',
-    description: '再讲机制，讲清为什么会这样。',
-  },
-  TRAINING: {
-    label: 'TRAINING',
-    description: '再做训练，把理解变成动作。',
-  },
-  REFLECTION: {
-    label: 'REFLECTION',
-    description: '最后回看，沉淀判断规则。',
-  },
+/** 阶段代码（与 StepFlow 一致） */
+const PATH_STAGE_COPY: Record<LearningPlanPathStageKey, { label: string }> = {
+  STRUCTURE: { label: 'STRUCTURE' },
+  UNDERSTANDING: { label: 'UNDERSTANDING' },
+  TRAINING: { label: 'TRAINING' },
+  REFLECTION: { label: 'REFLECTION' },
+}
+
+/** Stage rail 折叠一句（与四阶段认知动作对齐） */
+const STAGE_RAIL_LINE: Record<LearningPlanPathStageKey, string> = {
+  STRUCTURE: '先站稳骨架',
+  UNDERSTANDING: '再看机制如何运作',
+  TRAINING: '再用自己的话讲清',
+  REFLECTION: '最后收束错误规则',
 }
 
 const BLOCKER_TAG_TO_USER: Record<string, string> = {
@@ -74,6 +73,10 @@ const STRATEGY_CODE_TO_ACTION: Record<string, string> = {
   DRILL_STRENGTHEN: '先用一小轮训练把理解压实',
   LOCAL_REPAIR: '先修掉最卡推进的局部问题',
 }
+
+const TITLE_MAX = 18
+const BLOCK_MAX = 28
+const SUBTITLE_MAX = 40
 
 function truncate(s: string, max: number): string {
   const t = s.trim()
@@ -144,17 +147,17 @@ function strategyActionText(plan: PlanPreviewData): string {
   if (strategyCode) {
     const normalized = strategyCode.toUpperCase().replace(/-/g, '_')
     if (STRATEGY_CODE_TO_ACTION[normalized]) {
-      return STRATEGY_CODE_TO_ACTION[normalized]
+      return truncate(STRATEGY_CODE_TO_ACTION[normalized], BLOCK_MAX)
     }
   }
   const label = plan.recommendedStrategy?.label?.trim()
-  if (label && !/[A-Z_]{4,}/.test(label)) return truncate(label, 28)
+  if (label && !/[A-Z_]{4,}/.test(label)) return truncate(label, BLOCK_MAX)
   const reason = plan.recommendedStrategy?.reason?.trim()
-  if (reason) return truncate(reason.replace(/^先/, ''), 28)
-  return '先把眼前这一小步走稳'
+  if (reason) return truncate(reason.replace(/^先/, ''), BLOCK_MAX)
+  return '从推荐起点开始'
 }
 
-function titleToActionSentence(
+function titleToHeadline(
   title: string,
   packId: KnowledgePackId | null,
   seed: string
@@ -167,7 +170,7 @@ function titleToActionSentence(
         seed
       )
     }
-    return '先用一句话讲清这一步到底要交付什么'
+    return '先完成这一步的最小交付'
   }
   if (packId) {
     return pickTopicLine(
@@ -175,7 +178,7 @@ function titleToActionSentence(
       `${raw}${seed}`
     )
   }
-  return truncate(raw.replace(/^先/, ''), 32)
+  return truncate(raw.replace(/^先/, ''), 40)
 }
 
 function goalTextOneLine(
@@ -192,21 +195,29 @@ function goalTextOneLine(
   return '这轮学习目标'
 }
 
-function buildCurrentStateSentence(
+function buildHeroSubtitle(
   plan: PlanPreviewData,
   profile: LearnerProfileSnapshot | null | undefined,
   diagnosis: DiagnosisEvidenceSummary | null | undefined,
+  stage: PlanStageCode,
+  packId: KnowledgePackId | null,
   blockerText: string
 ): string {
+  const entryReason = plan.recommendedEntry?.reason?.trim()
+  if (entryReason) return truncate(entryReason, SUBTITLE_MAX)
   const diagnosisSummary = diagnosis?.summary?.trim()
   if (diagnosisSummary) {
-    return truncate(diagnosisSummary.split(/[。!\n]/)[0] || diagnosisSummary, 34)
+    return truncate(diagnosisSummary.split(/[。!\n]/)[0] || diagnosisSummary, SUBTITLE_MAX)
   }
-  const reason = plan.recommendedStrategy?.reason?.trim()
-  if (reason) return truncate(reason, 34)
+  const strategyReason = plan.recommendedStrategy?.reason?.trim()
+  if (strategyReason) return truncate(strategyReason, SUBTITLE_MAX)
+  if (packId) {
+    const gain = getPhaseWorkbenchCopy(packId, stage)?.expectedGain
+    if (gain) return truncate(gain, SUBTITLE_MAX)
+  }
   const foundationLevel = profile?.foundationLevel?.trim()
-  if (foundationLevel) return `当前基础状态：${truncate(foundationLevel, 24)}`
-  return `当前先要处理的是：${truncate(blockerText, 18)}`
+  if (foundationLevel) return truncate(`当前基础：${foundationLevel}`, SUBTITLE_MAX)
+  return truncate(`先处理「${truncate(blockerText, 12)}」，再往后推进。`, SUBTITLE_MAX)
 }
 
 function fallbackMinutes(stage: PlanStageCode): number {
@@ -224,31 +235,6 @@ function fallbackMinutes(stage: PlanStageCode): number {
   }
 }
 
-function buildOutcomeText(
-  plan: PlanPreviewData,
-  stage: PlanStageCode,
-  packId: KnowledgePackId | null,
-  blockerText: string
-): string {
-  if (packId) {
-    const expectedGain = getPhaseWorkbenchCopy(packId, stage)?.expectedGain
-    if (expectedGain) return truncate(expectedGain, 40)
-  }
-  if (plan.recommendedEntry?.reason?.trim()) {
-    return truncate(plan.recommendedEntry.reason, 40)
-  }
-  const evidence = plan.keyEvidence?.find(Boolean)?.trim()
-  if (evidence) return `先把“${truncate(evidence, 18)}”讲清。`
-  return `先把“${truncate(blockerText, 14)}”压实，再往后推。`
-}
-
-function buildFirstTaskReason(
-  blockerText: string,
-  strategyAction: string
-): string {
-  return `${strategyAction}，把“${truncate(blockerText, 12)}”先处理掉。`
-}
-
 function buildContrastText(
   wrongActionText: string,
   stage: PlanStageCode,
@@ -257,9 +243,60 @@ function buildContrastText(
 ): string {
   if (packId) {
     const skipRisk = getPhaseWorkbenchCopy(packId, stage)?.skipRisk
-    if (skipRisk) return `现在不建议${wrongActionText}，否则容易${truncate(skipRisk, 26)}。`
+    if (skipRisk) return `不建议${wrongActionText}，否则${truncate(skipRisk, 20)}。`
   }
-  return `现在不建议${wrongActionText}，否则“${truncate(blockerText, 12)}”会继续拖住后面四步。`
+  return `不建议${wrongActionText}，否则「${truncate(blockerText, 10)}」会拖住后面几步。`
+}
+
+function countTasksInStage(plan: PlanPreviewData, stage: PlanStageCode): number {
+  const tasks = plan.tasks ?? []
+  const n = tasks.length
+  if (n === 0) return 0
+  return tasks.filter((t, i) => mapTaskToStageCode(t, i, n) === stage).length
+}
+
+function buildFirstTaskContent(
+  plan: PlanPreviewData,
+  stage: PlanStageCode,
+  packId: KnowledgePackId | null,
+  primaryTag: string,
+  recommendedEntryTitle: string
+): {
+  headline: string
+  goalLine: string
+  deliverableLine: string
+  errorReminder: string
+} {
+  const task: TaskBlueprint | undefined = plan.tasks?.[0]
+  const seed = `${primaryTag}${recommendedEntryTitle}`
+
+  const headline = titleToHeadline(
+    task?.title?.trim() || plan.recommendedEntry?.title?.trim() || '',
+    packId,
+    seed
+  )
+
+  const goalLine = truncate(
+    task?.goal?.trim() ||
+      plan.recommendedEntry?.reason?.trim() ||
+      STAGE_GUIDE_META[stage as keyof typeof STAGE_GUIDE_META].stageGoal,
+    BLOCK_MAX
+  )
+
+  const criteria = task?.completionCriteria?.filter(Boolean) ?? []
+  const deliverableLine =
+    criteria.length > 0
+      ? truncate(criteria.slice(0, 2).join('；'), 56)
+      : truncate(STAGE_GUIDE_META[stage as keyof typeof STAGE_GUIDE_META].passEvidence, BLOCK_MAX)
+
+  const misconception = plan.commonMisconceptions?.find(Boolean)?.trim()
+  const skip = packId ? getPhaseWorkbenchCopy(packId, stage)?.skipRisk : undefined
+  const errorReminder = truncate(
+    misconception || skip || `不要先背术语，先${STAGE_RAIL_LINE[stage]}`,
+    BLOCK_MAX
+  )
+
+  return { headline, goalLine, deliverableLine, errorReminder }
 }
 
 export function buildLearningPlanDecisionViewModel(
@@ -291,72 +328,95 @@ export function buildLearningPlanDecisionViewModel(
   const gapKind = gapKindFromTag(primaryTag || plan.recommendedStrategy?.code || 'GENERIC')
   const wrongActionText = wrongActionForGap(gapKind)
   const strategyAction = strategyActionText(plan)
-  const taskName = titleToActionSentence(
-    plan.recommendedEntry?.title?.trim() || '',
-    packId,
-    `${primaryTag}${plan.recommendedEntry?.title ?? ''}`
-  )
+
   const goalText = goalTextOneLine(
     ctx.structuredGoal,
     plan,
     ctx.diagnosisEvidenceSummary
   )
-  const outcomeText = buildOutcomeText(plan, stage, packId, blockerText)
+
   const estimatedMinutes =
     plan.recommendedEntry?.estimatedMinutes && plan.recommendedEntry.estimatedMinutes > 0
       ? plan.recommendedEntry.estimatedMinutes
-      : fallbackMinutes(stage)
+      : plan.tasks?.[0]?.estimatedMinutes && plan.tasks[0].estimatedMinutes! > 0
+        ? plan.tasks[0].estimatedMinutes!
+        : fallbackMinutes(stage)
+
+  const inStageCount = countTasksInStage(plan, stage)
+  const taskCountChip =
+    inStageCount > 0 ? `完成 ${inStageCount} 个任务` : '先完成 1 个任务'
+
+  const rawHeroTitle =
+    plan.recommendedEntry?.title?.trim() ||
+    plan.tasks?.[0]?.title?.trim() ||
+    goalText ||
+    `进入 ${PATH_STAGE_COPY[stage as LearningPlanPathStageKey].label}`
+
+  const heroTitle = truncate(rawHeroTitle, TITLE_MAX)
+
+  const subtitle = buildHeroSubtitle(
+    plan,
+    ctx.learnerProfileSnapshot,
+    ctx.diagnosisEvidenceSummary,
+    stage,
+    packId,
+    blockerText
+  )
+
+  const skipRiskLine = truncate(
+    buildContrastText(wrongActionText, stage, blockerText, packId),
+    BLOCK_MAX
+  )
+
+  const firstTask = buildFirstTaskContent(
+    plan,
+    stage,
+    packId,
+    primaryTag,
+    plan.recommendedEntry?.title ?? ''
+  )
 
   const pathStages: LearningPlanDecisionViewModel['pathPreview']['stages'] = (
     ['STRUCTURE', 'UNDERSTANDING', 'TRAINING', 'REFLECTION'] as const
   ).map((key) => ({
     key,
     label: PATH_STAGE_COPY[key].label,
-    description: PATH_STAGE_COPY[key].description,
+    railLine: STAGE_RAIL_LINE[key],
     stateLabel: key === stage ? '当前起点' : '后续推进',
     active: key === stage,
   }))
 
+  const chips: [string, string, string] = [
+    `预计 ${estimatedMinutes} 分钟`,
+    taskCountChip,
+    `当前卡点：${truncate(blockerText, 10)}`,
+  ]
+
   return {
     hero: {
-      eyebrow: '学习规划',
-      title: `这轮先从 ${PATH_STAGE_COPY[stage].label} 开始`,
-      decisionText: `${goalText} 这一轮先不求铺开，先把“${blockerText}”处理掉。`,
-      reasonText: `${buildCurrentStateSentence(plan, ctx.learnerProfileSnapshot, ctx.diagnosisEvidenceSummary, blockerText)}。`,
-      outcomeText,
-      ctaLabel: '开始学习',
-      ctaSubtext: `先完成 1 个小任务，预计 ${estimatedMinutes} 分钟。`,
+      eyebrow: `当前起点 · ${PATH_STAGE_COPY[stage as LearningPlanPathStageKey].label}`,
+      title: heroTitle,
+      subtitle,
+      chips,
+      ctaLabel: `进入 ${PATH_STAGE_COPY[stage as LearningPlanPathStageKey].label}`,
+      ctaSubtext: undefined,
+      secondaryCtaLabel: '查看为什么从这里开始',
     },
     reasoning: {
-      title: '为什么这样安排',
-      summary: '先收住起点，再顺着四步推进。',
+      accordionTitle: '为什么从这里开始',
       bullets: [
-        {
-          label: '当前卡点',
-          text: blockerText,
-        },
-        {
-          label: '先做什么',
-          text: strategyAction,
-        },
-        {
-          label: '避免什么',
-          text: buildContrastText(wrongActionText, stage, blockerText, packId),
-        },
+        { label: '当前卡点', text: truncate(blockerText, BLOCK_MAX) },
+        { label: '先处理', text: truncate(strategyAction, BLOCK_MAX) },
+        { label: '跳过风险', text: skipRiskLine },
       ],
     },
     firstTask: {
-      title: '开始前预告',
-      taskName,
-      reasonText: buildFirstTaskReason(blockerText, strategyAction),
-      estimatedTimeText: `预计 ${estimatedMinutes} 分钟`,
-      benefitText: outcomeText,
+      ...firstTask,
+      enterTaskLabel: '进入任务',
     },
     pathPreview: {
-      title: '接下来按四步推进',
-      summary: '路线先给你看清，但现在只做第一步。',
+      title: '四阶段推进',
       stages: pathStages,
     },
-    contrast: buildContrastText(wrongActionText, stage, blockerText, packId),
   }
 }
