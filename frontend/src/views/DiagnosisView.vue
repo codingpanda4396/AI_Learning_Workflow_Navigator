@@ -15,7 +15,7 @@
           <h1 class="text-2xl font-bold text-text-primary md:text-3xl">
             {{ DIAGNOSIS_COPY.title }}
           </h1>
-          <p class="mt-2 text-text-secondary">
+          <p class="mt-2 max-w-xl text-text-secondary">
             {{ DIAGNOSIS_COPY.subtitle }}
           </p>
           <div
@@ -35,122 +35,66 @@
 
         <template #primary>
           <form class="space-y-5" @submit.prevent="onSubmit">
-            <FormCard v-if="topicDemoConfig" class="space-y-3">
-              <p class="text-sm font-semibold text-primary">第 1 题</p>
-              <h3 class="text-base font-medium text-text-primary">
-                {{ topicDemoConfig.diagnosisQuestion.question }}
-              </h3>
-              <div class="space-y-2 pt-1">
+            <FormCard
+              v-for="question in questionCards"
+              :key="question.id"
+              class="space-y-4"
+            >
+              <div class="space-y-2">
+                <p class="text-sm font-semibold text-primary">
+                  {{ DIAGNOSIS_COPY.qPrefix }} {{ question.number }} {{ DIAGNOSIS_COPY.qSuffix }}
+                </p>
+                <h3 class="text-base font-medium leading-6 text-text-primary">
+                  {{ question.prompt }}
+                </h3>
+              </div>
+
+              <div class="space-y-2">
                 <label
-                  v-for="opt in topicDemoConfig.diagnosisQuestion.options"
-                  :key="opt.value"
-                  class="flex cursor-pointer items-start gap-3 rounded-input border p-3 text-sm transition-colors"
+                  v-for="opt in question.options"
+                  :key="opt.key"
+                  class="flex cursor-pointer items-start gap-3 rounded-input border px-4 py-3 text-sm transition-all"
                   :class="
-                    topicDiag === opt.value
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
+                    question.selected === opt.value
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                      : 'border-border hover:border-primary/50 hover:bg-primary/5'
                   "
                 >
                   <input
-                    v-model="topicDiag"
+                    :checked="question.selected === opt.value"
                     type="radio"
-                    name="topic-diag"
+                    :name="question.id"
                     :value="opt.value"
                     class="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary"
+                    @change="selectAnswer(question.id, opt.value)"
                   />
-                  <span class="text-text-primary"
-                    ><span class="font-semibold text-primary/90">{{ opt.value }}.</span>
-                    {{ opt.label }}</span
-                  >
+                  <span class="flex-1 text-text-primary">
+                    <span
+                      v-if="opt.badge"
+                      class="mr-2 inline-flex min-w-6 items-center justify-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+                    >
+                      {{ opt.badge }}
+                    </span>
+                    <span
+                      :class="question.selected === opt.value ? 'font-semibold' : ''"
+                    >
+                      {{ opt.label }}
+                    </span>
+                  </span>
                 </label>
               </div>
             </FormCard>
 
-            <FormCard v-else class="space-y-3">
-              <p class="text-sm font-semibold text-primary">{{ DIAGNOSIS_COPY.qPrefix }} 1 {{ DIAGNOSIS_COPY.qSuffix }}</p>
-              <h3 class="text-base font-medium text-text-primary">
-                {{ DIAGNOSIS_COPY.qFoundation }}
-              </h3>
-              <div class="space-y-2 pt-1">
-                <label
-                  v-for="opt in foundationOptions"
-                  :key="opt.id"
-                  class="flex cursor-pointer items-start gap-3 rounded-input border p-3 text-sm transition-colors"
-                  :class="
-                    ui.foundation === opt.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  "
-                >
-                  <input
-                    v-model="ui.foundation"
-                    type="radio"
-                    name="foundation"
-                    :value="opt.id"
-                    class="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary"
-                  />
-                  <span class="text-text-primary">{{ opt.label }}</span>
-                </label>
-              </div>
-            </FormCard>
+            <div class="rounded-card border border-border bg-white px-5 py-4 shadow-card">
+              <p class="text-sm font-medium text-text-secondary">
+                {{ progressMessage }}
+              </p>
+              <p class="mt-1 text-sm text-text-primary">
+                完成后会直接进入学习规划。
+              </p>
+            </div>
 
-            <FormCard class="space-y-3">
-              <p class="text-sm font-semibold text-primary">{{ DIAGNOSIS_COPY.qPrefix }} 2 {{ DIAGNOSIS_COPY.qSuffix }}</p>
-              <h3 class="text-base font-medium text-text-primary">
-                {{ DIAGNOSIS_COPY.qBlocker }}
-              </h3>
-              <div class="space-y-2 pt-1">
-                <label
-                  v-for="opt in blockerOptions"
-                  :key="opt.id"
-                  class="flex cursor-pointer items-start gap-3 rounded-input border p-3 text-sm transition-colors"
-                  :class="
-                    ui.blocker === opt.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  "
-                >
-                  <input
-                    v-model="ui.blocker"
-                    type="radio"
-                    name="blocker"
-                    :value="opt.id"
-                    class="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary"
-                  />
-                  <span class="text-text-primary">{{ opt.label }}</span>
-                </label>
-              </div>
-            </FormCard>
-
-            <FormCard class="space-y-3">
-              <p class="text-sm font-semibold text-primary">{{ DIAGNOSIS_COPY.qPrefix }} 3 {{ DIAGNOSIS_COPY.qSuffix }}</p>
-              <h3 class="text-base font-medium text-text-primary">
-                {{ DIAGNOSIS_COPY.q3 }}
-              </h3>
-              <div class="space-y-2 pt-1">
-                <label
-                  v-for="opt in paceOptions"
-                  :key="opt.id"
-                  class="flex cursor-pointer items-start gap-3 rounded-input border p-3 text-sm transition-colors"
-                  :class="
-                    ui.pace === opt.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  "
-                >
-                  <input
-                    v-model="ui.pace"
-                    type="radio"
-                    name="pace"
-                    :value="opt.id"
-                    class="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary"
-                  />
-                  <span class="text-text-primary">{{ opt.label }}</span>
-                </label>
-              </div>
-            </FormCard>
-
-            <div class="flex justify-end pt-2">
+            <div class="flex justify-end pt-1">
               <PrimaryButton :loading="submitting" @click="onSubmit">
                 {{ DIAGNOSIS_COPY.submit }}
               </PrimaryButton>
@@ -194,6 +138,23 @@ import type { KnowledgePackId } from '@/types/knowledgePack'
 import { SESSION_KEY_PLAN_DIAGNOSIS_RECAP } from '@/utils/diagnosisRecapCopy'
 import { workflowTopicLabelFromStructuredGoal } from '@/utils/workflowTopicLabel'
 import { DIAGNOSIS_COPY } from '@/constants/uiCopy'
+
+type QuestionCardId = 'foundation' | 'blocker' | 'pace'
+
+type QuestionOption = {
+  key: string
+  value: string
+  label: string
+  badge?: string
+}
+
+type QuestionCard = {
+  id: QuestionCardId
+  number: number
+  prompt: string
+  selected: string | null
+  options: QuestionOption[]
+}
 
 const router = useRouter()
 const store = useWorkflowStore()
@@ -250,6 +211,87 @@ const paceOptions: { id: PaceUiId; label: string }[] = [
   { id: 'pc_normal', label: '正常推进，理解和练习并重' },
   { id: 'pc_relaxed', label: '时间充裕，想学扎实一点' },
 ]
+
+const questionCards = computed<QuestionCard[]>(() => {
+  const foundationQuestion: QuestionCard = topicDemoConfig.value
+    ? {
+        id: 'foundation',
+        number: 1,
+        prompt: topicDemoConfig.value.diagnosisQuestion.question,
+        selected: topicDiag.value,
+        options: topicDemoConfig.value.diagnosisQuestion.options.map((opt) => ({
+          key: opt.value,
+          value: opt.value,
+          label: opt.label,
+          badge: opt.value,
+        })),
+      }
+    : {
+        id: 'foundation',
+        number: 1,
+        prompt: DIAGNOSIS_COPY.qFoundation,
+        selected: ui.value.foundation,
+        options: foundationOptions.map((opt) => ({
+          key: opt.id,
+          value: opt.id,
+          label: opt.label,
+        })),
+      }
+
+  return [
+    foundationQuestion,
+    {
+      id: 'blocker',
+      number: 2,
+      prompt: DIAGNOSIS_COPY.qBlocker,
+      selected: ui.value.blocker,
+      options: blockerOptions.map((opt) => ({
+        key: opt.id,
+        value: opt.id,
+        label: opt.label,
+      })),
+    },
+    {
+      id: 'pace',
+      number: 3,
+      prompt: DIAGNOSIS_COPY.q3,
+      selected: ui.value.pace,
+      options: paceOptions.map((opt) => ({
+        key: opt.id,
+        value: opt.id,
+        label: opt.label,
+      })),
+    },
+  ]
+})
+
+const answeredCount = computed(() => {
+  const foundationAnswered = topicDemoConfig.value ? !!topicDiag.value : !!ui.value.foundation
+  return Number(foundationAnswered) + Number(!!ui.value.blocker) + Number(!!ui.value.pace)
+})
+
+const progressMessage = computed(() => {
+  if (answeredCount.value === 3) return '已完成 3/3，下一步生成你的学习规划。'
+  const remaining = 3 - answeredCount.value
+  if (answeredCount.value === 0) return '还没开始，先完成 3 个选择。'
+  return `已完成 ${answeredCount.value}/3，还差 ${remaining} 题。`
+})
+
+function selectAnswer(questionId: QuestionCardId, value: string) {
+  if (questionId === 'foundation') {
+    if (topicDemoConfig.value) {
+      topicDiag.value = value as DiagnosisOptionValue
+      return
+    }
+    ui.value.foundation = value as FoundationUiId
+    return
+  }
+  if (questionId === 'blocker') {
+    ui.value.blocker = value as BlockerUiId
+    return
+  }
+  ui.value.pace = value as PaceUiId
+}
 
 async function fetchSession() {
   if (!store.goalId) return

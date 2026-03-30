@@ -65,13 +65,13 @@ export const GOAL_COPY = {
 } as const
 
 export const DIAGNOSIS_COPY = {
-  title: '回答 3 个问题',
-  subtitle: '选最贴近的一项即可。',
+  title: '只做 3 个选择',
+  subtitle: '先判断当前卡点，再决定从哪一步开始。',
   topicLabel: '本轮主题',
-  intro: '答完进入下一步。',
-  submit: '继续下一步',
+  intro: '不用展开解释，选最贴近的一项。',
+  submit: '生成学习规划',
   loading: '正在准备快速定位…',
-  transition: '我正在根据你的回答整理思路，马上就好…',
+  transition: '正在根据你的卡点生成学习规划…',
   qFoundation: '你对这个内容现在大概处于什么状态？',
   qBlocker: '你现在最大的困难更像哪一种？',
   qPrefix: '第',
