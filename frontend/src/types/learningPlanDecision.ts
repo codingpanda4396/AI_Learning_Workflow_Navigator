@@ -6,45 +6,39 @@ export type LearningPlanPathStageKey =
 
 export type LearningPlanDecisionViewModel = {
   hero: {
+    eyebrow: string
     title: string
-    goalHint?: string
-    blockerText: string
-    wrongActionText: string
-    correctActionText: string
+    decisionText: string
+    reasonText: string
+    outcomeText: string
     ctaLabel: string
     ctaSubtext?: string
   }
-  reason: {
+  reasoning: {
     title: string
-    goalText: string
-    blockerText: string
-    consequenceText: string
-  }
-  causal: {
-    title: string
-    currentState: string
-    strategyAction: string
-    expectedResult: string
+    summary: string
+    bullets: Array<{
+      label: string
+      text: string
+    }>
   }
   firstTask: {
     title: string
-    intro: string
-    actionText: string
+    taskName: string
+    reasonText: string
     estimatedTimeText: string
     benefitText: string
   }
   pathPreview: {
     title: string
+    summary: string
     stages: Array<{
       key: LearningPlanPathStageKey
       label: string
       description: string
+      stateLabel: string
       active: boolean
     }>
   }
-  contrast: {
-    title: string
-    riskText: string
-    betterPathText: string
-  }
+  contrast: string
 }
