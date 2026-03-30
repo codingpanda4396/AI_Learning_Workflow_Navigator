@@ -4,36 +4,56 @@
     <AppTopBar current="goal" />
 
     <main class="relative overflow-hidden bg-background">
-      <div class="relative mx-auto flex w-full max-w-5xl flex-col gap-10 px-5 py-8 pb-40 md:px-8 md:py-12 md:pb-44">
-        <header class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-          <section class="rounded-card bg-white/80 px-2 py-3 shadow-card md:px-3">
-            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-text-primary md:text-[42px] md:leading-[1.1]">
+      <div class="relative mx-auto flex w-full max-w-5xl flex-col gap-8 px-5 py-6 pb-44 md:px-8 md:py-10 md:pb-48">
+        <header class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+          <section class="rounded-[30px] border border-white/70 bg-white/85 p-5 shadow-card md:p-7">
+            <p class="text-sm font-medium tracking-[0.18em] text-slate-500">{{ GOAL_COPY.eyebrow }}</p>
+            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-text-primary md:text-[42px] md:leading-[1.05]">
               {{ GOAL_COPY.title }}
             </h1>
-            <p class="mt-4 max-w-2xl text-base leading-7 text-text-secondary">
+            <p class="mt-3 max-w-2xl text-base leading-7 text-text-secondary">
               {{ GOAL_COPY.subtitle }}
             </p>
+            <div class="mt-5 rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ GOAL_COPY.flowTitle }}</p>
+              <div class="mt-3 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
+                <template v-for="(step, index) in GOAL_COPY.flowSteps" :key="step">
+                  <span
+                    class="rounded-full px-3 py-1"
+                    :class="index === 0 ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 ring-1 ring-slate-200'"
+                  >
+                    {{ step }}
+                  </span>
+                  <span v-if="index < GOAL_COPY.flowSteps.length - 1" class="text-slate-300">→</span>
+                </template>
+              </div>
+            </div>
           </section>
 
-          <aside class="rounded-card border border-border bg-white/90 p-5 shadow-card">
-            <p class="text-sm font-medium text-text-secondary">{{ GOAL_COPY.continueTitle }}</p>
+          <aside class="rounded-[26px] border border-slate-200/80 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-sm font-medium text-text-secondary">{{ GOAL_COPY.continueTitle }}</p>
+              <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-500">
+                {{ GOAL_COPY.continueCardHint }}
+              </span>
+            </div>
 
             <template v-if="auth.isAuthenticated && auth.recentLearningEntry?.sessionId">
-              <p class="mt-3 text-base font-semibold text-text-primary">{{ continueLabel }}</p>
-              <SecondaryButton class="mt-5 w-full justify-center" @click="continueLatest">
+              <p class="mt-4 text-base font-semibold text-text-primary">{{ continueLabel }}</p>
+              <SecondaryButton class="mt-4 w-full justify-center" @click="continueLatest">
                 {{ GOAL_COPY.continueCta }}
               </SecondaryButton>
             </template>
 
             <template v-else-if="auth.isAuthenticated">
-              <p class="mt-3 text-base font-semibold text-text-primary">{{ GOAL_COPY.continueEmpty }}</p>
+              <p class="mt-4 text-base font-semibold text-text-primary">{{ GOAL_COPY.continueEmpty }}</p>
               <p class="mt-2 text-sm leading-6 text-text-secondary">{{ GOAL_COPY.noProgressBody }}</p>
             </template>
 
             <template v-else>
-              <p class="mt-3 text-base font-semibold text-text-primary">{{ GOAL_COPY.continueLoginTitle }}</p>
+              <p class="mt-4 text-base font-semibold text-text-primary">{{ GOAL_COPY.continueLoginTitle }}</p>
               <p class="mt-2 text-sm leading-6 text-text-secondary">{{ GOAL_COPY.continueLoginHint }}</p>
-              <SecondaryButton class="mt-5 w-full justify-center" @click="goToLogin">
+              <SecondaryButton class="mt-4 w-full justify-center" @click="goToLogin">
                 {{ GOAL_COPY.loginCta }}
               </SecondaryButton>
             </template>
@@ -85,7 +105,7 @@
               </div>
 
               <p
-                class="mt-5 text-sm font-medium"
+                class="mt-4 text-xs font-semibold uppercase tracking-[0.12em]"
                 :class="selectedSubjectKey === subject.key ? 'text-slate-300' : 'text-slate-500'"
               >
                 {{ GOAL_COPY.representativePoints }}
@@ -104,13 +124,19 @@
           <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 class="text-xl font-semibold text-text-primary">{{ GOAL_COPY.topicSection }}</h2>
+              <p class="mt-1 text-sm text-text-secondary">{{ GOAL_COPY.topicSectionHint }}</p>
             </div>
-            <div class="rounded-full border border-border bg-white px-4 py-2 text-sm text-text-secondary">
-              {{ GOAL_COPY.currentSubjectPrefix }}{{ selectedSubject.label }}
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="rounded-full border border-border bg-white px-4 py-2 text-sm text-text-secondary">
+                {{ GOAL_COPY.currentSubjectPrefix }}{{ selectedSubject.label }}
+              </div>
+              <div class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+                {{ GOAL_COPY.topicStartTag }}
+              </div>
             </div>
           </div>
 
-          <div class="rounded-card border border-border/60 bg-white/80 p-1 shadow-card">
+          <div class="rounded-[30px] border border-border/60 bg-white/82 p-1.5 shadow-card">
             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <button
                 v-for="topic in selectedSubjectTopics"
@@ -121,7 +147,16 @@
                 @click="selectTopic(topic.key)"
               >
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-base font-semibold">{{ topic.label }}</p>
+                  <div class="min-w-0">
+                    <p class="text-base font-semibold">{{ topic.label }}</p>
+                    <p
+                      v-if="selectedTopicKey === topic.key && isHomeTopicConfigured(topic.key)"
+                      class="mt-1 text-xs font-medium uppercase tracking-[0.14em]"
+                      :class="selectedTopicKey === topic.key ? 'text-slate-300' : 'text-slate-500'"
+                    >
+                      {{ GOAL_COPY.topicStartTag }}
+                    </p>
+                  </div>
                   <span
                     v-if="!isHomeTopicConfigured(topic.key)"
                     class="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-400"
@@ -149,6 +184,9 @@
             <p class="text-sm font-medium text-text-secondary">{{ GOAL_COPY.footerTitle }}</p>
             <p class="mt-1 truncate text-base font-semibold text-text-primary">{{ selectionSummary }}</p>
             <p class="mt-1 text-sm text-text-secondary">{{ GOAL_COPY.footerHint }}</p>
+            <p class="mt-1 text-sm font-medium text-slate-700">
+              {{ GOAL_COPY.footerNextLabel }}：{{ GOAL_COPY.footerNextValue }}
+            </p>
           </div>
 
           <PrimaryButton
@@ -300,7 +338,7 @@ function subjectCardClass(subjectKey: string) {
 function topicCardClass(topicKey: string) {
   const configured = isHomeTopicConfigured(topicKey)
   if (!configured) {
-    return 'pointer-events-none cursor-not-allowed border-dashed border-slate-200 bg-slate-50/90 text-slate-400 opacity-80'
+    return 'pointer-events-none cursor-not-allowed border-dashed border-slate-200 bg-slate-50/65 text-slate-400 opacity-65'
   }
   if (selectedTopicKey.value === topicKey) {
     return 'border-slate-950 bg-slate-950 text-white shadow-[0_18px_36px_rgba(15,23,42,0.14)]'
@@ -381,4 +419,3 @@ async function onSubmit() {
   }
 }
 </script>
-
