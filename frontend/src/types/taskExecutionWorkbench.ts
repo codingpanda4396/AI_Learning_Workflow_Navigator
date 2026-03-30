@@ -101,6 +101,13 @@ export interface WorkbenchTutorAssistModel {
   quickQuestions: string[]
 }
 
+/** STRUCTURE 单任务画布：按需展开的三段支架（前端由 scaffold 推导） */
+export interface WorkbenchHintRevealModel {
+  tips: string
+  example: string
+  pitfalls: string
+}
+
 export interface TaskExecutionWorkbenchModel {
   packId: KnowledgePackId | null
   phaseProgress: WorkbenchPhaseProgressModel
@@ -116,6 +123,7 @@ export interface TaskExecutionWorkbenchModel {
   expressionLayout: WorkbenchExpressionLayoutModel
   feedbackSchema: WorkbenchFeedbackSchemaModel
   tutorAssist: WorkbenchTutorAssistModel
+  hintReveal: WorkbenchHintRevealModel
   /** 主列 data-phase */
   emphasisPhase: WorkbenchPhaseCode
 }

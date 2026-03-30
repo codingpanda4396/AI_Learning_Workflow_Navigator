@@ -1,10 +1,11 @@
 <template>
   <router-view />
-  <!-- 任务执行页已内嵌导师对话，不再挂全局浮层；其它路由保持原开关 -->
+  <!-- 执行工作台：仅抽屉导师，无全局浮球；其它路由保持浮球 + 面板 -->
   <template v-if="showAiTutorChrome">
     <AiTutorFloating />
     <AiTutorPanel />
   </template>
+  <AiTutorPanel v-else-if="showAiTutorPanelOnly" />
   <Teleport to="body">
     <Transition name="toast">
       <div
@@ -30,6 +31,11 @@ const showAiTutorChrome = computed(() => {
   if (route.name === 'task' || route.name === 'taskRun') return false
   return route.name === 'execution'
 })
+
+/** 任务跑页需挂载面板，顶栏「求助」才能打开抽屉（不挂全局浮球） */
+const showAiTutorPanelOnly = computed(
+  () => route.name === 'task' || route.name === 'taskRun'
+)
 useAuthStore().ensureReady()
 </script>
 

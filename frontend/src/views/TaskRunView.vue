@@ -15,92 +15,177 @@
       </EmptyState>
 
       <section v-else-if="task" class="space-y-5 pb-28">
-        <ExecutionHeader
-          :topic-name="workbenchTopicName"
-          :phase-progress="headerPhaseProgress"
-          :task-status-label="pageModel.workbench.taskStatusLabel"
-          :subtitle-line="headerSubtitleLine"
-          compact
-        />
+        <template v-if="isStructureWorkbench">
+          <ExecutionStageHeader
+            :topic-name="workbenchTopicName"
+            :phase-progress="headerPhaseProgress"
+            @help="onWorkbenchHelp"
+          />
 
-        <div class="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
-          <aside class="space-y-4 lg:sticky lg:top-6">
-            <ExecutionProgressRail :model="pageModel.progressRail" @stuck-action="onStuckAction" />
-          </aside>
+          <div class="grid gap-5 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:items-start">
+            <details
+              class="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:hidden [&_summary::-webkit-details-marker]:hidden"
+            >
+              <summary
+                class="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-900"
+              >
+                {{ TASKRUN_COPY.structureRailStage }} · {{ TASKRUN_COPY.structureRailProgress }}
+                <span class="text-xs font-normal text-slate-500">{{ structureStepSummary }}</span>
+              </summary>
+              <ExecutionMiniRail
+                class="mt-4 border-0 p-0 shadow-none"
+                :phase-label="pageModel.workbench.currentTask.phaseDisplayZh"
+                :objective-line="structureObjectiveLine"
+                :output-lines="structureDeliverableLines"
+                :step-label="pageModel.workbench.phaseProgress.stepLabel"
+              />
+            </details>
 
-          <div class="space-y-5" :data-phase="pageModel.workbench.emphasisPhase">
-            <PrimaryTaskCard
-              :model="pageModel.workbench.currentTask"
-              :emphasis-phase="pageModel.workbench.emphasisPhase"
-            />
+            <aside class="hidden lg:sticky lg:top-6 lg:block">
+              <ExecutionMiniRail
+                :phase-label="pageModel.workbench.currentTask.phaseDisplayZh"
+                :objective-line="structureObjectiveLine"
+                :output-lines="structureDeliverableLines"
+                :step-label="pageModel.workbench.phaseProgress.stepLabel"
+              />
+            </aside>
 
-            <ScaffoldGuideCard
-              :sections="pageModel.workbench.guideSections"
-              :topic-observation-bullets="pageModel.workbench.topicHints.bullets"
-              :sending="mainActionLoading"
-              @prefill-chip="onPrefillGuideText"
-            />
+            <div class="min-w-0 space-y-5" :data-phase="pageModel.workbench.emphasisPhase">
+              <StructureActionCard
+                :task-title="pageModel.workbench.currentTask.taskTitle"
+                :objective-line="structureObjectiveLine"
+                :output-requirements="structureActionOutputs"
+                :completion-lines="pageModel.workbench.currentTask.completionLines"
+                :avoid-lines="structureAvoidLines"
+              />
 
-            <ExpressionWorkspace
-              :chat-turns="chatTurns"
-              :draft-value="draftInput"
-              :input-label="pageModel.mainAction.inputLabel || TASKRUN_COPY.defaultMyExpression"
-              :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
-              :input-placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
-              :sending="mainActionLoading"
-              :micro-check-labels="microCheckLabels"
-              :checks="microChecks"
-              :emphasis-phase="pageModel.workbench.emphasisPhase"
-              :show-advance="showAdvanceSection"
-              :helper-text="pageModel.workbench.expressionLayout.helperText"
-              :low-friction-prompt="pageModel.workbench.expressionLayout.lowFrictionPrompt"
-              :structured-fields="pageModel.workbench.expressionLayout.fields"
-              :structured-inputs="structuredInputs"
-              @update:draft-value="draftInput = $event"
-              @update:structured-inputs="structuredInputs = $event"
-              @update:checks="microChecks = $event"
-              @save-draft="saveDraftExplicit"
-              @stuck="onStuckFromPanel"
-            />
+              <StructureHintReveal :hint-reveal="pageModel.workbench.hintReveal" />
 
-            <FeedbackSummary
-              :class="feedbackEmphasisClass"
-              :model="pageModel.feedback"
-              :schema="pageModel.workbench.feedbackSchema"
-              @action="handleFeedbackAction"
-            />
+              <StructureComposer
+                ref="structureComposerRef"
+                v-model="draftInput"
+                :placeholder="structureComposerPlaceholder"
+                :sending="mainActionLoading"
+              />
 
-            <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
+              <FeedbackSummary
+                :class="feedbackEmphasisClass"
+                :model="pageModel.feedback"
+                :schema="pageModel.workbench.feedbackSchema"
+                @action="handleFeedbackAction"
+              />
+
+              <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
+            </div>
           </div>
-        </div>
 
-        <StickyActionBar
-          :hint-label="pageModel.scaffoldCards[0]?.actionLabel || scaffoldHintLabel"
-          :primary-label="bottomPrimaryLabel"
-          :primary-loading="mainActionLoading"
-          :primary-disabled="bottomPrimaryDisabled"
-          :show-advance="showAdvanceSection"
-          :can-advance="canAdvanceDriving"
-          :advancing="advancing"
-          :advance-label="scaffold?.actionBar?.nextActionLabel || TASKRUN_COPY.advancePhase"
-          @hint="handleHintAction"
-          @save-draft="saveDraftExplicit"
-          @primary="handlePrimaryAction"
-          @advance="onAdvanceDrivingSeat"
-        />
+          <ExecutionBottomBar
+            :primary-label="structureBottomPrimaryLabel"
+            :primary-loading="mainActionLoading"
+            :primary-disabled="bottomPrimaryDisabled"
+            :secondary-label="TASKRUN_COPY.structureNotReady"
+            :secondary-disabled="mainActionLoading"
+            :save-disabled="mainActionLoading"
+            @primary="handlePrimaryAction"
+            @secondary="onStuckFromPanel"
+            @save-draft="saveDraftExplicit"
+          />
+        </template>
+
+        <template v-else>
+          <ExecutionHeader
+            :topic-name="workbenchTopicName"
+            :phase-progress="headerPhaseProgress"
+            :task-status-label="pageModel.workbench.taskStatusLabel"
+            :subtitle-line="headerSubtitleLine"
+            compact
+          />
+
+          <div class="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+            <aside class="space-y-4 lg:sticky lg:top-6">
+              <ExecutionProgressRail :model="pageModel.progressRail" @stuck-action="onStuckAction" />
+            </aside>
+
+            <div class="space-y-5" :data-phase="pageModel.workbench.emphasisPhase">
+              <PrimaryTaskCard
+                :model="pageModel.workbench.currentTask"
+                :emphasis-phase="pageModel.workbench.emphasisPhase"
+              />
+
+              <ScaffoldGuideCard
+                :sections="pageModel.workbench.guideSections"
+                :topic-observation-bullets="pageModel.workbench.topicHints.bullets"
+                :sending="mainActionLoading"
+                @prefill-chip="onPrefillGuideText"
+              />
+
+              <ExpressionWorkspace
+                :chat-turns="chatTurns"
+                :draft-value="draftInput"
+                :input-label="pageModel.mainAction.inputLabel || TASKRUN_COPY.defaultMyExpression"
+                :input-placeholder="pageModel.mainAction.inputPlaceholder || ''"
+                :input-placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
+                :sending="mainActionLoading"
+                :micro-check-labels="microCheckLabels"
+                :checks="microChecks"
+                :emphasis-phase="pageModel.workbench.emphasisPhase"
+                :show-advance="showAdvanceSection"
+                :helper-text="pageModel.workbench.expressionLayout.helperText"
+                :low-friction-prompt="pageModel.workbench.expressionLayout.lowFrictionPrompt"
+                :structured-fields="pageModel.workbench.expressionLayout.fields"
+                :structured-inputs="structuredInputs"
+                @update:draft-value="draftInput = $event"
+                @update:structured-inputs="structuredInputs = $event"
+                @update:checks="microChecks = $event"
+                @save-draft="saveDraftExplicit"
+                @stuck="onStuckFromPanel"
+              />
+
+              <FeedbackSummary
+                :class="feedbackEmphasisClass"
+                :model="pageModel.feedback"
+                :schema="pageModel.workbench.feedbackSchema"
+                @action="handleFeedbackAction"
+              />
+
+              <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
+            </div>
+          </div>
+
+          <StickyActionBar
+            :hint-label="pageModel.scaffoldCards[0]?.actionLabel || scaffoldHintLabel"
+            :primary-label="bottomPrimaryLabel"
+            :primary-loading="mainActionLoading"
+            :primary-disabled="bottomPrimaryDisabled"
+            :show-advance="showAdvanceSection"
+            :can-advance="canAdvanceDriving"
+            :advancing="advancing"
+            :advance-label="scaffold?.actionBar?.nextActionLabel || TASKRUN_COPY.advancePhase"
+            @hint="handleHintAction"
+            @save-draft="saveDraftExplicit"
+            @primary="handlePrimaryAction"
+            @advance="onAdvanceDrivingSeat"
+          />
+        </template>
       </section>
     </main>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
+import ExecutionBottomBar from '@/components/task-run/ExecutionBottomBar.vue'
 import ExecutionHeader from '@/components/task-run/ExecutionHeader.vue'
+import ExecutionMiniRail from '@/components/task-run/ExecutionMiniRail.vue'
 import ExecutionProgressRail from '@/components/task-run/ExecutionProgressRail.vue'
+import ExecutionStageHeader from '@/components/task-run/ExecutionStageHeader.vue'
 import ExpressionWorkspace from '@/components/task-run/ExpressionWorkspace.vue'
+import StructureActionCard from '@/components/task-run/StructureActionCard.vue'
+import StructureComposer from '@/components/task-run/StructureComposer.vue'
+import StructureHintReveal from '@/components/task-run/StructureHintReveal.vue'
 import FeedbackSummary from '@/components/task-run/FeedbackSummary.vue'
 import PrimaryTaskCard from '@/components/task-run/PrimaryTaskCard.vue'
 import ReflectionSummaryCard from '@/components/task-run/ReflectionSummaryCard.vue'
@@ -327,6 +412,43 @@ const workbenchTopicName = computed(() => {
   return pageModel.value.header.operationConsole?.knowledgePointName || pageModel.value.header.title || '当前任务'
 })
 
+const structureComposerRef = ref<InstanceType<typeof StructureComposer> | null>(null)
+
+const isStructureWorkbench = computed(() => pageModel.value.workbench.emphasisPhase === 'STRUCTURE')
+
+const structureObjectiveLine = computed(() => pageModel.value.workbench.currentTask.objective?.trim() || '')
+
+const structureDeliverableLines = computed(() => {
+  const o = pageModel.value.workbench.currentTask.outputRequirements?.filter((s) => s?.trim()).slice(0, 8)
+  if (o?.length) return o
+  return pageModel.value.workbench.scaffoldProduct.whatToOutput.filter(Boolean).slice(0, 8)
+})
+
+const structureActionOutputs = computed(() => {
+  const o = pageModel.value.workbench.currentTask.outputRequirements?.filter((s) => s?.trim())
+  if (o?.length) return o
+  return pageModel.value.workbench.scaffoldProduct.whatToOutput.filter(Boolean)
+})
+
+const structureAvoidLines = computed(() => {
+  const a = pageModel.value.workbench.scaffoldProduct.avoid.filter(Boolean)
+  if (a.length) return a
+  return pageModel.value.workbench.stageRules.rules.filter(Boolean).slice(0, 6)
+})
+
+const structureComposerPlaceholder = computed(
+  () => pageModel.value.mainAction.inputPlaceholder || TASKRUN_COPY.structureComposerPlaceholder
+)
+
+const structureBottomPrimaryLabel = computed(
+  () =>
+    scaffold.value?.actionBar?.submitActionLabel ||
+    pageModel.value.mainAction.primaryActionLabel ||
+    TASKRUN_COPY.structureSubmit
+)
+
+const structureStepSummary = computed(() => pageModel.value.workbench.phaseProgress.stepLabel)
+
 const microCheckLabels = computed(() => {
   const raw = scaffold.value?.selfCheckTemplates?.filter((s) => s?.trim()).slice(0, 3) ?? []
   if (raw.length >= 2) return raw
@@ -344,6 +466,10 @@ watch(
 watch(
   () => pageModel.value.workbench.expressionLayout.fields,
   (fields) => {
+    if (pageModel.value.workbench.emphasisPhase === 'STRUCTURE') {
+      structuredInputs.value = []
+      return
+    }
     structuredInputs.value = fields.map((_, index) => structuredInputs.value[index] ?? '')
   },
   { immediate: true }
@@ -352,6 +478,7 @@ watch(
 watch(
   structuredInputs,
   (parts) => {
+    if (pageModel.value.workbench.emphasisPhase === 'STRUCTURE') return
     const fields = pageModel.value.workbench.expressionLayout.fields
     const merged = parts
       .map((value, index) => {
@@ -365,6 +492,15 @@ watch(
     if (merged) draftInput.value = merged
   },
   { deep: true }
+)
+
+watch(
+  [() => task.value?.taskId, isStructureWorkbench],
+  () => {
+    if (!task.value?.taskId || !isStructureWorkbench.value) return
+    nextTick(() => structureComposerRef.value?.focus())
+  },
+  { flush: 'post' }
 )
 
 const showAdvanceSection = computed(() => taskState.value === 'EXPLORE' && chatTurns.value.length >= 1)
@@ -541,6 +677,10 @@ function fillDraftInput(text: string) {
   const value = text.trim()
   if (!value) return
   draftInput.value = draftInput.value.trim() ? `${draftInput.value.trim()}\n${value}` : value
+}
+
+function onWorkbenchHelp() {
+  aiTutorStore.openPanel()
 }
 
 function handleHintAction() {

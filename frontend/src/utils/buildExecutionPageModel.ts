@@ -536,6 +536,17 @@ function buildWorkbenchModel(
   const core =
     clipFirstLine(opts.currentDirective, 120) || clipFirstLine(opts.roundGoal, 120) || opts.copyTitle
 
+  const guideFirst = input.scaffold?.scaffoldGuide?.sections?.[0]
+  const hintReveal = {
+    tips: (guideFirst?.standardHint || merged.recommendedSteps[0] || '').trim(),
+    example: (guideFirst?.lightHint || merged.recommendedSteps[1] || '').trim(),
+    pitfalls: (
+      guideFirst?.strongHint ||
+      merged.avoid.slice(0, 4).filter(Boolean).join('\n') ||
+      ''
+    ).trim(),
+  }
+
   return {
     packId,
     phaseProgress: {
@@ -621,6 +632,7 @@ function buildWorkbenchModel(
       panelTitle: input.scaffold?.tutorAssist?.panelTitle || '导师辅助',
       quickQuestions: input.scaffold?.tutorAssist?.quickQuestions || [],
     },
+    hintReveal,
     emphasisPhase: opts.phaseCode,
   }
 }
@@ -690,6 +702,7 @@ export function createEmptyWorkbenchModel(): TaskExecutionWorkbenchModel {
       panelTitle: '导师辅助',
       quickQuestions: [],
     },
+    hintReveal: { tips: '', example: '', pitfalls: '' },
     emphasisPhase: 'STRUCTURE',
   }
 }
