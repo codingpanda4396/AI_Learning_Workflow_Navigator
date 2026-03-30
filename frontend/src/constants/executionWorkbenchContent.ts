@@ -19,6 +19,81 @@ export const WORKBENCH_PHASE_SEQUENCE: WorkbenchPhaseCode[] = [
   'REFLECTION',
 ]
 
+/** DFS/BFS 演示：按四阶段起步 chip（优先于通用 STEP_COPY，由 buildExecutionPageModel 注入） */
+export const DFS_BFS_STARTER_CHIPS: Record<
+  KnowledgeDemoStageCode,
+  { id: string; label: string; fill: string }[]
+> = {
+  STRUCTURE: [
+    {
+      id: 'dfs-what',
+      label: '先写「它是什么」',
+      fill: 'DFS 与 BFS 各自在处理：',
+    },
+    {
+      id: 'dfs-problem',
+      label: '再写「它解决什么」',
+      fill: '这一类遍历主要用来解决：',
+    },
+    {
+      id: 'dfs-diff',
+      label: '最后写「它和谁不同」',
+      fill: '和另一种遍历相比，关键差别在于：',
+    },
+  ],
+  UNDERSTANDING: [
+    {
+      id: 'dfs-why',
+      label: '因果：为什么需要它',
+      fill: '之所以要用这种顺序，是因为：',
+    },
+    {
+      id: 'dfs-edge',
+      label: '少了哪一步会错',
+      fill: '如果跳过或写错这一步，会出现：',
+    },
+    {
+      id: 'dfs-mini',
+      label: '给一个最小例子',
+      fill: '用一个最小图/树例子说明推进过程：',
+    },
+  ],
+  TRAINING: [
+    {
+      id: 'dfs-explain',
+      label: '用解释写清',
+      fill: '我先用一段话讲清为什么选这种遍历：',
+    },
+    {
+      id: 'dfs-example',
+      label: '用举例写清',
+      fill: '我举一个具体场景说明怎么选：',
+    },
+    {
+      id: 'dfs-gap',
+      label: '说说我还不稳的点',
+      fill: '我现在最容易写错或选错的是：',
+    },
+  ],
+  REFLECTION: [
+    {
+      id: 'dfs-wrong',
+      label: '我错在哪',
+      fill: '我刚才错在：',
+    },
+    {
+      id: 'dfs-root',
+      label: '根因是什么',
+      fill: '根因更像是：',
+    },
+    {
+      id: 'dfs-next',
+      label: '下次怎么判断',
+      fill: '下次我会先用这条检查：',
+    },
+  ],
+}
+
 /** 四阶段通用规则（可被知识点覆盖语气，此处保持短） */
 export const STAGE_RULES_BY_PHASE: Record<KnowledgeDemoStageCode, string[]> = {
   STRUCTURE: ['先看位置与边界，不急着记细节', '用一句话说清「它是什么、解决什么问题」', '允许粗糙，但必须站得住'],

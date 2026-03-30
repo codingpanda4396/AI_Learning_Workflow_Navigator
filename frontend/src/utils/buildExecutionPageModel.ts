@@ -20,6 +20,7 @@ import { useKnowledgePack } from '@/composables/useKnowledgePack'
 import { enrichExecutionSpec } from '@/utils/enrichExecutionSpec'
 import type { KnowledgeDemoStageCode } from '@/constants/KnowledgeConfig'
 import {
+  DFS_BFS_STARTER_CHIPS,
   mergePhaseCopyWithFallback,
   STAGE_RULES_BY_PHASE,
   TOPIC_DISPLAY_NAME,
@@ -32,6 +33,7 @@ import { phaseCodeToFullZh } from '@/constants/stageLabels'
 import type { KnowledgePackId } from '@/types/knowledgePack'
 import type {
   TaskExecutionWorkbenchModel,
+  WorkbenchExpressionFieldModel,
   WorkbenchPhaseCode,
   WorkbenchTaskStatus,
 } from '@/types/taskExecutionWorkbench'
@@ -196,7 +198,23 @@ const STEP_COPY: Record<
     inputPlaceholder: '一两句话 + 你的判断依据。',
     primaryActionLabel: '提交本轮表达',
     helperText: '',
-    defaultChips: [],
+    defaultChips: [
+      {
+        id: 'check-judgment',
+        label: '先写我的判断',
+        fill: '我的判断是：',
+      },
+      {
+        id: 'check-basis',
+        label: '再写依据',
+        fill: '依据是：',
+      },
+      {
+        id: 'check-wrap',
+        label: '一句话收束',
+        fill: '所以我会选：',
+      },
+    ],
   },
   PASS: {
     stageLabel: 'REFLECTION',
@@ -310,6 +328,18 @@ function buildKnowledgePoints(
   })
 }
 
+function taskStateToDemoPhase(state: string): KnowledgeDemoStageCode {
+  const m: Record<string, KnowledgeDemoStageCode> = {
+    ORIENT: 'STRUCTURE',
+    EXPLORE: 'UNDERSTANDING',
+    SELF_EXPLAIN: 'TRAINING',
+    REMEDIAL: 'TRAINING',
+    CHECK: 'REFLECTION',
+    PASS: 'REFLECTION',
+  }
+  return m[state] ?? 'STRUCTURE'
+}
+
 function buildActionModel(
   state: string,
   task: CurrentTaskItem,
@@ -319,7 +349,8 @@ function buildActionModel(
   directive: string,
   inputPlaceholderSoft: string,
   stageCode: string,
-  stageDisplayZh: string
+  stageDisplayZh: string,
+  packId: KnowledgePackId | null
 ): ExecutionGuideActionModel {
   const copy = STEP_COPY[state]
   const scaffoldPrompts =
@@ -347,6 +378,12 @@ function buildActionModel(
     .filter(Boolean)
     .slice(0, 3)
 
+  const demoPhase = taskStateToDemoPhase(state)
+  let chipList = [...copy.defaultChips, ...scaffoldPrompts, ...actionChips]
+  if (packId === 'ds_dfs_bfs') {
+    chipList = [...DFS_BFS_STARTER_CHIPS[demoPhase], ...scaffoldPrompts, ...actionChips]
+  }
+
   return {
     mode: state === 'PASS' ? 'closure' : 'guided-input',
     phaseCode: stageCode,
@@ -369,10 +406,7 @@ function buildActionModel(
       summarizeLine(task.whyThisTask, scaffold?.whyThisTask) ||
       '这一轮先只围绕当前知识点推进，不把其它点混进来。',
     focusTips,
-    chips:
-      state === 'CHECK'
-        ? []
-        : [...copy.defaultChips, ...scaffoldPrompts, ...actionChips].slice(0, 3),
+    chips: chipList.slice(0, 3),
   }
 }
 
@@ -471,6 +505,72 @@ function isKnowledgePackId(id: string | null | undefined): id is KnowledgePackId
     id === 'ds_dfs_bfs' ||
     id === 'arch_cache_locality'
   )
+}
+
+function buildDefaultExpressionFields(
+  input: BuildExecutionPageModelInput,
+  phaseCode: WorkbenchPhaseCode
+): WorkbenchExpressionFieldModel[] {
+  const fromScaffold = input.scaffold?.expressionLayout?.fields
+  if (fromScaffold?.length) {
+    return fromScaffold.map((field) => ({
+      id: field.id,
+      label: field.label,
+      placeholder: field.placeholder,
+      multiline: field.multiline,
+    }))
+  }
+  if (input.taskState === 'PASS') {
+    return [
+      {
+        id: 'closure-summary',
+        label: '一句总结',
+        placeholder: '用一句话收束本轮收获',
+        multiline: true,
+      },
+      {
+        id: 'closure-point1',
+        label: '要点一',
+        placeholder: '可复用的要点',
+        multiline: false,
+      },
+      {
+        id: 'closure-point2',
+        label: '要点二',
+        placeholder: '可复用的要点',
+        multiline: false,
+      },
+      {
+        id: 'closure-next',
+        label: '下一步练什么',
+        placeholder: '下一步具体练什么',
+        multiline: false,
+      },
+    ]
+  }
+  if (phaseCode === 'REFLECTION' && input.taskState === 'CHECK') {
+    return [
+      {
+        id: 'refl-wrong',
+        label: '我错在哪',
+        placeholder: '一句话',
+        multiline: false,
+      },
+      {
+        id: 'refl-root',
+        label: '根因是什么',
+        placeholder: '一句话',
+        multiline: false,
+      },
+      {
+        id: 'refl-next',
+        label: '下次怎么判断',
+        placeholder: '一条可执行检查',
+        multiline: false,
+      },
+    ]
+  }
+  return []
 }
 
 function computeWorkbenchTaskStatus(
@@ -613,19 +713,13 @@ function buildWorkbenchModel(
       helperText: input.scaffold?.expressionLayout?.helperText || '按当前阶段的结构填写，不必一次写对。',
       lowFrictionPrompt:
         input.scaffold?.expressionLayout?.lowFrictionPrompt || '先写一版，我们再一起修。',
-      fields:
-        input.scaffold?.expressionLayout?.fields?.map((field) => ({
-          id: field.id,
-          label: field.label,
-          placeholder: field.placeholder,
-          multiline: field.multiline,
-        })) || [],
+      fields: buildDefaultExpressionFields(input, opts.phaseCode),
     },
     feedbackSchema: {
-      correctTitle: input.scaffold?.feedbackSchema?.correctTitle || '你已经说对了什么',
+      correctTitle: input.scaffold?.feedbackSchema?.correctTitle || '你说对了什么',
       missingTitle: input.scaffold?.feedbackSchema?.missingTitle || '你漏了什么',
       confusedTitle: input.scaffold?.feedbackSchema?.confusedTitle || '你混淆了什么',
-      nextFixTitle: input.scaffold?.feedbackSchema?.nextFixTitle || '下一步该怎么修',
+      nextFixTitle: input.scaffold?.feedbackSchema?.nextFixTitle || '下一步该修什么',
     },
     tutorAssist: {
       floatingLabel: input.scaffold?.tutorAssist?.floatingLabel || '不懂这一步？',
@@ -692,10 +786,10 @@ export function createEmptyWorkbenchModel(): TaskExecutionWorkbenchModel {
       fields: [],
     },
     feedbackSchema: {
-      correctTitle: '你已经说对了什么',
+      correctTitle: '你说对了什么',
       missingTitle: '你漏了什么',
       confusedTitle: '你混淆了什么',
-      nextFixTitle: '下一步该怎么修',
+      nextFixTitle: '下一步该修什么',
     },
     tutorAssist: {
       floatingLabel: '不懂这一步？',
@@ -717,6 +811,7 @@ export function buildExecutionPageModel(
     knowledgeKey: input.plan?.knowledgeKey,
     packId: input.plan?.packId,
   })
+  const packIdForChips = pack?.id && isKnowledgePackId(pack.id) ? pack.id : null
   const copy = STEP_COPY[state]
   const knowledgePoints = buildKnowledgePoints(input.task, input.progress, input.planTasks)
   const activePoint =
@@ -831,7 +926,8 @@ export function buildExecutionPageModel(
       enriched.currentDirective,
       enriched.inputPlaceholderSoft,
       copy.stageLabel,
-      enriched.stageDisplay
+      enriched.stageDisplay,
+      packIdForChips
     ),
     feedback: buildFeedback(
       input.latestFeedback,
