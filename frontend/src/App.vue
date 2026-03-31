@@ -1,11 +1,14 @@
 <template>
   <router-view />
-  <!-- 执行工作台：仅抽屉导师，无全局浮球；其它路由保持浮球 + 面板 -->
+  <!-- 执行工作台：仅抽屉导师；DFS/BFS STRUCTURE 骨架台另开右下角浮球 -->
   <template v-if="showAiTutorChrome">
     <AiTutorFloating />
     <AiTutorPanel />
   </template>
-  <AiTutorPanel v-else-if="showAiTutorPanelOnly" />
+  <template v-else-if="showAiTutorPanelOnly">
+    <AiTutorFloating v-if="aiTutor.showTaskRunFloatingFab" />
+    <AiTutorPanel />
+  </template>
   <Teleport to="body">
     <Transition name="toast">
       <div
@@ -25,8 +28,10 @@ import { toastMessage } from '@/stores/toast'
 import AiTutorFloating from '@/components/ai-tutor/AiTutorFloating.vue'
 import AiTutorPanel from '@/components/ai-tutor/AiTutorPanel.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useAiTutorStore } from '@/stores/aiTutor'
 
 const route = useRoute()
+const aiTutor = useAiTutorStore()
 const showAiTutorChrome = computed(() => {
   if (route.name === 'task' || route.name === 'taskRun') return false
   return route.name === 'execution'

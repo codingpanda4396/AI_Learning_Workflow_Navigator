@@ -52,7 +52,6 @@ export function useLearningScaffoldEngine(opts: {
     error.value = null
     try {
       stage.value = await getLearningScaffoldStage(tid, sid)
-      lastResult.value = null
     } catch (e) {
       error.value = e instanceof Error ? e.message : '加载脚手架失败'
       stage.value = null

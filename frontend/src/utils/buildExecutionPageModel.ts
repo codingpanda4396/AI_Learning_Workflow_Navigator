@@ -31,6 +31,7 @@ import {
 } from '@/constants/executionWorkbenchContent'
 import { phaseCodeToFullZh } from '@/constants/stageLabels'
 import type { KnowledgePackId } from '@/types/knowledgePack'
+import type { StageScaffold } from '@/types/scaffoldEngine'
 import type {
   TaskExecutionWorkbenchModel,
   WorkbenchExpressionFieldModel,
@@ -947,5 +948,110 @@ export function buildExecutionPageModel(
       phasePromptChips: enriched.phasePromptChips,
     },
     workbench,
+  }
+}
+
+function coerceWorkbenchPhase(mode: string | undefined): WorkbenchPhaseCode {
+  const u = (mode || 'STRUCTURE').toUpperCase()
+  if (u === 'UNDERSTANDING' || u === 'TRAINING' || u === 'REFLECTION' || u === 'STRUCTURE') {
+    return u
+  }
+  return 'STRUCTURE'
+}
+
+/** 将后端 learning-scaffold 的 workbench 载荷合并进执行页 view model */
+export function mergeScaffoldEngineWorkbench(
+  base: ExecutionPageViewModel,
+  engineStage: StageScaffold | null
+): ExecutionPageViewModel {
+  const w = engineStage?.workbench
+  if (!w) return base
+
+  const emphasis = coerceWorkbenchPhase(w.emphasisMode)
+  const stageDisplay = phaseCodeToFullZh(emphasis)
+
+  const workbench: TaskExecutionWorkbenchModel = {
+    ...base.workbench,
+    emphasisPhase: emphasis,
+    phaseProgress: {
+      ...base.workbench.phaseProgress,
+      currentPhase: emphasis,
+    },
+    currentTask: {
+      ...base.workbench.currentTask,
+      phaseCode: emphasis,
+      phaseDisplayZh: stageDisplay,
+      taskTitle: w.currentTaskTitle || base.workbench.currentTask.taskTitle,
+      coreActionLine: w.cognitiveAction || base.workbench.currentTask.coreActionLine,
+      currentAction: w.cognitiveAction || base.workbench.currentTask.currentAction,
+      objective: w.stageGoal || base.workbench.currentTask.objective,
+      whyNow: w.llmGeneratedGuide?.trim() || base.workbench.currentTask.whyNow,
+      completionLines: w.completionCriteria?.length
+        ? w.completionCriteria
+        : base.workbench.currentTask.completionLines,
+      outputRequirements: w.deliverable
+        ? [w.deliverable, ...(base.workbench.currentTask.outputRequirements ?? [])].filter(Boolean).slice(0, 4)
+        : base.workbench.currentTask.outputRequirements,
+    },
+    expressionLayout: {
+      helperText:
+        w.currentTaskInstruction || w.llmGeneratedMicroHint || base.workbench.expressionLayout.helperText,
+      lowFrictionPrompt:
+        w.llmGeneratedExampleBoundary || base.workbench.expressionLayout.lowFrictionPrompt,
+      fields: [],
+    },
+    feedbackSchema: w.feedbackSchema
+      ? {
+          correctTitle: w.feedbackSchema.completenessLabel || base.workbench.feedbackSchema.correctTitle,
+          missingTitle: w.feedbackSchema.issuePointsLabel || base.workbench.feedbackSchema.missingTitle,
+          confusedTitle: base.workbench.feedbackSchema.confusedTitle,
+          nextFixTitle:
+            w.feedbackSchema.minimalRevisionLabel || base.workbench.feedbackSchema.nextFixTitle,
+        }
+      : base.workbench.feedbackSchema,
+    scaffoldProduct: {
+      ...base.workbench.scaffoldProduct,
+      whatToOutput: w.completionCriteria?.length
+        ? w.completionCriteria
+        : base.workbench.scaffoldProduct.whatToOutput,
+      recommendedSteps: w.deliverable
+        ? [w.deliverable]
+        : base.workbench.scaffoldProduct.recommendedSteps,
+    },
+    hintReveal: {
+      tips: w.llmGeneratedMicroHint || base.workbench.hintReveal.tips,
+      example: w.llmGeneratedExampleBoundary || base.workbench.hintReveal.example,
+      pitfalls: base.workbench.hintReveal.pitfalls,
+    },
+  }
+
+  const starterChips = w.starterPrompts.slice(0, 3).map((label, i) => ({
+    id: `scaffold-${i}`,
+    label: label.length > 20 ? `${label.slice(0, 20)}…` : label,
+    fill: label,
+  }))
+
+  const block0 = w.promptScaffold?.blocks?.find((b) => b.id === 'main')
+
+  const mainAction: ExecutionGuideActionModel = {
+    ...base.mainAction,
+    phaseCode: emphasis,
+    phaseDisplayZh: stageDisplay,
+    chips: starterChips.length ? starterChips : base.mainAction.chips,
+    inputPlaceholder: block0?.placeholder || base.mainAction.inputPlaceholder,
+    primaryActionLabel: '提交当前动作',
+  }
+
+  return {
+    ...base,
+    header: {
+      ...base.header,
+      phaseCode: emphasis,
+      phaseDisplayZh: stageDisplay,
+      anchorActionLine: w.cognitiveAction || base.header.anchorActionLine,
+      subtitle: w.stageGoal || base.header.subtitle,
+    },
+    workbench,
+    mainAction,
   }
 }

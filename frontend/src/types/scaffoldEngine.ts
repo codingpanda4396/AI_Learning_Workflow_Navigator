@@ -38,6 +38,66 @@ export interface CompleteStructureStageResult {
   nextActionId: string
 }
 
+export interface PromptScaffoldBlock {
+  id: string
+  title: string
+  intent?: string
+  prompt: string
+  placeholder?: string
+  constraint?: string
+  maxLength?: number
+  sentenceLimit?: number
+  required?: boolean
+  kind?: string
+}
+
+export interface PromptScaffold {
+  blocks: PromptScaffoldBlock[]
+}
+
+export interface ExpressionSchemaPayload {
+  mode: string
+  fieldIds: string[]
+  minChars?: number
+  maxChars?: number
+}
+
+export interface WorkbenchFeedbackSchemaPayload {
+  completenessLabel?: string
+  issuePointsLabel?: string
+  minimalRevisionLabel?: string
+  nextActionLabel?: string
+  maxIssuePoints?: number
+}
+
+/** 驱动脚手架工作台（与后端 StageScaffoldWorkbenchPayload 对齐） */
+export interface StageScaffoldWorkbenchPayload {
+  stageKey: string
+  cognitiveAction: string
+  stageGoal: string
+  currentTaskTitle: string
+  currentTaskInstruction: string
+  deliverable: string
+  completionCriteria: string[]
+  promptScaffold: PromptScaffold
+  expressionSchema: ExpressionSchemaPayload
+  starterPrompts: string[]
+  hintPrompts: string[]
+  feedbackSchema?: WorkbenchFeedbackSchemaPayload
+  llmGeneratedGuide?: string
+  llmGeneratedMicroHint?: string
+  llmGeneratedExampleBoundary?: string
+  submitConstraint?: string
+  emphasisMode: string
+}
+
+export interface StructuredScaffoldFeedbackPayload {
+  completeness?: string
+  issuePoints: string[]
+  minimalRevision?: string
+  nextAction?: string
+}
+
 export interface StageScaffold {
   stageKey: string
   stageTitle: string
@@ -60,6 +120,7 @@ export interface StageScaffold {
   structureLightInteractionCount?: number
   structureCanComplete?: boolean
   structureLastPromptKey?: string
+  workbench?: StageScaffoldWorkbenchPayload
 }
 
 export interface ActionRuntime {
@@ -142,4 +203,5 @@ export interface LearningScaffoldActionResult {
   canProceed?: boolean
   reflectionRecord?: ReflectionRecord
   reflectionInsight?: ReflectionInsight
+  feedbackPayload?: StructuredScaffoldFeedbackPayload
 }

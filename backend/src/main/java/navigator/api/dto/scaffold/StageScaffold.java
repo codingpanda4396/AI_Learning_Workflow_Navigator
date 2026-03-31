@@ -44,4 +44,7 @@ public class StageScaffold {
     private Integer structureLightInteractionCount;
     private Boolean structureCanComplete;
     private String structureLastPromptKey;
+
+    /** 工作台渲染载荷（prompt 槽位 + 表达 schema + 反馈约束） */
+    private StageScaffoldWorkbenchPayload workbench;
 }

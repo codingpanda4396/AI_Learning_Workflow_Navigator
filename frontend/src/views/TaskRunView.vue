@@ -15,8 +15,22 @@
       </EmptyState>
 
       <section v-else-if="task" class="pb-28">
-        <div class="mx-auto max-w-3xl space-y-5">
+        <div class="mx-auto space-y-5" :class="showScaffoldWorkbench ? 'max-w-4xl' : 'max-w-3xl'">
+          <StageWorkbenchHeader
+            v-if="showScaffoldWorkbench"
+            :topic-name="workbenchTopicName"
+            :cognitive-action="
+              pageModel.workbench.currentTask.coreActionLine ||
+              pageModel.workbench.currentTask.currentAction ||
+              ''
+            "
+            :stage-goal="pageModel.workbench.currentTask.objective || ''"
+            :emphasis-phase="pageModel.workbench.emphasisPhase"
+            :phase-progress="headerPhaseProgress"
+            :task-index-label="headerPhaseProgress.taskIndexLabel || ''"
+          />
           <TaskRunPhaseHeader
+            v-else
             :topic-name="workbenchTopicName"
             :phase-progress="headerPhaseProgress"
             :goal-line="phaseGoalLine"
@@ -24,51 +38,92 @@
           />
 
           <div class="space-y-5" :data-phase="pageModel.workbench.emphasisPhase">
-            <MainTaskWorkbenchCard
-              :model="pageModel.workbench.currentTask"
-              :why-this-step="pageModel.workbench.whyThisStep"
-              :scaffold-product="pageModel.workbench.scaffoldProduct"
-              :hint-reveal="pageModel.workbench.hintReveal"
-              :guide-sections="pageModel.workbench.guideSections"
-              :emphasis-phase="pageModel.workbench.emphasisPhase"
-            />
+            <template v-if="showScaffoldWorkbench">
+              <MainTaskWorkbenchCard
+                :model="pageModel.workbench.currentTask"
+                :why-this-step="pageModel.workbench.whyThisStep"
+                :scaffold-product="pageModel.workbench.scaffoldProduct"
+                :hint-reveal="pageModel.workbench.hintReveal"
+                :guide-sections="pageModel.workbench.guideSections"
+                :emphasis-phase="pageModel.workbench.emphasisPhase"
+              />
+              <ScaffoldPromptPanel :workbench="scaffoldEngine.stage?.workbench" />
+              <p v-if="scaffoldEngine.loading" class="text-xs font-medium text-slate-500">加载脚手架…</p>
+              <p v-if="scaffoldEngine.error" class="text-sm text-red-700">{{ scaffoldEngine.error }}</p>
+              <TaskExpressionPanel
+                ref="expressionPanelRef"
+                :draft-value="draftInput"
+                :placeholder="pageModel.mainAction.inputPlaceholder || ''"
+                :placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
+                :sending="mainActionLoading"
+                :helper-text="pageModel.workbench.expressionLayout.helperText"
+                :low-friction-prompt="pageModel.workbench.expressionLayout.lowFrictionPrompt"
+                :structured-fields="pageModel.workbench.expressionLayout.fields"
+                :structured-inputs="structuredInputs"
+                :starter-chips="pageModel.mainAction.chips"
+                :emphasis-phase="pageModel.workbench.emphasisPhase"
+                :checkpoint-prompt="''"
+                :show-advance="false"
+                :micro-check-labels="microCheckLabels"
+                :checks="microChecks"
+                @update:draft-value="draftInput = $event"
+                @update:structured-inputs="structuredInputs = $event"
+                @update:checks="microChecks = $event"
+                @chip="fillDraftInput"
+              />
+            </template>
 
-            <TaskExpressionPanel
-              ref="expressionPanelRef"
-              :draft-value="draftInput"
-              :placeholder="pageModel.mainAction.inputPlaceholder || ''"
-              :placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
-              :sending="mainActionLoading"
-              :helper-text="pageModel.workbench.expressionLayout.helperText"
-              :low-friction-prompt="pageModel.workbench.expressionLayout.lowFrictionPrompt"
-              :structured-fields="pageModel.workbench.expressionLayout.fields"
-              :structured-inputs="structuredInputs"
-              :starter-chips="pageModel.mainAction.chips"
-              :emphasis-phase="pageModel.workbench.emphasisPhase"
-              :checkpoint-prompt="checkpointQuestionDisplay"
-              :show-advance="showAdvanceSection"
-              :micro-check-labels="microCheckLabels"
-              :checks="microChecks"
-              @update:draft-value="draftInput = $event"
-              @update:structured-inputs="structuredInputs = $event"
-              @update:checks="microChecks = $event"
-              @chip="fillDraftInput"
-            />
+            <template v-else>
+              <MainTaskWorkbenchCard
+                :model="pageModel.workbench.currentTask"
+                :why-this-step="pageModel.workbench.whyThisStep"
+                :scaffold-product="pageModel.workbench.scaffoldProduct"
+                :hint-reveal="pageModel.workbench.hintReveal"
+                :guide-sections="pageModel.workbench.guideSections"
+                :emphasis-phase="pageModel.workbench.emphasisPhase"
+              />
+
+              <TaskExpressionPanel
+                ref="expressionPanelRef"
+                :draft-value="draftInput"
+                :placeholder="pageModel.mainAction.inputPlaceholder || ''"
+                :placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
+                :sending="mainActionLoading"
+                :helper-text="pageModel.workbench.expressionLayout.helperText"
+                :low-friction-prompt="pageModel.workbench.expressionLayout.lowFrictionPrompt"
+                :structured-fields="pageModel.workbench.expressionLayout.fields"
+                :structured-inputs="structuredInputs"
+                :starter-chips="pageModel.mainAction.chips"
+                :emphasis-phase="pageModel.workbench.emphasisPhase"
+                :checkpoint-prompt="checkpointQuestionDisplay"
+                :show-advance="showAdvanceSection"
+                :micro-check-labels="microCheckLabels"
+                :checks="microChecks"
+                @update:draft-value="draftInput = $event"
+                @update:structured-inputs="structuredInputs = $event"
+                @update:checks="microChecks = $event"
+                @chip="fillDraftInput"
+              />
+            </template>
 
             <TaskFeedbackDeck
+              v-if="taskFeedbackModel.visible"
               :class="feedbackEmphasisClass"
-              :model="pageModel.feedback"
+              :model="taskFeedbackModel"
               :schema="pageModel.workbench.feedbackSchema"
               @action="handleFeedbackAction"
             />
 
-            <ReflectionSummaryCard v-if="reflectionSummaryForWorkbench" :summary="reflectionSummaryForWorkbench" />
+            <ReflectionSummaryCard
+              v-if="!showScaffoldWorkbench && reflectionSummaryForWorkbench"
+              :summary="reflectionSummaryForWorkbench"
+            />
           </div>
         </div>
 
         <TaskRunDualActionBar
           :primary-label="dualPrimaryLabel"
-          :secondary-label="'我还没想清楚'"
+          :secondary-label="dualSecondaryLabel"
           :primary-loading="mainActionLoading || advancing"
           :primary-disabled="dualPrimaryDisabled"
           :secondary-disabled="mainActionLoading || advancing"
@@ -81,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
@@ -89,6 +144,8 @@ import MainTaskWorkbenchCard from '@/components/task-run/MainTaskWorkbenchCard.v
 import TaskExpressionPanel from '@/components/task-run/TaskExpressionPanel.vue'
 
 type TaskExpressionPanelExposed = InstanceType<typeof TaskExpressionPanel>
+import ScaffoldPromptPanel from '@/components/task-run/ScaffoldPromptPanel.vue'
+import StageWorkbenchHeader from '@/components/task-run/StageWorkbenchHeader.vue'
 import TaskFeedbackDeck from '@/components/task-run/TaskFeedbackDeck.vue'
 import TaskRunDualActionBar from '@/components/task-run/TaskRunDualActionBar.vue'
 import TaskRunPhaseHeader from '@/components/task-run/TaskRunPhaseHeader.vue'
@@ -107,6 +164,7 @@ import {
   postSelfExplanation,
   postTaskMessage,
 } from '@/api/task'
+import { supportsLearningScaffoldEngine } from '@/constants/learningScaffoldPack'
 import { TASKRUN_COPY } from '@/constants/uiCopy'
 import { fallbackGuidanceForState, tutorPromptFor } from '@/constants/taskRunUi'
 import { showToast } from '@/stores/toast'
@@ -124,8 +182,14 @@ import type {
 } from '@/types/dto'
 import type { ExecutionGuideFeedbackModel, ExecutionPageViewModel } from '@/types/executionGuide'
 import { TaskCompletionStatus, type TaskCompletionStatusType } from '@/types/enums'
+import { useLearningScaffoldEngine } from '@/composables/useLearningScaffoldEngine'
 import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
-import { buildExecutionPageModel, createEmptyWorkbenchModel } from '@/utils/buildExecutionPageModel'
+import {
+  buildExecutionPageModel,
+  createEmptyWorkbenchModel,
+  mergeScaffoldEngineWorkbench,
+} from '@/utils/buildExecutionPageModel'
+import { mapEngineFeedbackPayloadToGuide } from '@/utils/mapEngineScaffoldFeedback'
 import { buildTaskGuidedSteps, getCurrentGuidedStepId } from '@/utils/taskGuidedSteps'
 import type { ReflectionSummary } from '@/types/scaffoldEngine'
 
@@ -162,6 +226,7 @@ const chatTurns = ref<ChatTurn[]>([])
 const draftInput = ref('')
 const structuredInputs = ref<string[]>([])
 const latestFeedback = ref<ExecutionGuideFeedbackModel | null>(null)
+const engineFeedback = ref<ExecutionGuideFeedbackModel | null>(null)
 const microChecks = ref<boolean[]>([false, false, false])
 const closureSummary = ref('')
 const closurePoint1 = ref('')
@@ -176,6 +241,25 @@ const completeForm = ref<{
 })
 
 const expressionPanelRef = ref<TaskExpressionPanelExposed | null>(null)
+
+const scaffoldEngine = useLearningScaffoldEngine({
+  taskId: () => task.value?.taskId,
+  sessionId: () => store.sessionId,
+  enabled: () =>
+    supportsLearningScaffoldEngine(scaffold.value?.packId ?? store.planPreview?.packId) &&
+    !!task.value &&
+    !legacyComplete.value &&
+    !loading.value,
+})
+
+const showScaffoldWorkbench = computed(() => {
+  const pid = scaffold.value?.packId ?? store.planPreview?.packId
+  return (
+    supportsLearningScaffoldEngine(pid) &&
+    !legacyComplete.value &&
+    !scaffoldEngine.scaffoldEngineComplete
+  )
+})
 
 const guidedStepsList = computed(() => buildTaskGuidedSteps(legacyComplete.value, scaffold.value))
 const guidedStepId = computed(() =>
@@ -268,7 +352,7 @@ const EMPTY_PAGE_MODEL: ExecutionPageViewModel = {
 
 const pageModel = computed<ExecutionPageViewModel>(() => {
   if (!task.value) return EMPTY_PAGE_MODEL
-  return buildExecutionPageModel({
+  const base = buildExecutionPageModel({
     task: task.value,
     progress: progress.value,
     planTasks: store.planPreview?.tasks ?? [],
@@ -286,6 +370,26 @@ const pageModel = computed<ExecutionPageViewModel>(() => {
     plan: store.planPreview,
     canAdvanceDriving: canAdvanceDriving.value,
   })
+  if (showScaffoldWorkbench.value && scaffoldEngine.stage) {
+    return mergeScaffoldEngineWorkbench(base, scaffoldEngine.stage)
+  }
+  return base
+})
+
+const EMPTY_TASK_FEEDBACK: ExecutionGuideFeedbackModel = {
+  visible: false,
+  title: '',
+  mastered: '',
+  gap: '',
+  nextStep: '',
+  actions: [],
+}
+
+const taskFeedbackModel = computed(() => {
+  if (showScaffoldWorkbench.value) {
+    return engineFeedback.value ?? EMPTY_TASK_FEEDBACK
+  }
+  return pageModel.value.feedback
 })
 
 const reflectionSummaryForWorkbench = computed((): ReflectionSummary | null => scaffold.value?.reflectionSummary ?? null)
@@ -372,6 +476,7 @@ watch(
   () => task.value?.taskId,
   () => {
     if (!task.value?.taskId) return
+    if (showScaffoldWorkbench.value) return
     nextTick(() => expressionPanelRef.value?.focus())
   },
   { flush: 'post' }
@@ -383,6 +488,9 @@ const canAdvanceDriving = computed(() => microChecks.value.length > 0 && microCh
 const primaryShowsAdvance = computed(() => showAdvanceSection.value && canAdvanceDriving.value)
 
 const dualPrimaryLabel = computed(() => {
+  if (showScaffoldWorkbench.value) {
+    return pageModel.value.mainAction.primaryActionLabel || '提交当前动作'
+  }
   if (primaryShowsAdvance.value) {
     return scaffold.value?.actionBar?.nextActionLabel || TASKRUN_COPY.advancePhase
   }
@@ -394,8 +502,16 @@ const dualPrimaryLabel = computed(() => {
   )
 })
 
+const dualSecondaryLabel = computed(() => {
+  if (showScaffoldWorkbench.value) {
+    return '我卡住了'
+  }
+  return '我还没想清楚'
+})
+
 const dualPrimaryDisabled = computed(() => {
   if (mainActionLoading.value || advancing.value) return true
+  if (showScaffoldWorkbench.value) return !draftInput.value.trim()
   if (pageModel.value.mainAction.mode === 'closure') return false
   if (primaryShowsAdvance.value) return false
   return !draftInput.value.trim()
@@ -408,6 +524,7 @@ const feedbackEmphasisClass = computed(() => {
 })
 
 const mainActionLoading = computed(() => {
+  if (showScaffoldWorkbench.value) return scaffoldEngine.submitting
   const mode = pageModel.value.mainAction.mode
   if (mode === 'closure') return completing.value
   if (taskState.value === 'CHECK') return submittingCheckpoint.value
@@ -416,7 +533,12 @@ const mainActionLoading = computed(() => {
 })
 
 watch(
-  [task, () => pageModel.value.workbench.tutorAssist, () => pageModel.value.workbench.currentTask.currentAction],
+  [
+    task,
+    () => pageModel.value.workbench.tutorAssist,
+    () => pageModel.value.workbench.currentTask.currentAction,
+    showScaffoldWorkbench,
+  ],
   () => {
     if (!task.value) return
     aiTutorStore.setContext({
@@ -427,12 +549,40 @@ watch(
       phaseCode: pageModel.value.header.phaseCode || 'STRUCTURE',
       phaseLabel: pageModel.value.header.phaseDisplayZh || '',
       currentAction: pageModel.value.workbench.currentTask.currentAction,
-      floatingLabel: pageModel.value.workbench.tutorAssist.floatingLabel,
+      floatingLabel: showScaffoldWorkbench.value
+        ? '给我提示'
+        : pageModel.value.workbench.tutorAssist.floatingLabel,
       panelTitle: pageModel.value.workbench.tutorAssist.panelTitle,
-      quickQuestions: pageModel.value.workbench.tutorAssist.quickQuestions,
+      quickQuestions: showScaffoldWorkbench.value
+        ? (scaffoldEngine.stage?.workbench?.hintPrompts ?? pageModel.value.workbench.tutorAssist.quickQuestions)
+        : pageModel.value.workbench.tutorAssist.quickQuestions,
     })
   },
   { immediate: true }
+)
+
+watch(
+  showScaffoldWorkbench,
+  (v) => {
+    aiTutorStore.showTaskRunFloatingFab = v
+  },
+  { immediate: true }
+)
+
+watch(
+  () => scaffoldEngine.currentCard?.actionId,
+  () => {
+    engineFeedback.value = null
+  }
+)
+
+watch(
+  () => scaffoldEngine.scaffoldEngineComplete,
+  async (done, prev) => {
+    if (done && prev !== true && task.value?.taskId && store.sessionId) {
+      await loadScaffold(task.value.taskId)
+    }
+  }
 )
 
 function draftStorageKey(taskId: string) {
@@ -546,6 +696,7 @@ function resetInteractionDraft() {
   draftInput.value = ''
   structuredInputs.value = []
   latestFeedback.value = null
+  engineFeedback.value = null
 }
 
 function fillDraftInput(text: string) {
@@ -555,6 +706,15 @@ function fillDraftInput(text: string) {
 }
 
 function onStuckFromPanel() {
+  if (showScaffoldWorkbench.value) {
+    const hp = scaffoldEngine.stage?.workbench?.hintPrompts?.filter(Boolean) ?? []
+    if (hp.length) {
+      fillDraftInput(hp[0]!)
+      return
+    }
+    aiTutorStore.openPanel()
+    return
+  }
   const actions = pageModel.value.progressRail.stuckActions
   if (actions.length) {
     onStuckAction(actions[0]!)
@@ -830,6 +990,20 @@ async function handlePrimaryAction() {
 }
 
 async function onPrimaryBar() {
+  if (showScaffoldWorkbench.value) {
+    const text = draftInput.value.trim()
+    if (!text) return
+    const res = await scaffoldEngine.submit(text)
+    if (scaffoldEngine.error) {
+      showToast(scaffoldEngine.error)
+      return
+    }
+    if (res?.feedbackPayload) {
+      engineFeedback.value = mapEngineFeedbackPayloadToGuide(res.feedbackPayload)
+    }
+    draftInput.value = ''
+    return
+  }
   if (primaryShowsAdvance.value) {
     await onAdvanceDrivingSeat()
     return
@@ -837,13 +1011,18 @@ async function onPrimaryBar() {
   await handlePrimaryAction()
 }
 
+function activeFeedbackSurface() {
+  return showScaffoldWorkbench.value ? engineFeedback.value : latestFeedback.value
+}
+
 function handleFeedbackAction(actionId: string) {
+  const fb = activeFeedbackSurface()
   if (actionId === 'apply_suggestion') {
-    fillDraftInput(latestFeedback.value?.gap || latestFeedback.value?.nextStep || '')
+    fillDraftInput(fb?.gap || fb?.nextStep || '')
     return
   }
   if (actionId === 'restate') {
-    draftInput.value = latestFeedback.value?.nextRestateAsk || latestFeedback.value?.nextStep || ''
+    draftInput.value = fb?.nextRestateAsk || fb?.nextStep || ''
     return
   }
   if (actionId === 'show_example') {
@@ -853,5 +1032,9 @@ function handleFeedbackAction(actionId: string) {
 
 onMounted(() => {
   fetchTask()
+})
+
+onUnmounted(() => {
+  aiTutorStore.showTaskRunFloatingFab = false
 })
 </script>

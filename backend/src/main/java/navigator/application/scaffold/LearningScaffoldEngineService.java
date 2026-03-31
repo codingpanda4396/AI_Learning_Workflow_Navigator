@@ -8,6 +8,7 @@ import navigator.api.dto.scaffold.CompleteStructureStageResult;
 import navigator.api.dto.scaffold.LearningScaffoldActionResult;
 import navigator.api.dto.scaffold.ReflectionInsight;
 import navigator.api.dto.scaffold.ReflectionRecord;
+import navigator.api.dto.scaffold.StructuredScaffoldFeedbackPayload;
 import navigator.api.dto.scaffold.StageScaffold;
 import navigator.api.dto.scaffold.StructureSkeletonBlock;
 import navigator.api.dto.scaffold.StructureSkeletonRequest;
@@ -55,6 +56,7 @@ public class LearningScaffoldEngineService {
     private final ReflectionTutorComposer reflectionTutorComposer;
     private final ReflectionAssembler reflectionAssembler;
     private final StructureSkeletonComposer structureSkeletonComposer;
+    private final StageScaffoldWorkbenchComposer stageScaffoldWorkbenchComposer;
 
     public LearningScaffoldEngineService(TaskExecutionFlowService taskExecutionFlowService,
                                          InMemoryStore store,
@@ -69,7 +71,8 @@ public class LearningScaffoldEngineService {
                                          DfsBfsReflectionEvaluator dfsBfsReflectionEvaluator,
                                          ReflectionTutorComposer reflectionTutorComposer,
                                          ReflectionAssembler reflectionAssembler,
-                                         StructureSkeletonComposer structureSkeletonComposer) {
+                                         StructureSkeletonComposer structureSkeletonComposer,
+                                         StageScaffoldWorkbenchComposer stageScaffoldWorkbenchComposer) {
         this.taskExecutionFlowService = taskExecutionFlowService;
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
@@ -84,6 +87,7 @@ public class LearningScaffoldEngineService {
         this.reflectionTutorComposer = reflectionTutorComposer;
         this.reflectionAssembler = reflectionAssembler;
         this.structureSkeletonComposer = structureSkeletonComposer;
+        this.stageScaffoldWorkbenchComposer = stageScaffoldWorkbenchComposer;
     }
 
     public StageScaffold getStage(String sessionId, String taskId, String stageKeyParam) {
@@ -91,8 +95,8 @@ public class LearningScaffoldEngineService {
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
         taskExecutionFlowService.getScaffold(sessionId, taskId);
         KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
-        if (pack == null || !DfsBfsStructureValidator.PACK_ID.equals(pack.packId())) {
-            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎（需 DFS/BFS 知识点）");
+        if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎（需已注册的知识点包）");
         }
         TaskExecutionRuntime rt = requireRuntime(sessionId, taskId);
         ensureEngineState(rt.getScaffold());
@@ -108,7 +112,9 @@ public class LearningScaffoldEngineService {
         }
 
         persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
-        return mergeProgress(buildStageForKey(stageKey), eng);
+        StageScaffold stage = mergeProgress(buildStageForKey(stageKey), eng);
+        stage.setWorkbench(stageScaffoldWorkbenchComposer.composeWorkbench(pack.packId(), stage));
+        return stage;
     }
 
     public StructureSkeletonResult generateStructureSkeleton(String taskId, StructureSkeletonRequest request) {
@@ -117,7 +123,7 @@ public class LearningScaffoldEngineService {
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
         taskExecutionFlowService.getScaffold(sessionId, taskId);
         KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
-        if (pack == null || !DfsBfsStructureValidator.PACK_ID.equals(pack.packId())) {
+        if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
             throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎");
         }
         TaskExecutionRuntime rt = requireRuntime(sessionId, taskId);
@@ -167,7 +173,7 @@ public class LearningScaffoldEngineService {
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
         taskExecutionFlowService.getScaffold(sessionId, taskId);
         KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
-        if (pack == null || !DfsBfsStructureValidator.PACK_ID.equals(pack.packId())) {
+        if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
             throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎");
         }
         TaskExecutionRuntime rt = requireRuntime(sessionId, taskId);
@@ -212,7 +218,7 @@ public class LearningScaffoldEngineService {
         taskExecutionFlowService.getScaffold(sessionId, taskId);
 
         KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
-        if (pack == null || !DfsBfsStructureValidator.PACK_ID.equals(pack.packId())) {
+        if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
             throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎");
         }
 
@@ -329,6 +335,8 @@ public class LearningScaffoldEngineService {
             outRecord = eng.getReflectionRecord();
             outInsight = eng.getReflectionInsight();
         }
+        StructuredScaffoldFeedbackPayload feedbackPayload = ScaffoldStructuredFeedbackFactory.build(
+                passed, validation, tutor, trainingFeedback);
         return LearningScaffoldActionResult.builder()
                 .actionRuntime(ar)
                 .validation(validation)
@@ -344,6 +352,7 @@ public class LearningScaffoldEngineService {
                 .attemptNo(entry.getAttemptNo())
                 .runtimeStatus(entry.getRuntimeStatus())
                 .canProceed(tutor.isCanProceed())
+                .feedbackPayload(feedbackPayload)
                 .build();
     }
 

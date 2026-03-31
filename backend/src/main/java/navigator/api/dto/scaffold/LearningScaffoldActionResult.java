@@ -28,4 +28,7 @@ public class LearningScaffoldActionResult {
     private Boolean canProceed;
     private ReflectionRecord reflectionRecord;
     private ReflectionInsight reflectionInsight;
+
+    /** 结构化反馈（issue ≤3），供前端稳定渲染 */
+    private StructuredScaffoldFeedbackPayload feedbackPayload;
 }

@@ -48,6 +48,8 @@ const defaultContext = (): AiTutorContextState => ({
 
 export const useAiTutorStore = defineStore('aiTutor', () => {
   const visible = ref(false)
+  /** 任务执行页（如 STRUCTURE 骨架台）是否显示右下角导师浮球；与面板独立 */
+  const showTaskRunFloatingFab = ref(false)
   const messages = ref<AiTutorMessage[]>([])
   const context = ref<AiTutorContextState>(defaultContext())
   const lastBoundStepId = ref<string | null>(null)
@@ -268,6 +270,7 @@ export const useAiTutorStore = defineStore('aiTutor', () => {
 
   return {
     visible,
+    showTaskRunFloatingFab,
     messages,
     context,
     contextPayload,
