@@ -16,21 +16,8 @@
 
       <section v-else-if="task" class="pb-28">
         <div class="mx-auto space-y-5" :class="showScaffoldWorkbench ? 'max-w-4xl' : 'max-w-3xl'">
-          <StageWorkbenchHeader
-            v-if="showScaffoldWorkbench"
-            :topic-name="workbenchTopicName"
-            :cognitive-action="
-              pageModel.workbench.currentTask.coreActionLine ||
-              pageModel.workbench.currentTask.currentAction ||
-              ''
-            "
-            :stage-goal="pageModel.workbench.currentTask.objective || ''"
-            :emphasis-phase="pageModel.workbench.emphasisPhase"
-            :phase-progress="headerPhaseProgress"
-            :task-index-label="headerPhaseProgress.taskIndexLabel || ''"
-          />
           <TaskRunPhaseHeader
-            v-else
+            v-if="!showScaffoldWorkbench"
             :topic-name="workbenchTopicName"
             :phase-progress="headerPhaseProgress"
             :goal-line="phaseGoalLine"
@@ -39,37 +26,19 @@
 
           <div class="space-y-5" :data-phase="pageModel.workbench.emphasisPhase">
             <template v-if="showScaffoldWorkbench">
-              <MainTaskWorkbenchCard
-                :model="pageModel.workbench.currentTask"
-                :why-this-step="pageModel.workbench.whyThisStep"
-                :scaffold-product="pageModel.workbench.scaffoldProduct"
-                :hint-reveal="pageModel.workbench.hintReveal"
-                :guide-sections="pageModel.workbench.guideSections"
-                :emphasis-phase="pageModel.workbench.emphasisPhase"
-              />
-              <ScaffoldPromptPanel :workbench="scaffoldEngine.stage?.workbench" />
-              <p v-if="scaffoldEngine.loading" class="text-xs font-medium text-slate-500">加载脚手架…</p>
-              <p v-if="scaffoldEngine.error" class="text-sm text-red-700">{{ scaffoldEngine.error }}</p>
-              <TaskExpressionPanel
-                ref="expressionPanelRef"
-                :draft-value="draftInput"
-                :placeholder="pageModel.mainAction.inputPlaceholder || ''"
-                :placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
-                :sending="mainActionLoading"
-                :helper-text="pageModel.workbench.expressionLayout.helperText"
-                :low-friction-prompt="pageModel.workbench.expressionLayout.lowFrictionPrompt"
-                :structured-fields="pageModel.workbench.expressionLayout.fields"
-                :structured-inputs="structuredInputs"
-                :starter-chips="pageModel.mainAction.chips"
-                :emphasis-phase="pageModel.workbench.emphasisPhase"
-                :checkpoint-prompt="''"
-                :show-advance="false"
-                :micro-check-labels="microCheckLabels"
-                :checks="microChecks"
-                @update:draft-value="draftInput = $event"
-                @update:structured-inputs="structuredInputs = $event"
-                @update:checks="microChecks = $event"
-                @chip="fillDraftInput"
+              <ExecutionWorkbenchPage
+                :vm="executionWorkbenchVm"
+                :structure-error="structureSubmitError"
+                :structure-highlight="structureHighlight"
+                @append-explanation="appendExplanationFromScaffold"
+                @update-structure-ui="structureUi = $event"
+                @submit-structure="submitStructureSelection"
+                @pick-understanding="submitUnderstandingSelection"
+                @update-training-draft="draftInput = $event"
+                @submit-training="submitTrainingExpression"
+                @select-reflection-question="reflectionOutput.questionOptionId = $event"
+                @select-reflection-strategy="reflectionOutput.strategyId = $event"
+                @submit-reflection="submitReflectionOutput"
               />
             </template>
 
@@ -107,7 +76,7 @@
             </template>
 
             <TaskFeedbackDeck
-              v-if="taskFeedbackModel.visible"
+              v-if="!showScaffoldWorkbench && taskFeedbackModel.visible"
               :class="feedbackEmphasisClass"
               :model="taskFeedbackModel"
               :schema="pageModel.workbench.feedbackSchema"
@@ -122,6 +91,7 @@
         </div>
 
         <TaskRunDualActionBar
+          v-if="!showScaffoldWorkbench"
           :primary-label="dualPrimaryLabel"
           :secondary-label="dualSecondaryLabel"
           :primary-loading="mainActionLoading || advancing"
@@ -142,10 +112,23 @@ import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import MainTaskWorkbenchCard from '@/components/task-run/MainTaskWorkbenchCard.vue'
 import TaskExpressionPanel from '@/components/task-run/TaskExpressionPanel.vue'
+import ExecutionWorkbenchPage from '@/components/task-run/ExecutionWorkbenchPage.vue'
+import {
+  createEmptyDfsBfsWorkbenchUi,
+  deriveLegacySelection,
+  formatSkeletonForSubmit,
+  type DfsBfsWorkbenchHighlight,
+  type DfsBfsStructureWorkbenchUi,
+  validateDfsBfsWorkbenchUi,
+} from '@/constants/dfsBfsStructureSkeleton'
+import {
+  DFS_BFS_PHASE_INTRO,
+  DFS_BFS_REFLECTION_QUESTION,
+  DFS_BFS_REFLECTION_STRATEGIES,
+  DFS_BFS_UNDERSTANDING_QUESTIONS,
+} from '@/constants/phaseWorkbenchDfsBfs'
 
 type TaskExpressionPanelExposed = InstanceType<typeof TaskExpressionPanel>
-import ScaffoldPromptPanel from '@/components/task-run/ScaffoldPromptPanel.vue'
-import StageWorkbenchHeader from '@/components/task-run/StageWorkbenchHeader.vue'
 import TaskFeedbackDeck from '@/components/task-run/TaskFeedbackDeck.vue'
 import TaskRunDualActionBar from '@/components/task-run/TaskRunDualActionBar.vue'
 import TaskRunPhaseHeader from '@/components/task-run/TaskRunPhaseHeader.vue'
@@ -192,6 +175,14 @@ import {
 import { mapEngineFeedbackPayloadToGuide } from '@/utils/mapEngineScaffoldFeedback'
 import { buildTaskGuidedSteps, getCurrentGuidedStepId } from '@/utils/taskGuidedSteps'
 import type { ReflectionSummary } from '@/types/scaffoldEngine'
+import type {
+  ExecutionWorkbenchViewModel,
+  ExplanationBlock,
+  PhaseFeedbackPayload,
+  WorkbenchReflectionOutput,
+  WorkbenchRenderState,
+  WorkbenchStructureSubmitPayload,
+} from '@/types/phaseWorkbench'
 
 interface ChatTurn {
   role: 'USER' | 'ASSISTANT'
@@ -227,6 +218,18 @@ const draftInput = ref('')
 const structuredInputs = ref<string[]>([])
 const latestFeedback = ref<ExecutionGuideFeedbackModel | null>(null)
 const engineFeedback = ref<ExecutionGuideFeedbackModel | null>(null)
+const phaseRenderState = ref<WorkbenchRenderState>('PROMPT')
+const explanationBlocks = ref<ExplanationBlock[]>([])
+const phaseFeedback = ref<PhaseFeedbackPayload | null>(null)
+const structureUi = ref<DfsBfsStructureWorkbenchUi>(createEmptyDfsBfsWorkbenchUi())
+const structureSubmitError = ref('')
+const structureHighlight = ref<DfsBfsWorkbenchHighlight>(null)
+const understandingQuestionIndex = ref(0)
+const understandingSelectedId = ref<string | null>(null)
+const reflectionOutput = ref<WorkbenchReflectionOutput>({
+  questionOptionId: null,
+  strategyId: null,
+})
 const microChecks = ref<boolean[]>([false, false, false])
 const closureSummary = ref('')
 const closurePoint1 = ref('')
@@ -375,6 +378,58 @@ const pageModel = computed<ExecutionPageViewModel>(() => {
   }
   return base
 })
+
+const currentPhase = computed(() => pageModel.value.workbench.emphasisPhase)
+
+const scaffoldActions = computed(() => {
+  const blocks = scaffoldEngine.stage?.workbench?.promptScaffold?.blocks ?? []
+  return blocks
+    .filter((b) => b.id && b.title)
+    .map((b) => ({
+      id: b.id,
+      title: b.title,
+      prompt: b.prompt || '',
+    }))
+})
+
+const understandingQuestion = computed(() => {
+  return DFS_BFS_UNDERSTANDING_QUESTIONS[understandingQuestionIndex.value] ?? null
+})
+
+const reflectionSummaryText = computed(() => {
+  const r = scaffoldEngine.stage?.reflectionRecord
+  if (r?.futureStrategy?.trim()) return r.futureStrategy.trim()
+  const insight = scaffoldEngine.stage?.reflectionInsight
+  if (insight?.improvedAspects?.length) return insight.improvedAspects.join('；')
+  return '你已完成四阶段学习，请选择本轮最值得迁移的一条策略。'
+})
+
+const executionWorkbenchVm = computed<ExecutionWorkbenchViewModel>(() => ({
+  topicName: workbenchTopicName.value,
+  stageGoal: pageModel.value.workbench.currentTask.objective || pageModel.value.header.subtitle || '',
+  cognitiveAction:
+    pageModel.value.workbench.currentTask.coreActionLine ||
+    pageModel.value.workbench.currentTask.currentAction ||
+    '',
+  phase: currentPhase.value,
+  phaseProgress: headerPhaseProgress.value,
+  intro: DFS_BFS_PHASE_INTRO[currentPhase.value] || '按当前阶段完成一个主动作。',
+  renderState: phaseRenderState.value,
+  explanations: explanationBlocks.value,
+  scaffoldActions: scaffoldActions.value,
+  structureUi: structureUi.value,
+  understandingQuestion: understandingQuestion.value,
+  understandingSelectedId: understandingSelectedId.value,
+  trainingPrompt:
+    pageModel.value.workbench.expressionLayout.helperText || '请用自己的话完成当前表达任务。',
+  trainingDraft: draftInput.value,
+  reflectionSummary: reflectionSummaryText.value,
+  reflectionQuestion: DFS_BFS_REFLECTION_QUESTION,
+  reflectionStrategies: DFS_BFS_REFLECTION_STRATEGIES,
+  reflectionOutput: reflectionOutput.value,
+  feedback: phaseFeedback.value,
+  busy: scaffoldEngine.submitting || scaffoldEngine.loading,
+}))
 
 const EMPTY_TASK_FEEDBACK: ExecutionGuideFeedbackModel = {
   visible: false,
@@ -573,7 +628,97 @@ watch(
   () => scaffoldEngine.currentCard?.actionId,
   () => {
     engineFeedback.value = null
+    phaseFeedback.value = null
   }
+)
+
+function phaseSnapshotKey(taskId: string) {
+  return `task-workbench-snapshot-${taskId}`
+}
+
+function buildInitialExplanationBlocks(): ExplanationBlock[] {
+  const w = scaffoldEngine.stage?.workbench
+  if (!w) return []
+  const blocks: ExplanationBlock[] = []
+  const guide = w.llmGeneratedGuide?.trim() || w.currentTaskInstruction?.trim() || ''
+  if (guide) blocks.push({ id: 'intro', title: '阶段讲解', body: guide, tone: 'base' })
+  const micro = w.llmGeneratedMicroHint?.trim() || ''
+  if (micro) blocks.push({ id: 'micro', title: '关键提示', body: micro, tone: 'base' })
+  return blocks
+}
+
+function restoreWorkbenchSnapshot() {
+  const id = task.value?.taskId
+  if (!id || !showScaffoldWorkbench.value) return
+  const raw = localStorage.getItem(phaseSnapshotKey(id))
+  if (!raw) return
+  try {
+    const snap = JSON.parse(raw) as {
+      phase?: string
+      renderState?: WorkbenchRenderState
+      structureUi?: DfsBfsStructureWorkbenchUi
+      explanations?: ExplanationBlock[]
+      understandingSelectedId?: string | null
+      understandingQuestionIndex?: number
+      reflectionOutput?: WorkbenchReflectionOutput
+    }
+    if (snap.phase !== currentPhase.value) return
+    if (snap.renderState) phaseRenderState.value = snap.renderState
+    if (snap.structureUi) structureUi.value = snap.structureUi
+    if (snap.explanations?.length) explanationBlocks.value = snap.explanations
+    if (typeof snap.understandingQuestionIndex === 'number') {
+      understandingQuestionIndex.value = snap.understandingQuestionIndex
+    }
+    understandingSelectedId.value = snap.understandingSelectedId ?? null
+    if (snap.reflectionOutput) reflectionOutput.value = snap.reflectionOutput
+  } catch {
+    // ignore malformed snapshot
+  }
+}
+
+watch(
+  () => [showScaffoldWorkbench.value, scaffoldEngine.stage?.stageKey] as const,
+  ([enabled]) => {
+    if (!enabled) return
+    phaseRenderState.value = 'THINK'
+    phaseFeedback.value = null
+    structureSubmitError.value = ''
+    structureHighlight.value = null
+    understandingSelectedId.value = null
+    explanationBlocks.value = buildInitialExplanationBlocks()
+    restoreWorkbenchSnapshot()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => [
+    showScaffoldWorkbench.value,
+    task.value?.taskId,
+    currentPhase.value,
+    phaseRenderState.value,
+    structureUi.value,
+    explanationBlocks.value,
+    understandingQuestionIndex.value,
+    understandingSelectedId.value,
+    reflectionOutput.value,
+  ] as const,
+  ([enabled, taskId]) => {
+    if (!enabled || !taskId) return
+    localStorage.setItem(
+      phaseSnapshotKey(taskId),
+      JSON.stringify({
+        phase: currentPhase.value,
+        renderState: phaseRenderState.value,
+        structureUi: structureUi.value,
+        explanations: explanationBlocks.value.slice(-8),
+        understandingSelectedId: understandingSelectedId.value,
+        understandingQuestionIndex: understandingQuestionIndex.value,
+        reflectionOutput: reflectionOutput.value,
+      })
+    )
+  },
+  { deep: true }
 )
 
 watch(
@@ -705,14 +850,108 @@ function fillDraftInput(text: string) {
   draftInput.value = draftInput.value.trim() ? `${draftInput.value.trim()}\n${value}` : value
 }
 
+function appendExplanationFromScaffold(actionId: string) {
+  const action = scaffoldActions.value.find((a) => a.id === actionId)
+  if (!action) return
+  const body = action.prompt?.trim() || action.title
+  explanationBlocks.value.push({
+    id: `${actionId}-${Date.now()}`,
+    title: action.title,
+    body,
+    tone: 'scaffold',
+  })
+}
+
+async function submitStructureSelection(payload: WorkbenchStructureSubmitPayload) {
+  if (currentPhase.value !== 'STRUCTURE') return
+  structureUi.value = payload.ui
+  const check = validateDfsBfsWorkbenchUi(payload.ui)
+  if (!check.ok) {
+    structureSubmitError.value = check.message
+    structureHighlight.value = check.highlight
+    phaseRenderState.value = 'THINK'
+    return
+  }
+  structureSubmitError.value = ''
+  structureHighlight.value = null
+  phaseRenderState.value = 'OUTPUT'
+  const selection = deriveLegacySelection(payload.ui)
+  const submitText = formatSkeletonForSubmit(selection)
+  const res = await scaffoldEngine.submit(submitText)
+  if (scaffoldEngine.error) {
+    showToast(scaffoldEngine.error)
+    return
+  }
+  const mapped = mapEngineFeedbackPayloadToGuide(res?.feedbackPayload, 'STRUCTURE')
+  phaseFeedback.value = {
+    title: mapped?.title || '你可能混淆了',
+    tag: mapped?.errorTags?.[0] || '结构判断',
+    body: mapped?.gap || mapped?.mastered || '结构轮廓已提交。',
+    nextAction: mapped?.nextStep || '继续下一题或进入下一阶段。',
+  }
+  phaseRenderState.value = 'FEEDBACK'
+}
+
+async function submitUnderstandingSelection(optionId: string) {
+  if (currentPhase.value !== 'UNDERSTANDING') return
+  const q = understandingQuestion.value
+  if (!q) return
+  phaseRenderState.value = 'OUTPUT'
+  understandingSelectedId.value = optionId
+  const fb = q.feedbackByOption[optionId]
+  const text = `UNDERSTANDING:${q.id}:${optionId}`
+  const res = await scaffoldEngine.submit(text)
+  const mapped = mapEngineFeedbackPayloadToGuide(res?.feedbackPayload, 'UNDERSTANDING')
+  phaseFeedback.value = {
+    title: mapped?.title || '机制理解提示',
+    tag: fb?.tag || mapped?.errorTags?.[0] || '',
+    body: fb?.body || mapped?.gap || mapped?.mastered || '已记录你的机制判断。',
+    nextAction: mapped?.nextStep || '继续机制判断。',
+  }
+  phaseRenderState.value = 'FEEDBACK'
+}
+
+async function submitTrainingExpression() {
+  if (currentPhase.value !== 'TRAINING') return
+  const text = draftInput.value.trim()
+  if (!text) return
+  phaseRenderState.value = 'OUTPUT'
+  const res = await scaffoldEngine.submit(text)
+  if (scaffoldEngine.error) {
+    showToast(scaffoldEngine.error)
+    return
+  }
+  const mapped = mapEngineFeedbackPayloadToGuide(res?.feedbackPayload, 'TRAINING')
+  phaseFeedback.value = {
+    title: mapped?.title || '表达改进建议',
+    tag: mapped?.errorTags?.[0] || '',
+    body: mapped?.gap || mapped?.mastered || '已收到你的表达。',
+    nextAction: mapped?.nextStep || '按建议改一版。',
+  }
+  phaseRenderState.value = 'FEEDBACK'
+}
+
+async function submitReflectionOutput() {
+  if (currentPhase.value !== 'REFLECTION') return
+  if (!reflectionOutput.value.questionOptionId || !reflectionOutput.value.strategyId) return
+  phaseRenderState.value = 'OUTPUT'
+  const text =
+    `REFLECTION:Q=${reflectionOutput.value.questionOptionId};` +
+    `S=${reflectionOutput.value.strategyId}`
+  const res = await scaffoldEngine.submit(text)
+  const mapped = mapEngineFeedbackPayloadToGuide(res?.feedbackPayload, 'REFLECTION')
+  phaseFeedback.value = {
+    title: mapped?.title || '学习总结',
+    body: mapped?.mastered || mapped?.gap || '反思已记录，保留这条迁移策略。',
+    nextAction: mapped?.nextStep || '可以进入下一任务。',
+  }
+  phaseRenderState.value = 'FEEDBACK'
+}
+
 function onStuckFromPanel() {
   if (showScaffoldWorkbench.value) {
-    const hp = scaffoldEngine.stage?.workbench?.hintPrompts?.filter(Boolean) ?? []
-    if (hp.length) {
-      fillDraftInput(hp[0]!)
-      return
-    }
-    aiTutorStore.openPanel()
+    const action = scaffoldActions.value[0]
+    if (action) appendExplanationFromScaffold(action.id)
     return
   }
   const actions = pageModel.value.progressRail.stuckActions

@@ -1,0 +1,489 @@
+---
+alwaysApply: false
+---
+
+# DFS / BFS 执行页内容配置初稿
+
+## 1. 知识点标识
+- knowledgeKey: `ds_dfs_bfs`
+- knowledgeLabel: `DFS / BFS`
+
+---
+
+## 2. STRUCTURE 阶段
+
+### 2.1 阶段标题
+结构建立
+
+### 2.2 阶段目标
+先知道 DFS 是做什么的，不急着记代码。
+
+### 2.3 阶段引导文案
+> 先不要急着背递归写法，先搞清楚 DFS 到底是在做什么。
+
+### 2.4 explanation block（默认）
+> DFS（深度优先搜索）是一种在树或图中进行搜索的方式。  
+> 它的特点不是“把所有点都扫一遍”，而是优先沿着一条路径不断深入，走不下去时再退回来继续找。  
+> 所以它更像“先把一条路走到底，再回来换路”。
+
+### 2.5 questions
+
+#### q_structure_1
+**stem**  
+下面哪个描述更接近 DFS 的本质？
+
+**options**
+- A：一层一层向外扩展
+- B：沿着一条路径不断深入，再回退
+- C：随机访问节点
+
+**expected**
+- B
+
+**feedback**
+- A：
+  - title: 这更像 BFS
+  - body: 你把“层次扩展”当成了 DFS 的特征。DFS 的核心不是先看同一层，而是先沿着一条路径深入。
+  - misconceptionTag: DFS_BFS_CONFUSION
+- B：
+  - title: 对，就是“先深入，再回退”
+  - body: 这句话已经抓住了 DFS 的核心轮廓。当前阶段先记住这个路径感，比记代码更重要。
+  - misconceptionTag: null
+- C：
+  - title: DFS 不是随机搜索
+  - body: DFS 虽然会遍历不同路径，但它并不是随意访问，而是有明确的“优先深入”策略。
+  - misconceptionTag: RANDOM_SEARCH_MISUNDERSTANDING
+
+#### q_structure_2
+**stem**  
+如果用生活中的场景来类比，DFS 更像：
+
+**options**
+- A：先把一层楼所有房间都看完，再去下一层
+- B：先沿着一条走廊一直走到底，再回头看岔路
+- C：几个人同时分头把所有路都走完
+
+**expected**
+- B
+
+**feedback**
+- A：
+  - title: 这是“按层扩展”的思路
+  - body: 这种方式更接近 BFS。DFS 更强调先抓住一条路径走深，而不是先照顾同一层的所有位置。
+  - misconceptionTag: LEVEL_ORDER_CONFUSION
+- B：
+  - title: 这个类比很贴近 DFS
+  - body: “一条走廊走到底，再回头看岔路”很好地体现了 DFS 的深入和回退。
+  - misconceptionTag: null
+- C：
+  - title: 这不是 DFS 的单路径推进感
+  - body: DFS 是一步一步沿着当前路径深入，而不是同时展开所有路径。
+  - misconceptionTag: PARALLEL_EXPANSION_CONFUSION
+
+#### q_structure_3
+**stem**  
+DFS 和 BFS 在当前阶段最该先区分的是：
+
+**options**
+- A：一个用递归，一个不用递归
+- B：一个先深入路径，一个先扩展层次
+- C：一个时间复杂度更高
+
+**expected**
+- B
+
+**feedback**
+- A：
+  - title: 你抓到了表面实现，但还没抓到本质
+  - body: 递归只是常见写法，不是 DFS 的本质。真正重要的是搜索策略的不同。
+  - misconceptionTag: IMPLEMENTATION_OVER_ESSENCE
+- B：
+  - title: 对，先抓“搜索策略差异”
+  - body: 当前阶段最重要的是建立轮廓：DFS 是路径优先，BFS 是层次优先。
+  - misconceptionTag: null
+- C：
+  - title: 复杂度不是当前阶段的重点
+  - body: 现在先建立“它们怎么搜索”的直观模型，再去看复杂度才更容易不混乱。
+  - misconceptionTag: PREMATURE_COMPLEXITY
+
+### 2.6 scaffold prompts
+
+#### PROBLEM_VIEW
+label: 从“解决什么问题”理解  
+prompt:
+```text
+请从“DFS 要解决什么问题”的角度解释 DFS。
+要求：
+1. 不讲代码
+2. 不讲递归细节
+3. 用初学者能懂的语言
+4. 控制在 120 字以内
+LIFE_ANALOGY
+
+label: 用生活类比解释
+prompt:
+
+请用生活中的场景类比 DFS。
+要求：
+1. 类比中必须体现“先深入，再回退”
+2. 不超过 100 字
+3. 不要堆术语
+COMPARE_BFS
+
+label: 只讲 DFS 和 BFS 的区别
+prompt:
+
+请只从“搜索方式”的角度解释 DFS 和 BFS 的区别。
+要求：
+1. 不讲代码实现
+2. 不讲复杂度
+3. 控制在 100 字以内
+SIMPLE_EXAMPLE
+
+label: 给一个最简单的小例子
+prompt:
+
+请给一个非常简单的树或图例子，帮助初学者理解 DFS。
+要求：
+1. 节点数不超过 5 个
+2. 要体现“先深入，再回退”
+3. 不写代码
+3. UNDERSTANDING 阶段
+3.1 阶段标题
+
+机制理解
+
+3.2 阶段目标
+
+知道 DFS 为什么会“深入”和“回退”。
+
+3.3 阶段引导文案
+
+现在不只要知道 DFS 是什么，还要知道它为什么会这样工作。
+
+3.4 explanation block（默认）
+
+DFS 每次都会优先尝试当前节点的下一个未访问邻居。
+如果一条路径无法继续，它就必须回到上一个还有其他分支的位置，这就是回溯。
+如果用递归实现，这种“深入—返回—继续尝试”的过程会自然地映射到函数调用栈。
+
+3.5 questions
+q_understanding_1
+
+stem
+DFS 为什么会回溯？
+
+options
+
+A：因为队列为空
+B：因为当前路径走不下去了
+C：因为它优先访问浅层节点
+
+expected
+
+B
+
+feedback
+
+A：
+title: 你把 BFS 的实现影子带进来了
+body: 队列通常对应 BFS。DFS 回溯的根本原因不是队列，而是当前路径已经不能继续延伸。
+misconceptionTag: BFS_STRUCTURE_CONFUSION
+B：
+title: 对，回溯来自“路径走不通”
+body: 这已经抓住了 DFS 的行为机制：当前路走到头，就返回上一个分叉点。
+misconceptionTag: null
+C：
+title: 这和 DFS 的策略正好相反
+body: DFS 不是优先浅层，而是优先深入；回溯发生在深入失败之后。
+misconceptionTag: SHALLOW_FIRST_CONFUSION
+q_understanding_2
+
+stem
+为什么递归很适合表达 DFS？
+
+options
+
+A：因为递归一定更快
+B：因为调用栈天然匹配“深入—返回”的过程
+C：因为递归代码更短，更容易记
+
+expected
+
+B
+
+feedback
+
+A：
+title: “更快”不是关键原因
+body: 递归适合 DFS，不是因为速度，而是因为结构上刚好映射了深入和返回。
+misconceptionTag: PERFORMANCE_MISUNDERSTANDING
+B：
+title: 对，结构匹配才是关键
+body: 每深入一层递归，就像路径再向下走一步；返回时，就像回到上一个节点继续探索。
+misconceptionTag: null
+C：
+title: 这是表面优势，不是本质原因
+body: 代码短只是现象。真正关键的是调用栈自然保存了“从哪里回来”的信息。
+misconceptionTag: SURFACE_ADVANTAGE_CONFUSION
+q_understanding_3
+
+stem
+DFS 和 BFS 的根本区别更接近下面哪一种？
+
+options
+
+A：一个用栈，一个用队列
+B：一个先深入路径，一个先扩展层次
+C：一个能遍历图，一个不能
+
+expected
+
+B
+
+feedback
+
+A：
+title: 这是实现层差异，不是最根本的区别
+body: 栈和队列是外在实现，真正决定行为的是搜索策略：路径优先还是层次优先。
+misconceptionTag: IMPLEMENTATION_OVER_STRATEGY
+B：
+title: 对，策略差异才是根本
+body: 先抓这个本质，再去理解为什么会用栈或队列，会更清楚。
+misconceptionTag: null
+C：
+title: 两者都可以遍历图
+body: 它们的差异不在“能不能遍历”，而在“如何推进遍历”。
+misconceptionTag: CAPABILITY_CONFUSION
+3.6 scaffold prompts
+WHY_BACKTRACK
+
+label: 解释为什么会回溯
+prompt:
+
+请解释 DFS 为什么会回溯。
+要求：
+1. 用“路径走不下去”来组织解释
+2. 不直接写代码
+3. 不超过 120 字
+CALL_STACK_VIEW
+
+label: 从调用栈角度解释
+prompt:
+
+请从函数调用栈的角度解释 DFS 为什么天然适合递归。
+要求：
+1. 重点解释“进入、返回、继续尝试”
+2. 不贴代码
+3. 语言适合初学者
+COMPARE_MECHANISM
+
+label: 对比 DFS / BFS 的机制
+prompt:
+
+请从“搜索机制”的角度比较 DFS 和 BFS。
+要求：
+1. 不要只说栈和队列
+2. 要强调“路径优先”和“层次优先”
+3. 控制在 120 字以内
+GRAPH_DEMO
+
+label: 给一个小图演示
+prompt:
+
+请用一个很小的图或树示例，演示 DFS 的搜索过程。
+要求：
+1. 节点数不超过 6 个
+2. 明确体现“深入”和“回退”
+3. 不写完整代码
+4. TRAINING 阶段
+4.1 阶段标题
+
+表达训练
+
+4.2 阶段目标
+
+把理解变成你自己的话。
+
+4.3 阶段引导文案
+
+现在轮到你来讲。能讲清楚，才说明你真的懂了。
+
+4.4 tasks
+t_training_1
+
+title: 一句话解释
+instruction:
+
+请你用一句话解释 DFS，像讲给刚学数据结构的同学听。
+不要背教材定义。
+
+t_training_2
+
+title: 对比解释
+instruction:
+
+请你用 2~3 句话说明 DFS 和 BFS 的核心区别。
+尽量说“本质区别”，不要只说“一个用栈一个用队列”。
+
+t_training_3
+
+title: 原因解释
+instruction:
+
+请解释 DFS 为什么会回溯。
+不要只写“因为递归”，而要说明路径层面的原因。
+
+4.5 training feedback rubric
+
+系统反馈重点看：
+
+是否抓住“先深入，再回退”
+是否把“机制”讲清楚
+是否把“实现形式”和“本质”混淆
+是否具备对比表达能力
+4.6 scaffold prompts
+ONE_SENTENCE_TEMPLATE
+
+label: 给我一句话模板
+prompt:
+
+请给我一个适合初学者的一句话表达模板，用于解释 DFS。
+要求：
+1. 语言自然
+2. 不像教材定义
+3. 必须体现“先深入，再回退”
+COMPARE_TEMPLATE
+
+label: 给我一个对比框架
+prompt:
+
+请给我一个 3 句式表达框架，用来说明 DFS 和 BFS 的区别。
+要求：
+1. 第一句说共同点
+2. 第二句说 DFS
+3. 第三句说 BFS
+FEYNMAN_REWRITE
+
+label: 用费曼风格重讲
+prompt:
+
+请把 DFS 用费曼风格讲给一个刚入门的数据结构学生。
+要求：
+1. 像在口头解释
+2. 不要堆术语
+3. 重点突出“先深入，再回退”
+CHECK_TERMS
+
+label: 检查我是不是只会背术语
+prompt:
+
+请帮我检查下面这段 DFS 表达是否只是堆术语，没有讲清本质。
+要求：
+1. 指出是否讲清“路径优先”
+2. 指出是否解释了“回退”
+3. 给出简短修改建议
+5. REFLECTION 阶段
+5.1 阶段标题
+
+反思收口
+
+5.2 阶段目标
+
+知道自己错在哪，下次怎么更快学会。
+
+5.3 阶段引导文案
+
+最后一步，不是继续学新东西，而是收住这次学习的收获和误区。
+
+5.4 system summary template
+
+默认总结结构：
+
+你已经掌握了什么
+你最容易混淆的地方是什么
+你以后遇到类似知识点时应该先抓什么
+
+示例：
+
+你已经掌握了 DFS 的核心轮廓：先沿路径深入，再在走不通时回退。
+你最容易出现的问题是：把“实现形式”和“本质机制”混在一起。
+下次学习类似算法时，可以先抓三件事：它解决什么问题、它如何推进、它为什么这样推进。
+
+5.5 questions
+q_reflection_1
+
+stem
+你觉得自己刚才最容易混淆的是哪一点？
+
+options
+
+A：DFS 和 BFS 的策略区别
+B：DFS 为什么会回溯
+C：递归和 DFS 的关系
+q_reflection_2
+
+stem
+这种混淆更像是因为：
+
+options
+
+A：我记了表面术语，但没抓本质
+B：我没背代码
+C：我只是粗心
+
+建议目标
+
+A
+q_reflection_3
+
+stem
+下次再学类似算法时，你最该先抓住什么？
+
+options
+
+A：先背模板代码
+B：先搞清楚“它解决什么问题、如何推进、为什么这样推进”
+C：先记复杂度
+
+建议目标
+
+B
+5.6 scaffold prompts
+LEARN_SUMMARY
+
+label: 帮我总结这次收获
+prompt:
+
+请帮我总结这次关于 DFS 的学习收获。
+要求：
+1. 不超过 120 字
+2. 要包括“我已经懂了什么”和“我还容易错什么”
+COMMON_MISTAKES
+
+label: 帮我提炼常见误区
+prompt:
+
+请总结初学者学习 DFS 时最常见的 3 个误区。
+要求：
+1. 每条都要简短
+2. 要有一句避免建议
+REVIEW_CARD
+
+label: 生成复习卡片
+prompt:
+
+请把 DFS 的核心理解整理成一张简短复习卡片。
+要求：
+1. 不超过 5 条
+2. 适合考前快速回顾
+TRANSFER_FRAMEWORK
+
+label: 提炼可迁移框架
+prompt:
+
+请基于这次 DFS 学习，提炼一个以后学习算法概念都能复用的理解框架。
+要求：
+1. 结构清晰
+2. 不超过 4 条
+3. 能迁移到其他知识点

@@ -30,13 +30,13 @@ export const AUTH_COPY = {
 
 export const GOAL_COPY = {
   eyebrow: '学习入口',
-  title: '开始这轮 AI 学习流程',
-  subtitle: '先选主题，下一步进入诊断定位。',
+  title: '开始导航',
+  subtitle: '先选主题后定位',
   flowTitle: '当前流程',
   flowSteps: ['目标', '诊断', '规划', '执行', '报告'],
-  continueTitle: '继续上次进度',
+  continueTitle: '继续上次学习',
   continueEmpty: '还没有上次进度',
-  continueEmptyHint: '开始后，这里会保留最近一轮。',
+  continueEmptyHint: '开始后，这里会保留最近一轮。',  
   continueLoginTitle: '登录后可继续上次学习',
   continueLoginHint: '学习记录会自动保留在账号里。',
   continueCardHint: '辅助入口',
@@ -52,7 +52,7 @@ export const GOAL_COPY = {
   demoHint: '当前每科开放 1 个演示主题',
   representativePoints: '本轮可选方向',
   continueCta: '继续学习',
-  noProgressBody: '这次开始后，这里会保留你的最近一轮学习。',
+  noProgressBody: '',
   loginCta: '登录',
   comingSoon: '即将开放',
   transition: '正在进入下一步…',
@@ -85,9 +85,9 @@ export const DIAGNOSIS_COPY = {
 } as const
 
 export const PLAN_COPY = {
-  loading: '正在整理这轮路径...',
+  loading: '正在加载路径...',
   reload: '重新加载',
-  whyFirst: '为什么从这里开始',
+  whyFirst: '为什么这么规划',
   currentAdvice: '当前建议',
 } as const
 

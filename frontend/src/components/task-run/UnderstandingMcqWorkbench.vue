@@ -1,0 +1,42 @@
+<template>
+  <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">机制选择题</p>
+    <p class="mt-1 text-base font-semibold text-slate-900">{{ question.prompt }}</p>
+    <div class="mt-3 space-y-2">
+      <button
+        v-for="o in question.options"
+        :key="o.id"
+        type="button"
+        class="w-full rounded-xl border px-3 py-2 text-left text-sm font-medium transition"
+        :class="btnClass(o.id)"
+        :disabled="locked || busy"
+        @click="$emit('pick', o.id)"
+      >
+        {{ o.id }}. {{ o.label }}
+      </button>
+    </div>
+  </section>
+</template>
+
+<script setup lang="ts">
+import type { UnderstandingQuestion } from '@/types/phaseWorkbench'
+
+const props = withDefaults(
+  defineProps<{
+    question: UnderstandingQuestion
+    selectedOptionId: string | null
+    locked: boolean
+    busy?: boolean
+  }>(),
+  { busy: false }
+)
+
+defineEmits<{
+  pick: [optionId: string]
+}>()
+
+function btnClass(id: string) {
+  if (props.selectedOptionId === id) return 'border-primary bg-primary/[0.08] text-slate-900'
+  return 'border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300'
+}
+</script>

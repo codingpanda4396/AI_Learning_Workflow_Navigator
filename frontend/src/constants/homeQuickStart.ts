@@ -209,6 +209,19 @@ const TOPICS: Record<string, HomeTopic> = {
 
 export const HOME_SUBJECTS: HomeSubject[] = [
   {
+    key: 'data-structure',
+    label: '数据结构',
+    description: '围绕做题场景，连接结构和判断线索。',
+    cardHint: 'DFS 与 BFS / 堆与优先队列 / 并查集',
+    topicKeys: [
+      'ds_dfs_bfs',
+      'ds_heap',
+      'ds_union_find',
+      'ds_topological_sort',
+      'ds_binary_tree',
+    ],
+  },
+  {
     key: 'operating-system',
     label: '操作系统',
     description: '围绕进程、内存和调度，先搭整体框架。',
@@ -232,19 +245,6 @@ export const HOME_SUBJECTS: HomeSubject[] = [
       'net_congestion_control',
       'net_http_caching',
       'net_routing',
-    ],
-  },
-  {
-    key: 'data-structure',
-    label: '数据结构',
-    description: '围绕做题场景，连接结构和判断线索。',
-    cardHint: 'DFS 与 BFS / 堆与优先队列 / 并查集',
-    topicKeys: [
-      'ds_dfs_bfs',
-      'ds_heap',
-      'ds_union_find',
-      'ds_topological_sort',
-      'ds_binary_tree',
     ],
   },
   {
