@@ -32,17 +32,23 @@ public class LlmProperties {
     /**
      * Max tokens for regular tutor chat to keep replies concise and fast.
      */
-    private Integer chatMaxTokens = 220;
+    private Integer chatMaxTokens = 512;
 
     /**
      * Max tokens for streaming tutor chat.
      */
-    private Integer streamMaxTokens = 220;
+    private Integer streamMaxTokens = 512;
 
     /**
-     * Max tokens for structured tutor feedback.
+     * Max tokens for structured tutor feedback (JSON).
      */
-    private Integer feedbackMaxTokens = 180;
+    private Integer feedbackMaxTokens = 320;
+
+    /**
+     * Max tokens for scaffold JSON generation (workbench soft content, structure skeleton).
+     * Needs to be higher because the output is a multi-field JSON object.
+     */
+    private Integer scaffoldMaxTokens = 800;
 
     /** HTTP connect timeout in milliseconds. */
     private int connectTimeoutMs = 3000;

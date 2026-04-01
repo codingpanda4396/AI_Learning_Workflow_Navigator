@@ -114,6 +114,11 @@ class AiTutorServiceImplStreamingTest {
         }
 
         @Override
+        public String chatForScaffold(String systemPrompt, String userPrompt) {
+            return "unused";
+        }
+
+        @Override
         public boolean isLiveProviderReady() {
             return true;
         }

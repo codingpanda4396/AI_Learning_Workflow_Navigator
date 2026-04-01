@@ -54,6 +54,7 @@ import ErrorState from '@/components/ui/ErrorState.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import { getErrorMessage } from '@/api/request'
+import { postCompleteStructureStage } from '@/api/learningScaffold'
 import { getCurrentTask, getTaskScaffold } from '@/api/task'
 import { supportsLearningScaffoldEngine } from '@/constants/learningScaffoldPack'
 import { TASKRUN_COPY } from '@/constants/uiCopy'
@@ -239,6 +240,12 @@ async function submitStructureToBackend() {
     if (!structureState.completedQuestionIds.includes(q.id)) {
       structureState.completedQuestionIds.push(q.id)
     }
+  }
+  if (task.value && store.sessionId) {
+    await postCompleteStructureStage(task.value.taskId, {
+      sessionId: store.sessionId,
+    })
+    await scaffoldEngine.loadStage()
   }
 }
 

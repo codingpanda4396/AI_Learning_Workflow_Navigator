@@ -76,7 +76,11 @@ export function useLearningScaffoldEngine(opts: {
         userInput,
       })
       lastResult.value = res
-      stage.value = await getLearningScaffoldStage(tid, sid)
+
+      const stageChanged = res.stageComplete || (res.stageKey && res.stageKey !== sk)
+      if (stageChanged) {
+        stage.value = await getLearningScaffoldStage(tid, sid)
+      }
       return res
     } catch (e) {
       error.value = e instanceof Error ? e.message : '提交失败'

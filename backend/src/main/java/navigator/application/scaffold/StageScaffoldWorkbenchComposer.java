@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -33,6 +34,8 @@ public class StageScaffoldWorkbenchComposer {
 
     private static final int MAX_SOFT_LEN = 480;
     private static final int MAX_BLOCK_PROMPT_LEN = 320;
+
+    private final ConcurrentHashMap<String, LlmSoftWorkbench> softContentCache = new ConcurrentHashMap<>();
 
     private final MockLlmGateway mockLlmGateway;
     private final OpenAiCompatibleLlmGateway openAiCompatibleLlmGateway;
@@ -230,41 +233,60 @@ public class StageScaffoldWorkbenchComposer {
     }
 
     private LlmSoftWorkbench fetchSoftContent(String packId, String stageKey, LearningActionCard card) {
+        String cacheKey = packId + "::" + stageKey + "::" + card.getActionId();
+        LlmSoftWorkbench cached = softContentCache.get(cacheKey);
+        if (cached != null) {
+            log.debug("workbench soft content: cache hit key={}", cacheKey);
+            return cached;
+        }
+
         String system = """
-                你是学习脚手架文案生成器。只输出一个 JSON 对象，不要 Markdown。
+                你是学习脚手架文案生成器，帮助学生在「DFS/BFS 图搜索」学习中完成当前认知动作。
+                只输出一个 JSON 对象，不要 Markdown 代码块，不要额外说明文字。
                 字段与要求：
-                - cognitiveAction: 字符串，5～12 字，面向动作，不要空泛
-                - llmGeneratedGuide: 字符串，1～2 句，告知用户当下要完成的认知动作（不要给标准答案）
+                - cognitiveAction: 字符串，5～12 字，面向当前动作卡的具体认知任务
+                - llmGeneratedGuide: 字符串，1～2 句，告知用户当下要完成什么（不要给标准答案）
                 - llmGeneratedMicroHint: 字符串，一句，最短起步提示
                 - llmGeneratedExampleBoundary: 字符串，一句，说明例子边界（不要直接给解题答案）
-                - starterPrompts: 字符串数组，2～4 条，可点击开头的短提示（不完整答案）
+                - starterPrompts: 字符串数组，2～4 条，可点击的短句引导（不是完整答案）
                 - hintPrompts: 字符串数组，1～2 条，卡住时可用的轻量提示
-                - blockPrompt: 字符串，用来作为主输入区上方的引导语（可与 systemPrompt 呼应，仍禁止给最终答案）
+                - blockPrompt: 字符串，主输入区上方的引导语（禁止给最终答案）
                 - placeholder: 字符串，输入框占位示例（示意句式，不要完整范例答案）
                 """;
 
+        String stageUpper = stageKey.toUpperCase(Locale.ROOT);
+        String stageDescription;
+        if (stageUpper.contains("STRUCTURE")) {
+            stageDescription = "当前处于「结构建立」阶段：学生需要把 DFS/BFS 放到知识图谱中，明确前置概念、位置和边界。";
+        } else if (stageUpper.contains("UNDERSTANDING")) {
+            stageDescription = "当前处于「机制理解」阶段：学生需要用自己的话说清 DFS/BFS 的推进过程（如回溯、分层扩展）。";
+        } else if (stageUpper.contains("TRAINING")) {
+            stageDescription = "当前处于「迁移训练」阶段：学生需要把理解转化为因果表达（如 BFS 为什么能找最短路径）。";
+        } else if (stageUpper.contains("REFLECTION")) {
+            stageDescription = "当前处于「反思沉淀」阶段：学生回顾学到了什么、哪些策略有效。";
+        } else {
+            stageDescription = "";
+        }
+
         String user = """
-                packId=%s
-                stageKey=%s
-                actionId=%s
-                cardTitle=%s
-                cardGoal=%s
-                cardInstructions=%s
-                systemPrompt=%s
-                allowedPrompts=%s
+                学习主题：DFS（深度优先搜索）与 BFS（广度优先搜索）
+                %s
+                当前动作卡：%s
+                动作目标：%s
+                具体指示：%s
+                允许的思考角度：%s
+                请根据以上信息生成 JSON。
                 """.formatted(
-                packId,
-                stageKey,
-                card.getActionId(),
+                stageDescription,
                 nz(card.getTitle()),
                 nz(card.getGoal()),
                 nz(card.getInstructions()),
-                nz(card.getSystemPrompt()),
-                card.getAllowedPrompts() != null ? String.join(" | ", card.getAllowedPrompts()) : "");
+                card.getAllowedPrompts() != null ? String.join(" | ", card.getAllowedPrompts()) : "无特别限制");
 
         String raw = callLlm(system, user);
         LlmSoftWorkbench parsed = parseSoftJson(raw);
         if (parsed != null) {
+            softContentCache.put(cacheKey, parsed);
             return parsed;
         }
         log.debug("workbench soft content: parse failed, using card-only fallback");
@@ -274,7 +296,7 @@ public class StageScaffoldWorkbenchComposer {
     private String callLlm(String system, String user) {
         if (llmProperties != null && llmProperties.isEnabled()) {
             try {
-                return openAiCompatibleLlmGateway.generateReply(system, user);
+                return openAiCompatibleLlmGateway.generateScaffoldReply(system, user);
             } catch (Exception ex) {
                 log.warn("workbench LLM failed: {} — {}", ex.getClass().getSimpleName(), ex.getMessage());
                 return mockLlmGateway.generateReply(system, user);

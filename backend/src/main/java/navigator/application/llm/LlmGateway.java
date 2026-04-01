@@ -11,4 +11,12 @@ public interface LlmGateway {
      * @return 助手回复正文
      */
     String generateReply(String systemHint, String userContent);
+
+    /**
+     * 脚手架 JSON 生成专用：使用更高的 max_tokens 避免 JSON 截断。
+     * 默认实现委托到 {@link #generateReply}。
+     */
+    default String generateScaffoldReply(String systemHint, String userContent) {
+        return generateReply(systemHint, userContent);
+    }
 }

@@ -31,6 +31,10 @@ navigator:
     baseUrl: ${NAVIGATOR_LLM_BASE_URL:https://api.openai.com}
     apiKey: ${NAVIGATOR_LLM_API_KEY:}
     model: ${NAVIGATOR_LLM_MODEL:gpt-4.1-mini}
+    chatMaxTokens: ${NAVIGATOR_LLM_CHAT_MAX_TOKENS:512}
+    streamMaxTokens: ${NAVIGATOR_LLM_STREAM_MAX_TOKENS:512}
+    feedbackMaxTokens: ${NAVIGATOR_LLM_FEEDBACK_MAX_TOKENS:320}
+    scaffoldMaxTokens: ${NAVIGATOR_LLM_SCAFFOLD_MAX_TOKENS:800}
     connectTimeoutMs: ${NAVIGATOR_LLM_CONNECT_TIMEOUT_MS:3000}
     timeoutMs: ${NAVIGATOR_LLM_TIMEOUT_MS:60000}
     feedbackTimeoutMs: ${NAVIGATOR_LLM_FEEDBACK_TIMEOUT_MS:60000}

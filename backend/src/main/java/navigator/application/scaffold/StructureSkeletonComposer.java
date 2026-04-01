@@ -59,7 +59,7 @@ public class StructureSkeletonComposer {
     private String callLlm(String system, String user) {
         if (llmProperties != null && llmProperties.isEnabled()) {
             try {
-                return openAiCompatibleLlmGateway.generateReply(system, user);
+                return openAiCompatibleLlmGateway.generateScaffoldReply(system, user);
             } catch (Exception ex) {
                 log.warn("structure skeleton LLM failed: {} — {}", ex.getClass().getSimpleName(), ex.getMessage());
                 return mockLlmGateway.generateReply(system, user);

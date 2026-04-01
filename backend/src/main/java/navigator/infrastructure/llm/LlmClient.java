@@ -19,9 +19,14 @@ public interface LlmClient {
     Flux<String> chatStream(String systemPrompt, String userPrompt);
 
     /**
-     * 反馈同步路径：固定短读超时（2s），避免用户等待抖动。
+     * 反馈同步路径：固定短读超时，避免用户等待抖动。
      */
     String chatForFeedback(String systemPrompt, String userPrompt);
+
+    /**
+     * 脚手架 JSON 生成路径：使用更高的 max_tokens 以避免 JSON 截断。
+     */
+    String chatForScaffold(String systemPrompt, String userPrompt);
 
     /** 是否应尝试调用真实供应商（启用且 apiKey 非空）。 */
     boolean isLiveProviderReady();

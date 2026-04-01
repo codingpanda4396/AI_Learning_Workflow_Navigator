@@ -100,6 +100,16 @@ public class OpenAiCompatibleLlmClientAdapter implements LlmClient {
     }
 
     @Override
+    public String chatForScaffold(String systemPrompt, String userPrompt) {
+        return exchange(
+                restTemplateLong,
+                systemPrompt,
+                userPrompt,
+                props.getTimeoutMs(),
+                props.getScaffoldMaxTokens());
+    }
+
+    @Override
     public Flux<String> chatStream(String systemPrompt, String userPrompt) {
         if (!isLiveProviderReady()) {
             return Flux.error(new IllegalStateException("LLM provider disabled or apiKey empty"));

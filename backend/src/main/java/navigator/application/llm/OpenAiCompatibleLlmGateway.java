@@ -20,4 +20,9 @@ public class OpenAiCompatibleLlmGateway implements LlmGateway {
     public String generateReply(String systemHint, String userContent) {
         return llmClient.chat(systemHint, userContent);
     }
+
+    @Override
+    public String generateScaffoldReply(String systemHint, String userContent) {
+        return llmClient.chatForScaffold(systemHint, userContent);
+    }
 }
