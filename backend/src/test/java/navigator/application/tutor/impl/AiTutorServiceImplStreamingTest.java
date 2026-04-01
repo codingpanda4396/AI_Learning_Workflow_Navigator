@@ -1,6 +1,7 @@
 package navigator.application.tutor.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import navigator.api.BusinessException;
 import navigator.api.dto.AiTutorChatRequest;
 import navigator.api.dto.TaskFeedbackResponse;
 import navigator.application.tutor.AiTutorFeedbackResult;
@@ -18,14 +19,15 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 class AiTutorServiceImplStreamingTest {
 
     @Test
-    void streamChat_emitsMetaThenChunksWithoutHandleError() {
+    void streamChat_emitsMetaReplyDeltasAndDonePayload() {
         AiTutorServiceImpl impl = newImpl(new StubLlmClient(
-                Flux.just("hello", " world"),
+                Flux.just("<reply>hello", " world</reply><can_proceed>true</can_proceed><completion_hint>ok</completion_hint><summary>done</summary><final_draft>final text</final_draft>"),
                 Mono.just("{\"correct\":true,\"diagnosis\":\"ok\",\"suggestion\":\"keep going\"}")
         ));
 
@@ -37,9 +39,16 @@ class AiTutorServiceImplStreamingTest {
         assertEquals("meta", events.get(0).event());
         assertEquals("LLM", events.get(0).data().get("source"));
         assertEquals("delta", events.get(1).event());
-        assertEquals("hello", events.get(1).data().get("text"));
-        assertEquals("delta", events.get(2).event());
-        assertEquals(" world", events.get(2).data().get("text"));
+        assertEquals("hello world", events.get(1).data().get("text"));
+        assertEquals("done", events.get(2).event());
+        assertEquals("true", events.get(2).data().get("canProceed"));
+        assertEquals("final text", events.get(2).data().get("finalDraft"));
+    }
+
+    @Test
+    void chat_throwsExplicitErrorWhenProviderDisabled() {
+        AiTutorServiceImpl impl = newImpl(new DisabledLlmClient());
+        assertThrows(BusinessException.class, () -> impl.chat(chatRequest("Explain binary search")));
     }
 
     @Test
@@ -58,7 +67,7 @@ class AiTutorServiceImplStreamingTest {
     }
 
     @Test
-    void streamChat_fallsBackWhenStreamErrorsBeforeFirstChunk() {
+    void streamChat_emitsErrorWhenStreamFailsBeforeReply() {
         AiTutorServiceImpl impl = newImpl(new StubLlmClient(
                 Flux.error(new IllegalStateException("provider down")),
                 Mono.just("{\"correct\":true}")
@@ -70,8 +79,8 @@ class AiTutorServiceImplStreamingTest {
 
         assertEquals(2, events.size());
         assertEquals("meta", events.get(0).event());
-        assertEquals("FALLBACK", events.get(0).data().get("source"));
-        assertEquals("delta", events.get(1).event());
+        assertEquals("LLM", events.get(0).data().get("source"));
+        assertEquals("error", events.get(1).event());
     }
 
     private static AiTutorServiceImpl newImpl(LlmClient llmClient) {
@@ -86,10 +95,13 @@ class AiTutorServiceImplStreamingTest {
 
     private static AiTutorChatRequest chatRequest(String message) {
         AiTutorChatRequest request = new AiTutorChatRequest();
-        request.setMessage(message);
+        AiTutorChatRequest.Message msg = new AiTutorChatRequest.Message();
+        msg.setRole("user");
+        msg.setContent(message);
+        request.setMessages(List.of(msg));
         AiTutorChatRequest.Context context = new AiTutorChatRequest.Context();
         context.setStep(1);
-        context.setPhase("understand");
+        context.setPhase("UNDERSTANDING");
         context.setKnowledge("binary-search");
         context.setKnowledgeLabel("Binary Search");
         request.setContext(context);
@@ -100,7 +112,7 @@ class AiTutorServiceImplStreamingTest {
 
         @Override
         public String chat(String systemPrompt, String userPrompt) {
-            return "unused";
+            return "<reply>ok</reply><can_proceed>false</can_proceed><completion_hint>继续</completion_hint><summary>已有进展</summary><final_draft></final_draft>";
         }
 
         @Override
@@ -121,6 +133,33 @@ class AiTutorServiceImplStreamingTest {
         @Override
         public boolean isLiveProviderReady() {
             return true;
+        }
+    }
+
+    private static final class DisabledLlmClient implements LlmClient {
+        @Override
+        public String chat(String systemPrompt, String userPrompt) {
+            throw new IllegalStateException("disabled");
+        }
+
+        @Override
+        public Flux<String> chatStream(String systemPrompt, String userPrompt) {
+            return Flux.error(new IllegalStateException("disabled"));
+        }
+
+        @Override
+        public String chatForFeedback(String systemPrompt, String userPrompt) {
+            throw new IllegalStateException("disabled");
+        }
+
+        @Override
+        public String chatForScaffold(String systemPrompt, String userPrompt) {
+            throw new IllegalStateException("disabled");
+        }
+
+        @Override
+        public boolean isLiveProviderReady() {
+            return false;
         }
     }
 }

@@ -38,6 +38,12 @@ export interface CompleteStructureStageResult {
   nextActionId: string
 }
 
+export interface CompleteConversationStageResult {
+  completedStageKey: string
+  nextStageKey: string
+  nextActionId: string
+}
+
 export interface PromptScaffoldBlock {
   id: string
   title: string

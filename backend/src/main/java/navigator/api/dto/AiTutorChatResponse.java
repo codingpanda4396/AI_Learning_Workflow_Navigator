@@ -9,6 +9,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AiTutorChatResponse {
     private String reply;
-    /** LLM 或 FALLBACK */
     private String source;
+    private Boolean canProceed;
+    private String finalDraft;
+    private String completionHint;
+    private String summary;
 }

@@ -5,6 +5,8 @@
       :draft-input="state.draftInput"
       :busy="busy"
       :input-highlight="inputHighlight"
+      :error="state.error"
+      :completion-hint="state.completionHint"
       placeholder="输入你的问题，或点右侧脚手架..."
       class="min-h-[480px]"
       @send="handleSend"
@@ -25,7 +27,7 @@
 import { ref } from 'vue'
 import UnderstandingChatPanel from '@/components/task-run/UnderstandingChatPanel.vue'
 import PromptScaffoldInjectPanel from '@/components/task-run/PromptScaffoldInjectPanel.vue'
-import type { UnderstandingPhaseState, ScaffoldButton } from '@/types/executionWorkbench'
+import type { ScaffoldButton, UnderstandingPhaseState } from '@/types/executionWorkbench'
 
 defineProps<{
   state: UnderstandingPhaseState

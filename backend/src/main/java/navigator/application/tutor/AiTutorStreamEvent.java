@@ -12,8 +12,8 @@ public record AiTutorStreamEvent(String event, Map<String, String> data) {
         return new AiTutorStreamEvent("delta", Map.of("text", text != null ? text : ""));
     }
 
-    public static AiTutorStreamEvent done() {
-        return new AiTutorStreamEvent("done", Map.of());
+    public static AiTutorStreamEvent done(Map<String, String> data) {
+        return new AiTutorStreamEvent("done", data != null ? data : Map.of());
     }
 
     public static AiTutorStreamEvent error(String message) {

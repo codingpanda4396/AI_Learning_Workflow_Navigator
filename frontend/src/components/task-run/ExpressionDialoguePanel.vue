@@ -1,9 +1,7 @@
 <template>
   <div class="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
     <div class="border-b border-slate-100 px-5 py-3">
-      <p class="text-xs font-medium text-slate-500">
-        表达训练 · 第 {{ roundCount }} / {{ maxRounds }} 轮
-      </p>
+      <p class="text-xs font-medium text-slate-500">表达训练 · 第 {{ roundCount }} / {{ maxRounds }} 轮</p>
     </div>
 
     <div ref="messagesRef" class="max-h-[420px] space-y-4 overflow-y-auto px-5 py-4">
@@ -16,8 +14,10 @@
         <div
           class="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
           :class="msg.role === 'user'
-            ? 'bg-primary/10 text-slate-800 rounded-br-md'
-            : 'bg-slate-100 text-slate-800 rounded-bl-md'"
+            ? 'rounded-br-md bg-primary/10 text-slate-800'
+            : msg.role === 'system'
+              ? 'rounded-bl-md bg-slate-50 text-slate-500'
+              : 'rounded-bl-md bg-slate-100 text-slate-800'"
         >
           <p class="whitespace-pre-wrap">{{ msg.content }}</p>
         </div>
@@ -33,6 +33,8 @@
     </div>
 
     <div v-if="!isComplete" class="border-t border-slate-100 px-4 py-3">
+      <p v-if="error" class="mb-2 text-xs text-rose-500">{{ error }}</p>
+      <p v-else-if="completionHint" class="mb-2 text-xs text-slate-500">{{ completionHint }}</p>
       <div class="flex items-end gap-2 rounded-xl border-2 border-slate-200 bg-slate-50/50 px-3 py-2">
         <textarea
           v-model="localDraft"
@@ -56,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import type { ChatMessage } from '@/types/executionWorkbench'
 
 const props = defineProps<{
@@ -66,6 +68,8 @@ const props = defineProps<{
   maxRounds: number
   busy: boolean
   isComplete: boolean
+  error?: string | null
+  completionHint?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -80,7 +84,7 @@ watch(
   () => props.draftInput,
   (v) => {
     if (v !== localDraft.value) localDraft.value = v
-  },
+  }
 )
 
 watch(localDraft, (v) => {
@@ -94,7 +98,7 @@ watch(
     if (messagesRef.value) {
       messagesRef.value.scrollTop = messagesRef.value.scrollHeight
     }
-  },
+  }
 )
 
 function handleSend() {

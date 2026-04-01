@@ -1,7 +1,6 @@
 import { request } from './request'
 import type { TaskFeedbackResponse } from '@/types/execution'
 
-/** GET /api/ai-tutor/prompt、GET /api/ai-tutor/explain */
 export interface AiTutorEnvelope {
   source: string
   content: string
@@ -12,66 +11,61 @@ export interface AiTutorExplainPostData {
   explanation: string
 }
 
-/** 不阻塞：预取 explain 入缓存 */
 export function postTutorPrefetch(step: string, knowledgePoint: string): void {
-  void request
-    .post<void>('/api/ai-tutor/prefetch', { step, knowledgePoint })
-    .catch(() => {
-      /* 忽略：主路径不依赖 prefetch 成功 */
-    })
+  void request.post<void>('/api/ai-tutor/prefetch', { step, knowledgePoint }).catch(() => {
+    /* noop */
+  })
 }
 
-export async function getTutorPrompt(
-  step: string,
-  knowledgePoint: string
-): Promise<AiTutorEnvelope> {
-  const { data } = await request.get<AiTutorEnvelope>(
-    '/api/ai-tutor/prompt',
-    { params: { step, knowledgePoint } }
-  )
+export async function getTutorPrompt(step: string, knowledgePoint: string): Promise<AiTutorEnvelope> {
+  const { data } = await request.get<AiTutorEnvelope>('/api/ai-tutor/prompt', {
+    params: { step, knowledgePoint },
+  })
   return data
 }
 
-export async function getTutorExplain(
-  step: string,
-  knowledgePoint: string
-): Promise<AiTutorEnvelope> {
-  const { data } = await request.get<AiTutorEnvelope>(
-    '/api/ai-tutor/explain',
-    { params: { step, knowledgePoint } }
-  )
+export async function getTutorExplain(step: string, knowledgePoint: string): Promise<AiTutorEnvelope> {
+  const { data } = await request.get<AiTutorEnvelope>('/api/ai-tutor/explain', {
+    params: { step, knowledgePoint },
+  })
   return data
 }
 
-/** 兼容旧调用：POST explain */
 export async function postTutorExplain(body: {
   step: string
   knowledgePoint: string
   userPrompt?: string
 }): Promise<AiTutorExplainPostData> {
-  const { data } = await request.post<AiTutorExplainPostData>(
-    '/api/ai-tutor/explain',
-    body
-  )
+  const { data } = await request.post<AiTutorExplainPostData>('/api/ai-tutor/explain', body)
   return data
 }
 
-/** POST /api/ai-tutor/chat — R00035 内嵌导师单轮对话 */
+export interface AiTutorChatMessagePayload {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
 export interface AiTutorChatContextPayload {
-  step: number
+  step?: number
   knowledge: string
   phase: string
   knowledgeLabel?: string
+  sessionId?: string
+  taskId?: string
 }
 
 export interface AiTutorChatRequestPayload {
-  message: string
+  messages: AiTutorChatMessagePayload[]
   context: AiTutorChatContextPayload
 }
 
 export interface AiTutorChatResponseData {
   reply: string
   source?: string
+  canProceed?: boolean
+  finalDraft?: string | null
+  completionHint?: string | null
+  summary?: string | null
 }
 
 export interface AiTutorFeedbackPayload {
@@ -83,28 +77,23 @@ export interface AiTutorFeedbackPayload {
 export async function postAiTutorChat(
   payload: AiTutorChatRequestPayload
 ): Promise<AiTutorChatResponseData> {
-  const { data } = await request.post<AiTutorChatResponseData>(
-    '/api/ai-tutor/chat',
-    payload
-  )
+  const { data } = await request.post<AiTutorChatResponseData>('/api/ai-tutor/chat', payload)
   return data
 }
 
 export async function postAiTutorFeedback(
   payload: AiTutorFeedbackPayload
 ): Promise<TaskFeedbackResponse> {
-  const { data } = await request.post<TaskFeedbackResponse>(
-    '/api/ai-tutor/feedback',
-    payload
-  )
+  const { data } = await request.post<TaskFeedbackResponse>('/api/ai-tutor/feedback', payload)
   return data
 }
 
 function parseOneSseEvent(
   block: string,
   handlers: {
-    onMeta?: (source: string) => void
+    onMeta?: (payload: Record<string, string>) => void
     onDelta: (text: string) => void
+    onDone?: (payload: Record<string, string>) => void
     onStreamError?: (message: string) => void
   }
 ): void {
@@ -121,8 +110,7 @@ function parseOneSseEvent(
   if (!dataStr) return
   if (eventType === 'meta') {
     try {
-      const o = JSON.parse(dataStr) as { source?: string }
-      handlers.onMeta?.(o.source ?? '')
+      handlers.onMeta?.(JSON.parse(dataStr) as Record<string, string>)
     } catch {
       /* ignore */
     }
@@ -137,24 +125,30 @@ function parseOneSseEvent(
     }
     return
   }
+  if (eventType === 'done') {
+    try {
+      handlers.onDone?.(JSON.parse(dataStr) as Record<string, string>)
+    } catch {
+      handlers.onDone?.({})
+    }
+    return
+  }
   if (eventType === 'error') {
     try {
       const o = JSON.parse(dataStr) as { message?: string }
-      handlers.onStreamError?.(o.message ?? '流式输出失败')
+      handlers.onStreamError?.(o.message ?? '导师回复失败')
     } catch {
-      handlers.onStreamError?.('流式输出失败')
+      handlers.onStreamError?.('导师回复失败')
     }
   }
 }
 
-/**
- * POST /api/ai-tutor/chat/stream — SSE（event: meta | delta | done | error）
- */
 export async function streamAiTutorChat(
   payload: AiTutorChatRequestPayload,
   handlers: {
-    onMeta?: (source: string) => void
+    onMeta?: (payload: Record<string, string>) => void
     onDelta: (text: string) => void
+    onDone?: (payload: Record<string, string>) => void
     signal?: AbortSignal
   }
 ): Promise<void> {

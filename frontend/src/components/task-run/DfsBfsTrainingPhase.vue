@@ -13,6 +13,8 @@
       :max-rounds="maxRounds"
       :busy="busy"
       :is-complete="!!state.finalDraft"
+      :error="state.error"
+      :completion-hint="state.completionHint"
       @send="handleSend"
       @update:draft-input="handleDraftUpdate"
     />
@@ -27,10 +29,10 @@ import ExpressionDialoguePanel from '@/components/task-run/ExpressionDialoguePan
 import TrainingSummaryDraftCard from '@/components/task-run/TrainingSummaryDraftCard.vue'
 import type { TrainingPhaseState } from '@/types/executionWorkbench'
 import {
-  TRAINING_TASK_TITLE,
-  TRAINING_TASK_SUBTITLE,
-  TRAINING_REQUIREMENTS,
   TRAINING_MAX_ROUNDS,
+  TRAINING_REQUIREMENTS,
+  TRAINING_TASK_SUBTITLE,
+  TRAINING_TASK_TITLE,
 } from '@/constants/dfsBfsExecutionConfig'
 
 defineProps<{

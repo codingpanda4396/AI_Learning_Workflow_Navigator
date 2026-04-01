@@ -1,7 +1,7 @@
 package navigator.application.tutor.prompt;
 
 /**
- * R0003: tutor prompt templates.
+ * Tutor prompt templates.
  */
 public final class TutorPromptTemplates {
 
@@ -17,10 +17,7 @@ public final class TutorPromptTemplates {
         String kp = blankToDefault(knowledgePoint, "当前知识点");
         return """
                 你是一名教学型 AI 导师。
-
-                教学目标：
-                帮助学生理解「%s」。
-
+                教学目标：帮助学生理解「%s」。
                 请输出 JSON（只输出一个对象，不要 markdown，不要额外说明）：
                 {
                   "correct": true/false,
@@ -49,8 +46,8 @@ public final class TutorPromptTemplates {
                 STAGE_NAME=EXECUTION/R0003_SCAFFOLD_EXPLAIN
                 ROLE=教学导师，用生活类比帮助初学者建立直观画面
                 FORBIDDEN=堆术语、长篇大论、直接给题解或标准答案
-                LENGTH=全文不超过120字
-                OUTPUT=纯中文短段落，不要JSON
+                LENGTH=全文不超过 120 字
+                OUTPUT=纯中文短段落，不要 JSON
                 """;
     }
 
@@ -64,36 +61,78 @@ public final class TutorPromptTemplates {
                 """.formatted(kp, extra);
     }
 
-    public static String embeddedChatSystemPrompt(int stepNumber,
-                                                  String phaseCode,
+    public static String conversationSystemPrompt(String phaseCode,
                                                   String knowledgeDisplay,
                                                   String canonicalKnowledgeKey) {
-        String phase = blankToDefault(phaseCode, "当前阶段");
+        String phase = blankToDefault(phaseCode, "UNDERSTANDING").trim().toUpperCase();
         String kp = blankToDefault(knowledgeDisplay, "当前知识点");
         String canon = blankToDefault(canonicalKnowledgeKey, "unknown");
-        return """
-                你是一名教学型 AI 导师。你不是答题机器人，不直接给标准答案，而是带着学生一点点想明白。
+        String phaseInstructions = switch (phase) {
+            case "TRAINING" -> """
+                    你在表达训练阶段。
+                    目标：
+                    - 帮学生把理解转成稳定、清楚、可复述的表达
+                    - 指出最关键的 1 个薄弱点，不要堆很多要求
+                    - 当表达已经达标时，帮学生收束成一版最终表述
+                    - final_draft 只有在学生已经可以进入下一步时才填写
+                    """;
+            default -> """
+                    你在机制理解阶段。
+                    目标：
+                    - 承接学生当前问题，解释 DFS / BFS 背后的推进机制
+                    - 优先帮助学生理解“为什么会这样”，而不是直接背定义
+                    - 当学生已经真正说清机制时，可以允许进入表达训练
+                    - 还没理解透时，继续追问或换角度解释
+                    """;
+        };
 
-                STAGE_NAME=EXECUTION/R00035_EMBEDDED_TUTOR_CHAT
-                CURRENT_STEP=%d
+        return """
+                你是一名教学型 AI 导师。
                 CURRENT_PHASE_CODE=%s
                 CURRENT_KNOWLEDGE_DISPLAY=%s
                 CANONICAL_KNOWLEDGE_KEY=%s
 
-                你的目标：
-                - 先承接学生回答里合理的部分
-                - 再指出不完整、模糊或偏差的位置
-                - 不直接给出标准定义或完整答案
-                - 多用类比、观察和追问推进理解
-                - 结尾必须带一个引导性问题或下一步观察方向
+                %s
 
-                输出要求：
-                - 纯中文，像真人导师在带学生思考
-                - 全文不超过 200 字
-                - 不要 JSON，不要代码块
-                - 不要假装学生已经完全掌握
-                - 不要编造学生没说过的经历或结论
-                """.formatted(stepNumber, phase, kp, canon);
+                输出格式必须严格遵守，且只能输出下面这些标签：
+                <reply>给学生展示的中文回复，80-220 字，像真人导师，先承接再推进</reply>
+                <can_proceed>true 或 false</can_proceed>
+                <completion_hint>一句中文提示，说明当前为什么能/不能进入下一步</completion_hint>
+                <summary>一句中文总结，概括这轮学生达到了什么</summary>
+                <final_draft>仅在 TRAINING 且 can_proceed=true 时填写最终版表达，否则留空</final_draft>
+
+                额外要求：
+                - reply 不要出现 XML、标签名或 JSON
+                - 不要伪装学生已经掌握没有说清的内容
+                - 不要输出代码块
+                - 不要直接贴标准答案后结束，要保持教学感
+                - TRAINING 阶段如果 can_proceed=false，final_draft 必须留空
+                """.formatted(phase, kp, canon, phaseInstructions);
+    }
+
+    public static String conversationUserPrompt(String phaseCode,
+                                                String knowledgePoint,
+                                                java.util.List<? extends navigator.api.dto.AiTutorChatRequest.Message> messages) {
+        String phase = blankToDefault(phaseCode, "UNDERSTANDING").trim().toUpperCase();
+        String kp = blankToDefault(knowledgePoint, "当前知识点");
+        StringBuilder sb = new StringBuilder();
+        sb.append("知识点：").append(kp).append('\n');
+        sb.append("阶段：").append(phase).append('\n');
+        sb.append("以下是当前阶段到目前为止的对话，请基于上下文连续回复。\n");
+        for (navigator.api.dto.AiTutorChatRequest.Message message : messages) {
+            if (message == null) continue;
+            String role = blankToDefault(message.getRole(), "user").trim().toLowerCase();
+            String content = blankToDefault(message.getContent(), "").trim();
+            if (content.isEmpty()) continue;
+            String speaker = switch (role) {
+                case "assistant", "ai" -> "导师";
+                case "system" -> "系统";
+                default -> "学生";
+            };
+            sb.append(speaker).append("：").append(content).append('\n');
+        }
+        sb.append("请只按规定标签输出。");
+        return sb.toString();
     }
 
     private static String blankToDefault(String s, String d) {

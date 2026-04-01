@@ -69,7 +69,11 @@ export interface UnderstandingPhaseState {
   injectedPrompt: string | null
   scaffoldKey: string | null
   turnCount: number
-  isReadyToAdvance: boolean
+  streaming: boolean
+  error: string | null
+  canProceed: boolean
+  completionHint: string | null
+  stageSummary: string | null
   feedback: PhaseFeedback | null
 }
 
@@ -77,9 +81,13 @@ export interface TrainingPhaseState {
   messages: ChatMessage[]
   draftInput: string
   roundCount: number
+  streaming: boolean
+  error: string | null
+  canProceed: boolean
+  completionHint: string | null
+  stageSummary: string | null
   evaluation: TrainingEvaluation | null
   finalDraft: string | null
-  isReadyToAdvance: boolean
   feedback: PhaseFeedback | null
 }
 
@@ -151,7 +159,11 @@ export function createEmptyUnderstandingState(): UnderstandingPhaseState {
     injectedPrompt: null,
     scaffoldKey: null,
     turnCount: 0,
-    isReadyToAdvance: false,
+    streaming: false,
+    error: null,
+    canProceed: false,
+    completionHint: null,
+    stageSummary: null,
     feedback: null,
   }
 }
@@ -161,9 +173,13 @@ export function createEmptyTrainingState(): TrainingPhaseState {
     messages: [],
     draftInput: '',
     roundCount: 0,
+    streaming: false,
+    error: null,
+    canProceed: false,
+    completionHint: null,
+    stageSummary: null,
     evaluation: null,
     finalDraft: null,
-    isReadyToAdvance: false,
     feedback: null,
   }
 }

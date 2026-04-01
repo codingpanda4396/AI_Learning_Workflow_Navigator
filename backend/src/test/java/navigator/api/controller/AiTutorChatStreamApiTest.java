@@ -29,9 +29,9 @@ class AiTutorChatStreamApiTest {
     private MockMvc mvc;
 
     @Test
-    void streamReturnsSseFallbackWhenLlmDisabled() throws Exception {
+    void streamReturnsSseErrorWhenLlmDisabled() throws Exception {
         String body = """
-                {"message":"我觉得二叉树像分叉","context":{"step":1,"knowledge":"binary_tree","phase":"STRUCTURE","knowledgeLabel":"二叉树"}}
+                {"messages":[{"role":"user","content":"我想知道 DFS 为什么会回退"}],"context":{"step":1,"knowledge":"dfs_bfs","phase":"UNDERSTANDING","knowledgeLabel":"DFS / BFS"}}
                 """;
         MvcResult async = mvc.perform(post("/api/ai-tutor/chat/stream")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -46,9 +46,7 @@ class AiTutorChatStreamApiTest {
                 .getResponse()
                 .getContentAsString();
 
-        assertThat(out).contains("event:meta");
-        assertThat(out).contains("FALLBACK");
-        assertThat(out).contains("event:delta");
-        assertThat(out).contains("event:done");
+        assertThat(out).contains("event:error");
+        assertThat(out).doesNotContain("event:delta");
     }
 }

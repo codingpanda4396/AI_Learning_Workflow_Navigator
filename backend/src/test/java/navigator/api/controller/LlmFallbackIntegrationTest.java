@@ -79,13 +79,13 @@ class LlmFallbackIntegrationTest {
     }
 
     @Test
-    void aiTutorChatShouldReturnFallbackWhenProviderFails() throws Exception {
+    void aiTutorChatShouldReturnExplicitErrorWhenProviderFails() throws Exception {
         String body = """
-                {"message":"我觉得二叉树像分叉","context":{"step":1,"knowledge":"binary_tree","phase":"STRUCTURE","knowledgeLabel":"二叉树"}}
+                {"messages":[{"role":"user","content":"我想知道 DFS 为什么会回退"}],"context":{"step":1,"knowledge":"dfs_bfs","phase":"UNDERSTANDING","knowledgeLabel":"DFS / BFS"}}
                 """;
         mvc.perform(post("/api/ai-tutor/chat").contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.source").value("FALLBACK"))
-                .andExpect(jsonPath("$.data.reply").isNotEmpty());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.message").isNotEmpty());
     }
 }

@@ -1,6 +1,8 @@
 package navigator.application.tutor.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import navigator.api.BusinessErrorCode;
+import navigator.api.BusinessException;
 import navigator.api.dto.AiTutorChatRequest;
 import navigator.api.dto.TaskFeedbackResponse;
 import navigator.application.tutor.AiTutorChatResult;
@@ -20,7 +22,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class AiTutorServiceImpl implements AiTutorService {
@@ -30,7 +36,12 @@ public class AiTutorServiceImpl implements AiTutorService {
     public static final String SOURCE_CACHE = "CACHE";
     public static final String SOURCE_FALLBACK = "FALLBACK";
     public static final String SOURCE_LLM = "LLM";
-    private static final String STREAM_INTERRUPTED_PREFIX = "\n\n\uFF08\u8FDE\u63A5\u4E2D\u65AD\uFF0C\u4EE5\u4E0B\u4E3A\u672C\u5730\u63D0\u793A\uFF09\n";
+    private static final String LLM_UNAVAILABLE_MESSAGE = "当前导师暂不可用，请稍后重试。";
+    private static final Pattern REPLY_PATTERN = Pattern.compile("<reply>(.*?)</reply>", Pattern.DOTALL);
+    private static final Pattern CAN_PROCEED_PATTERN = Pattern.compile("<can_proceed>(.*?)</can_proceed>", Pattern.DOTALL);
+    private static final Pattern COMPLETION_HINT_PATTERN = Pattern.compile("<completion_hint>(.*?)</completion_hint>", Pattern.DOTALL);
+    private static final Pattern SUMMARY_PATTERN = Pattern.compile("<summary>(.*?)</summary>", Pattern.DOTALL);
+    private static final Pattern FINAL_DRAFT_PATTERN = Pattern.compile("<final_draft>(.*?)</final_draft>", Pattern.DOTALL);
 
     private final LlmClient llmClient;
     private final TutorContentCache tutorContentCache;
@@ -52,87 +63,69 @@ public class AiTutorServiceImpl implements AiTutorService {
 
     @Override
     public AiTutorChatResult chat(AiTutorChatRequest request) {
-        AiTutorChatRequest.Context ctx = request.getContext();
-        String userMsg = request.getMessage() != null ? request.getMessage().trim() : "";
-        if (userMsg.isEmpty()) {
-            return new AiTutorChatResult(SOURCE_FALLBACK, tutorFallbackRegistry.embeddedChatFallback(
-                    TutorKnowledgeNormalizer.UNKNOWN, ""));
+        requireLiveProvider();
+        PromptBundle prompt = buildPrompt(request);
+        try {
+            String raw = llmClient.chat(prompt.systemPrompt(), prompt.userPrompt());
+            StructuredTutorReply parsed = parseStructuredReply(raw);
+            return new AiTutorChatResult(
+                    SOURCE_LLM,
+                    parsed.reply(),
+                    parsed.canProceed(),
+                    parsed.finalDraft(),
+                    parsed.completionHint(),
+                    parsed.summary()
+            );
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("AiTutor chat LLM failed {}: {}", e.getClass().getSimpleName(), e.getMessage());
+            throw new BusinessException(BusinessErrorCode.INTERNAL_ERROR, LLM_UNAVAILABLE_MESSAGE);
         }
-        int stepNum = ctx.getStep() != null ? ctx.getStep() : 1;
-        String phase = ctx.getPhase() != null ? ctx.getPhase().trim() : "";
-        String knowledgeKey = ctx.getKnowledge() != null ? ctx.getKnowledge().trim() : "";
-        String knowledgeLabel = ctx.getKnowledgeLabel() != null ? ctx.getKnowledgeLabel().trim() : "";
-        String forNorm = !knowledgeKey.isBlank() ? knowledgeKey : knowledgeLabel;
-        String norm = TutorKnowledgeNormalizer.normalize(forNorm);
-        String display = !knowledgeLabel.isBlank() ? knowledgeLabel
-                : (!knowledgeKey.isBlank() ? knowledgeKey : "\u5f53\u524d\u77e5\u8bc6\u70b9");
-        String system = TutorPromptTemplates.embeddedChatSystemPrompt(stepNum, phase, display, norm);
-        if (llmClient.isLiveProviderReady()) {
-            try {
-                String raw = llmClient.chat(system, userMsg);
-                if (raw != null && !raw.isBlank()) {
-                    return new AiTutorChatResult(SOURCE_LLM, raw.trim());
-                }
-            } catch (Exception e) {
-                log.warn("AiTutor chat LLM failed 鈥?{}: {}", e.getClass().getSimpleName(), e.getMessage());
-            }
-        }
-        String fallback = tutorFallbackRegistry.embeddedChatFallback(norm, userMsg);
-        return new AiTutorChatResult(SOURCE_FALLBACK, fallback);
     }
 
     @Override
     public Flux<AiTutorStreamEvent> streamChat(AiTutorChatRequest request) {
-        return Flux.defer(() -> {
-            AiTutorChatRequest.Context ctx = request.getContext();
-            String userMsg = request.getMessage() != null ? request.getMessage().trim() : "";
-            if (userMsg.isEmpty()) {
-                return fallbackStream(TutorKnowledgeNormalizer.UNKNOWN, "");
-            }
+        if (!llmClient.isLiveProviderReady()) {
+            return Flux.error(new BusinessException(BusinessErrorCode.INTERNAL_ERROR, LLM_UNAVAILABLE_MESSAGE));
+        }
 
-            int stepNum = ctx.getStep() != null ? ctx.getStep() : 1;
-            String phase = ctx.getPhase() != null ? ctx.getPhase().trim() : "";
-            String knowledgeKey = ctx.getKnowledge() != null ? ctx.getKnowledge().trim() : "";
-            String knowledgeLabel = ctx.getKnowledgeLabel() != null ? ctx.getKnowledgeLabel().trim() : "";
-            String forNorm = !knowledgeKey.isBlank() ? knowledgeKey : knowledgeLabel;
-            String norm = TutorKnowledgeNormalizer.normalize(forNorm);
-            String display = !knowledgeLabel.isBlank() ? knowledgeLabel
-                    : (!knowledgeKey.isBlank() ? knowledgeKey : "\u5f53\u524d\u77e5\u8bc6\u70b9");
-            String system = TutorPromptTemplates.embeddedChatSystemPrompt(stepNum, phase, display, norm);
+        PromptBundle prompt = buildPrompt(request);
+        ReplyDeltaExtractor extractor = new ReplyDeltaExtractor();
+        StringBuilder raw = new StringBuilder();
 
-            if (!llmClient.isLiveProviderReady()) {
-                return fallbackStream(norm, userMsg);
-            }
+        Flux<AiTutorStreamEvent> deltas = llmClient.chatStream(prompt.systemPrompt(), prompt.userPrompt())
+                .filter(chunk -> chunk != null && !chunk.isEmpty())
+                .concatMap(chunk -> {
+                    raw.append(chunk);
+                    List<String> pieces = extractor.consume(chunk);
+                    if (pieces.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    return Flux.fromIterable(pieces).map(AiTutorStreamEvent::delta);
+                });
 
-            AtomicBoolean sawNonEmpty = new AtomicBoolean(false);
-            Flux<String> chunks = llmClient.chatStream(system, userMsg)
-                    .filter(chunk -> chunk != null && !chunk.isEmpty())
-                    .doOnNext(chunk -> sawNonEmpty.set(true));
-
-            Flux<AiTutorStreamEvent> llmEvents = chunks.switchOnFirst((signal, flux) -> {
-                if (signal.isOnNext()) {
-                    return Flux.concat(
-                            Flux.just(AiTutorStreamEvent.meta(SOURCE_LLM)),
-                            flux.map(AiTutorStreamEvent::delta)
-                    );
-                }
-                if (signal.isOnComplete()) {
-                    return Flux.empty();
-                }
-                return Flux.error(signal.getThrowable());
-            });
-
-            return llmEvents
-                    .switchIfEmpty(fallbackStream(norm, userMsg))
-                    .onErrorResume(e -> {
-                        log.warn("AiTutor chat stream LLM failed 鈥?{}: {}", e.getClass().getSimpleName(), e.getMessage());
-                        if (!sawNonEmpty.get()) {
-                            return fallbackStream(norm, userMsg);
-                        }
-                        return Flux.just(AiTutorStreamEvent.delta(
-                                STREAM_INTERRUPTED_PREFIX + tutorFallbackRegistry.embeddedChatFallback(norm, userMsg)));
-                    });
-        });
+        return Flux.concat(
+                        Flux.just(AiTutorStreamEvent.meta(SOURCE_LLM)),
+                        deltas,
+                        Flux.defer(() -> {
+                            StructuredTutorReply parsed = parseStructuredReply(raw.toString());
+                            return Flux.just(AiTutorStreamEvent.done(Map.of(
+                                    "source", SOURCE_LLM,
+                                    "canProceed", Boolean.toString(parsed.canProceed()),
+                                    "finalDraft", nullToEmpty(parsed.finalDraft()),
+                                    "completionHint", nullToEmpty(parsed.completionHint()),
+                                    "summary", nullToEmpty(parsed.summary())
+                            )));
+                        })
+                )
+                .onErrorResume(e -> {
+                    log.warn("AiTutor chat stream LLM failed {}: {}", e.getClass().getSimpleName(), e.getMessage());
+                    String msg = e instanceof BusinessException be && be.getMessage() != null
+                            ? be.getMessage()
+                            : LLM_UNAVAILABLE_MESSAGE;
+                    return Flux.just(AiTutorStreamEvent.error(msg));
+                });
     }
 
     @Override
@@ -181,7 +174,7 @@ public class AiTutorServiceImpl implements AiTutorService {
                 return new AiTutorFeedbackResult(SOURCE_FALLBACK,
                         tutorFallbackRegistry.feedbackWhenLlmJsonUnreliable(norm, st, userAnswer));
             } catch (Exception e) {
-                log.warn("AiTutor feedback LLM failed 鈥?{}: {}", e.getClass().getSimpleName(), e.getMessage());
+                log.warn("AiTutor feedback LLM failed {}: {}", e.getClass().getSimpleName(), e.getMessage());
             }
         }
         TaskFeedbackResponse fb = tutorFallbackRegistry.feedbackFallback(norm, st, userAnswer);
@@ -200,6 +193,52 @@ public class AiTutorServiceImpl implements AiTutorService {
         return r != null ? r : malformedLlmFeedbackResponse();
     }
 
+    private PromptBundle buildPrompt(AiTutorChatRequest request) {
+        AiTutorChatRequest.Context ctx = request.getContext();
+        String phase = ctx.getPhase() != null ? ctx.getPhase().trim() : "";
+        String knowledgeKey = ctx.getKnowledge() != null ? ctx.getKnowledge().trim() : "";
+        String knowledgeLabel = ctx.getKnowledgeLabel() != null ? ctx.getKnowledgeLabel().trim() : "";
+        String forNorm = !knowledgeKey.isBlank() ? knowledgeKey : knowledgeLabel;
+        String norm = TutorKnowledgeNormalizer.normalize(forNorm);
+        String display = !knowledgeLabel.isBlank() ? knowledgeLabel
+                : (!knowledgeKey.isBlank() ? knowledgeKey : "当前知识点");
+        String system = TutorPromptTemplates.conversationSystemPrompt(phase, display, norm);
+        String user = TutorPromptTemplates.conversationUserPrompt(phase, display, request.getMessages());
+        return new PromptBundle(system, user);
+    }
+
+    private void requireLiveProvider() {
+        if (!llmClient.isLiveProviderReady()) {
+            throw new BusinessException(BusinessErrorCode.INTERNAL_ERROR, LLM_UNAVAILABLE_MESSAGE);
+        }
+    }
+
+    private StructuredTutorReply parseStructuredReply(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalStateException("empty tutor reply");
+        }
+        String reply = extractTag(raw, REPLY_PATTERN);
+        if (reply.isBlank()) {
+            throw new IllegalStateException("missing reply block");
+        }
+        boolean canProceed = "true".equalsIgnoreCase(extractTag(raw, CAN_PROCEED_PATTERN));
+        String completionHint = extractTag(raw, COMPLETION_HINT_PATTERN);
+        String summary = extractTag(raw, SUMMARY_PATTERN);
+        String finalDraft = extractTag(raw, FINAL_DRAFT_PATTERN);
+        if (!canProceed) {
+            finalDraft = "";
+        }
+        return new StructuredTutorReply(reply, canProceed, emptyToNull(finalDraft), emptyToNull(completionHint), emptyToNull(summary));
+    }
+
+    private static String extractTag(String raw, Pattern pattern) {
+        Matcher matcher = pattern.matcher(raw);
+        if (!matcher.find()) {
+            return "";
+        }
+        return matcher.group(1) == null ? "" : matcher.group(1).trim();
+    }
+
     private TaskFeedbackResponse parseFeedbackBody(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
@@ -210,8 +249,8 @@ public class AiTutorServiceImpl implements AiTutorService {
             if (p.getDiagnosis() == null && p.getSuggestion() == null && p.getNextHint() == null) {
                 return null;
             }
-            String comment = blankToText(p.getDiagnosis(), "\u6211\u5df2\u770b\u8fc7\u4f60\u7684\u56de\u7b54\u3002");
-            String suggestion = blankToText(p.getSuggestion(), "\u8bd5\u7740\u7528\u4e00\u53e5\u8bdd\u6293\u4f4f\u6838\u5fc3\u6982\u5ff5\u3002");
+            String comment = blankToText(p.getDiagnosis(), "我已看过你的回答。");
+            String suggestion = blankToText(p.getSuggestion(), "试着用一句话抓住核心概念。");
             String nextHint = p.getNextHint() != null && !p.getNextHint().isBlank() ? p.getNextHint().trim() : null;
             return new TaskFeedbackResponse(
                     p.isCorrect(),
@@ -227,21 +266,14 @@ public class AiTutorServiceImpl implements AiTutorService {
         }
     }
 
-    private Flux<AiTutorStreamEvent> fallbackStream(String norm, String userMsg) {
-        return Flux.just(
-                AiTutorStreamEvent.meta(SOURCE_FALLBACK),
-                AiTutorStreamEvent.delta(tutorFallbackRegistry.embeddedChatFallback(norm, userMsg))
-        );
-    }
-
     private static TaskFeedbackResponse malformedLlmFeedbackResponse() {
         return new TaskFeedbackResponse(
                 false,
-                "\u6682\u65f6\u65e0\u6cd5\u89e3\u6790\u5bfc\u5e08\u53cd\u9988\uff0c\u8bf7\u518d\u8bd5\u4e00\u6b21\u3002",
-                "\u53ef\u4ee5\u6362\u4e00\u53e5\u8bdd\u63cf\u8ff0\u4f60\u7684\u7406\u89e3\uff0c\u6216\u8865\u5145\u4e00\u4e2a\u4f60\u770b\u5230\u7684\u5173\u952e\u70b9\u3002",
+                "暂时无法解析导师反馈，请再试一次。",
+                "可以换一句话描述你的理解，或补充一个你看到的关键点。",
                 null,
                 null,
-                "\u8bd5\u7740\u5148\u8bf4\u51fa\uff1a\u8fd9\u4e2a\u6982\u5ff5\u8ba9\u4f60\u8054\u60f3\u5230\u4ec0\u4e48\u5177\u4f53\u753b\u9762\uff1f",
+                "试着先说出：这个概念让你联想到什么具体画面？",
                 null);
     }
 
@@ -279,5 +311,78 @@ public class AiTutorServiceImpl implements AiTutorService {
 
     static String extractFirstJsonObject(String s) {
         return extractJson(s);
+    }
+
+    private static String emptyToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s;
+    }
+
+    private record PromptBundle(String systemPrompt, String userPrompt) {
+    }
+
+    private record StructuredTutorReply(
+            String reply,
+            boolean canProceed,
+            String finalDraft,
+            String completionHint,
+            String summary
+    ) {
+    }
+
+    private static final class ReplyDeltaExtractor {
+        private static final String OPEN = "<reply>";
+        private static final String CLOSE = "</reply>";
+
+        private final StringBuilder pending = new StringBuilder();
+        private boolean insideReply = false;
+        private boolean replyClosed = false;
+
+        List<String> consume(String chunk) {
+            pending.append(chunk);
+            List<String> pieces = new ArrayList<>();
+
+            while (!replyClosed) {
+                if (!insideReply) {
+                    int openIndex = pending.indexOf(OPEN);
+                    if (openIndex < 0) {
+                        trimPrefixForPartialTag(OPEN.length() - 1);
+                        break;
+                    }
+                    pending.delete(0, openIndex + OPEN.length());
+                    insideReply = true;
+                }
+
+                int closeIndex = pending.indexOf(CLOSE);
+                if (closeIndex < 0) {
+                    int safeLen = Math.max(0, pending.length() - (CLOSE.length() - 1));
+                    if (safeLen == 0) {
+                        break;
+                    }
+                    pieces.add(pending.substring(0, safeLen));
+                    pending.delete(0, safeLen);
+                    break;
+                }
+
+                if (closeIndex > 0) {
+                    pieces.add(pending.substring(0, closeIndex));
+                }
+                pending.delete(0, closeIndex + CLOSE.length());
+                insideReply = false;
+                replyClosed = true;
+            }
+
+            return pieces;
+        }
+
+        private void trimPrefixForPartialTag(int keepTail) {
+            if (pending.length() <= keepTail) {
+                return;
+            }
+            pending.delete(0, pending.length() - keepTail);
+        }
     }
 }

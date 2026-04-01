@@ -6,16 +6,30 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 public class AiTutorChatRequest {
 
-    @NotBlank
-    @Size(max = 2000)
-    private String message;
+    @Valid
+    @NotNull
+    @Size(min = 1, max = 40)
+    private List<Message> messages = new ArrayList<>();
 
     @Valid
     @NotNull
     private Context context;
+
+    @Data
+    public static class Message {
+        @NotBlank
+        private String role;
+
+        @NotBlank
+        @Size(max = 4000)
+        private String content;
+    }
 
     @Data
     public static class Context {
@@ -27,7 +41,10 @@ public class AiTutorChatRequest {
         @NotBlank
         private String phase;
 
-        /** 人读标签，优先用于 system prompt 展示 */
         private String knowledgeLabel;
+
+        private String sessionId;
+
+        private String taskId;
     }
 }

@@ -1,14 +1,5 @@
 <template>
   <router-view />
-  <!-- 执行工作台：仅抽屉导师；DFS/BFS STRUCTURE 骨架台另开右下角浮球 -->
-  <template v-if="showAiTutorChrome">
-    <AiTutorFloating />
-    <AiTutorPanel />
-  </template>
-  <template v-else-if="showAiTutorPanelOnly">
-    <AiTutorFloating v-if="aiTutor.showTaskRunFloatingFab" />
-    <AiTutorPanel />
-  </template>
   <Teleport to="body">
     <Transition name="toast">
       <div
@@ -22,25 +13,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { toastMessage } from '@/stores/toast'
-import AiTutorFloating from '@/components/ai-tutor/AiTutorFloating.vue'
-import AiTutorPanel from '@/components/ai-tutor/AiTutorPanel.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useAiTutorStore } from '@/stores/aiTutor'
 
-const route = useRoute()
-const aiTutor = useAiTutorStore()
-const showAiTutorChrome = computed(() => {
-  if (route.name === 'task' || route.name === 'taskRun') return false
-  return route.name === 'execution'
-})
-
-/** 任务跑页需挂载面板，顶栏「求助」才能打开抽屉（不挂全局浮球） */
-const showAiTutorPanelOnly = computed(
-  () => route.name === 'task' || route.name === 'taskRun'
-)
 useAuthStore().ensureReady()
 </script>
 

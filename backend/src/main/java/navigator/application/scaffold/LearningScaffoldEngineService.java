@@ -3,6 +3,8 @@ package navigator.application.scaffold;
 import navigator.api.BusinessErrorCode;
 import navigator.api.BusinessException;
 import navigator.api.dto.scaffold.ActionRuntime;
+import navigator.api.dto.scaffold.CompleteConversationStageRequest;
+import navigator.api.dto.scaffold.CompleteConversationStageResult;
 import navigator.api.dto.scaffold.CompleteStructureStageRequest;
 import navigator.api.dto.scaffold.CompleteStructureStageResult;
 import navigator.api.dto.scaffold.LearningScaffoldActionResult;
@@ -204,6 +206,51 @@ public class LearningScaffoldEngineService {
                 .build();
     }
 
+    public CompleteConversationStageResult completeConversationStage(String taskId, CompleteConversationStageRequest request) {
+        String sessionId = request.getSessionId();
+        sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
+        entityLookupGuard.requireTaskInSession(sessionId, taskId);
+        taskExecutionFlowService.getScaffold(sessionId, taskId);
+        KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
+        if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎");
+        }
+
+        TaskExecutionRuntime rt = requireRuntime(sessionId, taskId);
+        ensureEngineState(rt.getScaffold());
+        LearningScaffoldEngineState eng = rt.getScaffold().getLearningScaffoldEngineState();
+        Objects.requireNonNull(eng);
+        normalizeEngineState(eng);
+
+        String stageKey = request.getStageKey() != null ? request.getStageKey().trim() : "";
+        if (!DfsBfsUnderstandingScaffoldDefinition.STAGE_KEY.equals(stageKey)
+                && !DfsBfsTrainingScaffoldDefinition.STAGE_KEY.equals(stageKey)) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "仅支持完成 UNDERSTANDING 或 TRAINING 阶段");
+        }
+        if (!stageKey.equals(eng.getCurrentStageKey())) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT,
+                    "当前脚手架阶段为 " + eng.getCurrentStageKey() + "，无法完成 " + stageKey);
+        }
+
+        appendCompletedStage(eng, stageKey);
+        if (DfsBfsUnderstandingScaffoldDefinition.STAGE_KEY.equals(stageKey)) {
+            eng.setCurrentStageKey(DfsBfsTrainingScaffoldDefinition.STAGE_KEY);
+            eng.setCurrentActionId(DfsBfsTrainingScaffoldDefinition.orderedActionIds().get(0));
+        } else {
+            eng.setCurrentStageKey(DfsBfsReflectionScaffoldDefinition.STAGE_KEY);
+            eng.setCurrentActionId(DfsBfsReflectionScaffoldDefinition.orderedActionIds().get(0));
+        }
+        syncLegacyBooleans(eng);
+        rt.getScaffold().setLearningScaffoldEngineState(eng);
+        persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
+
+        return CompleteConversationStageResult.builder()
+                .completedStageKey(stageKey)
+                .nextStageKey(eng.getCurrentStageKey())
+                .nextActionId(eng.getCurrentActionId())
+                .build();
+    }
+
     private static boolean canCompleteStructure(LearningScaffoldEngineState eng) {
         int gen = eng.getStructureGenerationCount();
         int light = eng.getStructureLightInteractionCount();
@@ -249,6 +296,11 @@ public class LearningScaffoldEngineService {
                 .build();
 
         String sk = request.getStageKey();
+        if (DfsBfsUnderstandingScaffoldDefinition.STAGE_KEY.equals(sk)
+                || DfsBfsTrainingScaffoldDefinition.STAGE_KEY.equals(sk)) {
+            throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT,
+                    sk + " 阶段已改为 LLM 对话驱动，不再支持 learning-scaffold/action 提交");
+        }
         TrainingFeedback trainingFeedback = null;
         ValidationResult validation;
         TutorResponse tutor;

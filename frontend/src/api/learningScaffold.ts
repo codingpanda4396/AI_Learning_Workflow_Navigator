@@ -1,5 +1,6 @@
 import { request } from './request'
 import type {
+  CompleteConversationStageResult,
   CompleteStructureStageResult,
   LearningScaffoldActionResult,
   StageScaffold,
@@ -58,6 +59,17 @@ export async function postCompleteStructureStage(
 ): Promise<CompleteStructureStageResult> {
   const { data } = await request.post<CompleteStructureStageResult>(
     `/api/tasks/${taskId}/learning-scaffold/structure/complete`,
+    body
+  )
+  return data
+}
+
+export async function postCompleteConversationStage(
+  taskId: string,
+  body: { sessionId: string; stageKey: string; finalDraft?: string }
+): Promise<CompleteConversationStageResult> {
+  const { data } = await request.post<CompleteConversationStageResult>(
+    `/api/tasks/${taskId}/learning-scaffold/conversation/complete`,
     body
   )
   return data

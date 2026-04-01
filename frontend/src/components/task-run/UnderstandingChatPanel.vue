@@ -29,6 +29,8 @@
     </div>
 
     <div class="border-t border-slate-100 px-4 py-3">
+      <p v-if="error" class="mb-2 text-xs text-rose-500">{{ error }}</p>
+      <p v-else-if="completionHint" class="mb-2 text-xs text-slate-500">{{ completionHint }}</p>
       <div
         class="flex items-end gap-2 rounded-xl border-2 px-3 py-2 transition-colors"
         :class="inputHighlight ? 'border-primary/50 bg-primary/5' : 'border-slate-200 bg-slate-50/50'"
@@ -56,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import type { ChatMessage } from '@/types/executionWorkbench'
 
 const props = defineProps<{
@@ -64,6 +66,8 @@ const props = defineProps<{
   draftInput: string
   busy: boolean
   inputHighlight: boolean
+  error?: string | null
+  completionHint?: string | null
   placeholder?: string
 }>()
 
@@ -82,7 +86,7 @@ watch(
     if (v !== localDraft.value) {
       localDraft.value = v
     }
-  },
+  }
 )
 
 watch(localDraft, (v) => {
@@ -96,7 +100,7 @@ watch(
     if (messagesRef.value) {
       messagesRef.value.scrollTop = messagesRef.value.scrollHeight
     }
-  },
+  }
 )
 
 watch(
@@ -106,7 +110,7 @@ watch(
       await nextTick()
       inputRef.value?.focus()
     }
-  },
+  }
 )
 
 function handleSend() {
@@ -118,8 +122,11 @@ function handleSend() {
 
 function bubbleClass(role: string): string {
   if (role === 'user') {
-    return 'bg-primary/10 text-slate-800 rounded-br-md'
+    return 'rounded-br-md bg-primary/10 text-slate-800'
   }
-  return 'bg-slate-100 text-slate-800 rounded-bl-md'
+  if (role === 'system') {
+    return 'rounded-bl-md bg-slate-50 text-slate-500'
+  }
+  return 'rounded-bl-md bg-slate-100 text-slate-800'
 }
 </script>

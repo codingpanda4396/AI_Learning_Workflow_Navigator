@@ -83,13 +83,19 @@ public class AiTutorController {
     @PostMapping("/chat")
     public GlobalResponse<AiTutorChatResponse> chat(@Valid @RequestBody AiTutorChatRequest request) {
         AiTutorChatResult r = aiTutorService.chat(request);
-        return GlobalResponse.ok(new AiTutorChatResponse(r.reply(), r.source()));
+        return GlobalResponse.ok(new AiTutorChatResponse(
+                r.reply(),
+                r.source(),
+                r.canProceed(),
+                r.finalDraft(),
+                r.completionHint(),
+                r.summary()
+        ));
     }
 
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<Map<String, String>>> chatStream(@Valid @RequestBody AiTutorChatRequest request) {
         return aiTutorService.streamChat(request)
-                .concatWithValues(AiTutorStreamEvent.done())
                 .map(this::toSse)
                 .onErrorResume(ex -> Flux.just(toSse(AiTutorStreamEvent.error(
                         ex.getMessage() != null ? ex.getMessage() : STREAM_ERROR_MESSAGE))));

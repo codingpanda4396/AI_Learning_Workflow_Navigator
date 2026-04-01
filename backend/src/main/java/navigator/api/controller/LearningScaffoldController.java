@@ -2,6 +2,8 @@ package navigator.api.controller;
 
 import jakarta.validation.Valid;
 import navigator.api.GlobalResponse;
+import navigator.api.dto.scaffold.CompleteConversationStageRequest;
+import navigator.api.dto.scaffold.CompleteConversationStageResult;
 import navigator.api.dto.scaffold.CompleteStructureStageRequest;
 import navigator.api.dto.scaffold.CompleteStructureStageResult;
 import navigator.api.dto.scaffold.LearningScaffoldActionResult;
@@ -68,5 +70,12 @@ public class LearningScaffoldController {
             @PathVariable String taskId,
             @Valid @RequestBody CompleteStructureStageRequest request) {
         return GlobalResponse.ok(learningScaffoldEngineService.completeStructureStage(taskId, request));
+    }
+
+    @PostMapping("/{taskId}/learning-scaffold/conversation/complete")
+    public GlobalResponse<CompleteConversationStageResult> completeConversationStage(
+            @PathVariable String taskId,
+            @Valid @RequestBody CompleteConversationStageRequest request) {
+        return GlobalResponse.ok(learningScaffoldEngineService.completeConversationStage(taskId, request));
     }
 }
