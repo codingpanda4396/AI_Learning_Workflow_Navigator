@@ -1,7 +1,9 @@
 <template>
   <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">表达任务</p>
-    <p class="mt-1 text-sm font-medium text-slate-900">{{ prompt }}</p>
+    <p class="mt-1 text-base font-semibold text-slate-900">{{ taskTitle }}</p>
+    <p class="mt-1 text-sm text-slate-700">{{ taskRequirement }}</p>
+    <p class="mt-2 text-xs text-slate-500">{{ prompt }}</p>
     <textarea
       class="mt-3 min-h-[150px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-primary/50 focus:bg-white"
       :value="draft"
@@ -25,6 +27,8 @@
 <script setup lang="ts">
 withDefaults(
   defineProps<{
+    taskTitle: string
+    taskRequirement: string
     prompt: string
     draft: string
     busy?: boolean

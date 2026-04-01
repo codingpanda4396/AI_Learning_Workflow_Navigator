@@ -1,7 +1,6 @@
 import type { WorkbenchPhaseCode, WorkbenchPhaseProgressModel } from '@/types/taskExecutionWorkbench'
-import type { DfsBfsStructureWorkbenchUi } from '@/constants/dfsBfsStructureSkeleton'
 
-export type WorkbenchRenderState = 'PROMPT' | 'THINK' | 'OUTPUT' | 'FEEDBACK'
+export type WorkbenchRenderState = 'prompt' | 'think' | 'output' | 'feedback'
 
 export interface ExplanationBlock {
   id: string
@@ -13,6 +12,17 @@ export interface ExplanationBlock {
 export interface McqOption {
   id: string
   label: string
+}
+
+export interface StageIntroCopy {
+  title: string
+  subtitle: string
+}
+
+export interface StructureQuestion {
+  id: string
+  prompt: string
+  options: McqOption[]
 }
 
 export interface UnderstandingQuestion {
@@ -47,10 +57,6 @@ export interface WorkbenchScaffoldAction {
   prompt: string
 }
 
-export interface WorkbenchStructureSubmitPayload {
-  ui: DfsBfsStructureWorkbenchUi
-}
-
 export interface WorkbenchReflectionOutput {
   questionOptionId: string | null
   strategyId: string | null
@@ -62,13 +68,16 @@ export interface ExecutionWorkbenchViewModel {
   cognitiveAction: string
   phase: WorkbenchPhaseCode
   phaseProgress: WorkbenchPhaseProgressModel
-  intro: string
+  intro: StageIntroCopy
   renderState: WorkbenchRenderState
   explanations: ExplanationBlock[]
   scaffoldActions: WorkbenchScaffoldAction[]
-  structureUi: DfsBfsStructureWorkbenchUi
+  structureQuestion: StructureQuestion | null
+  structureSelectedId: string | null
   understandingQuestion: UnderstandingQuestion | null
   understandingSelectedId: string | null
+  trainingTaskTitle: string
+  trainingTaskRequirement: string
   trainingPrompt: string
   trainingDraft: string
   reflectionSummary: string

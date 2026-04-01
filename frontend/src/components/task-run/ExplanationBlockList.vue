@@ -1,6 +1,12 @@
 <template>
   <section class="space-y-3">
     <article
+      v-if="blocks.length === 0"
+      class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+    >
+      <p class="text-sm text-slate-600">暂时没有补充说明，可先完成当前主交互。</p>
+    </article>
+    <article
       v-for="b in blocks"
       :key="b.id"
       class="rounded-2xl border px-4 py-3 shadow-sm"

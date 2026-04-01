@@ -1,25 +1,27 @@
 <template>
   <div class="space-y-4">
     <DfsBfsStructureWorkbench
-      v-if="phase === 'STRUCTURE'"
-      :model-value="structureUi"
-      :disabled="busy"
-      :error-message="structureError"
-      :highlight="structureHighlight"
-      @update:model-value="$emit('update-structure-ui', $event)"
+      v-if="phase === 'STRUCTURE' && structureQuestion"
+      :question="structureQuestion"
+      :selected-option-id="structureSelectedId"
+      :locked="renderState !== 'prompt'"
+      :busy="busy"
+      @pick="$emit('pick-structure', $event)"
     />
 
     <UnderstandingMcqWorkbench
       v-else-if="phase === 'UNDERSTANDING' && understandingQuestion"
       :question="understandingQuestion"
       :selected-option-id="understandingSelectedId"
-      :locked="renderState !== 'THINK'"
+      :locked="renderState !== 'prompt'"
       :busy="busy"
       @pick="$emit('pick-understanding', $event)"
     />
 
     <TrainingExpressionWorkbench
       v-else-if="phase === 'TRAINING'"
+      :task-title="trainingTaskTitle"
+      :task-requirement="trainingTaskRequirement"
       :prompt="trainingPrompt"
       :draft="trainingDraft"
       :busy="busy"
@@ -47,20 +49,9 @@
           :disabled="busy || !reflectionOutput.questionOptionId || !reflectionOutput.strategyId"
           @click="$emit('submit-reflection')"
         >
-          提交反思
+          提交本轮反思
         </button>
       </div>
-    </div>
-
-    <div v-if="phase === 'STRUCTURE'" class="flex justify-end">
-      <button
-        type="button"
-        class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-        :disabled="busy || renderState !== 'THINK'"
-        @click="$emit('submit-structure', { ui: structureUi })"
-      >
-        提交结构判断
-      </button>
     </div>
   </div>
 </template>
@@ -75,23 +66,23 @@ import UnderstandingMcqWorkbench from '@/components/task-run/UnderstandingMcqWor
 import type {
   ReflectionQuestion,
   ReflectionStrategy,
+  StructureQuestion,
   UnderstandingQuestion,
   WorkbenchReflectionOutput,
   WorkbenchRenderState,
-  WorkbenchStructureSubmitPayload,
 } from '@/types/phaseWorkbench'
-import type { DfsBfsStructureWorkbenchUi, DfsBfsWorkbenchHighlight } from '@/constants/dfsBfsStructureSkeleton'
 import type { WorkbenchPhaseCode } from '@/types/taskExecutionWorkbench'
 
 defineProps<{
   phase: WorkbenchPhaseCode
   renderState: WorkbenchRenderState
   busy: boolean
-  structureUi: DfsBfsStructureWorkbenchUi
-  structureError: string
-  structureHighlight: DfsBfsWorkbenchHighlight
+  structureQuestion: StructureQuestion | null
+  structureSelectedId: string | null
   understandingQuestion: UnderstandingQuestion | null
   understandingSelectedId: string | null
+  trainingTaskTitle: string
+  trainingTaskRequirement: string
   trainingPrompt: string
   trainingDraft: string
   reflectionSummary: string
@@ -101,8 +92,7 @@ defineProps<{
 }>()
 
 defineEmits<{
-  'update-structure-ui': [value: DfsBfsStructureWorkbenchUi]
-  'submit-structure': [payload: WorkbenchStructureSubmitPayload]
+  'pick-structure': [optionId: string]
   'pick-understanding': [optionId: string]
   'update-training-draft': [value: string]
   'submit-training': []

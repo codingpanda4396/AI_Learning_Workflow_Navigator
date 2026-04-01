@@ -3,6 +3,7 @@
     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">认知动作库</p>
     <p class="mt-1 text-sm font-semibold text-slate-900">{{ phaseLabel }}</p>
     <div class="mt-3 space-y-2">
+      <p v-if="actions.length === 0" class="text-xs text-slate-500">暂无可用动作，先完成左侧主任务。</p>
       <button
         v-for="a in actions"
         :key="a.id"

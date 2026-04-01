@@ -6,20 +6,13 @@
     <div class="flex flex-wrap items-start justify-between gap-2">
       <div class="min-w-0 flex-1">
         <p class="truncate text-sm font-semibold text-slate-950">{{ topicName }}</p>
-        <p class="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">脚手架工作台</p>
+        <p class="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">阶段学习工作台</p>
         <p class="mt-0.5 text-sm font-semibold text-slate-900">
           <span class="font-mono text-xs text-primary">{{ emphasisPhase }}</span>
           <span class="mx-1.5 text-slate-300">·</span>
           <span>{{ cognitiveAction }}</span>
         </p>
       </div>
-      <button
-        type="button"
-        class="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-        @click="router.push('/plan')"
-      >
-        返回规划
-      </button>
     </div>
 
     <div class="mt-3 flex gap-0 rounded-lg border border-slate-200/80 bg-slate-50/80 p-0.5">
@@ -42,13 +35,13 @@
 
     <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-slate-600">
       <span v-if="taskIndexLabel" class="text-slate-500">{{ taskIndexLabel }}</span>
+      <span>阶段目标：{{ stageGoal || '完成当前主交互并查看反馈' }}</span>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { PHASE_STRIP_LABELS_ZH } from '@/constants/stageLabels'
 import type { WorkbenchPhaseCode, WorkbenchPhaseProgressModel } from '@/types/taskExecutionWorkbench'
 
@@ -61,7 +54,6 @@ const props = defineProps<{
   taskIndexLabel: string
 }>()
 
-const router = useRouter()
 const phases = computed(() => props.phaseProgress.phases)
 
 function phaseStripLabel(code: string) {

@@ -15,90 +15,24 @@
       </EmptyState>
 
       <section v-else-if="task" class="pb-28">
-        <div class="mx-auto space-y-5" :class="showScaffoldWorkbench ? 'max-w-4xl' : 'max-w-3xl'">
-          <TaskRunPhaseHeader
-            v-if="!showScaffoldWorkbench"
-            :topic-name="workbenchTopicName"
-            :phase-progress="headerPhaseProgress"
-            :goal-line="phaseGoalLine"
-            :phase-hint="phaseHintLine"
+        <div class="mx-auto max-w-6xl space-y-5" :data-phase="executionWorkbenchVm.phase">
+          <ExecutionWorkbenchPage
+            :vm="executionWorkbenchVm"
+            @append-explanation="appendExplanationFromScaffold"
+            @pick-structure="submitStructureSelection"
+            @pick-understanding="submitUnderstandingSelection"
+            @update-training-draft="draftInput = $event"
+            @submit-training="submitTrainingExpression"
+            @select-reflection-question="reflectionOutput.questionOptionId = $event"
+            @select-reflection-strategy="reflectionOutput.strategyId = $event"
+            @submit-reflection="submitReflectionOutput"
           />
-
-          <div class="space-y-5" :data-phase="pageModel.workbench.emphasisPhase">
-            <template v-if="showScaffoldWorkbench">
-              <ExecutionWorkbenchPage
-                :vm="executionWorkbenchVm"
-                :structure-error="structureSubmitError"
-                :structure-highlight="structureHighlight"
-                @append-explanation="appendExplanationFromScaffold"
-                @update-structure-ui="structureUi = $event"
-                @submit-structure="submitStructureSelection"
-                @pick-understanding="submitUnderstandingSelection"
-                @update-training-draft="draftInput = $event"
-                @submit-training="submitTrainingExpression"
-                @select-reflection-question="reflectionOutput.questionOptionId = $event"
-                @select-reflection-strategy="reflectionOutput.strategyId = $event"
-                @submit-reflection="submitReflectionOutput"
-              />
-            </template>
-
-            <template v-else>
-              <MainTaskWorkbenchCard
-                :model="pageModel.workbench.currentTask"
-                :why-this-step="pageModel.workbench.whyThisStep"
-                :scaffold-product="pageModel.workbench.scaffoldProduct"
-                :hint-reveal="pageModel.workbench.hintReveal"
-                :guide-sections="pageModel.workbench.guideSections"
-                :emphasis-phase="pageModel.workbench.emphasisPhase"
-              />
-
-              <TaskExpressionPanel
-                ref="expressionPanelRef"
-                :draft-value="draftInput"
-                :placeholder="pageModel.mainAction.inputPlaceholder || ''"
-                :placeholder-soft="pageModel.tutorConsole.inputPlaceholderSoft"
-                :sending="mainActionLoading"
-                :helper-text="pageModel.workbench.expressionLayout.helperText"
-                :low-friction-prompt="pageModel.workbench.expressionLayout.lowFrictionPrompt"
-                :structured-fields="pageModel.workbench.expressionLayout.fields"
-                :structured-inputs="structuredInputs"
-                :starter-chips="pageModel.mainAction.chips"
-                :emphasis-phase="pageModel.workbench.emphasisPhase"
-                :checkpoint-prompt="checkpointQuestionDisplay"
-                :show-advance="showAdvanceSection"
-                :micro-check-labels="microCheckLabels"
-                :checks="microChecks"
-                @update:draft-value="draftInput = $event"
-                @update:structured-inputs="structuredInputs = $event"
-                @update:checks="microChecks = $event"
-                @chip="fillDraftInput"
-              />
-            </template>
-
-            <TaskFeedbackDeck
-              v-if="!showScaffoldWorkbench && taskFeedbackModel.visible"
-              :class="feedbackEmphasisClass"
-              :model="taskFeedbackModel"
-              :schema="pageModel.workbench.feedbackSchema"
-              @action="handleFeedbackAction"
-            />
-
-            <ReflectionSummaryCard
-              v-if="!showScaffoldWorkbench && reflectionSummaryForWorkbench"
-              :summary="reflectionSummaryForWorkbench"
-            />
-          </div>
         </div>
-
-        <TaskRunDualActionBar
-          v-if="!showScaffoldWorkbench"
-          :primary-label="dualPrimaryLabel"
-          :secondary-label="dualSecondaryLabel"
-          :primary-loading="mainActionLoading || advancing"
-          :primary-disabled="dualPrimaryDisabled"
-          :secondary-disabled="mainActionLoading || advancing"
-          @primary="onPrimaryBar"
-          @secondary="onStuckFromPanel"
+        <BottomActionBar
+          :primary-label="nextActionLabel"
+          :primary-disabled="!canGoNext"
+          :primary-loading="scaffoldEngine.submitting"
+          @primary="goNextPhase"
         />
       </section>
     </main>
@@ -113,6 +47,7 @@ import PageContainer from '@/components/layout/PageContainer.vue'
 import MainTaskWorkbenchCard from '@/components/task-run/MainTaskWorkbenchCard.vue'
 import TaskExpressionPanel from '@/components/task-run/TaskExpressionPanel.vue'
 import ExecutionWorkbenchPage from '@/components/task-run/ExecutionWorkbenchPage.vue'
+import BottomActionBar from '@/components/task-run/BottomActionBar.vue'
 import {
   createEmptyDfsBfsWorkbenchUi,
   deriveLegacySelection,
@@ -122,7 +57,11 @@ import {
   validateDfsBfsWorkbenchUi,
 } from '@/constants/dfsBfsStructureSkeleton'
 import {
+  DFS_BFS_DEFAULT_EXPLANATION,
+  DFS_BFS_NEXT_ACTION_LABEL,
   DFS_BFS_PHASE_INTRO,
+  DFS_BFS_SCAFFOLD_ACTIONS,
+  DFS_BFS_STRUCTURE_QUESTION,
   DFS_BFS_REFLECTION_QUESTION,
   DFS_BFS_REFLECTION_STRATEGIES,
   DFS_BFS_UNDERSTANDING_QUESTIONS,
@@ -181,7 +120,6 @@ import type {
   PhaseFeedbackPayload,
   WorkbenchReflectionOutput,
   WorkbenchRenderState,
-  WorkbenchStructureSubmitPayload,
 } from '@/types/phaseWorkbench'
 
 interface ChatTurn {
@@ -218,12 +156,13 @@ const draftInput = ref('')
 const structuredInputs = ref<string[]>([])
 const latestFeedback = ref<ExecutionGuideFeedbackModel | null>(null)
 const engineFeedback = ref<ExecutionGuideFeedbackModel | null>(null)
-const phaseRenderState = ref<WorkbenchRenderState>('PROMPT')
+const phaseRenderState = ref<WorkbenchRenderState>('prompt')
 const explanationBlocks = ref<ExplanationBlock[]>([])
 const phaseFeedback = ref<PhaseFeedbackPayload | null>(null)
 const structureUi = ref<DfsBfsStructureWorkbenchUi>(createEmptyDfsBfsWorkbenchUi())
 const structureSubmitError = ref('')
 const structureHighlight = ref<DfsBfsWorkbenchHighlight>(null)
+const structureSelectedId = ref<string | null>(null)
 const understandingQuestionIndex = ref(0)
 const understandingSelectedId = ref<string | null>(null)
 const reflectionOutput = ref<WorkbenchReflectionOutput>({
@@ -379,18 +318,68 @@ const pageModel = computed<ExecutionPageViewModel>(() => {
   return base
 })
 
-const currentPhase = computed(() => pageModel.value.workbench.emphasisPhase)
+const PHASE_QUERY_TO_CODE = {
+  structure: 'STRUCTURE',
+  understanding: 'UNDERSTANDING',
+  training: 'TRAINING',
+  reflection: 'REFLECTION',
+} as const
+
+const PHASE_CODE_TO_QUERY = {
+  STRUCTURE: 'structure',
+  UNDERSTANDING: 'understanding',
+  TRAINING: 'training',
+  REFLECTION: 'reflection',
+} as const
+
+const phaseFromQuery = computed(() => {
+  const raw = typeof route.query.phase === 'string' ? route.query.phase.toLowerCase() : ''
+  return PHASE_QUERY_TO_CODE[raw as keyof typeof PHASE_QUERY_TO_CODE] ?? null
+})
+
+const currentPhase = computed(() => phaseFromQuery.value ?? pageModel.value.workbench.emphasisPhase)
 
 const scaffoldActions = computed(() => {
+  const defaults = DFS_BFS_SCAFFOLD_ACTIONS[currentPhase.value] ?? []
   const blocks = scaffoldEngine.stage?.workbench?.promptScaffold?.blocks ?? []
-  return blocks
+  const dynamic = blocks
     .filter((b) => b.id && b.title)
     .map((b) => ({
       id: b.id,
       title: b.title,
       prompt: b.prompt || '',
     }))
+  return dynamic.length ? dynamic : defaults
 })
+
+watch(
+  currentPhase,
+  async (phase) => {
+    const expected = PHASE_CODE_TO_QUERY[phase]
+    const current = typeof route.query.phase === 'string' ? route.query.phase.toLowerCase() : ''
+    if (current === expected) return
+    await router.replace({
+      query: {
+        ...route.query,
+        phase: expected,
+      },
+    })
+  },
+  { immediate: true }
+)
+
+watch(
+  currentPhase,
+  (phase, prev) => {
+    if (!prev || phase === prev) return
+    phaseRenderState.value = 'prompt'
+    phaseFeedback.value = null
+    structureSelectedId.value = null
+    understandingSelectedId.value = null
+    reflectionOutput.value = { questionOptionId: null, strategyId: null }
+    explanationBlocks.value = buildInitialExplanationBlocks()
+  }
+)
 
 const understandingQuestion = computed(() => {
   return DFS_BFS_UNDERSTANDING_QUESTIONS[understandingQuestionIndex.value] ?? null
@@ -413,13 +402,16 @@ const executionWorkbenchVm = computed<ExecutionWorkbenchViewModel>(() => ({
     '',
   phase: currentPhase.value,
   phaseProgress: headerPhaseProgress.value,
-  intro: DFS_BFS_PHASE_INTRO[currentPhase.value] || '按当前阶段完成一个主动作。',
+  intro: DFS_BFS_PHASE_INTRO[currentPhase.value],
   renderState: phaseRenderState.value,
   explanations: explanationBlocks.value,
   scaffoldActions: scaffoldActions.value,
-  structureUi: structureUi.value,
+  structureQuestion: DFS_BFS_STRUCTURE_QUESTION,
+  structureSelectedId: structureSelectedId.value,
   understandingQuestion: understandingQuestion.value,
   understandingSelectedId: understandingSelectedId.value,
+  trainingTaskTitle: '用 2~3 句话解释 DFS 和 BFS 的差别',
+  trainingTaskRequirement: '至少说出：推进方式、典型数据结构、适用场景中的一个。',
   trainingPrompt:
     pageModel.value.workbench.expressionLayout.helperText || '请用自己的话完成当前表达任务。',
   trainingDraft: draftInput.value,
@@ -430,6 +422,38 @@ const executionWorkbenchVm = computed<ExecutionWorkbenchViewModel>(() => ({
   feedback: phaseFeedback.value,
   busy: scaffoldEngine.submitting || scaffoldEngine.loading,
 }))
+
+const canGoNext = computed(() => phaseRenderState.value === 'feedback')
+
+const nextActionLabel = computed(() => DFS_BFS_NEXT_ACTION_LABEL[currentPhase.value])
+
+async function goNextPhase() {
+  if (!canGoNext.value) return
+  if (currentPhase.value === 'REFLECTION') {
+    router.push('/report')
+    return
+  }
+  const nextMap = {
+    STRUCTURE: 'understanding',
+    UNDERSTANDING: 'training',
+    TRAINING: 'reflection',
+  } as const
+  const nextQuery = nextMap[currentPhase.value as keyof typeof nextMap]
+  if (!nextQuery) return
+  await router.replace({
+    query: {
+      ...route.query,
+      phase: nextQuery,
+    },
+  })
+  phaseRenderState.value = 'prompt'
+  phaseFeedback.value = null
+  structureSelectedId.value = null
+  understandingSelectedId.value = null
+  draftInput.value = ''
+  reflectionOutput.value = { questionOptionId: null, strategyId: null }
+  explanationBlocks.value = buildInitialExplanationBlocks()
+}
 
 const EMPTY_TASK_FEEDBACK: ExecutionGuideFeedbackModel = {
   visible: false,
@@ -637,13 +661,12 @@ function phaseSnapshotKey(taskId: string) {
 }
 
 function buildInitialExplanationBlocks(): ExplanationBlock[] {
-  const w = scaffoldEngine.stage?.workbench
-  if (!w) return []
-  const blocks: ExplanationBlock[] = []
-  const guide = w.llmGeneratedGuide?.trim() || w.currentTaskInstruction?.trim() || ''
-  if (guide) blocks.push({ id: 'intro', title: '阶段讲解', body: guide, tone: 'base' })
-  const micro = w.llmGeneratedMicroHint?.trim() || ''
-  if (micro) blocks.push({ id: 'micro', title: '关键提示', body: micro, tone: 'base' })
+  const defaultBlock = DFS_BFS_DEFAULT_EXPLANATION[currentPhase.value]
+  const blocks: ExplanationBlock[] = [
+    { id: `${currentPhase.value}-default`, title: defaultBlock.title, body: defaultBlock.body, tone: 'base' },
+  ]
+  const guide = scaffoldEngine.stage?.workbench?.llmGeneratedGuide?.trim() || ''
+  if (guide) blocks.push({ id: `${currentPhase.value}-guide`, title: '补充讲解', body: guide, tone: 'base' })
   return blocks
 }
 
@@ -657,6 +680,7 @@ function restoreWorkbenchSnapshot() {
       phase?: string
       renderState?: WorkbenchRenderState
       structureUi?: DfsBfsStructureWorkbenchUi
+      structureSelectedId?: string | null
       explanations?: ExplanationBlock[]
       understandingSelectedId?: string | null
       understandingQuestionIndex?: number
@@ -665,6 +689,7 @@ function restoreWorkbenchSnapshot() {
     if (snap.phase !== currentPhase.value) return
     if (snap.renderState) phaseRenderState.value = snap.renderState
     if (snap.structureUi) structureUi.value = snap.structureUi
+    structureSelectedId.value = snap.structureSelectedId ?? null
     if (snap.explanations?.length) explanationBlocks.value = snap.explanations
     if (typeof snap.understandingQuestionIndex === 'number') {
       understandingQuestionIndex.value = snap.understandingQuestionIndex
@@ -680,10 +705,11 @@ watch(
   () => [showScaffoldWorkbench.value, scaffoldEngine.stage?.stageKey] as const,
   ([enabled]) => {
     if (!enabled) return
-    phaseRenderState.value = 'THINK'
+    phaseRenderState.value = 'prompt'
     phaseFeedback.value = null
     structureSubmitError.value = ''
     structureHighlight.value = null
+    structureSelectedId.value = null
     understandingSelectedId.value = null
     explanationBlocks.value = buildInitialExplanationBlocks()
     restoreWorkbenchSnapshot()
@@ -711,6 +737,7 @@ watch(
         phase: currentPhase.value,
         renderState: phaseRenderState.value,
         structureUi: structureUi.value,
+        structureSelectedId: structureSelectedId.value,
         explanations: explanationBlocks.value.slice(-8),
         understandingSelectedId: understandingSelectedId.value,
         understandingQuestionIndex: understandingQuestionIndex.value,
@@ -737,12 +764,25 @@ function draftStorageKey(taskId: string) {
 let draftPersistTimer: ReturnType<typeof setTimeout> | null = null
 watch(draftInput, (v) => {
   const id = task.value?.taskId
+  if (currentPhase.value === 'TRAINING' && phaseRenderState.value === 'prompt' && v.trim()) {
+    phaseRenderState.value = 'think'
+  }
   if (!id) return
   if (draftPersistTimer) clearTimeout(draftPersistTimer)
   draftPersistTimer = setTimeout(() => {
     localStorage.setItem(draftStorageKey(id), v)
   }, 450)
 })
+
+watch(
+  () => [reflectionOutput.value.questionOptionId, reflectionOutput.value.strategyId] as const,
+  ([q, s]) => {
+    if (currentPhase.value !== 'REFLECTION') return
+    if (phaseRenderState.value === 'prompt' && (q || s)) {
+      phaseRenderState.value = 'think'
+    }
+  }
+)
 
 function firstLine(text: string, fallback: string) {
   const line = text.split('\n').map((item) => item.trim()).find(Boolean)
@@ -862,24 +902,18 @@ function appendExplanationFromScaffold(actionId: string) {
   })
 }
 
-async function submitStructureSelection(payload: WorkbenchStructureSubmitPayload) {
+async function submitStructureSelection(optionId: string) {
   if (currentPhase.value !== 'STRUCTURE') return
-  structureUi.value = payload.ui
-  const check = validateDfsBfsWorkbenchUi(payload.ui)
-  if (!check.ok) {
-    structureSubmitError.value = check.message
-    structureHighlight.value = check.highlight
-    phaseRenderState.value = 'THINK'
-    return
-  }
+  if (phaseRenderState.value !== 'prompt') return
+  structureSelectedId.value = optionId
+  phaseRenderState.value = 'think'
   structureSubmitError.value = ''
   structureHighlight.value = null
-  phaseRenderState.value = 'OUTPUT'
-  const selection = deriveLegacySelection(payload.ui)
-  const submitText = formatSkeletonForSubmit(selection)
-  const res = await scaffoldEngine.submit(submitText)
+  phaseRenderState.value = 'output'
+  const res = await scaffoldEngine.submit(`STRUCTURE:${DFS_BFS_STRUCTURE_QUESTION.id}:${optionId}`)
   if (scaffoldEngine.error) {
     showToast(scaffoldEngine.error)
+    phaseRenderState.value = 'prompt'
     return
   }
   const mapped = mapEngineFeedbackPayloadToGuide(res?.feedbackPayload, 'STRUCTURE')
@@ -889,14 +923,16 @@ async function submitStructureSelection(payload: WorkbenchStructureSubmitPayload
     body: mapped?.gap || mapped?.mastered || '结构轮廓已提交。',
     nextAction: mapped?.nextStep || '继续下一题或进入下一阶段。',
   }
-  phaseRenderState.value = 'FEEDBACK'
+  phaseRenderState.value = 'feedback'
 }
 
 async function submitUnderstandingSelection(optionId: string) {
   if (currentPhase.value !== 'UNDERSTANDING') return
+  if (phaseRenderState.value !== 'prompt') return
   const q = understandingQuestion.value
   if (!q) return
-  phaseRenderState.value = 'OUTPUT'
+  phaseRenderState.value = 'think'
+  phaseRenderState.value = 'output'
   understandingSelectedId.value = optionId
   const fb = q.feedbackByOption[optionId]
   const text = `UNDERSTANDING:${q.id}:${optionId}`
@@ -908,14 +944,14 @@ async function submitUnderstandingSelection(optionId: string) {
     body: fb?.body || mapped?.gap || mapped?.mastered || '已记录你的机制判断。',
     nextAction: mapped?.nextStep || '继续机制判断。',
   }
-  phaseRenderState.value = 'FEEDBACK'
+  phaseRenderState.value = 'feedback'
 }
 
 async function submitTrainingExpression() {
   if (currentPhase.value !== 'TRAINING') return
   const text = draftInput.value.trim()
   if (!text) return
-  phaseRenderState.value = 'OUTPUT'
+  phaseRenderState.value = 'output'
   const res = await scaffoldEngine.submit(text)
   if (scaffoldEngine.error) {
     showToast(scaffoldEngine.error)
@@ -928,13 +964,13 @@ async function submitTrainingExpression() {
     body: mapped?.gap || mapped?.mastered || '已收到你的表达。',
     nextAction: mapped?.nextStep || '按建议改一版。',
   }
-  phaseRenderState.value = 'FEEDBACK'
+  phaseRenderState.value = 'feedback'
 }
 
 async function submitReflectionOutput() {
   if (currentPhase.value !== 'REFLECTION') return
   if (!reflectionOutput.value.questionOptionId || !reflectionOutput.value.strategyId) return
-  phaseRenderState.value = 'OUTPUT'
+  phaseRenderState.value = 'output'
   const text =
     `REFLECTION:Q=${reflectionOutput.value.questionOptionId};` +
     `S=${reflectionOutput.value.strategyId}`
@@ -945,7 +981,7 @@ async function submitReflectionOutput() {
     body: mapped?.mastered || mapped?.gap || '反思已记录，保留这条迁移策略。',
     nextAction: mapped?.nextStep || '可以进入下一任务。',
   }
-  phaseRenderState.value = 'FEEDBACK'
+  phaseRenderState.value = 'feedback'
 }
 
 function onStuckFromPanel() {
