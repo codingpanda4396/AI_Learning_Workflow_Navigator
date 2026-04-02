@@ -12,6 +12,7 @@ import navigator.api.dto.scaffold.StructureSkeletonRequest;
 import navigator.api.dto.scaffold.StructureSkeletonResult;
 import navigator.api.dto.scaffold.SubmitLearningScaffoldActionRequest;
 import navigator.application.scaffold.LearningScaffoldEngineService;
+import navigator.application.scaffold.WorkbenchMode;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,8 +37,10 @@ public class LearningScaffoldController {
     @GetMapping("/{taskId}/learning-scaffold/stage/current")
     public GlobalResponse<StageScaffold> getCurrentStage(
             @PathVariable String taskId,
-            @RequestParam String sessionId) {
-        return GlobalResponse.ok(learningScaffoldEngineService.getStage(sessionId, taskId, null));
+            @RequestParam String sessionId,
+            @RequestParam(required = false, defaultValue = "full") String workbenchMode) {
+        return GlobalResponse.ok(learningScaffoldEngineService.getStage(
+                sessionId, taskId, null, WorkbenchMode.fromQueryParam(workbenchMode)));
     }
 
     /**
@@ -47,8 +50,10 @@ public class LearningScaffoldController {
     public GlobalResponse<StageScaffold> getStage(
             @PathVariable String taskId,
             @RequestParam String sessionId,
-            @RequestParam(required = false) String stageKey) {
-        return GlobalResponse.ok(learningScaffoldEngineService.getStage(sessionId, taskId, stageKey));
+            @RequestParam(required = false) String stageKey,
+            @RequestParam(required = false, defaultValue = "full") String workbenchMode) {
+        return GlobalResponse.ok(learningScaffoldEngineService.getStage(
+                sessionId, taskId, stageKey, WorkbenchMode.fromQueryParam(workbenchMode)));
     }
 
     @PostMapping("/{taskId}/learning-scaffold/action")

@@ -292,18 +292,14 @@ async function goNextPhase() {
   if (!canGoNext.value || !task.value || !store.sessionId) return
   advancingPhase.value = true
   try {
-    let enginePhaseBeforeSubmit = resolveEnginePhase()
+    const enginePhaseBeforeSubmit = resolveEnginePhase()
     if (enginePhaseBeforeSubmit && enginePhaseBeforeSubmit !== currentPhase.value) {
-      await scaffoldEngine.loadStage()
-      enginePhaseBeforeSubmit = resolveEnginePhase()
-      if (enginePhaseBeforeSubmit && enginePhaseBeforeSubmit !== currentPhase.value) {
-        if (enginePhaseBeforeSubmit === 'reflection') {
-          buildReflectionSummary()
-        }
-        await syncRoutePhase(enginePhaseBeforeSubmit)
-        ensureConversationState(enginePhaseBeforeSubmit)
-        return
+      if (enginePhaseBeforeSubmit === 'reflection') {
+        buildReflectionSummary()
       }
+      await syncRoutePhase(enginePhaseBeforeSubmit)
+      ensureConversationState(enginePhaseBeforeSubmit)
+      return
     }
 
     if (currentPhase.value === 'reflection') {
@@ -316,7 +312,6 @@ async function goNextPhase() {
       if (latestStructureSubmit.value) {
         await latestStructureSubmit.value
       }
-      await scaffoldEngine.loadStage()
       const enginePhaseAfterSync = resolveEnginePhase()
       if (enginePhaseAfterSync && enginePhaseAfterSync !== 'structure') {
         await syncRoutePhase(enginePhaseAfterSync)
@@ -331,7 +326,7 @@ async function goNextPhase() {
         sessionId: store.sessionId,
       })
       engineStageKeyHint.value = csr.nextStageKey
-      await scaffoldEngine.loadStage()
+      await scaffoldEngine.loadStage({ force: true })
     }
 
     if (currentPhase.value === 'understanding') {
@@ -340,7 +335,7 @@ async function goNextPhase() {
         stageKey: 'UNDERSTANDING',
       })
       engineStageKeyHint.value = ucr.nextStageKey
-      await scaffoldEngine.loadStage()
+      await scaffoldEngine.loadStage({ force: true })
     }
 
     if (currentPhase.value === 'training') {
@@ -350,7 +345,7 @@ async function goNextPhase() {
         finalDraft: trainingState.finalDraft ?? undefined,
       })
       engineStageKeyHint.value = tcr.nextStageKey
-      await scaffoldEngine.loadStage()
+      await scaffoldEngine.loadStage({ force: true })
     }
 
     const next = nextPhase(currentPhase.value)
@@ -575,15 +570,17 @@ async function fetchTask() {
   try {
     const data = await getCurrentTask(store.sessionId)
     const previousTaskId = task.value?.taskId ?? null
+    const taskChanged = !!previousTaskId && !!data.taskId && data.taskId !== previousTaskId
+
+    if (taskChanged) {
+      resetWorkbenchState()
+    }
+
     store.currentTask = data
     store.progress = data.progress
     task.value = data
     progress.value = data.progress
-    engineStageKeyHint.value = data.currentStage
-
-    if (previousTaskId && data.taskId && data.taskId !== previousTaskId) {
-      resetWorkbenchState()
-    }
+    engineStageKeyHint.value = scaffoldEngine.stage?.stageKey ?? data.currentStage
 
     if (!data.taskId) {
       store.currentTaskId = null

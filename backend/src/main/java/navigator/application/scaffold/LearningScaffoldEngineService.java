@@ -95,7 +95,11 @@ public class LearningScaffoldEngineService {
     }
 
     public StageScaffold getStage(String sessionId, String taskId, String stageKeyParam) {
-        return buildStageScaffoldForSession(sessionId, taskId, stageKeyParam);
+        return getStage(sessionId, taskId, stageKeyParam, WorkbenchMode.FULL);
+    }
+
+    public StageScaffold getStage(String sessionId, String taskId, String stageKeyParam, WorkbenchMode workbenchMode) {
+        return buildStageScaffoldForSession(sessionId, taskId, stageKeyParam, workbenchMode);
     }
 
     /**
@@ -171,6 +175,11 @@ public class LearningScaffoldEngineService {
      * 构建当前会话下的脚手架阶段视图（含工作台 LLM 软文案），与 {@link #getStage} 同源，供 action 提交后合并返回以避免重复请求。
      */
     private StageScaffold buildStageScaffoldForSession(String sessionId, String taskId, String stageKeyParam) {
+        return buildStageScaffoldForSession(sessionId, taskId, stageKeyParam, WorkbenchMode.FULL);
+    }
+
+    private StageScaffold buildStageScaffoldForSession(
+            String sessionId, String taskId, String stageKeyParam, WorkbenchMode workbenchMode) {
         sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
         taskExecutionFlowService.ensureTaskExecutionRuntimeAndScaffoldDomain(sessionId, taskId);
@@ -193,7 +202,7 @@ public class LearningScaffoldEngineService {
 
         persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
         StageScaffold stage = mergeProgress(buildStageForKey(stageKey), eng);
-        stage.setWorkbench(stageScaffoldWorkbenchComposer.composeWorkbench(pack.packId(), stage));
+        stage.setWorkbench(stageScaffoldWorkbenchComposer.composeWorkbench(pack.packId(), stage, workbenchMode));
         return stage;
     }
 
@@ -489,7 +498,7 @@ public class LearningScaffoldEngineService {
         }
         StructuredScaffoldFeedbackPayload feedbackPayload = ScaffoldStructuredFeedbackFactory.build(
                 passed, validation, tutor, trainingFeedback);
-        StageScaffold updatedStage = buildStageScaffoldForSession(sessionId, taskId, null);
+        StageScaffold updatedStage = buildStageScaffoldForSession(sessionId, taskId, null, WorkbenchMode.FAST);
         return LearningScaffoldActionResult.builder()
                 .actionRuntime(ar)
                 .validation(validation)

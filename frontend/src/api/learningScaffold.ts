@@ -1,5 +1,5 @@
 import { request } from './request'
-import { getTaskScaffold } from './task'
+import { getTaskScaffold, type WorkbenchMode } from './task'
 import type {
   CompleteConversationStageResult,
   CompleteStructureStageResult,
@@ -8,14 +8,17 @@ import type {
   StructureSkeletonResult,
 } from '@/types/scaffoldEngine'
 
-/** 与 GET /api/tasks/{taskId}/scaffold?stage= 一致（须传引擎当前阶段 STAGE_KEY） */
+/** 与 GET /api/tasks/{taskId}/scaffold?stage=&workbenchMode= 一致（须传引擎当前阶段 STAGE_KEY） */
 export async function getLearningScaffoldStage(
   taskId: string,
   sessionId: string,
-  stageKey: string
+  stageKey: string,
+  workbenchMode: WorkbenchMode = 'full'
 ): Promise<StageScaffold> {
-  return getTaskScaffold(taskId, sessionId, stageKey)
+  return getTaskScaffold(taskId, sessionId, stageKey, workbenchMode)
 }
+
+export type { WorkbenchMode } from './task'
 
 export async function submitLearningScaffoldAction(
   taskId: string,

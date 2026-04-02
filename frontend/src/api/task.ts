@@ -28,14 +28,17 @@ export async function getCurrentTaskGuidance(
   return data
 }
 
+export type WorkbenchMode = 'fast' | 'full'
+
 export async function getTaskScaffold(
   taskId: string,
   sessionId: string,
-  stage: string
+  stage: string,
+  workbenchMode: WorkbenchMode = 'full'
 ): Promise<StageScaffold> {
   const { data } = await request.get<StageScaffold>(
     `/api/tasks/${taskId}/scaffold`,
-    { params: { sessionId, stage } }
+    { params: { sessionId, stage, workbenchMode } }
   )
   return data
 }

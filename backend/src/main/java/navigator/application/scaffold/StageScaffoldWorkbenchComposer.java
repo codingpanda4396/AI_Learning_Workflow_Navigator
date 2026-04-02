@@ -36,6 +36,8 @@ public class StageScaffoldWorkbenchComposer {
     private static final int MAX_BLOCK_PROMPT_LEN = 320;
 
     private final ConcurrentHashMap<String, LlmSoftWorkbench> softContentCache = new ConcurrentHashMap<>();
+    /** 同 cacheKey 并发只跑一次 LLM（single-flight） */
+    private final ConcurrentHashMap<String, Object> softContentLocks = new ConcurrentHashMap<>();
 
     private final MockLlmGateway mockLlmGateway;
     private final OpenAiCompatibleLlmGateway openAiCompatibleLlmGateway;
@@ -53,6 +55,13 @@ public class StageScaffoldWorkbenchComposer {
     }
 
     public StageScaffoldWorkbenchPayload composeWorkbench(String packId, StageScaffold stage) {
+        return composeWorkbench(packId, stage, WorkbenchMode.FULL);
+    }
+
+    /**
+     * @param mode FAST：仅用动作卡组装，不调 LLM；FULL：含软文案（缓存命中则不调）
+     */
+    public StageScaffoldWorkbenchPayload composeWorkbench(String packId, StageScaffold stage, WorkbenchMode mode) {
         if (!LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(packId) || stage == null) {
             return null;
         }
@@ -63,7 +72,9 @@ public class StageScaffoldWorkbenchComposer {
         String stageKey = stage.getStageKey() != null ? stage.getStageKey() : "";
         String emphasis = mapEmphasis(stageKey);
 
-        LlmSoftWorkbench soft = fetchSoftContent(packId, stageKey, card);
+        LlmSoftWorkbench soft = mode == WorkbenchMode.FAST
+                ? new LlmSoftWorkbench()
+                : fetchSoftContentWithLlm(packId, stageKey, card);
 
         PromptScaffoldBlock mainBlock = PromptScaffoldBlock.builder()
                 .id("main")
@@ -232,13 +243,21 @@ public class StageScaffoldWorkbenchComposer {
                 .collect(Collectors.joining("；"));
     }
 
-    private LlmSoftWorkbench fetchSoftContent(String packId, String stageKey, LearningActionCard card) {
+    private LlmSoftWorkbench fetchSoftContentWithLlm(String packId, String stageKey, LearningActionCard card) {
         String cacheKey = packId + "::" + stageKey + "::" + card.getActionId();
         LlmSoftWorkbench cached = softContentCache.get(cacheKey);
         if (cached != null) {
             log.debug("workbench soft content: cache hit key={}", cacheKey);
             return cached;
         }
+
+        Object lock = softContentLocks.computeIfAbsent(cacheKey, k -> new Object());
+        try {
+            synchronized (lock) {
+                cached = softContentCache.get(cacheKey);
+                if (cached != null) {
+                    return cached;
+                }
 
         String system = """
                 你是学习脚手架文案生成器，帮助学生在「DFS/BFS 图搜索」学习中完成当前认知动作。
@@ -283,14 +302,18 @@ public class StageScaffoldWorkbenchComposer {
                 nz(card.getInstructions()),
                 card.getAllowedPrompts() != null ? String.join(" | ", card.getAllowedPrompts()) : "无特别限制");
 
-        String raw = callLlm(system, user);
-        LlmSoftWorkbench parsed = parseSoftJson(raw);
-        if (parsed != null) {
-            softContentCache.put(cacheKey, parsed);
-            return parsed;
+                String raw = callLlm(system, user);
+                LlmSoftWorkbench parsed = parseSoftJson(raw);
+                if (parsed != null) {
+                    softContentCache.put(cacheKey, parsed);
+                    return parsed;
+                }
+                log.debug("workbench soft content: parse failed, using card-only fallback");
+                return new LlmSoftWorkbench();
+            }
+        } finally {
+            softContentLocks.remove(cacheKey, lock);
         }
-        log.debug("workbench soft content: parse failed, using card-only fallback");
-        return new LlmSoftWorkbench();
     }
 
     private String callLlm(String system, String user) {

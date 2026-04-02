@@ -16,6 +16,7 @@ import navigator.api.dto.TaskMessageResponse;
 import navigator.api.dto.scaffold.StageScaffold;
 import navigator.application.ExecutionApplicationService;
 import navigator.application.scaffold.LearningScaffoldEngineService;
+import navigator.application.scaffold.WorkbenchMode;
 import navigator.application.task.TaskExecutionFlowService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,14 +43,17 @@ public class TaskController {
     }
 
     /**
-     * 按阶段加载脚手架 UI（含 LLM 软文案）。stage 须与引擎当前阶段一致。
+     * 按阶段加载脚手架 UI。stage 须与引擎当前阶段一致。
+     * workbenchMode=fast：仅动作卡组装工作台，不调 LLM；full（默认）：含软文案。
      */
     @GetMapping("/{taskId}/scaffold")
     public GlobalResponse<StageScaffold> getScaffold(
             @PathVariable String taskId,
             @RequestParam String sessionId,
-            @RequestParam String stage) {
-        return GlobalResponse.ok(learningScaffoldEngineService.getStage(sessionId, taskId, stage));
+            @RequestParam String stage,
+            @RequestParam(required = false, defaultValue = "full") String workbenchMode) {
+        return GlobalResponse.ok(learningScaffoldEngineService.getStage(
+                sessionId, taskId, stage, WorkbenchMode.fromQueryParam(workbenchMode)));
     }
 
     @PostMapping("/{taskId}/messages")

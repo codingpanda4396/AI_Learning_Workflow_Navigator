@@ -3,17 +3,19 @@ import { getLearningScaffoldStage, submitLearningScaffoldAction } from '@/api/le
 import { phaseCodeToFullZh } from '@/constants/stageLabels'
 import type { LearningScaffoldActionResult, StageScaffold } from '@/types/scaffoldEngine'
 
-/** 四阶段展示名（与后端 stageKey 对齐） */
+/** 四阶段展示名，与后端 stageKey 对齐 */
 export function scaffoldStageLabel(stageKey: string | undefined): string {
   if (!stageKey) return '脚手架'
   const zh = phaseCodeToFullZh(stageKey)
   return zh || stageKey
 }
 
+type StageMode = 'fast' | 'full'
+
 export function useLearningScaffoldEngine(opts: {
   taskId: () => string | null | undefined
   sessionId: () => string | null | undefined
-  /** 后端 STAGE_KEY（须与引擎当前阶段一致，如 STRUCTURE） */
+  /** 后端 STAGE_KEY，需与引擎当前阶段一致，如 STRUCTURE */
   stageApiKey: () => string | undefined
   enabled: () => boolean
 }) {
@@ -26,7 +28,7 @@ export function useLearningScaffoldEngine(opts: {
   const structureStageComplete = computed(() => stage.value?.structureStageComplete === true)
   const understandingStageComplete = computed(() => stage.value?.understandingStageComplete === true)
 
-  /** STRUCTURE → REFLECTION（占位）全部完成后再退出动作卡主区 */
+  /** STRUCTURE -> REFLECTION 全部完成后再退出动作卡主区 */
   const scaffoldEngineComplete = computed(() => {
     const keys = stage.value?.completedStageKeys
     if (keys?.length) {
@@ -46,21 +48,151 @@ export function useLearningScaffoldEngine(opts: {
     return stage.value.actionCards.find((c) => c.actionId === id) ?? null
   })
 
-  async function loadStage() {
+  let loadGeneration = 0
+  let activeFastLoadKey: string | null = null
+  let activeFastLoadPromise: Promise<StageScaffold | null> | null = null
+  let activeFullLoadKey: string | null = null
+  let activeFullLoadPromise: Promise<StageScaffold | null> | null = null
+  let currentStageLoadKey: string | null = null
+  const currentStageMode = ref<StageMode | null>(null)
+  const inflightStageRequests = new Map<string, Promise<StageScaffold>>()
+
+  function makeLoadKey(tid: string, sid: string, sk: string) {
+    return `${tid}::${sid}::${sk}`
+  }
+
+  function makeRequestKey(tid: string, sid: string, sk: string, mode: StageMode) {
+    return `${makeLoadKey(tid, sid, sk)}::${mode}`
+  }
+
+  function assignStage(nextStage: StageScaffold, mode: StageMode, loadKey: string) {
+    stage.value = nextStage
+    currentStageMode.value = mode
+    currentStageLoadKey = loadKey
+  }
+
+  async function requestStage(
+    tid: string,
+    sid: string,
+    sk: string,
+    mode: StageMode
+  ): Promise<StageScaffold> {
+    const requestKey = makeRequestKey(tid, sid, sk, mode)
+    const inflight = inflightStageRequests.get(requestKey)
+    if (inflight) return inflight
+
+    const requestPromise = getLearningScaffoldStage(tid, sid, sk, mode).finally(() => {
+      if (inflightStageRequests.get(requestKey) === requestPromise) {
+        inflightStageRequests.delete(requestKey)
+      }
+    })
+
+    inflightStageRequests.set(requestKey, requestPromise)
+    return requestPromise
+  }
+
+  async function loadStage(options?: { force?: boolean }) {
     const tid = opts.taskId()
     const sid = opts.sessionId()
     const sk = opts.stageApiKey()
-    if (!tid || !sid || !sk || !opts.enabled()) return
+    if (!tid || !sid || !sk || !opts.enabled()) return null
+
+    const force = options?.force === true
+    const loadKey = makeLoadKey(tid, sid, sk)
+
+    if (!force && currentStageLoadKey === loadKey && currentStageMode.value === 'full' && stage.value) {
+      return stage.value
+    }
+    if (activeFastLoadKey === loadKey && activeFastLoadPromise) {
+      return activeFastLoadPromise
+    }
+    if (!force && activeFullLoadKey === loadKey && activeFullLoadPromise) {
+      return activeFullLoadPromise
+    }
+
+    const gen = ++loadGeneration
     loading.value = true
     error.value = null
-    try {
-      stage.value = await getLearningScaffoldStage(tid, sid, sk)
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : '加载脚手架失败'
-      stage.value = null
-    } finally {
-      loading.value = false
+
+    const fastPromise = (async () => {
+      try {
+        const fast = await requestStage(tid, sid, sk, 'fast')
+        if (gen === loadGeneration) {
+          assignStage(fast, 'fast', loadKey)
+        }
+        return fast
+      } catch (e) {
+        if (gen === loadGeneration) {
+          error.value = e instanceof Error ? e.message : '加载脚手架失败'
+          stage.value = null
+          currentStageMode.value = null
+          currentStageLoadKey = null
+        }
+        return null
+      } finally {
+        if (gen === loadGeneration) {
+          loading.value = false
+        }
+        if (activeFastLoadKey === loadKey) {
+          activeFastLoadKey = null
+          activeFastLoadPromise = null
+        }
+      }
+    })()
+
+    activeFastLoadKey = loadKey
+    activeFastLoadPromise = fastPromise
+
+    const fast = await fastPromise
+    if (!fast) return null
+
+    const shouldHydrate =
+      force ||
+      currentStageLoadKey !== loadKey ||
+      currentStageMode.value !== 'full' ||
+      stage.value?.currentActionId !== fast.currentActionId
+
+    if (shouldHydrate) {
+      void hydrateWorkbenchSoft(gen, tid, sid, sk, loadKey)
     }
+
+    return fast
+  }
+
+  async function hydrateWorkbenchSoft(
+    gen: number,
+    tid: string,
+    sid: string,
+    sk: string,
+    loadKey: string
+  ): Promise<void> {
+    if (currentStageLoadKey === loadKey && currentStageMode.value === 'full') {
+      return
+    }
+    if (activeFullLoadKey === loadKey && activeFullLoadPromise) {
+      await activeFullLoadPromise
+      return
+    }
+
+    const fullPromise = (async () => {
+      try {
+        const full = await requestStage(tid, sid, sk, 'full')
+        if (gen !== loadGeneration) return null
+        assignStage(full, 'full', loadKey)
+        return full
+      } catch {
+        return null
+      } finally {
+        if (activeFullLoadKey === loadKey) {
+          activeFullLoadKey = null
+          activeFullLoadPromise = null
+        }
+      }
+    })()
+
+    activeFullLoadKey = loadKey
+    activeFullLoadPromise = fullPromise
+    await fullPromise
   }
 
   async function submit(userInput: string) {
@@ -69,6 +201,7 @@ export function useLearningScaffoldEngine(opts: {
     const card = currentCard.value
     const sk = stage.value?.stageKey
     if (!tid || !sid || !card || !sk) return null
+
     submitting.value = true
     error.value = null
     try {
@@ -79,9 +212,13 @@ export function useLearningScaffoldEngine(opts: {
         userInput,
       })
       lastResult.value = res
-      // 同一 stageKey 内仍会切换 currentActionId（如 STRUCTURE 多卡 MCQ），仅依赖 stageComplete 会漏刷新，
-      // 导致后续提交仍用旧 actionId，后端拒绝且引擎状态不完整。
-      stage.value = res.updatedStage ?? (await getLearningScaffoldStage(tid, sid, sk))
+
+      if (res.updatedStage) {
+        assignStage(res.updatedStage, 'fast', makeLoadKey(tid, sid, res.updatedStage.stageKey ?? sk))
+      } else {
+        await loadStage({ force: true })
+      }
+
       return res
     } catch (e) {
       error.value = e instanceof Error ? e.message : '提交失败'
@@ -94,9 +231,13 @@ export function useLearningScaffoldEngine(opts: {
   watch(
     () => [opts.enabled(), opts.taskId(), opts.sessionId(), opts.stageApiKey()] as const,
     () => {
-      if (opts.enabled()) void loadStage()
-      else {
+      if (opts.enabled()) {
+        void loadStage()
+      } else {
+        loadGeneration++
         stage.value = null
+        currentStageMode.value = null
+        currentStageLoadKey = null
         lastResult.value = null
       }
     },
