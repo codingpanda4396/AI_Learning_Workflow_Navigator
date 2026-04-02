@@ -210,4 +210,6 @@ export interface LearningScaffoldActionResult {
   reflectionRecord?: ReflectionRecord
   reflectionInsight?: ReflectionInsight
   feedbackPayload?: StructuredScaffoldFeedbackPayload
+  /** 与 GET learning-scaffold/stage 一致；存在时无需再拉阶段 */
+  updatedStage?: StageScaffold
 }

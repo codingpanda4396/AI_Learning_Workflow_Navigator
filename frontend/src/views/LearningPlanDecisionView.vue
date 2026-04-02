@@ -108,7 +108,11 @@ async function fetchPlan() {
 }
 
 function goExecution() {
-  router.push({ name: 'task' })
+  if (store.currentTaskId) {
+    router.push({ name: 'taskRun', params: { taskId: store.currentTaskId } })
+    return
+  }
+  router.push({ name: 'execution' })
 }
 
 async function onStartStep() {

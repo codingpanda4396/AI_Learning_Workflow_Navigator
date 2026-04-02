@@ -54,7 +54,7 @@ import ErrorState from '@/components/ui/ErrorState.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import { getErrorMessage } from '@/api/request'
-import { postCompleteConversationStage } from '@/api/learningScaffold'
+import { postCompleteConversationStage, postCompleteStructureStage } from '@/api/learningScaffold'
 import { streamAiTutorChat, type AiTutorChatMessagePayload } from '@/api/tutor'
 import { getCurrentTask, getTaskScaffold } from '@/api/task'
 import { supportsLearningScaffoldEngine } from '@/constants/learningScaffoldPack'
@@ -102,6 +102,7 @@ const task = ref<CurrentTaskItem | null>(null)
 const progress = ref<ProgressItem | null>(null)
 const scaffold = ref<TaskScaffoldResponse | null>(null)
 const advancingPhase = ref(false)
+const latestStructureSubmit = ref<Promise<unknown> | null>(null)
 
 const structureState = reactive<StructurePhaseState>(
   createEmptyStructureState(DFS_BFS_STRUCTURE_QUESTIONS),
@@ -126,6 +127,17 @@ const PHASE_QUERY_TO_KEY: Record<string, PhaseKey> = {
   understanding: 'understanding',
   training: 'training',
   reflection: 'reflection',
+}
+
+function resolveEnginePhase(): PhaseKey | null {
+  const stageKey = scaffoldEngine.stage?.stageKey
+  if (!stageKey) return null
+  return PHASE_CODE_TO_KEY[stageKey as keyof typeof PHASE_CODE_TO_KEY] ?? null
+}
+
+async function syncRoutePhase(phase: PhaseKey) {
+  if (currentPhase.value === phase) return
+  await router.replace({ query: { ...route.query, phase } })
 }
 
 const phaseFromQuery = computed<PhaseKey>(() => {
@@ -154,7 +166,11 @@ const nextActionLoading = computed(() => advancingPhase.value || currentPhaseBus
 const canGoNext = computed(() => {
   switch (currentPhase.value) {
     case 'structure':
-      return structureState.completedQuestionIds.length >= structureState.questions.length
+      return (
+        !latestStructureSubmit.value &&
+        (scaffoldEngine.stage?.structureCanComplete === true ||
+          structureState.completedQuestionIds.length >= structureState.questions.length)
+      )
     case 'understanding':
       return understandingState.canProceed
     case 'training':
@@ -232,10 +248,41 @@ async function goNextPhase() {
   if (!canGoNext.value || !task.value || !store.sessionId) return
   advancingPhase.value = true
   try {
+    const enginePhaseBeforeSubmit = resolveEnginePhase()
+    if (enginePhaseBeforeSubmit && enginePhaseBeforeSubmit !== currentPhase.value) {
+      if (enginePhaseBeforeSubmit === 'reflection') {
+        buildReflectionSummary()
+      }
+      await syncRoutePhase(enginePhaseBeforeSubmit)
+      ensureConversationState(enginePhaseBeforeSubmit)
+      return
+    }
+
     if (currentPhase.value === 'reflection') {
       await submitReflectionToBackend()
       await router.push('/report')
       return
+    }
+
+    if (currentPhase.value === 'structure') {
+      if (latestStructureSubmit.value) {
+        await latestStructureSubmit.value
+      }
+      await scaffoldEngine.loadStage()
+      const enginePhaseAfterSync = resolveEnginePhase()
+      if (enginePhaseAfterSync && enginePhaseAfterSync !== 'structure') {
+        await syncRoutePhase(enginePhaseAfterSync)
+        ensureConversationState(enginePhaseAfterSync)
+        return
+      }
+      if (scaffoldEngine.stage?.structureCanComplete !== true) {
+        showToast('请先等当前题目的反馈同步完成，再进入下一阶段')
+        return
+      }
+      await postCompleteStructureStage(task.value.taskId, {
+        sessionId: store.sessionId,
+      })
+      await scaffoldEngine.loadStage()
     }
 
     if (currentPhase.value === 'understanding') {
@@ -257,11 +304,18 @@ async function goNextPhase() {
 
     const next = nextPhase(currentPhase.value)
     if (!next) return
-    if (next === 'reflection') {
+    const enginePhaseAfterSubmit = resolveEnginePhase()
+    // 引擎若仍返回「当前阶段」（常见于 loadStage 与后端状态短暂不一致），应前进到顺序上的 next；
+    // 若引擎已跳到更后阶段，则跟随引擎。
+    const targetPhase =
+      enginePhaseAfterSubmit && enginePhaseAfterSubmit !== currentPhase.value
+        ? enginePhaseAfterSubmit
+        : next
+    if (targetPhase === 'reflection') {
       buildReflectionSummary()
     }
-    await router.replace({ query: { ...route.query, phase: next } })
-    ensureConversationState(next)
+    await syncRoutePhase(targetPhase)
+    ensureConversationState(targetPhase)
   } catch (err) {
     showToast(getErrorMessage(err))
   } finally {
@@ -270,7 +324,7 @@ async function goNextPhase() {
 }
 
 function handleStructurePick(optionId: string) {
-  if (structureState.isLocked) return
+  if (structureState.isLocked || latestStructureSubmit.value) return
   structureState.selectedOptionId = optionId
   structureState.isLocked = true
 
@@ -279,11 +333,17 @@ function handleStructurePick(optionId: string) {
     if (!structureState.completedQuestionIds.includes(q.id)) {
       structureState.completedQuestionIds.push(q.id)
     }
-    void submitStructureSelectionToEngine(q.id, optionId)
+    void submitStructureSelectionToEngine(q.id, optionId).catch((err) => {
+      structureState.isLocked = false
+      structureState.selectedOptionId = null
+      structureState.completedQuestionIds = structureState.completedQuestionIds.filter((id) => id !== q.id)
+      showToast(getErrorMessage(err))
+    })
   }
 }
 
 function handleStructureNext() {
+  if (latestStructureSubmit.value) return
   const q = structureState.questions[structureState.currentQuestionIndex]
   if (q && !structureState.completedQuestionIds.includes(q.id)) {
     structureState.completedQuestionIds.push(q.id)
@@ -297,8 +357,23 @@ function handleStructureNext() {
 }
 
 async function submitStructureSelectionToEngine(questionId: string, optionId: string) {
+  const previousSubmit = latestStructureSubmit.value
+  if (previousSubmit) {
+    await previousSubmit
+  }
   const text = `STRUCTURE:${questionId}:${optionId}`
-  await scaffoldEngine.submit(text)
+  const submitPromise = scaffoldEngine.submit(text)
+  latestStructureSubmit.value = submitPromise
+  try {
+    const result = await submitPromise
+    if (!result) {
+      throw new Error('当前题目的反馈同步失败，请重试这一题')
+    }
+  } finally {
+    if (latestStructureSubmit.value === submitPromise) {
+      latestStructureSubmit.value = null
+    }
+  }
 }
 
 async function handleUnderstandingSend(text: string) {

@@ -31,6 +31,10 @@ const store = useWorkflowStore()
 
 onMounted(() => {
   if (store.sessionId) {
+    if (store.currentTaskId) {
+      router.replace({ name: 'taskRun', params: { taskId: store.currentTaskId } })
+      return
+    }
     router.replace({ name: 'task' })
     return
   }
@@ -39,5 +43,4 @@ onMounted(() => {
   router.replace({ name: 'plan' })
 })
 </script>
-
 

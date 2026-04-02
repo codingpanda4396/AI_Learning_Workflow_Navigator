@@ -37,4 +37,5 @@ navigator:
     scaffoldMaxTokens: ${NAVIGATOR_LLM_SCAFFOLD_MAX_TOKENS:800}
     connectTimeoutMs: ${NAVIGATOR_LLM_CONNECT_TIMEOUT_MS:3000}
     timeoutMs: ${NAVIGATOR_LLM_TIMEOUT_MS:60000}
-    feedbackTimeoutMs: ${NAVIGATOR_LLM_FEEDBACK_TIMEOUT_MS:60000}
+    # 结构化反馈专用；短于 timeoutMs 以便慢请求尽快走规则兜底（可用环境变量调大）
+    feedbackTimeoutMs: ${NAVIGATOR_LLM_FEEDBACK_TIMEOUT_MS:18000}

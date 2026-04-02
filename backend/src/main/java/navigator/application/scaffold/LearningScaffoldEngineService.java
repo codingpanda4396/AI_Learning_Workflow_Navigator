@@ -39,6 +39,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Service
@@ -93,6 +94,13 @@ public class LearningScaffoldEngineService {
     }
 
     public StageScaffold getStage(String sessionId, String taskId, String stageKeyParam) {
+        return buildStageScaffoldForSession(sessionId, taskId, stageKeyParam);
+    }
+
+    /**
+     * 构建当前会话下的脚手架阶段视图（含工作台 LLM 软文案），与 {@link #getStage} 同源，供 action 提交后合并返回以避免重复请求。
+     */
+    private StageScaffold buildStageScaffoldForSession(String sessionId, String taskId, String stageKeyParam) {
         sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
         taskExecutionFlowService.getScaffold(sessionId, taskId);
@@ -255,7 +263,29 @@ public class LearningScaffoldEngineService {
         int gen = eng.getStructureGenerationCount();
         int light = eng.getStructureLightInteractionCount();
         int explored = eng.getStructureExploredPromptKeys() != null ? eng.getStructureExploredPromptKeys().size() : 0;
-        return gen >= 1 && (light >= 1 || explored >= 2);
+        if (gen >= 1 && (light >= 1 || explored >= 2)) {
+            return true;
+        }
+        // 前端 STRUCTURE 三道 MCQ 与四张动作卡的前三张一一对应；完成 MCQ 后未走骨架生成 API，gen/light 仍为 0
+        return hasStructureMcqFirstThreeActionsPassed(eng);
+    }
+
+    /**
+     * 与 {@link DfsBfsStructureScaffoldDefinition#orderedActionIds()} 中前三张卡对齐（position / prereq / next）。
+     */
+    private static boolean hasStructureMcqFirstThreeActionsPassed(LearningScaffoldEngineState eng) {
+        Map<String, ScaffoldActionRuntimeEntry> m = eng.getActionRuntimeByActionId();
+        if (m == null || m.isEmpty()) {
+            return false;
+        }
+        return isStructureActionPassed(m, DfsBfsStructureScaffoldDefinition.ACTION_POSITION)
+                && isStructureActionPassed(m, DfsBfsStructureScaffoldDefinition.ACTION_PREREQ)
+                && isStructureActionPassed(m, DfsBfsStructureScaffoldDefinition.ACTION_NEXT);
+    }
+
+    private static boolean isStructureActionPassed(Map<String, ScaffoldActionRuntimeEntry> m, String actionId) {
+        ScaffoldActionRuntimeEntry e = m.get(actionId);
+        return e != null && e.isCompleted();
     }
 
     public LearningScaffoldActionResult submitAction(String taskId, SubmitLearningScaffoldActionRequest request) {
@@ -389,6 +419,7 @@ public class LearningScaffoldEngineService {
         }
         StructuredScaffoldFeedbackPayload feedbackPayload = ScaffoldStructuredFeedbackFactory.build(
                 passed, validation, tutor, trainingFeedback);
+        StageScaffold updatedStage = buildStageScaffoldForSession(sessionId, taskId, null);
         return LearningScaffoldActionResult.builder()
                 .actionRuntime(ar)
                 .validation(validation)
@@ -405,6 +436,7 @@ public class LearningScaffoldEngineService {
                 .runtimeStatus(entry.getRuntimeStatus())
                 .canProceed(tutor.isCanProceed())
                 .feedbackPayload(feedbackPayload)
+                .updatedStage(updatedStage)
                 .build();
     }
 

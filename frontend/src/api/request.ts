@@ -23,7 +23,9 @@ request.interceptors.response.use(
     const body = response.data as GlobalResponse<unknown>
     if (body.code !== 'OK') {
       const msg =
-        errorCodeLabels[body.code] ?? body.message ?? '请求失败'
+        body.message?.trim() ||
+        errorCodeLabels[body.code] ||
+        '请求失败'
       throw { code: body.code, message: msg }
     }
     response.data = body.data
@@ -33,7 +35,9 @@ request.interceptors.response.use(
     if (err.response?.data?.code) {
       const body = err.response.data
       const msg =
-        errorCodeLabels[body.code] ?? body.message ?? '请求失败'
+        body.message?.trim() ||
+        errorCodeLabels[body.code] ||
+        '请求失败'
       return Promise.reject<ApiError>({ code: body.code, message: msg })
     }
     const msg = err.message || '网络错误'

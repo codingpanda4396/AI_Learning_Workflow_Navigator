@@ -60,6 +60,13 @@ router.beforeEach(async (to) => {
     }
   }
   if (to.name === 'execution' && store.sessionId) {
+    if (store.currentTaskId) {
+      return {
+        name: 'taskRun',
+        params: { taskId: store.currentTaskId },
+        replace: true,
+      }
+    }
     return {
       name: 'task',
       replace: true,

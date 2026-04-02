@@ -46,7 +46,7 @@ public class LlmProperties {
 
     /**
      * Max tokens for scaffold JSON generation (workbench soft content, structure skeleton).
-     * Needs to be higher because the output is a multi-field JSON object.
+     * Larger values reduce truncation risk but increase latency; tune with NAVIGATOR_LLM_SCAFFOLD_MAX_TOKENS.
      */
     private Integer scaffoldMaxTokens = 800;
 
@@ -56,6 +56,6 @@ public class LlmProperties {
     /** HTTP read timeout in milliseconds. */
     private int timeoutMs = 60000;
 
-    /** HTTP read timeout for structured feedback calls. */
-    private int feedbackTimeoutMs = 60000;
+    /** HTTP read timeout for structured feedback calls (typically shorter than {@link #timeoutMs}). */
+    private int feedbackTimeoutMs = 18000;
 }

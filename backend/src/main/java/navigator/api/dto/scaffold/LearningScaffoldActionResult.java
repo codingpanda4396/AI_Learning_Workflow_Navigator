@@ -31,4 +31,7 @@ public class LearningScaffoldActionResult {
 
     /** 结构化反馈（issue ≤3），供前端稳定渲染 */
     private StructuredScaffoldFeedbackPayload feedbackPayload;
+
+    /** 提交后当前脚手架阶段快照（含工作台），与 GET learning-scaffold/stage 一致，避免前端二次拉取 */
+    private StageScaffold updatedStage;
 }

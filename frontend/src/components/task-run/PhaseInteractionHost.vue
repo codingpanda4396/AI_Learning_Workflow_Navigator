@@ -3,6 +3,7 @@
     <DfsBfsStructurePhase
       v-if="phase === 'structure'"
       :state="vm.structure"
+      :busy="vm.busy"
       @pick="$emit('structure:pick', $event)"
       @next="$emit('structure:next')"
     />

@@ -35,6 +35,14 @@ public class DfsBfsStructureValidator implements StructureValidator {
     @Override
     public ValidationResult validate(StructureValidationContext ctx) {
         String raw = ctx.getUserInput() != null ? ctx.getUserInput().trim() : "";
+        if (isStructureMcqSubmission(raw)) {
+            return ValidationResult.builder()
+                    .passed(true)
+                    .errorType(null)
+                    .message("通过")
+                    .suggestions(List.of())
+                    .build();
+        }
         if (raw.length() < MIN_CHARS) {
             return ValidationResult.builder()
                     .passed(false)
@@ -77,5 +85,11 @@ public class DfsBfsStructureValidator implements StructureValidator {
                 .message("通过")
                 .suggestions(List.of())
                 .build();
+    }
+
+    private static boolean isStructureMcqSubmission(String raw) {
+        return raw.startsWith("STRUCTURE:sq1:")
+                || raw.startsWith("STRUCTURE:sq2:")
+                || raw.startsWith("STRUCTURE:sq3:");
     }
 }

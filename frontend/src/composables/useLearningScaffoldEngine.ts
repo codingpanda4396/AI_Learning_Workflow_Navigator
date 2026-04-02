@@ -76,11 +76,9 @@ export function useLearningScaffoldEngine(opts: {
         userInput,
       })
       lastResult.value = res
-
-      const stageChanged = res.stageComplete || (res.stageKey && res.stageKey !== sk)
-      if (stageChanged) {
-        stage.value = await getLearningScaffoldStage(tid, sid)
-      }
+      // 同一 stageKey 内仍会切换 currentActionId（如 STRUCTURE 多卡 MCQ），仅依赖 stageComplete 会漏刷新，
+      // 导致后续提交仍用旧 actionId，后端拒绝且引擎状态不完整。
+      stage.value = res.updatedStage ?? (await getLearningScaffoldStage(tid, sid))
       return res
     } catch (e) {
       error.value = e instanceof Error ? e.message : '提交失败'

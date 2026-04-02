@@ -22,12 +22,13 @@
         <button
           v-if="!isLastQuestion"
           type="button"
-          class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+          class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="busy"
           @click="goNextQuestion"
         >
-          下一题
+          {{ busy ? '同步中…' : '下一题' }}
         </button>
-        <p v-else class="text-sm text-emerald-600 font-medium">
+        <p v-else class="text-sm font-medium text-emerald-600">
           三题已完成，可以进入下一阶段
         </p>
       </div>
@@ -43,6 +44,7 @@ import type { StructurePhaseState } from '@/types/executionWorkbench'
 
 const props = defineProps<{
   state: StructurePhaseState
+  busy?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -68,6 +70,7 @@ function handlePick(optionId: string) {
 }
 
 function goNextQuestion() {
+  if (props.busy) return
   emit('next')
 }
 </script>
