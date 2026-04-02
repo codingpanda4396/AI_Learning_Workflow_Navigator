@@ -1,9 +1,9 @@
 <template>
   <div
     data-testid="bottom-action-bar"
-    class="sticky bottom-0 z-10 mt-6 border-t border-slate-200/90 bg-[color-mix(in_srgb,var(--color-page-bg,#f8fafc)_92%,white)] px-4 py-3 backdrop-blur md:px-6"
+    class="sticky bottom-0 z-10 mt-6 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:px-6"
   >
-    <div class="mx-auto flex max-w-[1260px] flex-wrap items-center justify-between gap-3">
+    <div class="mx-auto flex max-w-execution flex-wrap items-center justify-between gap-3">
       <p class="text-xs text-slate-500">完成当前阶段并看到反馈后，可进入下一步。</p>
       <PrimaryButton :loading="primaryLoading" :disabled="primaryDisabled" @click="$emit('primary')">
         {{ primaryLabel }}

@@ -1,5 +1,5 @@
 <template>
-  <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+  <div class="grid gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)] lg:items-start">
     <UnderstandingChatPanel
       :messages="state.messages"
       :draft-input="state.draftInput"
@@ -7,13 +7,13 @@
       :input-highlight="inputHighlight"
       :error="state.error"
       :completion-hint="state.completionHint"
-      placeholder="输入你的问题，或点右侧脚手架..."
-      class="min-h-[480px]"
+      placeholder="补充追问，或点右侧认知动作…"
+      class="w-full min-w-0"
       @send="handleSend"
       @update:draft-input="handleDraftUpdate"
     />
 
-    <div class="lg:sticky lg:top-20 lg:self-start">
+    <div class="w-full min-w-0 lg:sticky lg:top-20 lg:max-w-[360px] lg:justify-self-end">
       <PromptScaffoldInjectPanel
         :buttons="scaffoldButtons"
         :busy="busy"

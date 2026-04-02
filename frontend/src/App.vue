@@ -1,5 +1,9 @@
 <template>
-  <router-view />
+  <RouterView v-slot="{ Component }">
+    <Transition name="page" mode="out-in">
+      <component :is="Component" />
+    </Transition>
+  </RouterView>
   <Teleport to="body">
     <Transition name="toast">
       <div

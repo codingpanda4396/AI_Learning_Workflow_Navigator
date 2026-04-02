@@ -10,11 +10,11 @@
       </ErrorState>
 
       <section v-else-if="report" class="space-y-6">
-        <section class="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_38%),linear-gradient(135deg,#ffffff_0%,#f7fbff_50%,#f5f7fb_100%)] shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+        <section class="overflow-hidden rounded-[32px] border border-border bg-[radial-gradient(circle_at_top_left,_rgba(30,58,95,0.12),_transparent_40%),linear-gradient(135deg,#ffffff_0%,#e8eef5_45%,#f1f5f9_100%)] shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
           <div class="grid gap-6 px-5 py-6 md:grid-cols-[minmax(0,1.4fr)_320px] md:px-8 md:py-8">
             <div class="space-y-5">
               <div class="flex flex-wrap items-center gap-3">
-                <span class="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold tracking-[0.16em] text-white">
+                <span class="rounded-full bg-primary px-3 py-1 text-xs font-semibold tracking-[0.16em] text-white">
                   {{ REPORT_COPY.heroEyebrow }}
                 </span>
                 <span
@@ -39,7 +39,7 @@
                 <button
                   v-if="recommendedAction"
                   type="button"
-                  class="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  class="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-hover"
                   @click="selectedAction = recommendedAction.actionType"
                 >
                   {{ recommendedAction.actionLabel || REPORT_COPY.primaryCta }}
@@ -61,6 +61,32 @@
                 <p class="mt-2 text-sm leading-6 text-slate-600">{{ item.hint }}</p>
               </article>
             </div>
+          </div>
+        </section>
+
+        <section
+          v-if="growthComparison.show"
+          class="overflow-hidden rounded-[28px] border border-border bg-white p-5 shadow-card md:p-7"
+        >
+          <p class="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{{ REPORT_COPY.growthEyebrow }}</p>
+          <h2 class="mt-2 text-2xl font-semibold tracking-tight text-text-primary">{{ REPORT_COPY.growthTitle }}</h2>
+          <p class="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">{{ REPORT_COPY.growthSubtitle }}</p>
+          <div class="mt-6 grid gap-4 md:grid-cols-2">
+            <article class="rounded-2xl border border-border bg-primary-muted/50 p-5">
+              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">{{ REPORT_COPY.growthBeforeLabel }}</p>
+              <p class="mt-3 text-sm leading-7 text-text-primary">{{ growthComparison.before }}</p>
+            </article>
+            <article
+              class="rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-5 shadow-sm ring-1 ring-emerald-100/80"
+            >
+              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800">{{ REPORT_COPY.growthAfterLabel }}</p>
+              <ul class="mt-3 space-y-2 text-sm leading-7 text-emerald-950">
+                <li v-for="(line, i) in growthComparison.afterLines" :key="i" class="flex gap-2">
+                  <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                  <span>{{ line }}</span>
+                </li>
+              </ul>
+            </article>
           </div>
         </section>
 
@@ -302,6 +328,12 @@ const REPORT_COPY = {
   metric3Hint: '报告页不是终点，还会直接接住下一步。',
   metric3Fallback: '继续判断下一步',
   metricLearnedUnit: '条结果',
+  growthEyebrow: '成长证据',
+  growthTitle: '学习前后对比',
+  growthSubtitle: '左侧为诊断时的起点信号，右侧为本轮沉淀的收获，用于呈现能力提升而非流水账总结。',
+  growthBeforeLabel: '学习前起点',
+  growthAfterLabel: '学习后带走',
+  growthBeforeFallback: '诊断阶段已记录你的起点状态；完成本轮任务后，右侧会沉淀可带走的收获。',
 } as const
 
 const router = useRouter()
@@ -339,6 +371,32 @@ const learnedPoints = computed(() => {
     : report.value?.completedProgress?.length
       ? report.value.completedProgress
       : [REPORT_COPY.learnedFallback]
+})
+
+const growthComparison = computed(() => {
+  if (!report.value) {
+    return { show: false, before: '', afterLines: [] as string[] }
+  }
+  const ev = store.diagnosisEvidenceSummary
+  const profile = store.learnerProfileSnapshot
+  let before: string = REPORT_COPY.growthBeforeFallback
+  if (ev?.summary?.trim()) {
+    before = ev.summary.trim()
+  } else if (ev?.keyEvidence?.length) {
+    before = ev.keyEvidence.slice(0, 3).join('；')
+  } else if (profile?.blockingPoint) {
+    before = `卡点信号：${profile.blockingPoint}`
+  } else if (profile?.foundationLevel) {
+    before = `基础自评：${profile.foundationLevel}`
+  }
+
+  const rawAfter = learnedPoints.value.filter((s) => s && s !== REPORT_COPY.learnedFallback).slice(0, 5)
+  const afterLines = rawAfter.length ? rawAfter : [REPORT_COPY.learnedFallback]
+  return {
+    show: true,
+    before,
+    afterLines,
+  }
 })
 
 const remainingGaps = computed(() => {

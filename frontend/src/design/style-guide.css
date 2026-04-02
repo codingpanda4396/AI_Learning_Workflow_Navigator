@@ -1,19 +1,29 @@
-/* Design system - imports from main style.css */
+/* 与 src/style.css :root 保持同步，供文档与 IDE 引用 */
 :root {
-  --color-primary: #4F46E5;
-  --color-primary-hover: #4338CA;
-  --color-secondary: #6366F1;
-  --color-background: #F8FAFC;
-  --color-card-bg: #FFFFFF;
-  --color-text-primary: #0F172A;
+  --color-primary: #1e3a5f;
+  --color-primary-hover: #152e4a;
+  --color-primary-muted: #e8eef5;
+  --color-secondary: #6366f1;
+  --color-accent: #ea580c;
+  --color-accent-hover: #c2410c;
+  --color-background: #f1f5f9;
+  --color-page-bg: #f1f5f9;
+  --color-card-bg: #ffffff;
+  --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
-  --color-border: #E2E8F0;
+  --color-text-muted: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
   --color-success: #059669;
-  --color-warning: #D97706;
-  --color-error: #DC2626;
+  --color-warning: #d97706;
+  --color-error: #dc2626;
+  --color-phase-structure: #2563eb;
+  --color-phase-understanding: #7c3aed;
+  --color-phase-training: #ea580c;
+  --color-phase-reflection: #059669;
   --radius-card: 16px;
   --radius-input: 12px;
-  --shadow-card: 0 1px 3px rgba(0,0,0,.08);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06);
   --spacing-page: 24px;
   --spacing-card: 20px;
 }

@@ -1,7 +1,7 @@
 <template>
   <PageContainer>
     <AppTopBar current="task" />
-    <main class="mx-auto max-w-[1280px] px-4 py-6 md:px-6 lg:px-8">
+    <main class="mx-auto max-w-execution px-4 py-6 md:px-6 lg:px-8">
       <LoadingState v-if="loading && !task" :message="TASKRUN_COPY.loading" />
       <ErrorState v-else-if="error" :message="error">
         <template #action>
@@ -15,7 +15,7 @@
       </EmptyState>
 
       <section v-else-if="task" ref="executionSectionRef" class="pb-28">
-        <div class="mx-auto max-w-6xl space-y-5" :data-phase="currentPhase">
+        <div class="space-y-5" :data-phase="currentPhase">
           <ExecutionWorkbenchPage
             :vm="workbenchVm"
             :scaffold-buttons="scaffoldButtons"

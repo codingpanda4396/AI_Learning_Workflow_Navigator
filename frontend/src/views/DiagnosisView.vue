@@ -2,7 +2,7 @@
   <PageContainer>
     <TransitionOverlay v-if="submitTransitionOverlay" :message="DIAGNOSIS_COPY.transition" />
     <AppTopBar current="diagnosis" />
-    <main class="mx-auto max-w-2xl px-6 py-8">
+    <main class="mx-auto max-w-2xl px-6 py-8 md:px-8">
       <LoadingState v-if="loading && !sessionReady" :message="DIAGNOSIS_COPY.loading" />
       <ErrorState v-else-if="error" :message="error">
         <template #action>
@@ -19,7 +19,7 @@
             {{ DIAGNOSIS_COPY.subtitle }}
           </p>
           <div
-            class="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3"
+            class="mt-4 rounded-xl border border-primary/25 bg-primary-muted/90 px-4 py-3"
           >
             <p class="text-[11px] font-semibold uppercase tracking-wider text-primary/90">
               {{ DIAGNOSIS_COPY.topicLabel }}

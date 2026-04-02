@@ -1,25 +1,25 @@
 <template>
   <section
-    class="relative overflow-hidden rounded-2xl border border-sky-100/90 bg-white px-5 py-5 shadow-[0_12px_40px_rgba(79,70,229,0.08)] md:rounded-[24px] md:px-7 md:py-6"
+    class="relative overflow-hidden rounded-2xl border border-border bg-white px-5 py-5 shadow-card md:rounded-[24px] md:px-7 md:py-6"
   >
     <div
-      class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_0%_-20%,rgba(56,189,248,0.14),transparent_50%),radial-gradient(ellipse_90%_60%_at_100%_100%,rgba(129,140,248,0.12),transparent_45%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,249,255,0.35))]"
+      class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_0%_-20%,rgba(30,58,95,0.08),transparent_50%),radial-gradient(ellipse_90%_60%_at_100%_100%,rgba(234,88,12,0.06),transparent_45%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(232,238,245,0.5))]"
     />
     <div
-      class="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-sky-200/30 blur-3xl"
+      class="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-primary/10 blur-3xl"
     />
     <div
-      class="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-indigo-200/25 blur-2xl"
+      class="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-accent/10 blur-2xl"
     />
 
     <div class="relative">
-      <p class="text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
         {{ model.eyebrow }}
       </p>
-      <h1 class="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-slate-900 md:text-4xl md:leading-[1.12]">
+      <h1 class="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-text-primary md:text-4xl md:leading-[1.12]">
         {{ model.title }}
       </h1>
-      <p class="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600 md:text-base">
+      <p class="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary md:text-base">
         {{ model.subtitle }}
       </p>
 
@@ -27,7 +27,7 @@
         <span
           v-for="(chip, i) in model.chips"
           :key="i"
-          class="inline-flex rounded-full border border-sky-200/80 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-900"
+          class="inline-flex rounded-full border border-primary/20 bg-primary-muted px-3 py-1 text-xs font-medium text-primary"
         >
           {{ chip }}
         </span>

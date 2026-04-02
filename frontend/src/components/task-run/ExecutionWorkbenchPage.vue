@@ -1,12 +1,14 @@
 <template>
-  <div class="mx-auto max-w-6xl space-y-5">
-    <ExecutionTopHeader
-      :topic-name="vm.topicName"
-      :phase="vm.phase"
-      :phase-goal="vm.phaseGoal"
-      :phase-progress="vm.phaseProgress"
-      @exit="$emit('exit')"
-    />
+  <ExecutionShell>
+    <template #header>
+      <ExecutionTopHeader
+        :topic-name="vm.topicName"
+        :phase="vm.phase"
+        :phase-goal="vm.phaseGoal"
+        :phase-progress="vm.phaseProgress"
+        @exit="$emit('exit')"
+      />
+    </template>
 
     <PhaseInteractionHost
       :phase="vm.phase"
@@ -22,10 +24,11 @@
       @reflection:toggle-strategy="$emit('reflection:toggle-strategy', $event)"
       @reflection:text="$emit('reflection:text', $event)"
     />
-  </div>
+  </ExecutionShell>
 </template>
 
 <script setup lang="ts">
+import ExecutionShell from '@/components/task-run/ExecutionShell.vue'
 import ExecutionTopHeader from '@/components/task-run/ExecutionTopHeader.vue'
 import PhaseInteractionHost from '@/components/task-run/PhaseInteractionHost.vue'
 import type { ExecutionWorkbenchVm, ScaffoldButton } from '@/types/executionWorkbench'

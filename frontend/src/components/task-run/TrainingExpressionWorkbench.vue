@@ -14,7 +14,7 @@
     <div class="mt-3 flex justify-end">
       <button
         type="button"
-        class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        class="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
         :disabled="busy || !draft.trim()"
         @click="$emit('submit')"
       >

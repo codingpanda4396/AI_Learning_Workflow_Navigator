@@ -20,7 +20,7 @@
                 <template v-for="(step, index) in GOAL_COPY.flowSteps" :key="step">
                   <span
                     class="rounded-full px-3 py-1"
-                    :class="index === 0 ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 ring-1 ring-slate-200'"
+                    :class="index === 0 ? 'bg-primary text-white' : 'bg-white text-slate-500 ring-1 ring-border'"
                   >
                     {{ step }}
                   </span>
@@ -96,7 +96,7 @@
                   class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold"
                   :class="
                     selectedSubjectKey === subject.key
-                      ? 'border-slate-950 bg-slate-950 text-white'
+                      ? 'border-primary bg-primary text-white'
                       : 'border-slate-200 bg-white text-slate-400'
                   "
                 >
@@ -130,7 +130,7 @@
               <div class="rounded-full border border-border bg-white px-4 py-2 text-sm text-text-secondary">
                 {{ GOAL_COPY.currentSubjectPrefix }}{{ selectedSubject.label }}
               </div>
-              <div class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+              <div class="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white">
                 {{ GOAL_COPY.topicStartTag }}
               </div>
             </div>
@@ -330,7 +330,7 @@ function selectTopic(topicKey: string) {
 
 function subjectCardClass(subjectKey: string) {
   if (selectedSubjectKey.value === subjectKey) {
-    return 'border-slate-900 bg-slate-900 text-white shadow-[0_24px_50px_rgba(15,23,42,0.14)]'
+    return 'border-primary bg-primary text-white shadow-[0_24px_50px_rgba(30,58,95,0.22)]'
   }
   return 'border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]'
 }
@@ -341,7 +341,7 @@ function topicCardClass(topicKey: string) {
     return 'pointer-events-none cursor-not-allowed border-dashed border-slate-200 bg-slate-50/65 text-slate-400 opacity-65'
   }
   if (selectedTopicKey.value === topicKey) {
-    return 'border-slate-950 bg-slate-950 text-white shadow-[0_18px_36px_rgba(15,23,42,0.14)]'
+    return 'border-primary bg-primary text-white shadow-[0_18px_36px_rgba(30,58,95,0.2)]'
   }
   return 'border-slate-200 bg-white text-slate-950 hover:border-slate-300 hover:bg-slate-50'
 }

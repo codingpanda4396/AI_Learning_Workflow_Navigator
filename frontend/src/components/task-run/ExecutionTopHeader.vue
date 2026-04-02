@@ -1,7 +1,7 @@
 <template>
   <header
     data-testid="execution-top-header"
-    class="sticky top-0 z-20 -mx-4 border-b border-slate-200/90 bg-[color-mix(in_srgb,var(--color-page-bg,#f8fafc)_96%,white)] px-4 py-3 backdrop-blur md:-mx-6 md:px-6 lg:-mx-8 lg:px-8"
+    class="sticky top-0 z-20 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6 lg:-mx-8 lg:px-8"
   >
     <div class="flex items-center justify-between gap-4">
       <div class="min-w-0 shrink-0">
@@ -17,7 +17,7 @@
           :key="p.key"
           class="relative flex min-w-0 flex-1 flex-col items-center rounded-md px-1 py-1.5 text-center transition-all duration-200"
           :class="p.key === phase
-            ? 'bg-white shadow-sm ring-1 ring-primary/20'
+            ? 'bg-white shadow-card ring-1 ring-primary/25'
             : isPhaseCompleted(idx)
               ? 'text-slate-600'
               : 'text-slate-400'"

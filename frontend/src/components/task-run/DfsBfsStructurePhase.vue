@@ -1,28 +1,30 @@
 <template>
   <div class="mx-auto max-w-2xl space-y-6">
-    <div class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
-      <p class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
-        第 {{ currentIndex + 1 }} / {{ totalQuestions }} 题
+    <div class="rounded-xl border border-border bg-white p-6 shadow-card">
+      <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-text-muted">
+        第 {{ currentIndex + 1 }} / {{ totalQuestions }} 步 · 当前动作
       </p>
 
-      <McqQuestionCard
-        :question="currentQuestion"
-        :selected-id="state.selectedOptionId"
-        :locked="state.isLocked"
-        @pick="handlePick"
-      />
+      <div
+        class="rounded-xl border-2 border-accent/35 bg-white p-4 shadow-[0_8px_28px_rgba(234,88,12,0.07)] ring-1 ring-accent/10"
+      >
+        <McqQuestionCard
+          :question="currentQuestion"
+          :selected-id="state.selectedOptionId"
+          :locked="state.isLocked"
+          @pick="handlePick"
+        />
+      </div>
 
-      <GuidedFeedbackCard
-        v-if="currentFeedback"
-        :feedback="currentFeedback"
-        class="mt-4"
-      />
+      <div v-if="currentFeedback" class="mt-4 rounded-xl border border-dashed border-border bg-slate-50/90 p-1">
+        <GuidedFeedbackCard :feedback="currentFeedback" />
+      </div>
 
       <div v-if="state.isLocked && currentFeedback" class="mt-5 flex justify-end">
         <button
           v-if="!isLastQuestion"
           type="button"
-          class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          class="h-11 rounded-md bg-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="busy"
           @click="goNextQuestion"
         >

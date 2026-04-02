@@ -1,5 +1,5 @@
 export const APP_COPY = {
-  brand: 'Lumina AI',
+  brand: '星火学航',
   tutorLabel: '导师',
   loginCta: '登录后继续',
   logoutCta: '退出',
@@ -65,17 +65,17 @@ export const GOAL_COPY = {
 } as const
 
 export const DIAGNOSIS_COPY = {
-  title: '只做 3 个选择',
-  subtitle: '先判断当前卡点，再决定从哪一步开始。',
+  title: '轻量诊断 · 3 步',
+  subtitle: '像在对话里定位起点：选最贴近的一项，没有对错压力。',
   topicLabel: '本轮主题',
-  intro: '不用展开解释，选最贴近的一项。',
+  intro: '选最贴近的一项即可，系统用来了解你而不是考核你。',
   submit: '生成学习规划',
   loading: '正在准备快速定位…',
   transition: '正在根据你的卡点生成学习规划…',
   qFoundation: '你对这个内容现在大概处于什么状态？',
   qBlocker: '你现在最大的困难更像哪一种？',
   qPrefix: '第',
-  qSuffix: '题',
+  qSuffix: '步',
   q3: '你这次想怎么推进？',
   toastSelectQ1: '请选择第 1 题',
   toastSelectQ2: '请选择第 2 题',

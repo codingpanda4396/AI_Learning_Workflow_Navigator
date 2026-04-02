@@ -81,43 +81,43 @@ export const DFS_BFS_STRUCTURE_QUESTIONS: McqQuestion[] = [
 export const DFS_BFS_SCAFFOLD_BUTTONS: ScaffoldButton[] = [
   {
     id: 'u-why-backtrack',
-    group: '解释机制',
-    title: '为什么 DFS 会回退？',
+    group: '机制线索',
+    title: '追问：回退从哪一步必然发生',
     injectPrompt:
-      '请不要直接给结论，而是一步一步解释：为什么 DFS 会沿一条路径不断深入，并且在走不下去时发生回退？请结合遍历过程来讲。',
+      '请不要直接给结论，而是一步一步说明：为什么 DFS 会沿一条路径不断深入，并且在走不下去时发生回退？请结合遍历过程来讲。',
   },
   {
     id: 'u-why-layer',
-    group: '解释机制',
-    title: '为什么 BFS 会分层？',
+    group: '机制线索',
+    title: '追问：分层推进如何出现',
     injectPrompt:
-      '请一步一步解释：为什么 BFS 会呈现出"从起点开始一层一层向外扩展"的效果？请重点讲"为什么会这样"，不要只给定义。',
+      '请一步一步说明：为什么 BFS 会呈现出"从起点开始一层一层向外扩展"的效果？请重点讲"为什么会这样"，不要只给定义。',
   },
   {
     id: 'u-root-diff',
-    group: '对比理解',
-    title: 'DFS 和 BFS 的根本差别是什么？',
+    group: '差异辨析',
+    title: '厘清：两种搜索的根本差别',
     injectPrompt:
-      '请不要只说"一个深度一个广度"。请从搜索推进方式、访问顺序感受、适合解决的问题三个角度，对比解释 DFS 和 BFS 的根本差别。',
+      '请不要只说"一个深度一个广度"。请从搜索推进方式、访问顺序感受、适合解决的问题三个角度，说明 DFS 和 BFS 的根本差别。',
   },
   {
     id: 'u-when-matters',
-    group: '对比理解',
-    title: '什么时候这种差异会很重要？',
+    group: '差异辨析',
+    title: '情境：什么时候差别会放大',
     injectPrompt:
-      '请结合具体场景说明：DFS 和 BFS 的差异在什么情况下会真正影响结果或效率？请举一个能体现差异的例子。',
+      '请结合具体场景说明：DFS 和 BFS 的差异在什么情况下会真正影响结果或效率？请举一个能体现差别的例子。',
   },
   {
     id: 'u-small-diagram',
-    group: '辅助理解',
-    title: '用一个小图例解释',
+    group: '示意辅助',
+    title: '示意：小图走一遍访问顺序',
     injectPrompt:
-      '请用一个非常小的图或树的例子，分别演示 DFS 和 BFS 的访问顺序，并解释为什么会出现这种顺序。',
+      '请用一个非常小的图或树的例子，分别演示 DFS 和 BFS 的访问顺序，并说明为什么会出现这种顺序。',
   },
   {
     id: 'u-check-gap',
-    group: '辅助理解',
-    title: '检查我哪里没懂',
+    group: '示意辅助',
+    title: '定位：我卡在哪一层',
     injectPrompt:
       '如果一个人知道"DFS 往深处走，BFS 按层扩展"，但还是说不清"为什么"，这通常说明他缺了哪一层理解？请帮我定位。',
   },
@@ -126,7 +126,7 @@ export const DFS_BFS_SCAFFOLD_BUTTONS: ScaffoldButton[] = [
 // ─── UNDERSTANDING 系统开场消息 ───
 
 export const UNDERSTANDING_SYSTEM_OPENER =
-  '你已经能区分 DFS 和 BFS 的表面差异了。现在我们来弄清楚：为什么 DFS 会先深入，为什么 BFS 会分层推进？你可以直接提问，也可以点右侧脚手架。'
+  '你已经能区分 DFS 和 BFS 的表面差异了。现在我们来弄清楚：为什么 DFS 会先深入，为什么 BFS 会分层推进？你可以直接提问，也可以点右侧认知动作。'
 
 export const UNDERSTANDING_CLOSURE_HINT =
   '你已经把关键机制问到了。下面试着进入表达训练，用你自己的话讲一次。'

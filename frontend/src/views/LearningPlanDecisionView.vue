@@ -1,6 +1,6 @@
 <template>
   <PageContainer>
-    <div class="min-h-screen bg-[linear-gradient(180deg,#f0f9ff_0%,#ffffff_42%,#f5f3ff_100%)]">
+    <div class="min-h-screen bg-[linear-gradient(180deg,#e8eef5_0%,#ffffff_42%,#f1f5f9_100%)]">
       <AppTopBar current="plan" />
       <main
         class="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 pb-14 pt-4 md:gap-6 md:px-6 lg:px-8"

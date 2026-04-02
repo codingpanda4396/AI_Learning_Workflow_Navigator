@@ -1,12 +1,16 @@
 <template>
-  <div class="flex h-full flex-col rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-    <div class="border-b border-slate-100 px-5 py-3">
-      <p class="text-xs font-medium text-slate-500">机制理解 · 学习讨论区</p>
+  <div
+    class="flex min-h-[min(420px,55vh)] max-h-[min(640px,72vh)] flex-col overflow-hidden rounded-xl border border-border bg-white shadow-card transition duration-200 ease-out hover:shadow-card-hover"
+  >
+    <div class="border-b border-border bg-slate-50/80 px-5 py-3">
+      <p class="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        机制理解 · 辅助讨论（不占主任务）
+      </p>
     </div>
 
     <div
       ref="messagesRef"
-      class="flex-1 space-y-4 overflow-y-auto px-5 py-4"
+      class="max-h-[min(280px,38vh)] min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4"
       @scroll="handleScroll"
     >
       <div
@@ -58,7 +62,7 @@
         />
         <button
           type="button"
-          class="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary/90 disabled:opacity-50"
+          class="shrink-0 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50"
           :disabled="busy || !localDraft.trim()"
           @click="handleSend"
         >
@@ -142,7 +146,7 @@ function isStreamingAssistantMessage(message: ChatMessage, index: number): boole
 
 function bubbleClass(role: string): string {
   if (role === 'user') {
-    return 'rounded-br-md bg-primary/10 text-slate-800'
+    return 'rounded-br-md bg-primary-muted text-text-primary'
   }
   if (role === 'system') {
     return 'rounded-bl-md bg-slate-50 text-slate-500'
