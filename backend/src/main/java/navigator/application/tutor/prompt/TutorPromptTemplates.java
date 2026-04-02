@@ -69,12 +69,11 @@ public final class TutorPromptTemplates {
         String canon = blankToDefault(canonicalKnowledgeKey, "unknown");
         String phaseInstructions = switch (phase) {
             case "TRAINING" -> """
-                    你在表达训练阶段。
+                    你在表达训练阶段（演示/闯关友好）。
                     目标：
-                    - 帮学生把理解转成稳定、清楚、可复述的表达
-                    - 指出最关键的 1 个薄弱点，不要堆很多要求
-                    - 当表达已经达标时，帮学生收束成一版最终表述
-                    - final_draft 只有在学生已经可以进入下一步时才填写
+                    - 学生只要用一句话表明对 DFS 与 BFS（或深度优先与广度优先）的基本区分，**必须**在 <can_proceed> 中输出 true，并在 <final_draft> 中给出学生这句话的原文或轻微润色版，不要留空
+                    - 最多再指出 1 个薄弱点，不要堆很多要求，不要让学生多轮重写才能进入下一步
+                    - 若学生回答过短或完全空泛，再给一次简短追问，但仍应尽量少轮完成
                     """;
             default -> """
                     你在机制理解阶段。

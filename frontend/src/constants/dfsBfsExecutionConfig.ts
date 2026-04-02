@@ -187,16 +187,12 @@ export const UNDERSTANDING_MAX_TURNS = 6
 export const TRAINING_TASK_TITLE = '用你自己的话讲清楚 DFS / BFS'
 
 export const TRAINING_TASK_SUBTITLE =
-  '不用追求术语标准，先把你真正理解到的内容说出来。系统会帮你补齐漏洞。'
+  '演示模式：用一句话说明 DFS 与 BFS 的核心区别即可，不必写长文。'
 
-export const TRAINING_REQUIREMENTS = [
-  '先说 DFS 是怎么搜索的',
-  '再说 BFS 是怎么搜索的',
-  '最后说二者最重要的区别',
-]
+export const TRAINING_REQUIREMENTS = ['用一句话区分 DFS 与 BFS（或深度优先与广度优先）']
 
 export const TRAINING_SYSTEM_OPENER =
-  '现在轮到你来讲。试着不用背定义，而是像在给同学解释一样，说清楚 DFS 和 BFS。'
+  '现在轮到你来讲。用一句话说明 DFS 和 BFS 的差别即可，不必追求术语完美。'
 
 export const TRAINING_MAX_ROUNDS = 3
 

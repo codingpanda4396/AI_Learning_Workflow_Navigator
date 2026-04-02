@@ -556,7 +556,7 @@ public class LearningScaffoldEngineService {
     }
 
     /**
-     * STRUCTURE → UNDERSTANDING → TRAINING → REFLECTION；REFLECTION 完成后任务 ORIENT→EXPLORE。
+     * STRUCTURE → UNDERSTANDING → TRAINING → REFLECTION；REFLECTION 完成后任务执行状态置为 PASS（见 maybeAdvanceTaskStateAfterScaffoldBlock）。
      */
     private boolean advanceAfterPass(LearningScaffoldEngineState eng, String stageKey, String actionId) {
         if (DfsBfsStructureValidator.STAGE_KEY.equals(stageKey)) {
@@ -683,14 +683,19 @@ public class LearningScaffoldEngineService {
         }
     }
 
+    /**
+     * REFLECTION 脚手架整阶段完成后，将任务执行状态置为 PASS，以便 {@link navigator.application.guard.TaskProgressGuard}
+     * 允许 completeTask（典型路径下用户早已在 EXPLORE，旧逻辑仅 ORIENT→EXPLORE 无法到达 PASS）。
+     */
     private void maybeAdvanceTaskStateAfterScaffoldBlock(String sessionId, String taskId, TaskExecutionRuntime rt) {
-        if (rt.getState() == TaskExecutionState.ORIENT) {
-            TaskExecutionState from = rt.getState();
-            rt.transitionTo(TaskExecutionState.EXPLORE, "learning_scaffold_reflection_done");
-            persistenceService.appendTransition(sessionId, taskId, from, TaskExecutionState.EXPLORE, "learning_scaffold_reflection_done");
-            if (rt.getScaffold() != null) {
-                rt.getScaffold().setCurrentExecutionState(TaskExecutionState.EXPLORE.name());
-            }
+        if (rt.getState() == TaskExecutionState.PASS) {
+            return;
+        }
+        TaskExecutionState from = rt.getState();
+        rt.transitionTo(TaskExecutionState.PASS, "learning_scaffold_reflection_complete");
+        persistenceService.appendTransition(sessionId, taskId, from, TaskExecutionState.PASS, "learning_scaffold_reflection_complete");
+        if (rt.getScaffold() != null) {
+            rt.getScaffold().setCurrentExecutionState(TaskExecutionState.PASS.name());
         }
     }
 

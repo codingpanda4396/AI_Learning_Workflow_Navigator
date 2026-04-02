@@ -31,13 +31,13 @@ class DfsBfsReflectionEvaluatorTest {
     }
 
     @Test
-    void decisionRule_rejectsDefinitionOnly() {
+    void decisionRule_acceptsShortContrast() {
         StructureValidationContext ctx = StructureValidationContext.builder()
                 .actionId(DfsBfsReflectionScaffoldDefinition.ACTION_DECISION_RULE)
                 .userInput("DFS 是深度优先，BFS 是广度优先。")
                 .build();
         ValidationResult v = evaluator.validate(ctx);
-        assertFalse(v.isPassed());
+        assertTrue(v.isPassed());
     }
 
     @Test

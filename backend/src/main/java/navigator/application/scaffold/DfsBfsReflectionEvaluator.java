@@ -8,18 +8,18 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * 四张反思卡：长度、泛化句、定义复述、规则形状、能力命名。
+ * 四张反思卡：演示/评委友好 — 降低字数门槛，减少「空话」误判。
  */
 @Component
 public class DfsBfsReflectionEvaluator implements ReflectionEvaluator {
 
-    private static final int MIN_ERROR_RECALL = 18;
-    private static final int MIN_ROOT_CAUSE = 16;
-    private static final int MIN_DECISION = 28;
-    private static final int MIN_CAPABILITY = 16;
+    private static final int MIN_ERROR_RECALL = 8;
+    private static final int MIN_ROOT_CAUSE = 8;
+    private static final int MIN_DECISION = 12;
+    private static final int MIN_CAPABILITY = 8;
 
     private static final Pattern RULE_SHAPE = Pattern.compile(
-            "(当|如果|若|遇到|优先|需要|强调|场景|问题).{0,40}(dfs|bfs|深度|广度|层|队列|栈|先)",
+            "(当|如果|若|遇到|优先|需要|强调|场景|问题).{0,48}(dfs|bfs|深度|广度|层|队列|栈|先)",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
     @Override
@@ -62,7 +62,7 @@ public class DfsBfsReflectionEvaluator implements ReflectionEvaluator {
         if (raw.length() < MIN_ROOT_CAUSE) {
             return fail(ReflectionErrorTypes.TOO_SHORT, "根因请至少写清楚一句：是背定义、机制不清、因果断了，还是表达太模糊。");
         }
-        if (isVagueLearn(n) && raw.length() < 40) {
+        if (isVagueLearn(n) && raw.length() < 28) {
             return fail(ReflectionErrorTypes.GENERIC, "请对应上一张的错误，说明根因，不要只写「基础不好」。");
         }
         return pass();
@@ -72,32 +72,38 @@ public class DfsBfsReflectionEvaluator implements ReflectionEvaluator {
         if (raw.length() < MIN_DECISION) {
             return fail(ReflectionErrorTypes.TOO_SHORT, "规则写长一点：用「遇到什么情况 → 优先想到哪种搜索」。");
         }
-        if (isDefinitionParrot(n)) {
-            return fail(ReflectionErrorTypes.DEFINITION_ONLY, "不要只复述定义。请写清「什么特征 → 选 DFS 还是 BFS」。");
-        }
         boolean hasDfs = n.contains("dfs") || n.contains("深度");
         boolean hasBfs = n.contains("bfs") || n.contains("广度") || n.contains("层");
-        if (!RULE_SHAPE.matcher(raw).find() && !(hasDfs && hasBfs)) {
-            return fail(ReflectionErrorTypes.NO_RULE_SHAPE, "加一句条件句：例如「当…优先…」并点出 DFS/BFS 或深度/广度特征。");
+        if (hasDfs && hasBfs) {
+            return pass();
         }
-        return pass();
+        if (RULE_SHAPE.matcher(raw).find()) {
+            return pass();
+        }
+        if (isDefinitionParrot(n) && raw.length() < 80) {
+            return fail(ReflectionErrorTypes.DEFINITION_ONLY, "不要只复述定义。请写清「什么特征 → 选 DFS 还是 BFS」。");
+        }
+        if ((hasDfs || hasBfs) && raw.length() >= 16) {
+            return pass();
+        }
+        return fail(ReflectionErrorTypes.NO_RULE_SHAPE, "加一句条件句：例如「当…优先…」并点出 DFS/BFS 或深度/广度特征。");
     }
 
     private static ValidationResult validateCapability(String raw, String n) {
         if (raw.length() < MIN_CAPABILITY) {
             return fail(ReflectionErrorTypes.TOO_SHORT, "能力请写具体：你能「判断 / 解释 / 对比」什么。");
         }
-        if (n.matches(".*(学会了|掌握了)\\s*(dfs|bfs|深度|广度).*") && raw.length() < 45) {
+        if (n.matches(".*(学会了|掌握了)\\s*(dfs|bfs|深度|广度).*") && raw.length() < 22) {
             return fail(ReflectionErrorTypes.CAPABILITY_VAGUE, "避免「学会了 DFS/BFS」。改成你能独立做到的一件事。");
         }
-        if ((n.contains("学会了") || n.contains("掌握了")) && !n.contains("能") && raw.length() < 50) {
+        if ((n.contains("学会了") || n.contains("掌握了")) && !n.contains("能") && raw.length() < 28) {
             return fail(ReflectionErrorTypes.CAPABILITY_VAGUE, "用「我能…」写一条可检验的能力。");
         }
         return pass();
     }
 
     private static boolean isGenericOnly(String n) {
-        return n.length() < 25 && (n.contains("不会") || n.contains("不懂") || n.contains("不深"));
+        return n.length() < 12 && (n.contains("不会") || n.contains("不懂") || n.contains("不深"));
     }
 
     private static boolean isVagueLearn(String n) {

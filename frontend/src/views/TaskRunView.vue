@@ -204,6 +204,36 @@ function understandingReadyToLeavePhase(): boolean {
   )
 }
 
+/** 演示友好：一句话即可；不依赖导师 XML 中的 can_proceed / final_draft */
+const TRAINING_MIN_USER_CHARS = 4
+
+function lastTrainingUserUtterance(): string {
+  for (let i = trainingState.messages.length - 1; i >= 0; i--) {
+    const m = trainingState.messages[i]
+    if (m.role === 'user' && m.content.trim().length > 0) {
+      return m.content.trim()
+    }
+  }
+  return ''
+}
+
+function effectiveTrainingFinalDraft(): string {
+  const fd = trainingState.finalDraft?.trim()
+  if (fd) return fd
+  return lastTrainingUserUtterance()
+}
+
+function trainingReadyToLeavePhase(): boolean {
+  if (trainingState.streaming) return false
+  const hasAssistant = trainingState.messages.some(
+    (m) => m.role === 'assistant' && m.content.trim().length > 0,
+  )
+  const hasUserOneLiner = trainingState.messages.some(
+    (m) => m.role === 'user' && m.content.trim().length >= TRAINING_MIN_USER_CHARS,
+  )
+  return hasAssistant && hasUserOneLiner
+}
+
 const canGoNext = computed(() => {
   switch (currentPhase.value) {
     case 'structure':
@@ -215,7 +245,7 @@ const canGoNext = computed(() => {
     case 'understanding':
       return understandingReadyToLeavePhase()
     case 'training':
-      return trainingState.canProceed && !!trainingState.finalDraft
+      return trainingReadyToLeavePhase()
     case 'reflection':
       return reflectionState.selectedStrategyIds.length > 0 || reflectionState.userReflectionText.trim().length > 0
     default:
@@ -353,7 +383,7 @@ async function goNextPhase() {
       const tcr = await postCompleteConversationStage(task.value.taskId, {
         sessionId: store.sessionId,
         stageKey: 'TRAINING',
-        finalDraft: trainingState.finalDraft ?? undefined,
+        finalDraft: effectiveTrainingFinalDraft() || undefined,
       })
       engineStageKeyHint.value = tcr.nextStageKey
       await scaffoldEngine.loadStage({ force: true })
@@ -463,13 +493,13 @@ function buildReflectionSummary() {
   if (understandingState.messages.some((m) => m.role === 'assistant' && m.content.trim().length > 0)) {
     learned.push('理解了 DFS 为什么会回退、BFS 为什么会分层推进')
   }
-  if (trainingState.finalDraft) {
+  if (effectiveTrainingFinalDraft()) {
     learned.push('用自己的话讲清了 DFS / BFS 的核心差异')
   }
 
   reflectionState.summary = {
     learnedPoints: learned,
-    finalUnderstanding: trainingState.finalDraft || '',
+    finalUnderstanding: effectiveTrainingFinalDraft(),
   }
   reflectionState.confusionPoints = DFS_BFS_CONFUSION_POINTS
 }
@@ -497,7 +527,7 @@ async function completeCurrentTaskAndAdvance() {
     legacyComplete: false,
     summaryText:
       reflectionState.summary?.finalUnderstanding ||
-      trainingState.finalDraft ||
+      effectiveTrainingFinalDraft() ||
       reflectionState.userReflectionText ||
       '本轮已完成当前任务，并形成了阶段性的理解总结。',
     learnedPoint1: learnedPoints[0] || '已经能说出当前主题的核心差异',
