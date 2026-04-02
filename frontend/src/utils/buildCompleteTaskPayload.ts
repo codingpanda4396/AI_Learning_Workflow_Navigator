@@ -13,6 +13,8 @@ export function buildCompleteTaskPayload(input: {
   summaryText: string
   learnedPoint1: string
   learnedPoint2: string
+  unresolvedQuestions?: string[]
+  behaviorSignals?: string[]
   nextPracticeIntent: string
   learnerReflection?: string
   taskStartedAt: number
@@ -45,6 +47,8 @@ export function buildCompleteTaskPayload(input: {
       input.learnedPoint1.trim(),
       input.learnedPoint2.trim(),
     ],
+    unresolvedQuestions: input.unresolvedQuestions?.filter((item) => item.trim().length > 0),
+    behaviorSignals: input.behaviorSignals?.filter((item) => item.trim().length > 0),
     nextPracticeIntent: next,
     closurePayloadVersion: 'sprint4-v1',
     selfRatedConfidence: 'MEDIUM',

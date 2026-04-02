@@ -56,10 +56,11 @@ import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import { getErrorMessage } from '@/api/request'
 import { postCompleteConversationStage, postCompleteStructureStage } from '@/api/learningScaffold'
 import { streamAiTutorChat, type AiTutorChatMessagePayload } from '@/api/tutor'
-import { getCurrentTask } from '@/api/task'
+import { completeTask, getCurrentTask } from '@/api/task'
 import { supportsLearningScaffoldEngine } from '@/constants/learningScaffoldPack'
 import { TASKRUN_COPY } from '@/constants/uiCopy'
 import {
+  DFS_BFS_CONFUSION_POINTS,
   DFS_BFS_NEXT_LABELS,
   DFS_BFS_PHASE_GOALS,
   DFS_BFS_REFLECTION_STRATEGIES,
@@ -71,6 +72,7 @@ import {
 import { showToast } from '@/stores/toast'
 import { useWorkflowStore } from '@/stores/workflow'
 import { useLearningScaffoldEngine } from '@/composables/useLearningScaffoldEngine'
+import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
 import type { CurrentTaskData, ProgressItem } from '@/types/dto'
 import type {
   ChatMessage,
@@ -105,6 +107,7 @@ const engineStageKeyHint = ref<string | null>(null)
 const advancingPhase = ref(false)
 const latestStructureSubmit = ref<Promise<unknown> | null>(null)
 const executionSectionRef = ref<HTMLElement | null>(null)
+const taskStartedAt = ref(Date.now())
 
 const structureState = reactive<StructurePhaseState>(
   createEmptyStructureState(DFS_BFS_STRUCTURE_QUESTIONS),
@@ -304,7 +307,7 @@ async function goNextPhase() {
 
     if (currentPhase.value === 'reflection') {
       await submitReflectionToBackend()
-      await router.push('/report')
+      await completeCurrentTaskAndAdvance()
       return
     }
 
@@ -460,6 +463,7 @@ function buildReflectionSummary() {
     learnedPoints: learned,
     finalUnderstanding: trainingState.finalDraft || '',
   }
+  reflectionState.confusionPoints = DFS_BFS_CONFUSION_POINTS
 }
 
 async function submitReflectionToBackend() {
@@ -468,6 +472,63 @@ async function submitReflectionToBackend() {
     `REFLECTION:strategies=${reflectionState.selectedStrategyIds.join(',')};` +
     `text=${reflectionState.userReflectionText}`
   await scaffoldEngine.submit(text)
+}
+
+async function completeCurrentTaskAndAdvance() {
+  if (!task.value || !store.sessionId) return
+
+  buildReflectionSummary()
+  const selectedStrategyLabels = reflectionState.availableStrategies
+    .filter((item) => reflectionState.selectedStrategyIds.includes(item.id))
+    .map((item) => item.label)
+
+  const learnedPoints = reflectionState.summary?.learnedPoints ?? []
+  const payload = buildCompleteTaskPayload({
+    sessionId: store.sessionId,
+    completionStatus: 'COMPLETED',
+    legacyComplete: false,
+    summaryText:
+      reflectionState.summary?.finalUnderstanding ||
+      trainingState.finalDraft ||
+      reflectionState.userReflectionText ||
+      '本轮已完成当前任务，并形成了阶段性的理解总结。',
+    learnedPoint1: learnedPoints[0] || '已经能说出当前主题的核心差异',
+    learnedPoint2: learnedPoints[1] || '已经把这轮任务沉淀成可复述的判断线索',
+    unresolvedQuestions: reflectionState.confusionPoints,
+    behaviorSignals: selectedStrategyLabels.map((label) => `NEXT_RULE:${label}`),
+    nextPracticeIntent:
+      selectedStrategyLabels.join('；') ||
+      reflectionState.userReflectionText ||
+      '下一轮先用自己的话判断，再根据反馈修正。',
+    learnerReflection: reflectionState.userReflectionText,
+    taskStartedAt: taskStartedAt.value,
+    userMessageCount: countUserMessages(),
+  })
+
+  const result = await completeTask(task.value.taskId, payload)
+  clearConversationSnapshots(task.value.taskId)
+  store.progress = result.sessionProgress
+    ? {
+        currentIndex: result.sessionProgress.completedTasks,
+        totalTasks: result.sessionProgress.totalTasks,
+      }
+    : null
+
+  if (result.nextTaskAvailable && result.nextTaskId) {
+    store.currentTaskId = result.nextTaskId
+    store.currentTask = null
+    task.value = null
+    progress.value = null
+    resetWorkbenchState()
+    await router.push({ name: 'taskRun', params: { taskId: result.nextTaskId }, query: { phase: 'structure' } })
+    return
+  }
+
+  store.currentTaskId = null
+  store.currentTask = null
+  task.value = null
+  progress.value = null
+  await router.push('/report')
 }
 
 async function submitPhaseConversation(phase: 'understanding' | 'training', text: string) {
@@ -581,6 +642,9 @@ async function fetchTask() {
     task.value = data
     progress.value = data.progress
     engineStageKeyHint.value = scaffoldEngine.stage?.stageKey ?? data.currentStage
+    if (taskChanged || !previousTaskId) {
+      taskStartedAt.value = Date.now()
+    }
 
     if (!data.taskId) {
       store.currentTaskId = null
@@ -693,6 +757,17 @@ function loadConversationSnapshot(phase: 'understanding' | 'training'): Conversa
 function conversationStorageKey(phase: 'understanding' | 'training') {
   if (!task.value?.taskId) return null
   return `taskrun:${task.value.taskId}:${phase}`
+}
+
+function clearConversationSnapshots(taskId: string) {
+  window.sessionStorage.removeItem(`taskrun:${taskId}:understanding`)
+  window.sessionStorage.removeItem(`taskrun:${taskId}:training`)
+}
+
+function countUserMessages() {
+  const understandingUser = understandingState.messages.filter((msg) => msg.role === 'user').length
+  const trainingUser = trainingState.messages.filter((msg) => msg.role === 'user').length
+  return understandingUser + trainingUser
 }
 
 function toTutorPayloadMessages(messages: ChatMessage[]): AiTutorChatMessagePayload[] {

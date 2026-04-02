@@ -16,6 +16,13 @@ public class LearningReport {
     private String sessionId;
     private ResultStatus resultStatus;
     private String goalReview;
+    private String finalSummary;
+    private List<String> whatYouLearned;
+    private List<String> whatStillNeedsWork;
+    private List<String> evidenceDigest;
+    private LearningMethodReview learningMethodReview;
+    private RecommendedNextStep recommendedNextStep;
+    private List<TaskHighlight> taskHighlights;
     private List<String> completedProgress;
     private List<String> unresolvedIssues;
     private List<String> evidenceSummary;

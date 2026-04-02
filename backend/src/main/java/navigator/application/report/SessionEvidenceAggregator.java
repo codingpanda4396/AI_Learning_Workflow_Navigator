@@ -40,7 +40,7 @@ public class SessionEvidenceAggregator {
 
     public AggregatedSessionEvidence aggregate(Long sessionDbId) {
         if (sessionDbId == null) {
-            return new AggregatedSessionEvidence(null, ExecutionEvidenceSummary.builder().build());
+            return new AggregatedSessionEvidence(null, List.of(), List.of(), ExecutionEvidenceSummary.builder().build());
         }
 
         LearningPlanEntity plan = learningPlanRepository.findBySessionId(sessionDbId);
@@ -50,7 +50,12 @@ public class SessionEvidenceAggregator {
 
         ExecutionEvidenceSummary executionSummary = buildExecutionSummary(tasks, completions, latestInteraction);
 
-        return new AggregatedSessionEvidence(plan, executionSummary);
+        return new AggregatedSessionEvidence(
+                plan,
+                tasks != null ? tasks : List.of(),
+                completions != null ? completions : List.of(),
+                executionSummary
+        );
     }
 
     private ExecutionEvidenceSummary buildExecutionSummary(
@@ -196,8 +201,9 @@ public class SessionEvidenceAggregator {
 
     public record AggregatedSessionEvidence(
             LearningPlanEntity plan,
+            List<SessionTaskEntity> tasks,
+            List<TaskCompletionEntity> completions,
             ExecutionEvidenceSummary execution
     ) {
     }
 }
-

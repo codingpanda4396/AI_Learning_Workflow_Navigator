@@ -4,36 +4,50 @@
       <p class="text-xs font-medium text-slate-500">表达训练 · 第 {{ roundCount }} / {{ maxRounds }} 轮</p>
     </div>
 
-    <div ref="messagesRef" class="max-h-[420px] space-y-4 overflow-y-auto px-5 py-4">
+    <div
+      ref="messagesRef"
+      class="max-h-[420px] space-y-4 overflow-y-auto px-5 py-4"
+      @scroll="handleScroll"
+    >
       <div
-        v-for="msg in messages"
+        v-for="(msg, index) in messages"
         :key="msg.id"
         class="flex"
         :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
       >
         <div
           class="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
-          :class="msg.role === 'user'
-            ? 'rounded-br-md bg-primary/10 text-slate-800'
-            : msg.role === 'system'
-              ? 'rounded-bl-md bg-slate-50 text-slate-500'
-              : 'rounded-bl-md bg-slate-100 text-slate-800'"
+          :class="
+            msg.role === 'user'
+              ? 'rounded-br-md bg-primary/10 text-slate-800'
+              : msg.role === 'system'
+                ? 'rounded-bl-md bg-slate-50 text-slate-500'
+                : 'rounded-bl-md bg-slate-100 text-slate-800'
+          "
         >
-          <p class="whitespace-pre-wrap">{{ msg.content }}</p>
-        </div>
-      </div>
-
-      <div v-if="busy" class="flex justify-start">
-        <div class="flex items-center gap-1.5 rounded-2xl bg-slate-100 px-4 py-3">
-          <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style="animation-delay: 0ms" />
-          <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style="animation-delay: 150ms" />
-          <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style="animation-delay: 300ms" />
+          <p v-if="msg.content" class="whitespace-pre-wrap">{{ msg.content }}</p>
+          <div
+            v-if="isStreamingAssistantMessage(msg, index)"
+            class="mt-2 inline-flex items-center gap-2 text-xs text-slate-500"
+          >
+            <span>正在生成</span>
+            <span class="inline-flex items-center gap-1">
+              <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
+              <span
+                class="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400 [animation-delay:120ms]"
+              />
+              <span
+                class="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400 [animation-delay:240ms]"
+              />
+            </span>
+          </div>
         </div>
       </div>
     </div>
 
     <div v-if="!isComplete" class="border-t border-slate-100 px-4 py-3">
       <p v-if="error" class="mb-2 text-xs text-rose-500">{{ error }}</p>
+      <p v-else-if="busy" class="mb-2 text-xs text-slate-500">正在生成当前回复…</p>
       <p v-else-if="completionHint" class="mb-2 text-xs text-slate-500">{{ completionHint }}</p>
       <div class="flex items-end gap-2 rounded-xl border-2 border-slate-200 bg-slate-50/50 px-3 py-2">
         <textarea
@@ -58,7 +72,8 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useStreamingMessageViewport } from '@/composables/useStreamingMessageViewport'
 import type { ChatMessage } from '@/types/executionWorkbench'
 
 const props = defineProps<{
@@ -77,34 +92,41 @@ const emit = defineEmits<{
   'update:draftInput': [value: string]
 }>()
 
-const messagesRef = ref<HTMLElement | null>(null)
 const localDraft = ref(props.draftInput)
-
-watch(
-  () => props.draftInput,
-  (v) => {
-    if (v !== localDraft.value) localDraft.value = v
-  }
+const { messagesRef, handleScroll } = useStreamingMessageViewport(
+  () => props.messages,
+  () => props.busy,
 )
-
-watch(localDraft, (v) => {
-  emit('update:draftInput', v)
+void messagesRef
+const streamingMessageId = computed(() => {
+  if (!props.busy) return null
+  const lastMessage = props.messages[props.messages.length - 1]
+  return lastMessage?.role === 'assistant' ? lastMessage.id : null
 })
 
 watch(
-  () => props.messages.length,
-  async () => {
-    await nextTick()
-    if (messagesRef.value) {
-      messagesRef.value.scrollTop = messagesRef.value.scrollHeight
-    }
-  }
+  () => props.draftInput,
+  (value) => {
+    if (value !== localDraft.value) localDraft.value = value
+  },
 )
+
+watch(localDraft, (value) => {
+  emit('update:draftInput', value)
+})
 
 function handleSend() {
   const text = localDraft.value.trim()
   if (!text || props.busy) return
   emit('send', text)
   localDraft.value = ''
+}
+
+function isStreamingAssistantMessage(message: ChatMessage, index: number): boolean {
+  return (
+    message.role === 'assistant' &&
+    index === props.messages.length - 1 &&
+    message.id === streamingMessageId.value
+  )
 }
 </script>

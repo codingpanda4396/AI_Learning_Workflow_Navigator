@@ -261,6 +261,7 @@ export interface CompleteTaskRequest {
   /** Sprint 4 脚手架任务收束（与后端 TaskClosureValidator 对齐） */
   summaryText?: string
   learnedFrameworkPoints?: string[]
+  unresolvedQuestions?: string[]
   nextPracticeIntent?: string
   selfRatedConfidence?: SelfRatedConfidenceType
   closurePayloadVersion?: string
@@ -482,10 +483,43 @@ export interface LearningMethodProfile {
   nextMethodAdvice?: string[]
 }
 
+export interface LearningMethodReview {
+  headline?: string
+  summary?: string
+  strengths?: string[]
+  risks?: string[]
+  nextFocus?: string[]
+}
+
+export interface RecommendedNextStep {
+  actionType: NextActionTypeType
+  title?: string
+  reason?: string
+  actionLabel?: string
+  nextEntryPoint?: string
+  signals?: string[]
+  requiresReplan: boolean
+}
+
+export interface TaskHighlight {
+  taskId: string
+  title: string
+  completionStatus: string
+  learned?: string
+  issue?: string
+}
+
 export interface LearningReport {
   sessionId: string
   resultStatus: string
   goalReview?: string
+  finalSummary?: string
+  whatYouLearned?: string[]
+  whatStillNeedsWork?: string[]
+  evidenceDigest?: string[]
+  learningMethodReview?: LearningMethodReview
+  recommendedNextStep?: RecommendedNextStep
+  taskHighlights?: TaskHighlight[]
   completedProgress?: string[]
   unresolvedIssues?: string[]
   evidenceSummary?: string[]

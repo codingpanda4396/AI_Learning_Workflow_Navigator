@@ -95,7 +95,9 @@ class Sprint2ReportAndNextActionIntegrationTest {
         mvc.perform(get("/api/sessions/" + sessionId + "/report").cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.learningReport.sessionId").value(sessionId))
-                .andExpect(jsonPath("$.data.learningReport.completedProgress[0]").exists())
+                .andExpect(jsonPath("$.data.learningReport.finalSummary").isNotEmpty())
+                .andExpect(jsonPath("$.data.learningReport.whatYouLearned[0]").exists())
+                .andExpect(jsonPath("$.data.learningReport.recommendedNextStep.actionType").exists())
                 .andExpect(jsonPath("$.data.nextActionDecision.actionType").exists());
 
         mvc.perform(post("/api/sessions/" + sessionId + "/next-action").cookie(authCookie)
