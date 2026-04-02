@@ -27,7 +27,7 @@ const toneClasses = computed(() => {
     case 'positive':
       return 'border-emerald-200 bg-emerald-50/60'
     case 'redirect':
-      return 'border-amber-200 bg-amber-50/50'
+      return 'border-accent/25 bg-accent-muted/60'
     default:
       return 'border-slate-200 bg-slate-50/60'
   }

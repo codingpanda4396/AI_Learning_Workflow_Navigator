@@ -6,7 +6,7 @@
     <div class="border-b border-border bg-primary-muted/60 px-4 py-3">
       <p class="text-sm font-semibold text-text-primary">学习脚手架</p>
       <p class="mt-1 text-xs leading-relaxed text-text-muted">
-        点击后将写入左侧输入区，作为你的追问起点（不展示技术指令全文）。
+        {{ panelHint }}
       </p>
     </div>
 
@@ -20,7 +20,7 @@
             v-for="btn in group.items"
             :key="btn.id"
             type="button"
-            class="group relative flex w-full items-center gap-2 rounded-md border border-border bg-white px-3 py-2.5 text-left text-sm transition hover:border-primary/35 hover:bg-primary-muted/50 disabled:opacity-50"
+            class="group relative flex w-full items-center gap-2 rounded-md border border-border bg-white px-3 py-2.5 text-left text-sm transition hover:border-accent/35 hover:bg-accent-muted/40 disabled:opacity-50"
             :disabled="busy || injectingId === btn.id"
             @click="handleInject(btn)"
           >
@@ -34,7 +34,7 @@
               </svg>
             </span>
             <span class="min-w-0 flex-1 font-medium text-text-primary">{{ btn.title }}</span>
-            <span v-if="injectingId === btn.id" class="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span v-if="injectingId === btn.id" class="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent" />
             <span
               v-else-if="successId === btn.id"
               class="shrink-0 text-success"
@@ -59,10 +59,17 @@
 import { computed, ref } from 'vue'
 import type { ScaffoldButton } from '@/types/executionWorkbench'
 
-const props = defineProps<{
-  buttons: ScaffoldButton[]
-  busy: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    buttons: ScaffoldButton[]
+    busy: boolean
+    /** 顶栏说明；默认兼容旧文案 */
+    panelHint?: string
+  }>(),
+  {
+    panelHint: '点击后将写入左侧输入区，作为你的追问起点（不展示技术指令全文）。',
+  },
+)
 
 const emit = defineEmits<{
   inject: [prompt: string, scaffoldKey: string]

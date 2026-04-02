@@ -95,6 +95,6 @@ const feedbackBoxClass = computed(() => {
   if (!t) return ''
   if (t === 'pass') return 'border-emerald-200 bg-emerald-50/90 text-emerald-950'
   if (t === 'empty') return 'border-slate-200 bg-slate-50 text-slate-700'
-  return 'border-amber-200/90 bg-amber-50/85 text-amber-950'
+  return 'border-accent/30 bg-accent-muted/80 text-accent-hover'
 })
 </script>

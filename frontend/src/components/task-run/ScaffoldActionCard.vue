@@ -22,9 +22,9 @@
           </li>
         </ul>
       </div>
-      <div class="rounded-xl border border-amber-200/80 bg-amber-50/40 px-4 py-3">
-        <p class="text-xs font-semibold text-amber-900/90">不要这样做</p>
-        <ul class="mt-2 space-y-1 text-sm text-amber-950/90">
+      <div class="rounded-xl border border-accent/25 bg-accent-muted/45 px-4 py-3">
+        <p class="text-xs font-semibold text-accent-hover/95">不要这样做</p>
+        <ul class="mt-2 space-y-1 text-sm text-text-primary/90">
           <li v-for="(line, i) in product.avoid" :key="`avoid-${i}`" class="flex gap-2">
             <span>×</span>
             <span>{{ line }}</span>

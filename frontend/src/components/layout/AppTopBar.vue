@@ -5,7 +5,7 @@
     <div class="mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-4 px-6 py-3">
       <router-link
         to="/goal"
-        class="text-lg font-semibold text-text-primary transition-colors hover:text-primary"
+        class="text-lg font-semibold text-text-primary transition-colors hover:text-accent"
       >
         {{ APP_COPY.brand }}
       </router-link>
@@ -29,7 +29,7 @@
         <router-link
           v-else
           to="/auth/login"
-          class="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-hover"
+          class="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-hover"
         >
           {{ APP_COPY.loginCta }}
         </router-link>

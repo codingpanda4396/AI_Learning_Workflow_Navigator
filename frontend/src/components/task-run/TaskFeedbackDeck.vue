@@ -17,9 +17,9 @@
 
       <article
         v-if="gapBlock"
-        class="rounded-xl border border-amber-200/90 bg-amber-50/70 px-4 py-3 shadow-sm"
+        class="rounded-xl border border-accent/25 bg-accent-muted/65 px-4 py-3 shadow-sm"
       >
-        <p class="text-xs font-semibold text-amber-950">{{ missingTitle }}</p>
+        <p class="text-xs font-semibold text-text-primary">{{ missingTitle }}</p>
         <p v-if="gapBlock.single" class="mt-1 line-clamp-4 text-sm text-slate-800">{{ gapBlock.single }}</p>
         <ul
           v-else-if="gapBlock.list?.length"
@@ -52,7 +52,7 @@
         :key="action.id"
         type="button"
         :data-testid="`feedback-action-${action.id}`"
-        class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 transition hover:border-primary/40 hover:bg-primary/5"
+        class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 transition hover:border-accent/40 hover:bg-accent-muted/50"
         @click="$emit('action', action.id)"
       >
         {{ action.label }}

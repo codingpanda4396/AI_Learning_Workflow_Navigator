@@ -32,17 +32,17 @@
         v-for="p in phases"
         :key="p"
         class="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-md px-0.5 py-1 text-center transition"
-        :class="p === currentPhase ? 'bg-primary/10 ring-1 ring-primary/20' : 'bg-slate-50/80'"
+        :class="p === currentPhase ? 'bg-accent-muted/70 ring-1 ring-accent/25' : 'bg-slate-50/80'"
       >
         <span
           class="w-full truncate text-center text-[10px] font-medium leading-tight text-slate-500 sm:hidden"
-          :class="p === currentPhase ? 'text-primary' : ''"
+          :class="p === currentPhase ? 'text-accent' : ''"
         >
           {{ phaseCodeToShortZh(p) }}
         </span>
         <span
           class="hidden w-full truncate text-center text-[10px] font-medium leading-tight sm:block"
-          :class="p === currentPhase ? 'font-semibold text-slate-900' : 'text-slate-500'"
+          :class="p === currentPhase ? 'font-semibold text-accent-hover' : 'text-slate-500'"
         >
           {{ phaseStripLabel(p) }}
         </span>

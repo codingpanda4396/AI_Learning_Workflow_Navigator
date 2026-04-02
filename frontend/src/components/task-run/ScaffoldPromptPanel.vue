@@ -2,9 +2,9 @@
   <section
     v-if="blocks.length"
     data-testid="scaffold-prompt-panel"
-    class="rounded-2xl border-2 border-primary/25 bg-gradient-to-b from-primary/[0.06] to-white p-5 shadow-md ring-1 ring-primary/10 md:p-6"
+    class="rounded-2xl border-2 border-accent/30 bg-gradient-to-b from-accent/[0.07] to-white p-5 shadow-md ring-1 ring-accent/15 md:p-6"
   >
-    <p class="text-xs font-semibold uppercase tracking-wide text-primary">脚手架 · 当前怎么写</p>
+    <p class="text-xs font-semibold uppercase tracking-wide text-accent">脚手架 · 当前怎么写</p>
     <div class="mt-4 space-y-4">
       <article
         v-for="block in blocks"
@@ -14,7 +14,7 @@
       >
         <p class="text-xs font-semibold text-slate-700">{{ block.title }}</p>
         <p v-if="block.prompt" class="mt-2 text-sm leading-relaxed text-slate-900">{{ block.prompt }}</p>
-        <p v-if="block.constraint" class="mt-2 text-xs leading-relaxed text-amber-900/90">
+        <p v-if="block.constraint" class="mt-2 text-xs leading-relaxed text-accent-hover/95">
           边界：{{ block.constraint }}
         </p>
       </article>

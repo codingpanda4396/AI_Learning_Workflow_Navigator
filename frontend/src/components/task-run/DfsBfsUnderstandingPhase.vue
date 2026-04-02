@@ -17,6 +17,7 @@
       <PromptScaffoldInjectPanel
         :buttons="scaffoldButtons"
         :busy="busy"
+        :panel-hint="UNDERSTANDING_SCAFFOLD_PANEL_HINT"
         @inject="handleInject"
       />
     </div>
@@ -27,6 +28,7 @@
 import { ref } from 'vue'
 import UnderstandingChatPanel from '@/components/task-run/UnderstandingChatPanel.vue'
 import PromptScaffoldInjectPanel from '@/components/task-run/PromptScaffoldInjectPanel.vue'
+import { UNDERSTANDING_SCAFFOLD_PANEL_HINT } from '@/constants/dfsBfsExecutionConfig'
 import type { ScaffoldButton, UnderstandingPhaseState } from '@/types/executionWorkbench'
 
 defineProps<{

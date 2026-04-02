@@ -29,9 +29,9 @@
             </li>
           </ul>
         </div>
-        <div class="rounded-[20px] border border-amber-100 bg-amber-50/70 p-4">
-          <p class="text-sm font-semibold text-amber-900">还缺少的点</p>
-          <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-amber-900">
+        <div class="rounded-[20px] border border-accent/20 bg-accent-muted/55 p-4">
+          <p class="text-sm font-semibold text-accent-hover">还缺少的点</p>
+          <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-accent-hover">
             <li v-for="(item, index) in missingPoints" :key="`miss-${index}`">
               {{ item }}
             </li>
@@ -93,7 +93,7 @@
           v-for="action in actions"
           :key="action.id"
           type="button"
-          class="w-full rounded-[18px] border border-border bg-slate-50/70 px-4 py-3 text-left transition hover:border-primary/35 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+          class="w-full rounded-[18px] border border-border bg-slate-50/70 px-4 py-3 text-left transition hover:border-accent/35 hover:bg-accent-muted/40 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="disabled"
           @click="$emit('select', action.id)"
         >

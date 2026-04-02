@@ -137,7 +137,7 @@ const props = withDefaults(
 
 function stepClass(stepId: string) {
   if (stepId === props.currentStepId) {
-    return 'border-primary/40 bg-primary/5 text-text-primary shadow-[0_12px_30px_rgba(79,70,229,0.12)]'
+    return 'border-accent/40 bg-accent-muted/50 text-text-primary shadow-[0_12px_30px_rgba(217,119,6,0.12)]'
   }
   const activeIndex = props.steps.findIndex((step) => step.id === props.currentStepId)
   const stepIndex = props.steps.findIndex((step) => step.id === stepId)
@@ -149,7 +149,7 @@ function stepClass(stepId: string) {
 
 function stepDotClass(stepId: string) {
   if (stepId === props.currentStepId) {
-    return 'bg-primary text-white'
+    return 'bg-accent text-white shadow-sm ring-2 ring-accent/25'
   }
   const activeIndex = props.steps.findIndex((step) => step.id === props.currentStepId)
   const stepIndex = props.steps.findIndex((step) => step.id === stepId)

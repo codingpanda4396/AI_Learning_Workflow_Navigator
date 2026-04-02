@@ -107,7 +107,7 @@
 
     <div
       v-if="showRestate"
-      class="rounded-[28px] border border-amber-200/80 bg-amber-50/35 p-5 shadow-sm md:p-7"
+      class="rounded-[28px] border border-accent/25 bg-accent-muted/40 p-5 shadow-sm md:p-7"
     >
       <h2 class="text-lg font-semibold tracking-tight text-slate-950">用自己的话再写三行</h2>
       <p class="mt-1 text-sm text-slate-600">不要求一次说对。</p>

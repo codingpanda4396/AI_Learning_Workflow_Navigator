@@ -14,7 +14,7 @@
       <button
         v-if="showStuck"
         type="button"
-        class="text-xs font-medium text-slate-500 underline-offset-2 hover:text-primary hover:underline"
+        class="text-xs font-medium text-slate-500 underline-offset-2 hover:text-accent hover:underline"
         @click="$emit('stuck')"
       >
         我卡住了
@@ -35,7 +35,7 @@
           v-for="(t, i) in chatTurns"
           :key="i"
           class="rounded-lg border px-3 py-2 text-sm"
-          :class="t.role === 'ASSISTANT' ? 'border-primary/15 bg-primary/5' : 'border-slate-200 bg-white'"
+          :class="t.role === 'ASSISTANT' ? 'border-accent/20 bg-accent-muted/45' : 'border-slate-200 bg-white'"
         >
           <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
             {{ t.role === 'USER' ? '你' : '导师' }}
@@ -52,7 +52,7 @@
         data-testid="driving-seat-input"
         :value="draftValue"
         :rows="textareaRows"
-        class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+        class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900 shadow-sm outline-none transition focus:border-accent focus:ring-4 focus:ring-accent/15"
         :placeholder="inputPlaceholderSoft || inputPlaceholder"
         :disabled="sending"
         @input="$emit('update:draftValue', ($event.target as HTMLTextAreaElement).value)"
@@ -71,7 +71,7 @@
 
     <div
       v-if="showRestate"
-      class="mt-8 rounded-2xl border border-amber-200/80 bg-amber-50/35 p-5"
+      class="mt-8 rounded-2xl border border-accent/25 bg-accent-muted/40 p-5"
     >
       <h3 class="text-base font-semibold text-slate-950">用自己的话再写三行</h3>
       <p class="mt-1 text-sm text-slate-600">不要求一次说对。</p>
@@ -81,7 +81,7 @@
           <input
             :value="restateWhat"
             type="text"
-            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
             placeholder="一句话定位"
             @input="$emit('update:restateWhat', ($event.target as HTMLInputElement).value)"
           />
@@ -91,7 +91,7 @@
           <input
             :value="restateProblem"
             type="text"
-            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
             placeholder="它在帮什么忙"
             @input="$emit('update:restateProblem', ($event.target as HTMLInputElement).value)"
           />
@@ -101,7 +101,7 @@
           <input
             :value="restateRelate"
             type="text"
-            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
             placeholder="相关概念"
             @input="$emit('update:restateRelate', ($event.target as HTMLInputElement).value)"
           />
@@ -123,7 +123,7 @@
         >
           <input
             type="checkbox"
-            class="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/30"
+            class="mt-1 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent/25"
             :checked="checks[i]"
             @change="toggleCheck(i)"
           />
@@ -188,7 +188,7 @@ const textareaRows = computed(() => (props.emphasisPhase === 'TRAINING' ? 8 : 5)
 
 const panelEmphasisClass = computed(() =>
   props.emphasisPhase === 'TRAINING'
-    ? 'ring-2 ring-primary/20 shadow-md'
+    ? 'ring-2 ring-accent/22 shadow-md'
     : props.emphasisPhase === 'STRUCTURE'
       ? 'opacity-[0.98]'
       : ''

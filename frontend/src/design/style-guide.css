@@ -4,8 +4,9 @@
   --color-primary-hover: #152e4a;
   --color-primary-muted: #e8eef5;
   --color-secondary: #6366f1;
-  --color-accent: #ea580c;
-  --color-accent-hover: #c2410c;
+  --color-accent: #d97706;
+  --color-accent-hover: #b45309;
+  --color-accent-muted: #fef3c7;
   --color-background: #f1f5f9;
   --color-page-bg: #f1f5f9;
   --color-card-bg: #ffffff;
@@ -15,11 +16,12 @@
   --color-border: #e2e8f0;
   --color-border-strong: #cbd5e1;
   --color-success: #059669;
-  --color-warning: #d97706;
+  --color-warning: #b45309;
+  --color-danger: #dc2626;
   --color-error: #dc2626;
   --color-phase-structure: #2563eb;
   --color-phase-understanding: #7c3aed;
-  --color-phase-training: #ea580c;
+  --color-phase-training: #d97706;
   --color-phase-reflection: #059669;
   --radius-card: 16px;
   --radius-input: 12px;

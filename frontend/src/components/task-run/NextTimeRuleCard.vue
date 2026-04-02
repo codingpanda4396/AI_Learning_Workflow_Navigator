@@ -11,14 +11,14 @@
         type="button"
         class="flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-sm transition-all"
         :class="isSelected(strategy.id)
-          ? 'border-primary bg-primary/5 text-primary font-medium'
-          : 'border-slate-200 text-slate-700 hover:border-primary/30 hover:bg-primary/5'"
+          ? 'border-accent bg-accent-muted/70 text-accent-hover font-medium'
+          : 'border-slate-200 text-slate-700 hover:border-accent/30 hover:bg-accent-muted/50'"
         @click="toggleStrategy(strategy.id)"
       >
         <span
           class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors"
           :class="isSelected(strategy.id)
-            ? 'border-primary bg-primary text-white'
+            ? 'border-accent bg-accent text-white'
             : 'border-slate-300'"
         >
           <svg
@@ -43,7 +43,7 @@
         v-model="localReflection"
         :placeholder="placeholder"
         rows="2"
-        class="w-full rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-primary/40 focus:bg-white"
+        class="w-full rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-accent/40 focus:bg-white"
       />
     </div>
   </div>

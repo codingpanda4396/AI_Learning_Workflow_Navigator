@@ -144,7 +144,7 @@ function appendChip(chip: string) {
       </div>
     </div>
 
-    <div v-else-if="!loading" class="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
+    <div v-else-if="!loading" class="rounded-2xl border border-accent/25 bg-accent-muted/70 p-4 text-sm text-accent-hover">
       当前没有可执行的学习动作，请刷新后重试。
     </div>
 

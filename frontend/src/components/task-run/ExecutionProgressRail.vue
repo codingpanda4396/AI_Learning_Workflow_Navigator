@@ -21,15 +21,15 @@
       </p>
     </section>
 
-    <section class="rounded-[20px] border border-amber-100 bg-amber-50/40 p-4">
-      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-900/90">
+    <section class="rounded-[20px] border border-accent/20 bg-accent-muted/45 p-4">
+      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-accent-hover/95">
         {{ model.stuckSectionTitle }}
       </p>
       <ul class="mt-3 space-y-2">
         <li v-for="(action, i) in model.stuckActions" :key="`stuck-${i}`">
           <button
             type="button"
-            class="w-full rounded-[14px] border border-amber-200/90 bg-white px-3 py-2 text-left text-sm text-slate-800 transition hover:border-primary/40 hover:bg-primary/5"
+            class="w-full rounded-[14px] border border-accent/25 bg-white px-3 py-2 text-left text-sm text-slate-800 transition hover:border-accent/40 hover:bg-accent-muted/45"
             :data-testid="`stuck-action-${i}`"
             @click="$emit('stuck-action', action)"
           >

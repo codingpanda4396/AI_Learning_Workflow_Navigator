@@ -5,7 +5,7 @@
     <p class="mt-1 text-sm text-slate-700">{{ taskRequirement }}</p>
     <p class="mt-2 text-xs text-slate-500">{{ prompt }}</p>
     <textarea
-      class="mt-3 min-h-[150px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-primary/50 focus:bg-white"
+      class="mt-3 min-h-[150px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-accent/50 focus:bg-white"
       :value="draft"
       :disabled="busy"
       placeholder="写一版你的表达"

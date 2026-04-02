@@ -106,9 +106,9 @@ export const STAGE_GUIDE_META: Record<StageGuideCode, StageGuideMeta> = {
       execution: '现在轮到你自己动手，先把这一步做完。',
     },
     visualTone: {
-      accent: 'text-emerald-700',
-      soft: 'from-emerald-50 via-white to-teal-50',
-      border: 'border-emerald-200/80',
+      accent: 'text-accent-hover',
+      soft: 'from-accent-muted/75 via-white to-white',
+      border: 'border-accent/25',
     },
   },
   REFLECTION: {
@@ -129,9 +129,9 @@ export const STAGE_GUIDE_META: Record<StageGuideCode, StageGuideMeta> = {
       execution: '现在先做个简短检查，把这一轮收住。',
     },
     visualTone: {
-      accent: 'text-amber-700',
-      soft: 'from-amber-50 via-white to-orange-50',
-      border: 'border-amber-200/80',
+      accent: 'text-accent-hover',
+      soft: 'from-accent-muted/80 via-white to-accent-muted/40',
+      border: 'border-accent/25',
     },
   },
 }

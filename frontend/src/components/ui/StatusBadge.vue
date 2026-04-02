@@ -19,7 +19,7 @@ const variantClass = computed(() => {
   const m: Record<string, string> = {
     default: 'bg-gray-100 text-text-secondary',
     success: 'bg-green-100 text-green-800',
-    warning: 'bg-amber-100 text-amber-800',
+    warning: 'bg-accent-muted text-accent-hover ring-1 ring-accent/20',
     error: 'bg-red-100 text-red-800',
   }
   return m[props.variant ?? 'default']

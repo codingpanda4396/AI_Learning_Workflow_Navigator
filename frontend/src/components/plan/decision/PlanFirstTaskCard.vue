@@ -22,7 +22,7 @@
         </dd>
       </div>
       <div>
-        <dt class="text-xs font-medium uppercase tracking-[0.14em] text-amber-700">
+        <dt class="text-xs font-medium uppercase tracking-[0.14em] text-accent-hover">
           错误提醒
         </dt>
         <dd class="mt-1.5 text-slate-700">

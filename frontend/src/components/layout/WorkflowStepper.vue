@@ -14,7 +14,7 @@
         class="flex flex-col items-center"
         :class="
           current === step
-            ? 'text-primary font-medium'
+            ? 'text-accent font-medium'
             : isDone(step)
               ? 'text-primary/80'
               : ''
@@ -24,7 +24,7 @@
           class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
           :class="
             current === step
-              ? 'bg-primary text-white'
+              ? 'bg-accent text-white shadow-sm ring-2 ring-accent/25'
               : isDone(step)
                 ? 'bg-primary/20'
                 : 'bg-border'

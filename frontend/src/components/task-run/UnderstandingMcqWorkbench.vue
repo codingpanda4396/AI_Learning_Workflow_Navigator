@@ -36,7 +36,7 @@ defineEmits<{
 }>()
 
 function btnClass(id: string) {
-  if (props.selectedOptionId === id) return 'border-primary bg-primary/[0.08] text-slate-900'
+  if (props.selectedOptionId === id) return 'border-accent bg-accent-muted/80 text-slate-900'
   return 'border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-300'
 }
 </script>

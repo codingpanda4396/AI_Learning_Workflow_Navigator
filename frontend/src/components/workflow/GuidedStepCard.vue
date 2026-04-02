@@ -7,8 +7,8 @@
       class="flex w-full items-start gap-3 rounded-input border px-4 py-3 text-left text-sm transition-colors"
       :class="
         step.id === currentStepId
-          ? 'border-primary bg-primary/5 font-medium text-text-primary ring-1 ring-primary/20'
-          : 'border-border text-text-secondary hover:border-primary/40 hover:bg-gray-50/80'
+          ? 'border-accent bg-accent-muted/80 font-medium text-text-primary ring-1 ring-accent/25'
+          : 'border-border text-text-secondary hover:border-accent/35 hover:bg-gray-50/80'
       "
       @click="$emit('select', step.id)"
     >
@@ -16,7 +16,7 @@
         class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
         :class="
           step.id === currentStepId
-            ? 'bg-primary text-white'
+            ? 'bg-accent text-white shadow-sm ring-2 ring-accent/20'
             : 'bg-gray-100 text-text-secondary'
         "
       >

@@ -12,7 +12,7 @@
           {{ model.mastered }}
         </p>
         <p class="mt-1 text-sm leading-6 text-slate-700">
-          <span class="font-medium text-amber-900">还要补：</span>
+          <span class="font-medium text-accent-hover">还要补：</span>
           {{ model.gap }}
           <span v-if="model.nextStep" class="text-slate-600">
             · 接下来：{{ model.nextStep }}

@@ -81,8 +81,8 @@ public final class TutorPromptTemplates {
                     目标：
                     - 承接学生当前问题，解释 DFS / BFS 背后的推进机制
                     - 优先帮助学生理解“为什么会这样”，而不是直接背定义
-                    - 当学生已经真正说清机制时，可以允许进入表达训练
                     - 还没理解透时，继续追问或换角度解释
+                    - 说明：是否进入下一阶段由学生自己在界面选择；can_proceed 与 completion_hint 仅作学习反馈参考，不得当作“通关许可”
                     """;
         };
 
@@ -106,6 +106,7 @@ public final class TutorPromptTemplates {
                 - 不要伪装学生已经掌握没有说清的内容
                 - 不要输出代码块
                 - 不要直接贴标准答案后结束，要保持教学感
+                - UNDERSTANDING 阶段：can_proceed 仅描述你对学习进度的判断，界面不会用它锁定「下一步」按钮
                 - TRAINING 阶段如果 can_proceed=false，final_draft 必须留空
                 """.formatted(phase, kp, canon, phaseInstructions);
     }

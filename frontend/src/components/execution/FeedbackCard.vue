@@ -8,7 +8,7 @@
         :class="
           feedback.correct
             ? 'bg-emerald-100 text-emerald-900'
-            : 'bg-amber-100 text-amber-950'
+            : 'bg-accent-muted text-accent-hover'
         "
       >
         {{ feedback.correct ? '整体方向不错' : '还可以再收紧一点' }}
@@ -27,8 +27,8 @@
         🟢 你已经抓住关键点 👍
       </p>
       <div v-if="feedback.gap" class="mt-3 space-y-1">
-        <p class="text-sm font-medium text-amber-950">⚠️ 但这里可以更清楚：</p>
-        <p class="text-sm leading-relaxed text-amber-950">{{ feedback.gap }}</p>
+        <p class="text-sm font-medium text-accent-hover">⚠️ 但这里可以更清楚：</p>
+        <p class="text-sm leading-relaxed text-text-primary">{{ feedback.gap }}</p>
       </div>
       <div v-if="feedback.nextHint" class="mt-3 space-y-1">
         <p class="text-sm font-medium text-text-secondary">👉 建议这样理解：</p>

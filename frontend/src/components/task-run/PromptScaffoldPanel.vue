@@ -8,7 +8,7 @@
         v-for="a in actions"
         :key="a.id"
         type="button"
-        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-900 transition hover:border-primary/40 hover:bg-primary/[0.06]"
+        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-900 transition hover:border-accent/40 hover:bg-accent-muted/50"
         :disabled="busy"
         @click="$emit('append-explanation', a.id)"
       >

@@ -85,7 +85,7 @@
               class="rounded-full border px-3 py-2 text-left text-sm transition"
               :class="
                 item.required
-                  ? 'border-primary/35 bg-primary/5 text-primary hover:bg-primary/10'
+                  ? 'border-accent/35 bg-accent-muted/60 text-accent-hover hover:bg-accent-muted'
                   : 'border-border bg-white text-text-primary hover:bg-slate-100'
               "
               :disabled="coachInputDisabled"
@@ -149,10 +149,10 @@
         </div>
         <div
           v-if="selfExplainMissingPoints.length"
-          class="rounded-[20px] border border-amber-200 bg-amber-50/90 p-4"
+          class="rounded-[20px] border border-accent/25 bg-accent-muted/75 p-4"
         >
-          <p class="text-sm font-semibold text-amber-900">还没补上的缺口</p>
-          <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-amber-900">
+          <p class="text-sm font-semibold text-accent-hover">还没补上的缺口</p>
+          <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-accent-hover">
             <li v-for="(item, index) in selfExplainMissingPoints" :key="index">
               {{ item }}
             </li>
@@ -305,7 +305,7 @@
             class="rounded-[22px] border px-4 py-4"
             :class="
               turn.role === 'ASSISTANT'
-                ? 'border-primary/20 bg-primary/5'
+                ? 'border-accent/20 bg-accent-muted/45'
                 : 'border-slate-200 bg-slate-50/90'
             "
           >

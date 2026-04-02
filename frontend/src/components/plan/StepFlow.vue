@@ -17,7 +17,7 @@
       aria-label="学习路径进度"
     >
       <div
-        class="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+        class="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
         :style="{ width: progressPercent }"
       />
     </div>
@@ -88,7 +88,7 @@ const progressPercent = computed(() => {
 function cardClass(item: StepFlowItem): string {
   const { status } = item
   if (status === 'CURRENT') {
-    return 'border-2 border-solid border-primary bg-primary/5 shadow-md ring-1 ring-primary/25'
+    return 'border-2 border-solid border-accent bg-accent-muted/70 shadow-md ring-1 ring-accent/25'
   }
   if (status === 'DONE') {
     return 'border border-solid border-border bg-slate-50/80 opacity-80'
@@ -97,13 +97,13 @@ function cardClass(item: StepFlowItem): string {
 }
 
 function iconWrapClass(status: StepFlowStatus): string {
-  if (status === 'CURRENT') return 'text-primary'
+  if (status === 'CURRENT') return 'text-accent'
   if (status === 'DONE') return 'text-text-secondary'
   return 'text-text-secondary/70'
 }
 
 function titleClass(status: StepFlowStatus): string {
-  if (status === 'CURRENT') return 'text-primary'
+  if (status === 'CURRENT') return 'text-accent-hover'
   if (status === 'DONE') return 'text-text-secondary line-through decoration-text-secondary/50'
   return 'text-text-secondary'
 }

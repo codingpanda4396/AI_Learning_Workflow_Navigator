@@ -6,12 +6,14 @@ export default {
       colors: {
         primary: {
           DEFAULT: '#1E3A5F',
-          hover: '#152e4a',
+          hover: '#152E4A',
           muted: '#E8EEF5',
         },
+        /** 琥珀金强调色：CTA、当前节点、轻量「点亮」 */
         accent: {
-          DEFAULT: '#EA580C',
-          hover: '#C2410C',
+          DEFAULT: '#D97706',
+          hover: '#B45309',
+          muted: '#FEF3C7',
         },
         secondary: '#6366F1',
         background: '#F1F5F9',
@@ -20,14 +22,15 @@ export default {
         'text-muted': '#94A3B8',
         border: '#E2E8F0',
         'border-strong': '#CBD5E1',
-        'primary-hover': '#152e4a',
+        'primary-hover': '#152E4A',
         success: '#059669',
-        warning: '#D97706',
+        /** 语义注意态（略深于 accent，避免与主 CTA 完全同色） */
+        warning: '#B45309',
         danger: '#DC2626',
         phase: {
           structure: '#2563EB',
           understanding: '#7C3AED',
-          training: '#EA580C',
+          training: '#D97706',
           reflection: '#059669',
         },
       },

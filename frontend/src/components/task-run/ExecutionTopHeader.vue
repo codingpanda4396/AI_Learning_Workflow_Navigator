@@ -17,14 +17,14 @@
           :key="p.key"
           class="relative flex min-w-0 flex-1 flex-col items-center rounded-md px-1 py-1.5 text-center transition-all duration-200"
           :class="p.key === phase
-            ? 'bg-white shadow-card ring-1 ring-primary/25'
+            ? 'bg-white shadow-card ring-1 ring-accent/25'
             : isPhaseCompleted(idx)
               ? 'text-slate-600'
               : 'text-slate-400'"
         >
           <span
             class="flex items-center gap-1 text-[10px] font-semibold leading-tight"
-            :class="p.key === phase ? 'text-primary' : ''"
+            :class="p.key === phase ? 'text-accent' : ''"
           >
             <svg
               v-if="isPhaseCompleted(idx)"

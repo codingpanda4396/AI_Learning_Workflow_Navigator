@@ -130,7 +130,7 @@
               <div class="rounded-full border border-border bg-white px-4 py-2 text-sm text-text-secondary">
                 {{ GOAL_COPY.currentSubjectPrefix }}{{ selectedSubject.label }}
               </div>
-              <div class="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white">
+              <div class="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white shadow-sm">
                 {{ GOAL_COPY.topicStartTag }}
               </div>
             </div>
@@ -152,7 +152,7 @@
                     <p
                       v-if="selectedTopicKey === topic.key && isHomeTopicConfigured(topic.key)"
                       class="mt-1 text-xs font-medium uppercase tracking-[0.14em]"
-                      :class="selectedTopicKey === topic.key ? 'text-slate-300' : 'text-slate-500'"
+                      :class="selectedTopicKey === topic.key ? 'text-accent-hover' : 'text-slate-500'"
                     >
                       {{ GOAL_COPY.topicStartTag }}
                     </p>
@@ -166,7 +166,7 @@
                   <span
                     v-else
                     class="h-3.5 w-3.5 shrink-0 rounded-full transition-colors"
-                    :class="selectedTopicKey === topic.key ? 'bg-white/90 ring-4 ring-white/20' : 'bg-slate-200'"
+                    :class="selectedTopicKey === topic.key ? 'bg-accent ring-2 ring-accent/35' : 'bg-slate-200'"
                   />
                 </div>
                 <p class="mt-3 text-sm leading-6" :class="topicDescClass(topic.key)">
@@ -341,7 +341,7 @@ function topicCardClass(topicKey: string) {
     return 'pointer-events-none cursor-not-allowed border-dashed border-slate-200 bg-slate-50/65 text-slate-400 opacity-65'
   }
   if (selectedTopicKey.value === topicKey) {
-    return 'border-primary bg-primary text-white shadow-[0_18px_36px_rgba(30,58,95,0.2)]'
+    return 'border-accent bg-accent-muted text-text-primary shadow-md ring-1 ring-accent/25'
   }
   return 'border-slate-200 bg-white text-slate-950 hover:border-slate-300 hover:bg-slate-50'
 }
@@ -349,7 +349,7 @@ function topicCardClass(topicKey: string) {
 function topicDescClass(topicKey: string) {
   const configured = isHomeTopicConfigured(topicKey)
   if (!configured) return 'text-slate-400'
-  return selectedTopicKey.value === topicKey ? 'text-slate-200' : 'text-slate-600'
+  return selectedTopicKey.value === topicKey ? 'text-text-secondary' : 'text-slate-600'
 }
 
 function delay(ms: number) {

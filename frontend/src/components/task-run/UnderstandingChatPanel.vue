@@ -49,7 +49,7 @@
       <p v-else-if="completionHint" class="mb-2 text-xs text-slate-500">{{ completionHint }}</p>
       <div
         class="flex items-end gap-2 rounded-xl border-2 px-3 py-2 transition-colors"
-        :class="inputHighlight ? 'border-primary/50 bg-primary/5' : 'border-slate-200 bg-slate-50/50'"
+        :class="inputHighlight ? 'border-accent/45 bg-accent-muted/50' : 'border-slate-200 bg-slate-50/50'"
       >
         <textarea
           ref="inputRef"

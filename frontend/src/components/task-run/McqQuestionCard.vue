@@ -44,13 +44,13 @@ function handlePick(optionId: string) {
 
 function optionClass(optionId: string): string {
   if (!props.selectedId) {
-    return 'border-slate-200 bg-white hover:border-primary/40 hover:bg-primary/5 cursor-pointer'
+    return 'border-slate-200 bg-white hover:border-accent/40 hover:bg-accent-muted/50 cursor-pointer'
   }
   if (optionId === props.selectedId && optionId === props.question.correctId) {
     return 'border-emerald-300 bg-emerald-50/60 cursor-default'
   }
   if (optionId === props.selectedId && optionId !== props.question.correctId) {
-    return 'border-amber-300 bg-amber-50/50 cursor-default'
+    return 'border-accent/40 bg-accent-muted/70 cursor-default'
   }
   if (optionId === props.question.correctId && props.locked) {
     return 'border-emerald-200 bg-emerald-50/30 cursor-default opacity-70'
@@ -60,13 +60,13 @@ function optionClass(optionId: string): string {
 
 function badgeClass(optionId: string): string {
   if (!props.selectedId) {
-    return 'border-slate-300 text-slate-500 group-hover:border-primary/60 group-hover:text-primary'
+    return 'border-slate-300 text-slate-500 group-hover:border-accent/50 group-hover:text-accent'
   }
   if (optionId === props.selectedId && optionId === props.question.correctId) {
     return 'border-emerald-400 bg-emerald-100 text-emerald-700'
   }
   if (optionId === props.selectedId && optionId !== props.question.correctId) {
-    return 'border-amber-400 bg-amber-100 text-amber-700'
+    return 'border-accent/50 bg-accent-muted text-accent-hover'
   }
   return 'border-slate-200 text-slate-400'
 }

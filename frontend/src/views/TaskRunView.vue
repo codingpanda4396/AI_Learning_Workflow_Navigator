@@ -196,6 +196,14 @@ const currentPhaseBusy = computed(() => {
 })
 const nextActionLoading = computed(() => advancingPhase.value || currentPhaseBusy.value)
 
+/** 至少完成一轮有效对话：非流式中且已有非空导师回复（进阶由用户决定，不采用 LLM 的 can_proceed） */
+function understandingReadyToLeavePhase(): boolean {
+  return (
+    !understandingState.streaming &&
+    understandingState.messages.some((m) => m.role === 'assistant' && m.content.trim().length > 0)
+  )
+}
+
 const canGoNext = computed(() => {
   switch (currentPhase.value) {
     case 'structure':
@@ -205,7 +213,7 @@ const canGoNext = computed(() => {
           structureState.completedQuestionIds.length >= structureState.questions.length)
       )
     case 'understanding':
-      return understandingState.canProceed
+      return understandingReadyToLeavePhase()
     case 'training':
       return trainingState.canProceed && !!trainingState.finalDraft
     case 'reflection':
@@ -452,7 +460,7 @@ function buildReflectionSummary() {
   if (structureState.completedQuestionIds.length > 0) {
     learned.push('能区分 DFS 与 BFS 的基本搜索行为')
   }
-  if (understandingState.canProceed || understandingState.messages.some((m) => m.role === 'assistant')) {
+  if (understandingState.messages.some((m) => m.role === 'assistant' && m.content.trim().length > 0)) {
     learned.push('理解了 DFS 为什么会回退、BFS 为什么会分层推进')
   }
   if (trainingState.finalDraft) {
@@ -570,12 +578,16 @@ async function submitPhaseConversation(phase: 'understanding' | 'training', text
           assistantMsg.content += chunk
         },
         onDone: (payload) => {
-          state.canProceed = payload.canProceed === 'true'
-          state.completionHint = payload.completionHint || null
-          state.stageSummary = payload.summary || null
-          if (phase === 'training') {
-            trainingState.finalDraft = payload.finalDraft || null
+          if (phase === 'understanding') {
+            understandingState.canProceed = false
+            understandingState.completionHint = payload.completionHint || null
+            understandingState.stageSummary = payload.summary || null
+            return
           }
+          trainingState.canProceed = payload.canProceed === 'true'
+          trainingState.completionHint = payload.completionHint || null
+          trainingState.stageSummary = payload.summary || null
+          trainingState.finalDraft = payload.finalDraft || null
         },
       }
     )

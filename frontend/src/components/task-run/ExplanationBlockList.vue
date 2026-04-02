@@ -26,7 +26,7 @@ defineProps<{
 }>()
 
 function toneClass(tone: ExplanationBlock['tone']) {
-  if (tone === 'scaffold') return 'border-primary/30 bg-primary/[0.04]'
+  if (tone === 'scaffold') return 'border-accent/30 bg-accent-muted/60'
   if (tone === 'feedback') return 'border-emerald-200 bg-emerald-50/60'
   return 'border-slate-200 bg-white'
 }

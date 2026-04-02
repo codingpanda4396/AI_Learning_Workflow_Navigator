@@ -8,7 +8,7 @@
         <p class="truncate text-sm font-semibold text-slate-950">{{ topicName }}</p>
         <p class="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">当前阶段</p>
         <p class="mt-0.5 text-sm font-semibold text-slate-900">
-          <span class="font-mono text-xs text-primary">{{ currentPhaseCode }}</span>
+          <span class="font-mono text-xs text-accent">{{ currentPhaseCode }}</span>
           <span class="mx-1.5 text-slate-300">·</span>
           <span>{{ phaseDisplayZh }}</span>
         </p>
@@ -27,11 +27,11 @@
         v-for="p in phases"
         :key="p"
         class="flex min-w-0 flex-1 flex-col items-center rounded-md px-1 py-1.5 text-center"
-        :class="p === currentPhase ? 'bg-white shadow-sm ring-1 ring-primary/20' : ''"
+        :class="p === currentPhase ? 'bg-white shadow-sm ring-1 ring-accent/25' : ''"
       >
         <span
           class="w-full truncate text-[10px] font-medium leading-tight"
-          :class="p === currentPhase ? 'text-primary' : 'text-slate-500'"
+          :class="p === currentPhase ? 'text-accent' : 'text-slate-500'"
         >
           {{ phaseStripLabel(p) }}
         </span>

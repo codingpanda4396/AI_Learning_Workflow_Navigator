@@ -3,11 +3,12 @@
  */
 export const colors = {
   primary: '#1E3A5F',
-  primaryHover: '#152e4a',
+  primaryHover: '#152E4A',
   primaryMuted: '#E8EEF5',
   secondary: '#6366F1',
-  accent: '#EA580C',
-  accentHover: '#C2410C',
+  accent: '#D97706',
+  accentHover: '#B45309',
+  accentMuted: '#FEF3C7',
   background: '#F1F5F9',
   cardBg: '#FFFFFF',
   textPrimary: '#0F172A',
@@ -16,12 +17,13 @@ export const colors = {
   border: '#E2E8F0',
   borderStrong: '#CBD5E1',
   success: '#059669',
-  warning: '#D97706',
+  warning: '#B45309',
+  danger: '#DC2626',
   error: '#DC2626',
   /** 执行四阶段识别色（仅标签/细条，不作大背景） */
   phaseStructure: '#2563EB',
   phaseUnderstanding: '#7C3AED',
-  phaseTraining: '#EA580C',
+  phaseTraining: '#D97706',
   phaseReflection: '#059669',
 } as const
 

@@ -25,7 +25,7 @@
           </p>
           <span
             v-if="item.code === props.expandedStageCode"
-            class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800"
+            class="rounded-full bg-accent-muted px-2 py-0.5 text-[10px] font-semibold text-accent-hover"
           >
             当前重点
           </span>
@@ -73,7 +73,7 @@ const items: { code: PlanStageCode; title: string; strategy: string }[] = [
 
 function itemClass(code: PlanStageCode) {
   if (code === props.expandedStageCode) {
-    return 'border-primary/35 bg-gradient-to-br from-primary/8 via-white to-white shadow-[0_16px_36px_rgba(79,70,229,0.12)]'
+    return 'border-accent/35 bg-gradient-to-br from-accent-muted/70 via-white to-white shadow-[0_16px_36px_rgba(217,119,6,0.1)]'
   }
   return 'border-slate-200 bg-white shadow-sm'
 }

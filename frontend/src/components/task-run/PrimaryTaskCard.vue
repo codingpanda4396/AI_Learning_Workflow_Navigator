@@ -6,7 +6,7 @@
   >
     <div class="flex flex-wrap items-center gap-2">
       <span
-        class="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+        class="rounded-full bg-accent-muted/90 px-2.5 py-0.5 text-xs font-semibold text-accent-hover"
       >
         {{ phaseLabel }}
       </span>
@@ -63,7 +63,7 @@ const phaseLabel = computed(() => props.model.phaseDisplayZh || phaseCodeToFullZ
 
 const emphasisClass = computed(() => {
   if (props.emphasisPhase === 'STRUCTURE') return 'ring-2 ring-slate-300/80'
-  if (props.emphasisPhase === 'TRAINING') return 'ring-2 ring-primary/20'
+  if (props.emphasisPhase === 'TRAINING') return 'ring-2 ring-accent/25'
   if (props.emphasisPhase === 'REFLECTION') return 'ring-1 ring-slate-200'
   return 'ring-1 ring-slate-200/80'
 })

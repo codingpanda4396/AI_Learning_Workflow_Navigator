@@ -33,7 +33,7 @@
           </div>
           <button
             type="button"
-            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-primary/40 hover:text-primary"
+            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-accent/40 hover:text-accent"
             :disabled="sending"
             @click="toggleOpen(section.id)"
           >
@@ -44,7 +44,7 @@
         <div v-if="openSectionId === section.id" class="mt-3 grid gap-2 md:grid-cols-3">
           <button
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-xs leading-5 text-slate-700 transition hover:border-primary/40 hover:bg-primary/5"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-xs leading-5 text-slate-700 transition hover:border-accent/40 hover:bg-accent-muted/50"
             :disabled="sending"
             @click="$emit('prefill-chip', section.lightHint)"
           >
@@ -53,7 +53,7 @@
           </button>
           <button
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-xs leading-5 text-slate-700 transition hover:border-primary/40 hover:bg-primary/5"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-xs leading-5 text-slate-700 transition hover:border-accent/40 hover:bg-accent-muted/50"
             :disabled="sending"
             @click="$emit('prefill-chip', section.standardHint)"
           >
@@ -62,7 +62,7 @@
           </button>
           <button
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-xs leading-5 text-slate-700 transition hover:border-primary/40 hover:bg-primary/5"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-xs leading-5 text-slate-700 transition hover:border-accent/40 hover:bg-accent-muted/50"
             :disabled="sending"
             @click="$emit('prefill-chip', section.strongHint)"
           >

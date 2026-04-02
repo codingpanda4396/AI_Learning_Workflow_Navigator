@@ -13,7 +13,7 @@
             </p>
             <span
               v-if="item.code === expandedStageCode"
-              class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800"
+              class="rounded-full bg-accent-muted px-2 py-0.5 text-[10px] font-semibold text-accent-hover"
             >
               当前这步
             </span>
@@ -54,7 +54,7 @@ const props = defineProps<{
 function nodeClass(item: PlanPathStripItem): string {
   const focus = item.code === props.expandedStageCode
   if (focus) {
-    return 'border-amber-400 bg-gradient-to-b from-amber-50 to-white shadow-[0_12px_28px_rgba(245,158,11,0.15)] ring-2 ring-amber-400/30'
+    return 'border-accent/45 bg-gradient-to-b from-accent-muted/90 to-white shadow-[0_12px_28px_rgba(217,119,6,0.12)] ring-2 ring-accent/25'
   }
   return 'border-slate-200/90 bg-white/70 text-slate-800 shadow-sm'
 }

@@ -76,57 +76,106 @@ export const DFS_BFS_STRUCTURE_QUESTIONS: McqQuestion[] = [
   },
 ]
 
-// ─── UNDERSTANDING 脚手架按钮 ───
+// ─── UNDERSTANDING 脚手架（右侧面板）───
+
+/** 学习脚手架顶栏副文案 */
+export const UNDERSTANDING_SCAFFOLD_PANEL_HINT =
+  '点击脚手架，快速把问题发到左侧。这一阶段重点不是记定义，而是看懂 DFS / BFS 分别是怎么走的。'
 
 export const DFS_BFS_SCAFFOLD_BUTTONS: ScaffoldButton[] = [
+  // ── 直观理解 ──
   {
-    id: 'u-why-backtrack',
-    group: '机制线索',
-    title: '追问：回退从哪一步必然发生',
+    id: 'u-intuition-dfs-like',
+    group: '直观理解',
+    title: 'DFS 像什么？',
     injectPrompt:
-      '请不要直接给结论，而是一步一步说明：为什么 DFS 会沿一条路径不断深入，并且在走不下去时发生回退？请结合遍历过程来讲。',
+      '用生活里好懂的类比帮我形容 DFS（比如走迷宫、沿一条路探到底之类），越口语越好。不要先甩教科书定义。',
   },
   {
-    id: 'u-why-layer',
-    group: '机制线索',
-    title: '追问：分层推进如何出现',
+    id: 'u-intuition-bfs-like',
+    group: '直观理解',
+    title: 'BFS 像什么？',
     injectPrompt:
-      '请一步一步说明：为什么 BFS 会呈现出"从起点开始一层一层向外扩展"的效果？请重点讲"为什么会这样"，不要只给定义。',
+      '用生活里好懂的类比帮我形容 BFS（比如水波一圈圈漾开、按距离一圈圈找），越口语越好。不要先甩教科书定义。',
   },
   {
-    id: 'u-root-diff',
-    group: '差异辨析',
-    title: '厘清：两种搜索的根本差别',
+    id: 'u-intuition-walk-dfs',
+    group: '直观理解',
+    title: '画个小图带我走一遍 DFS',
     injectPrompt:
-      '请不要只说"一个深度一个广度"。请从搜索推进方式、访问顺序感受、适合解决的问题三个角度，说明 DFS 和 BFS 的根本差别。',
+      '画一个特别小的图或树（大概 4～6 个点就行），从起点开始标出 DFS 的访问顺序（1、2、3…）。每一步说清楚「为什么下一步轮到它」，我跟着你走一遍。',
   },
   {
-    id: 'u-when-matters',
-    group: '差异辨析',
-    title: '情境：什么时候差别会放大',
+    id: 'u-intuition-walk-bfs',
+    group: '直观理解',
+    title: '画个小图带我走一遍 BFS',
     injectPrompt:
-      '请结合具体场景说明：DFS 和 BFS 的差异在什么情况下会真正影响结果或效率？请举一个能体现差别的例子。',
+      '画一个特别小的图或树（大概 4～6 个点就行），从起点开始标出 BFS 的访问顺序（1、2、3…）。每一步说清楚「为什么下一步轮到它」，我跟着你走一遍。',
+  },
+  // ── 顺序机制 ──
+  {
+    id: 'u-order-dfs-down',
+    group: '顺序机制',
+    title: 'DFS 为什么会一路往下走？',
+    injectPrompt:
+      '用栈或递归的思路讲清楚：DFS 为啥总是先往深处钻？请点到「后进先出」或「先处理刚到的分支」这种直觉，别写成定理证明。',
   },
   {
-    id: 'u-small-diagram',
-    group: '示意辅助',
-    title: '示意：小图走一遍访问顺序',
+    id: 'u-order-bfs-layers',
+    group: '顺序机制',
+    title: 'BFS 为什么是一层一层？',
     injectPrompt:
-      '请用一个非常小的图或树的例子，分别演示 DFS 和 BFS 的访问顺序，并说明为什么会出现这种顺序。',
+      '用队列讲清楚：BFS 为啥看起来像「先近后远」、一层一层往外铺？请点到「先进先出」和队列里点的处理顺序，口语讲就行。',
   },
   {
-    id: 'u-check-gap',
-    group: '示意辅助',
-    title: '定位：我卡在哪一层',
+    id: 'u-order-dfs-back',
+    group: '顺序机制',
+    title: 'DFS 为什么会回头？',
     injectPrompt:
-      '如果一个人知道"DFS 往深处走，BFS 按层扩展"，但还是说不清"为什么"，这通常说明他缺了哪一层理解？请帮我定位。',
+      '结合栈/递归说明：什么时候这条路走不下去了、系统是怎么「退回去」试别的岔路的？用一两句人话，别用「回溯」空喊。',
+  },
+  {
+    id: 'u-order-bfs-no-deep-first',
+    group: '顺序机制',
+    title: 'BFS 为什么不会先跑深处？',
+    injectPrompt:
+      '对比队列的弹出顺序：为啥 BFS 不会先冲到很远很深的点？用「队列里谁先被处理」说清楚，别和 DFS 混着讲结论。',
+  },
+  // ── 做题判断 ──
+  {
+    id: 'u-prob-when-dfs',
+    group: '做题判断',
+    title: '什么题先想 DFS？',
+    injectPrompt:
+      '做题时哪些关键词或问法会让我先想到 DFS？举几类常见题型（比如枚举路径、回溯、走到底再换支路），用口语列出来，别写成考点清单腔。',
+  },
+  {
+    id: 'u-prob-when-bfs',
+    group: '做题判断',
+    title: '什么题先想 BFS？',
+    injectPrompt:
+      '做题时哪些关键词或问法会让我先想到 BFS？举几类常见题型（比如最少步数、按层扩散），用口语列出来。',
+  },
+  {
+    id: 'u-prob-shortest-bfs',
+    group: '做题判断',
+    title: '最短路为什么先想 BFS？',
+    injectPrompt:
+      '在边权都相等（或步数一层算 1）的图里，为啥找「最少步数/最短层数」常常先想到 BFS？用人话讲直觉，可以带一句和 DFS 的对比。',
+  },
+  {
+    id: 'u-prob-quick-tell',
+    group: '做题判断',
+    title: '我做题时怎么快速区分？',
+    injectPrompt:
+      '给我一套很短、能照着用的「快速区分」小抄：比如先看题目问的是啥、再想用队列还是栈/递归，控制在几条 bullet，像给自己作弊条一样。',
   },
 ]
 
 // ─── UNDERSTANDING 系统开场消息 ───
 
 export const UNDERSTANDING_SYSTEM_OPENER =
-  '你已经能区分 DFS 和 BFS 的表面差异了。现在我们来弄清楚：为什么 DFS 会先深入，为什么 BFS 会分层推进？你可以直接提问，也可以点右侧认知动作。'
+  '你已经能分清 DFS 和 BFS 的大致感觉了。接下来我们一起把它「怎么走」看明白：可以随便问，也可以点右侧学习脚手架，让问题先出现在左边输入框里。'
 
 export const UNDERSTANDING_CLOSURE_HINT =
   '你已经把关键机制问到了。下面试着进入表达训练，用你自己的话讲一次。'

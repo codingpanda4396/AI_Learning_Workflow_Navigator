@@ -14,7 +14,7 @@
           <div class="grid gap-6 px-5 py-6 md:grid-cols-[minmax(0,1.4fr)_320px] md:px-8 md:py-8">
             <div class="space-y-5">
               <div class="flex flex-wrap items-center gap-3">
-                <span class="rounded-full bg-primary px-3 py-1 text-xs font-semibold tracking-[0.16em] text-white">
+                <span class="rounded-full bg-accent px-3 py-1 text-xs font-semibold tracking-[0.16em] text-white shadow-sm ring-1 ring-accent/20">
                   {{ REPORT_COPY.heroEyebrow }}
                 </span>
                 <span
@@ -118,13 +118,13 @@
             </article>
 
             <article class="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-600">{{ REPORT_COPY.gapEyebrow }}</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-accent">{{ REPORT_COPY.gapEyebrow }}</p>
               <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{{ REPORT_COPY.gapTitle }}</h2>
               <div class="mt-5 space-y-3">
                 <div
                   v-for="(item, index) in remainingGaps"
                   :key="item + index"
-                  class="rounded-[22px] border border-amber-100 bg-amber-50/80 p-4"
+                  class="rounded-[22px] border border-accent/20 bg-accent-muted/70 p-4"
                 >
                   <p class="text-sm leading-7 text-slate-800">{{ item }}</p>
                 </div>
@@ -150,7 +150,7 @@
                     </span>
                   </div>
                   <p class="mt-3 text-sm leading-7 text-slate-700">{{ item.learned }}</p>
-                  <p v-if="item.issue" class="mt-2 text-sm leading-7 text-amber-700">{{ item.issue }}</p>
+                  <p v-if="item.issue" class="mt-2 text-sm leading-7 text-accent-hover">{{ item.issue }}</p>
                 </article>
               </div>
             </article>
@@ -178,9 +178,9 @@
 
                 <article
                   v-if="methodReview.risks.length"
-                  class="rounded-[22px] border border-amber-100 bg-amber-50/80 p-4"
+                  class="rounded-[22px] border border-accent/20 bg-accent-muted/70 p-4"
                 >
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ REPORT_COPY.methodRisks }}</p>
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-hover">{{ REPORT_COPY.methodRisks }}</p>
                   <div class="mt-3 space-y-2">
                     <p v-for="item in methodReview.risks" :key="item" class="text-sm leading-7 text-slate-700">{{ item }}</p>
                   </div>
@@ -218,7 +218,7 @@
               </p>
               <p
                 v-if="recommendedAction?.requiresReplan"
-                class="mt-4 rounded-[18px] border border-white/15 bg-white/10 px-4 py-3 text-sm text-amber-100"
+                class="mt-4 rounded-[18px] border border-white/15 bg-white/10 px-4 py-3 text-sm text-accent-muted"
               >
                 {{ REPORT_COPY.replanBanner }}
               </p>
@@ -439,7 +439,7 @@ const heroStatusClass = computed(() => {
   if (report.value?.resultStatus === 'NOT_ACHIEVED') {
     return 'bg-rose-100 text-rose-700'
   }
-  return 'bg-amber-100 text-amber-800'
+  return 'bg-accent-muted text-accent-hover'
 })
 
 const heroMetrics = computed(() => {

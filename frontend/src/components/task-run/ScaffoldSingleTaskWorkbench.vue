@@ -259,7 +259,7 @@
       :class="
         lastResult.validation.passed
           ? 'border-emerald-200 bg-emerald-50/90 text-emerald-950'
-          : 'border-amber-200 bg-amber-50/90 text-amber-950'
+          : 'border-accent/30 bg-accent-muted/85 text-accent-hover'
       "
       data-testid="scaffold-wireframe-feedback"
     >
@@ -274,7 +274,7 @@
       </p>
       <div
         v-if="isTraining && !lastResult.validation.passed && firstTrainingProblem"
-        class="mt-3 rounded-xl border border-amber-200/80 bg-white/70 px-3 py-2 text-xs leading-5"
+        class="mt-3 rounded-xl border border-accent/25 bg-white/70 px-3 py-2 text-xs leading-5"
       >
         {{ firstTrainingProblem }}
       </div>

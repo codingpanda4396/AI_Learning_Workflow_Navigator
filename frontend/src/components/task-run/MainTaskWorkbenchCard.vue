@@ -25,7 +25,7 @@
 
       <div class="border-t border-slate-100 pt-4">
         <p class="text-xs font-semibold text-slate-700">怎么开始</p>
-        <p class="mt-1.5 text-sm font-medium leading-relaxed text-primary">{{ startLine }}</p>
+        <p class="mt-1.5 text-sm font-medium leading-relaxed text-accent">{{ startLine }}</p>
       </div>
     </div>
   </section>
@@ -80,7 +80,7 @@ const startLine = computed(() => {
 
 const emphasisClass = computed(() => {
   if (props.emphasisPhase === 'STRUCTURE') return 'ring-2 ring-slate-300/70'
-  if (props.emphasisPhase === 'TRAINING') return 'ring-2 ring-primary/15'
+  if (props.emphasisPhase === 'TRAINING') return 'ring-2 ring-accent/22'
   return 'ring-1 ring-slate-200/90'
 })
 </script>

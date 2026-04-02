@@ -9,7 +9,7 @@
       data-testid="structure-composer-input"
       :value="modelValue"
       :rows="12"
-      class="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm leading-7 text-slate-900 outline-none transition focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+      class="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm leading-7 text-slate-900 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/15"
       :placeholder="placeholder"
       :disabled="sending"
       @input="onInput"
@@ -19,7 +19,7 @@
         v-for="chip in chips"
         :key="chip.prefix"
         type="button"
-        class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-primary/40 hover:bg-primary/5"
+        class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-accent/40 hover:bg-accent-muted/50"
         :disabled="sending"
         @click="insertPrefix(chip.prefix)"
       >

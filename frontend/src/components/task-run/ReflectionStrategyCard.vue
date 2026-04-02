@@ -7,7 +7,7 @@
         :key="s.id"
         type="button"
         class="w-full rounded-xl border px-3 py-2 text-left text-sm font-medium transition"
-        :class="selected === s.id ? 'border-primary bg-primary/[0.08]' : 'border-slate-200 bg-slate-50'"
+        :class="selected === s.id ? 'border-accent bg-accent-muted/80' : 'border-slate-200 bg-slate-50'"
         @click="$emit('select', s.id)"
       >
         {{ s.label }}

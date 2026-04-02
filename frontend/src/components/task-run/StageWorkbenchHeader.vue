@@ -8,7 +8,7 @@
         <p class="truncate text-sm font-semibold text-slate-950">{{ topicName }}</p>
         <p class="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">阶段学习工作台</p>
         <p class="mt-0.5 text-sm font-semibold text-slate-900">
-          <span class="font-mono text-xs text-primary">{{ emphasisPhase }}</span>
+          <span class="font-mono text-xs text-accent">{{ emphasisPhase }}</span>
           <span class="mx-1.5 text-slate-300">·</span>
           <span>{{ cognitiveAction }}</span>
         </p>
@@ -24,7 +24,7 @@
       >
         <span
           class="w-full truncate text-[10px] font-medium leading-tight"
-          :class="p === emphasisPhase ? 'text-primary' : 'text-slate-500'"
+          :class="p === emphasisPhase ? 'text-accent' : 'text-slate-500'"
         >
           {{ phaseStripLabel(p) }}
         </span>

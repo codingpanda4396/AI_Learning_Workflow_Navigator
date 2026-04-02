@@ -8,7 +8,7 @@
         class="rounded-full border px-3 py-1.5 text-xs font-medium transition"
         :class="
           openKey === item.key
-            ? 'border-primary/40 bg-primary/10 text-primary'
+            ? 'border-accent/40 bg-accent-muted/80 text-accent-hover'
             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
         "
         @click="toggle(item.key)"

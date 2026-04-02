@@ -6,7 +6,7 @@
     <div class="flex flex-wrap items-center gap-2">
       <span
         v-if="phaseBadge"
-        class="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
+        class="rounded-full bg-accent-muted/90 px-3 py-1 text-xs font-semibold text-accent-hover"
       >
         {{ phaseBadge }}
       </span>

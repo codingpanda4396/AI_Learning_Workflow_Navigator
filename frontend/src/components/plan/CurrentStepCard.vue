@@ -24,9 +24,9 @@
     </div>
 
     <div
-      class="mt-4 rounded-lg border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm leading-snug text-text-primary"
+      class="mt-4 rounded-lg border border-accent/25 bg-accent-muted/75 px-4 py-3 text-sm leading-snug text-text-primary"
     >
-      <p class="font-semibold text-amber-900/90">
+      <p class="font-semibold text-accent-hover/95">
         <span aria-hidden="true">👉</span>
         {{ whyHeading }}
       </p>
@@ -207,7 +207,7 @@ function openAiMock() {
 
 const cardShellClass = computed(() => {
   if (!showcase.value) {
-    return 'border-primary/35 shadow-lg shadow-primary/10 ring-1 ring-primary/20'
+    return 'border-accent/35 shadow-lg shadow-accent/10 ring-1 ring-accent/22'
   }
   if (methodSelection.value) {
     return 'border-violet-400/45 shadow-lg shadow-violet-500/10 ring-2 ring-violet-400/35'
@@ -222,7 +222,7 @@ const aiPromptBoxClass = computed(() => {
   if (methodSelection.value) {
     return 'border-violet-400/35 bg-violet-50/90 text-sm font-medium md:text-base'
   }
-  return 'border-primary/30 bg-primary/[0.08] text-sm font-medium md:text-base'
+  return 'border-accent/30 bg-accent-muted/80 text-sm font-medium md:text-base'
 })
 
 const leadIn = computed(() =>

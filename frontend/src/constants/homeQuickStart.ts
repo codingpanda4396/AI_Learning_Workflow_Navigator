@@ -4,14 +4,10 @@ import type { PreferenceTagType } from '@/types/enums'
 import type { KnowledgePackId } from '@/types/knowledgePack'
 
 /**
- * 与 `KNOWLEDGE_PACKS` / 诊断演示包一致：仅这些主题具备完整学习编排，其余首页入口为占位展示。
+ * 首页可直接进入完整学习编排的知识点；其余入口为占位展示（灰色、不可点）。
+ * 当前仅开放 DFS / BFS。
  */
-export const HOME_CONFIGURED_TOPIC_KEYS = new Set<KnowledgePackId>([
-  'os_process_thread',
-  'net_tcp_handshake',
-  'ds_dfs_bfs',
-  'arch_cache_locality',
-])
+export const HOME_CONFIGURED_TOPIC_KEYS = new Set<KnowledgePackId>(['ds_dfs_bfs'])
 
 export function isHomeTopicConfigured(topicKey: string): boolean {
   return HOME_CONFIGURED_TOPIC_KEYS.has(topicKey as KnowledgePackId)

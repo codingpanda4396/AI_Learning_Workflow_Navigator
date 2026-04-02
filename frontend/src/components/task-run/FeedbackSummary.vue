@@ -13,13 +13,13 @@
       </div>
 
       <div v-if="keyIssues.length">
-        <span class="font-medium text-amber-900">{{ missingTitle }}</span>
+        <span class="font-medium text-accent-hover">{{ missingTitle }}</span>
         <ul class="mt-1 list-inside list-decimal space-y-1 text-slate-800">
           <li v-for="(issue, i) in keyIssues" :key="i" class="line-clamp-3">{{ issue }}</li>
         </ul>
       </div>
       <div v-else-if="gapLine">
-        <span class="font-medium text-amber-900">{{ missingTitle }}</span>
+        <span class="font-medium text-accent-hover">{{ missingTitle }}</span>
         <p class="mt-1 line-clamp-4 text-slate-800">{{ gapLine }}</p>
       </div>
 
@@ -44,7 +44,7 @@
         :key="action.id"
         type="button"
         :data-testid="`feedback-action-${action.id}`"
-        class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 transition hover:border-primary/40 hover:bg-primary/5"
+        class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 transition hover:border-accent/40 hover:bg-accent-muted/50"
         @click="$emit('action', action.id)"
       >
         {{ action.label }}

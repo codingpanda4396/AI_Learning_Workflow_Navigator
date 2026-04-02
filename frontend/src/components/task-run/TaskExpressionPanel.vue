@@ -9,9 +9,9 @@
       <p v-if="helperText" class="max-w-md text-xs text-slate-500">{{ helperText }}</p>
     </div>
 
-    <div v-if="checkpointPrompt" class="mt-4 rounded-xl border border-amber-200/80 bg-amber-50/60 px-4 py-3">
-      <p class="text-xs font-semibold text-amber-950">检查题</p>
-      <p class="mt-1 text-sm leading-relaxed text-amber-950/90">{{ checkpointPrompt }}</p>
+    <div v-if="checkpointPrompt" class="mt-4 rounded-xl border border-accent/25 bg-accent-muted/70 px-4 py-3">
+      <p class="text-xs font-semibold text-accent-hover">检查题</p>
+      <p class="mt-1 text-sm leading-relaxed text-text-primary/90">{{ checkpointPrompt }}</p>
     </div>
 
     <div v-if="structuredFields.length" class="mt-5 grid gap-4">
@@ -21,7 +21,7 @@
           v-if="field.multiline"
           :value="structuredInputs[index] ?? ''"
           :rows="3"
-          class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm leading-7 text-slate-900 outline-none transition focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+          class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm leading-7 text-slate-900 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/15"
           :placeholder="field.placeholder"
           :disabled="sending"
           @input="emitStructured(index, ($event.target as HTMLTextAreaElement).value)"
@@ -30,7 +30,7 @@
           v-else
           :value="structuredInputs[index] ?? ''"
           type="text"
-          class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+          class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/15"
           :placeholder="field.placeholder"
           :disabled="sending"
           @input="emitStructured(index, ($event.target as HTMLInputElement).value)"
@@ -57,7 +57,7 @@
         v-for="chip in starterChips"
         :key="chip.id"
         type="button"
-        class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800 transition hover:border-primary/40 hover:bg-primary/5"
+        class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800 transition hover:border-accent/40 hover:bg-accent-muted/50"
         :disabled="sending"
         @click="$emit('chip', chip.fill)"
       >
@@ -78,7 +78,7 @@
         >
           <input
             type="checkbox"
-            class="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/30"
+            class="mt-1 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent/25"
             :checked="checks[i]"
             @change="toggleCheck(i)"
           />
@@ -139,7 +139,7 @@ const useMainTextarea = computed(
 )
 
 const panelClass = computed(() => {
-  if (props.emphasisPhase === 'TRAINING') return 'ring-1 ring-primary/10'
+  if (props.emphasisPhase === 'TRAINING') return 'ring-1 ring-accent/18'
   return ''
 })
 
