@@ -13,6 +13,7 @@ import navigator.domain.model.ExecutableTaskSpec;
 import navigator.domain.model.LearningPlanPreview;
 import navigator.application.task.LearningMethodProfileAggregator;
 import navigator.application.task.TaskClosureValidator;
+import navigator.application.scaffold.LearningScaffoldEngineService;
 import navigator.application.task.TaskExecutionFlowService;
 import navigator.application.task.TaskExecutionPersistenceService;
 import navigator.application.task.TaskExecutionRuntime;
@@ -48,6 +49,7 @@ public class ExecutionApplicationService {
     private final TaskExecutionEventIngestService taskExecutionEventIngestService;
     private final JsonSerde jsonSerde;
     private final TaskExecutionFlowService taskExecutionFlowService;
+    private final LearningScaffoldEngineService learningScaffoldEngineService;
     private final TaskClosureValidator taskClosureValidator;
 
     public ExecutionApplicationService(InMemoryStore store,
@@ -61,6 +63,7 @@ public class ExecutionApplicationService {
                                        TaskExecutionEventIngestService taskExecutionEventIngestService,
                                        JsonSerde jsonSerde,
                                        TaskExecutionFlowService taskExecutionFlowService,
+                                       LearningScaffoldEngineService learningScaffoldEngineService,
                                        TaskClosureValidator taskClosureValidator) {
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
@@ -73,6 +76,7 @@ public class ExecutionApplicationService {
         this.taskExecutionEventIngestService = taskExecutionEventIngestService;
         this.jsonSerde = jsonSerde;
         this.taskExecutionFlowService = taskExecutionFlowService;
+        this.learningScaffoldEngineService = learningScaffoldEngineService;
         this.taskClosureValidator = taskClosureValidator;
     }
 
@@ -83,7 +87,7 @@ public class ExecutionApplicationService {
     public CurrentTaskData getCurrentTask(String sessionId) {
         sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
-        if (state.getTaskSequence() == null) {
+        if (state == null || state.getTaskSequence() == null) {
             return null;
         }
         int idx = state.getCurrentTaskIndex();
@@ -93,32 +97,20 @@ public class ExecutionApplicationService {
         }
         String taskId = seq.get(idx);
         TaskBlueprint blueprint = resolveBlueprint(state.getPlanId(), taskId);
-        if (blueprint == null) return null;
-        ExecutableTaskSpec spec = store.getExecutableTaskSpecs().get(InMemoryStore.taskRuntimeKey(sessionId, taskId));
-        String promptTemplate = blueprint.getRecommendedPromptTemplate() != null ? blueprint.getRecommendedPromptTemplate() : blueprint.getPromptScaffold();
-        CurrentTaskData.CurrentTaskItem item = CurrentTaskData.CurrentTaskItem.builder()
-                .taskId(blueprint.getTaskId())
-                .title(blueprint.getTitle())
-                .taskType(blueprint.getTaskType().name())
-                .goal(blueprint.getGoal())
-                .whyThisTask(promptTemplate != null ? promptTemplate : FixedSampleData.whyThisTask(taskId))
-                .taskMethod(blueprint.getTaskMethod())
-                .recommendedPromptTemplate(promptTemplate)
-                .estimatedMinutes(blueprint.getEstimatedMinutes())
-                .promptScaffold(blueprint.getPromptScaffold())
-                .completionCriteria(spec != null && spec.getCompletionCriteria() != null ? spec.getCompletionCriteria() : blueprint.getCompletionCriteria())
-                .selfEvaluationQuestions(blueprint.getSelfEvaluationQuestions())
-                .fallbackAction(blueprint.getFallbackAction())
-                .evaluationRubricSummary(spec != null && spec.getEvaluationRubric() != null ? rubricSummary(spec.getEvaluationRubric()) : null)
-                .scaffoldPolicySummary(spec != null && spec.getScaffoldPolicy() != null ? scaffoldPolicySummary(spec.getScaffoldPolicy()) : null)
-                .build();
+        if (blueprint == null) {
+            return null;
+        }
+        var meta = learningScaffoldEngineService.resolveTaskExecutionMeta(sessionId, taskId);
         CurrentTaskData.ProgressItem progress = CurrentTaskData.ProgressItem.builder()
                 .currentIndex(idx + 1)
                 .totalTasks(seq.size())
                 .build();
         return CurrentTaskData.builder()
                 .sessionId(sessionId)
-                .currentTask(item)
+                .taskId(taskId)
+                .knowledge(meta.getKnowledge())
+                .currentStage(meta.getCurrentStage())
+                .progressMap(meta.getProgressMap())
                 .progress(progress)
                 .build();
     }

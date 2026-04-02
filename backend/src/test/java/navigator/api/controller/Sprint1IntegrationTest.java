@@ -93,7 +93,7 @@ class Sprint1IntegrationTest {
 
         mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.currentTask").exists());
+                .andExpect(jsonPath("$.data.taskId").exists());
     }
 
     @Test

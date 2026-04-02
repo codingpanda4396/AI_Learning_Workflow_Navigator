@@ -236,9 +236,13 @@ export interface ProgressItem {
   totalTasks: number
 }
 
+/** GET /api/sessions/:id/current-task — 仅元信息与阶段进度 */
 export interface CurrentTaskData {
   sessionId: string
-  currentTask: CurrentTaskItem
+  taskId: string
+  knowledge: string
+  currentStage: string | null
+  progressMap: Record<string, boolean>
   progress: ProgressItem
 }
 

@@ -13,6 +13,8 @@ export function scaffoldStageLabel(stageKey: string | undefined): string {
 export function useLearningScaffoldEngine(opts: {
   taskId: () => string | null | undefined
   sessionId: () => string | null | undefined
+  /** 后端 STAGE_KEY（须与引擎当前阶段一致，如 STRUCTURE） */
+  stageApiKey: () => string | undefined
   enabled: () => boolean
 }) {
   const stage = ref<StageScaffold | null>(null)
@@ -47,11 +49,12 @@ export function useLearningScaffoldEngine(opts: {
   async function loadStage() {
     const tid = opts.taskId()
     const sid = opts.sessionId()
-    if (!tid || !sid || !opts.enabled()) return
+    const sk = opts.stageApiKey()
+    if (!tid || !sid || !sk || !opts.enabled()) return
     loading.value = true
     error.value = null
     try {
-      stage.value = await getLearningScaffoldStage(tid, sid)
+      stage.value = await getLearningScaffoldStage(tid, sid, sk)
     } catch (e) {
       error.value = e instanceof Error ? e.message : '加载脚手架失败'
       stage.value = null
@@ -78,7 +81,7 @@ export function useLearningScaffoldEngine(opts: {
       lastResult.value = res
       // 同一 stageKey 内仍会切换 currentActionId（如 STRUCTURE 多卡 MCQ），仅依赖 stageComplete 会漏刷新，
       // 导致后续提交仍用旧 actionId，后端拒绝且引擎状态不完整。
-      stage.value = res.updatedStage ?? (await getLearningScaffoldStage(tid, sid))
+      stage.value = res.updatedStage ?? (await getLearningScaffoldStage(tid, sid, sk))
       return res
     } catch (e) {
       error.value = e instanceof Error ? e.message : '提交失败'
@@ -89,7 +92,7 @@ export function useLearningScaffoldEngine(opts: {
   }
 
   watch(
-    () => [opts.enabled(), opts.taskId(), opts.sessionId()] as const,
+    () => [opts.enabled(), opts.taskId(), opts.sessionId(), opts.stageApiKey()] as const,
     () => {
       if (opts.enabled()) void loadStage()
       else {

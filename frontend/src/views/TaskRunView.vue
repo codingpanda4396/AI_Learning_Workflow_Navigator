@@ -14,7 +14,7 @@
         </template>
       </EmptyState>
 
-      <section v-else-if="task" class="pb-28">
+      <section v-else-if="task" ref="executionSectionRef" class="pb-28">
         <div class="mx-auto max-w-6xl space-y-5" :data-phase="currentPhase">
           <ExecutionWorkbenchPage
             :vm="workbenchVm"
@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppTopBar from '@/components/layout/AppTopBar.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
@@ -56,7 +56,7 @@ import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import { getErrorMessage } from '@/api/request'
 import { postCompleteConversationStage, postCompleteStructureStage } from '@/api/learningScaffold'
 import { streamAiTutorChat, type AiTutorChatMessagePayload } from '@/api/tutor'
-import { getCurrentTask, getTaskScaffold } from '@/api/task'
+import { getCurrentTask } from '@/api/task'
 import { supportsLearningScaffoldEngine } from '@/constants/learningScaffoldPack'
 import { TASKRUN_COPY } from '@/constants/uiCopy'
 import {
@@ -71,7 +71,7 @@ import {
 import { showToast } from '@/stores/toast'
 import { useWorkflowStore } from '@/stores/workflow'
 import { useLearningScaffoldEngine } from '@/composables/useLearningScaffoldEngine'
-import type { CurrentTaskItem, ProgressItem, TaskScaffoldResponse } from '@/types/dto'
+import type { CurrentTaskData, ProgressItem } from '@/types/dto'
 import type {
   ChatMessage,
   ExecutionWorkbenchVm,
@@ -98,11 +98,13 @@ const store = useWorkflowStore()
 
 const loading = ref(true)
 const error = ref<string | null>(null)
-const task = ref<CurrentTaskItem | null>(null)
+const task = ref<CurrentTaskData | null>(null)
 const progress = ref<ProgressItem | null>(null)
-const scaffold = ref<TaskScaffoldResponse | null>(null)
+/** 与后端引擎当前阶段对齐，供 GET .../scaffold?stage= 使用 */
+const engineStageKeyHint = ref<string | null>(null)
 const advancingPhase = ref(false)
 const latestStructureSubmit = ref<Promise<unknown> | null>(null)
+const executionSectionRef = ref<HTMLElement | null>(null)
 
 const structureState = reactive<StructurePhaseState>(
   createEmptyStructureState(DFS_BFS_STRUCTURE_QUESTIONS),
@@ -112,15 +114,6 @@ const trainingState = reactive<TrainingPhaseState>(createEmptyTrainingState())
 const reflectionState = reactive<ReflectionPhaseState>(
   createEmptyReflectionState(DFS_BFS_REFLECTION_STRATEGIES),
 )
-
-const scaffoldEngine = useLearningScaffoldEngine({
-  taskId: () => task.value?.taskId,
-  sessionId: () => store.sessionId,
-  enabled: () =>
-    supportsLearningScaffoldEngine(scaffold.value?.packId ?? store.planPreview?.packId) &&
-    !!task.value &&
-    !loading.value,
-})
 
 const PHASE_QUERY_TO_KEY: Record<string, PhaseKey> = {
   structure: 'structure',
@@ -140,12 +133,49 @@ async function syncRoutePhase(phase: PhaseKey) {
   await router.replace({ query: { ...route.query, phase } })
 }
 
+function resetWorkbenchState() {
+  Object.assign(structureState, createEmptyStructureState(DFS_BFS_STRUCTURE_QUESTIONS))
+  Object.assign(understandingState, createEmptyUnderstandingState())
+  Object.assign(trainingState, createEmptyTrainingState())
+  Object.assign(reflectionState, createEmptyReflectionState(DFS_BFS_REFLECTION_STRATEGIES))
+  latestStructureSubmit.value = null
+  advancingPhase.value = false
+  engineStageKeyHint.value = null
+}
+
+function scrollExecutionIntoView() {
+  nextTick(() => {
+    executionSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
 const phaseFromQuery = computed<PhaseKey>(() => {
   const raw = typeof route.query.phase === 'string' ? route.query.phase.toLowerCase() : ''
   return PHASE_QUERY_TO_KEY[raw] ?? 'structure'
 })
 
 const currentPhase = computed<PhaseKey>(() => phaseFromQuery.value)
+
+const scaffoldEngine = useLearningScaffoldEngine({
+  taskId: () => task.value?.taskId,
+  sessionId: () => store.sessionId,
+  stageApiKey: () =>
+    engineStageKeyHint.value ??
+    task.value?.currentStage ??
+    PHASE_KEY_TO_CODE[currentPhase.value],
+  enabled: () =>
+    supportsLearningScaffoldEngine(task.value?.knowledge ?? store.planPreview?.packId) &&
+    !!task.value &&
+    !loading.value,
+})
+
+watch(
+  () => scaffoldEngine.stage?.stageKey,
+  (k) => {
+    if (k) engineStageKeyHint.value = k
+  },
+)
+
 const scaffoldButtons = computed(() => DFS_BFS_SCAFFOLD_BUTTONS)
 const nextActionLabel = computed(() => DFS_BFS_NEXT_LABELS[currentPhase.value])
 const currentPhaseBusy = computed(() => {
@@ -182,24 +212,38 @@ const canGoNext = computed(() => {
   }
 })
 
+/** 仅处理非法或缺失的 phase query；合法 phase 由脚手架引擎 stageKey 同步（见下） */
 watch(
-  currentPhase,
-  async (phase) => {
-    const current = typeof route.query.phase === 'string' ? route.query.phase.toLowerCase() : ''
-    if (current === phase) return
-    await router.replace({ query: { ...route.query, phase } })
+  () => route.query.phase,
+  () => {
+    const raw = typeof route.query.phase === 'string' ? route.query.phase.toLowerCase() : ''
+    if (raw && !PHASE_QUERY_TO_KEY[raw]) {
+      void router.replace({ query: { ...route.query, phase: resolveEnginePhase() ?? 'structure' } })
+      return
+    }
+    if (!raw) {
+      void router.replace({ query: { ...route.query, phase: 'structure' } })
+    }
   },
   { immediate: true },
 )
 
+/** 脚手架引擎为阶段权威来源：与 URL 不一致时对齐（不再由 getTaskScaffold 写 URL） */
 watch(
   () => scaffoldEngine.stage?.stageKey,
   async (stageKey) => {
     if (!stageKey) return
     const phaseKey = PHASE_CODE_TO_KEY[stageKey as keyof typeof PHASE_CODE_TO_KEY]
-    if (phaseKey && phaseKey !== currentPhase.value) {
-      await router.replace({ query: { ...route.query, phase: phaseKey } })
-    }
+    if (!phaseKey || phaseKey === currentPhase.value) return
+    await router.replace({ query: { ...route.query, phase: phaseKey } })
+  },
+)
+
+watch(
+  () => (typeof route.query.phase === 'string' ? route.query.phase : 'structure'),
+  (_p, oldPhase) => {
+    if (oldPhase === undefined) return
+    scrollExecutionIntoView()
   },
 )
 
@@ -248,14 +292,18 @@ async function goNextPhase() {
   if (!canGoNext.value || !task.value || !store.sessionId) return
   advancingPhase.value = true
   try {
-    const enginePhaseBeforeSubmit = resolveEnginePhase()
+    let enginePhaseBeforeSubmit = resolveEnginePhase()
     if (enginePhaseBeforeSubmit && enginePhaseBeforeSubmit !== currentPhase.value) {
-      if (enginePhaseBeforeSubmit === 'reflection') {
-        buildReflectionSummary()
+      await scaffoldEngine.loadStage()
+      enginePhaseBeforeSubmit = resolveEnginePhase()
+      if (enginePhaseBeforeSubmit && enginePhaseBeforeSubmit !== currentPhase.value) {
+        if (enginePhaseBeforeSubmit === 'reflection') {
+          buildReflectionSummary()
+        }
+        await syncRoutePhase(enginePhaseBeforeSubmit)
+        ensureConversationState(enginePhaseBeforeSubmit)
+        return
       }
-      await syncRoutePhase(enginePhaseBeforeSubmit)
-      ensureConversationState(enginePhaseBeforeSubmit)
-      return
     }
 
     if (currentPhase.value === 'reflection') {
@@ -279,26 +327,29 @@ async function goNextPhase() {
         showToast('请先等当前题目的反馈同步完成，再进入下一阶段')
         return
       }
-      await postCompleteStructureStage(task.value.taskId, {
+      const csr = await postCompleteStructureStage(task.value.taskId, {
         sessionId: store.sessionId,
       })
+      engineStageKeyHint.value = csr.nextStageKey
       await scaffoldEngine.loadStage()
     }
 
     if (currentPhase.value === 'understanding') {
-      await postCompleteConversationStage(task.value.taskId, {
+      const ucr = await postCompleteConversationStage(task.value.taskId, {
         sessionId: store.sessionId,
         stageKey: 'UNDERSTANDING',
       })
+      engineStageKeyHint.value = ucr.nextStageKey
       await scaffoldEngine.loadStage()
     }
 
     if (currentPhase.value === 'training') {
-      await postCompleteConversationStage(task.value.taskId, {
+      const tcr = await postCompleteConversationStage(task.value.taskId, {
         sessionId: store.sessionId,
         stageKey: 'TRAINING',
         finalDraft: trainingState.finalDraft ?? undefined,
       })
+      engineStageKeyHint.value = tcr.nextStageKey
       await scaffoldEngine.loadStage()
     }
 
@@ -451,7 +502,7 @@ async function submitPhaseConversation(phase: 'understanding' | 'training', text
         messages: toTutorPayloadMessages(state.messages),
         context: {
           step: PHASE_SEQUENCE.indexOf(phase) + 1,
-          knowledge: scaffold.value?.packId || store.planPreview?.knowledgeKey || 'dfs_bfs',
+          knowledge: task.value?.knowledge || store.planPreview?.knowledgeKey || 'dfs_bfs',
           knowledgeLabel: workbenchTopicName.value,
           phase: PHASE_KEY_TO_CODE[phase],
           sessionId: store.sessionId,
@@ -509,60 +560,50 @@ const workbenchVm = computed<ExecutionWorkbenchVm>(() => ({
 }))
 
 const workbenchTopicName = computed(() => {
-  return task.value?.title || store.planPreview?.knowledgeKey || '深度优先与广度优先（DFS / BFS）'
+  return store.planPreview?.knowledgeKey || task.value?.knowledge || '深度优先与广度优先（DFS / BFS）'
 })
 
 async function fetchTask() {
   if (!store.sessionId) return
+  if (route.name !== 'task' && route.name !== 'taskRun') return
+  const paramId = typeof route.params.taskId === 'string' ? route.params.taskId : null
+  if (task.value?.taskId && paramId && paramId !== task.value.taskId) {
+    resetWorkbenchState()
+  }
   loading.value = true
   error.value = null
   try {
     const data = await getCurrentTask(store.sessionId)
-    store.currentTask = data.currentTask
+    const previousTaskId = task.value?.taskId ?? null
+    store.currentTask = data
     store.progress = data.progress
-    task.value = data.currentTask
+    task.value = data
     progress.value = data.progress
+    engineStageKeyHint.value = data.currentStage
 
-    if (!data.currentTask) {
+    if (previousTaskId && data.taskId && data.taskId !== previousTaskId) {
+      resetWorkbenchState()
+    }
+
+    if (!data.taskId) {
       store.currentTaskId = null
       router.push('/report')
       return
     }
 
-    store.currentTaskId = data.currentTask.taskId
+    store.currentTaskId = data.taskId
     const routeTaskId = typeof route.params.taskId === 'string' ? route.params.taskId : ''
     if (
       route.name === 'task' ||
-      (route.name === 'taskRun' && routeTaskId && routeTaskId !== data.currentTask.taskId)
+      (route.name === 'taskRun' && routeTaskId && routeTaskId !== data.taskId)
     ) {
-      router.replace({ name: 'taskRun', params: { taskId: data.currentTask.taskId } })
+      router.replace({ name: 'taskRun', params: { taskId: data.taskId } })
     }
-
-    await loadScaffold(data.currentTask.taskId)
     ensureConversationState(currentPhase.value)
   } catch (err) {
     error.value = getErrorMessage(err)
   } finally {
     loading.value = false
-  }
-}
-
-async function loadScaffold(taskId: string) {
-  if (!store.sessionId) return
-  try {
-    const data = await getTaskScaffold(taskId, store.sessionId)
-    scaffold.value = data
-
-    const enginePhase = data.phaseProgress?.currentPhase
-    if (enginePhase) {
-      const phaseKey = PHASE_CODE_TO_KEY[enginePhase as keyof typeof PHASE_CODE_TO_KEY]
-      if (phaseKey && phaseKey !== currentPhase.value) {
-        await router.replace({ query: { ...route.query, phase: phaseKey } })
-      }
-    }
-  } catch {
-    scaffold.value = null
-    showToast('当前任务先切到简化模式。')
   }
 }
 
@@ -680,7 +721,11 @@ function makeAssistantMessage(content: string): ChatMessage {
   return { id: `ast-${++msgIdCounter}`, role: 'assistant', content, timestamp: Date.now() }
 }
 
-onMounted(() => {
-  fetchTask()
-})
+watch(
+  () => [store.sessionId, route.name, route.params.taskId] as const,
+  () => {
+    void fetchTask()
+  },
+  { immediate: true },
+)
 </script>

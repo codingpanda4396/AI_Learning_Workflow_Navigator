@@ -5,9 +5,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 /**
  * GET /api/sessions/{sessionId}/current-task 响应。
- * 合同冻结：sessionId, currentTask, progress 为稳定字段。
+ * 仅任务元信息与阶段进度摘要，不含脚手架正文与题目数据。
  */
 @Data
 @Builder
@@ -15,34 +17,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CurrentTaskData {
     private String sessionId;
-    private CurrentTaskItem currentTask;
+    private String taskId;
+    /** 通常为 packId（与知识点包一致） */
+    private String knowledge;
+    /** 脚手架引擎当前阶段；未启用引擎时为 null */
+    private String currentStage;
+    /** STRUCTURE / UNDERSTANDING / TRAINING / REFLECTION 是否已完成 */
+    private Map<String, Boolean> progressMap;
+    /** 会话内任务序号（第几个 / 共几个） */
     private ProgressItem progress;
-
-    /**
-     * 稳定字段：taskId, title, taskType, goal, completionCriteria, evaluationRubricSummary, scaffoldPolicySummary
-     */
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class CurrentTaskItem {
-        private String taskId;
-        private String title;
-        private String taskType;
-        private String goal;
-        private String whyThisTask;
-        private String taskMethod;
-        private String recommendedPromptTemplate;
-        private Integer estimatedMinutes;
-        private String promptScaffold;
-        private java.util.List<String> completionCriteria;
-        private java.util.List<String> selfEvaluationQuestions;
-        private String fallbackAction;
-        /** 来自 ExecutableTaskSpec.evaluationRubric 的摘要 */
-        private String evaluationRubricSummary;
-        /** 来自 ExecutableTaskSpec.scaffoldPolicy 的摘要 */
-        private String scaffoldPolicySummary;
-    }
 
     @Data
     @Builder

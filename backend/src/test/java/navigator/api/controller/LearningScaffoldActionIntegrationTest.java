@@ -144,6 +144,6 @@ class LearningScaffoldActionIntegrationTest {
     private String getCurrentTaskId(String sessionId) throws Exception {
         return objectMapper.readTree(mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
-                .get("data").get("currentTask").get("taskId").asText();
+                .get("data").get("taskId").asText();
     }
 }

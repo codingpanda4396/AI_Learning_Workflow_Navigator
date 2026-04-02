@@ -27,7 +27,7 @@ class Sprint3TaskExecutionFlowTest {
     void scaffoldThenMessagesSelfExplainCheckpointComplete() throws Exception {
         Cookie authCookie = TestAuthSupport.registerAndLogin(mvc, "task_flow_user");
         String goalBody = """
-                {"rawGoalText":"链表入门","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC"}
+                {"rawGoalText":"DFS 与 BFS 搜索入门","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC"}
                 """;
         String goalId = objectMapper.readTree(mvc.perform(post("/api/goals").cookie(authCookie)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -61,17 +61,14 @@ class Sprint3TaskExecutionFlowTest {
 
         String taskId = objectMapper.readTree(mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
-                .get("data").get("currentTask").get("taskId").asText();
+                .get("data").get("taskId").asText();
 
-        mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie).param("sessionId", sessionId))
+        mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie)
+                        .param("sessionId", sessionId)
+                        .param("stage", "STRUCTURE"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.currentExecutionState").value("ORIENT"))
-                .andExpect(jsonPath("$.data.recommendedAskTemplates").isArray())
-                .andExpect(jsonPath("$.data.cognitiveUnits").isArray())
-                .andExpect(jsonPath("$.data.cognitiveUnits.length()").value(4))
-                .andExpect(jsonPath("$.data.cognitiveUnits[0].unitId").value("understand"))
-                .andExpect(jsonPath("$.data.cognitiveUnits[1].prompts[0].required").value(true))
-                .andExpect(jsonPath("$.data.taskLevelLearningIntent").exists());
+                .andExpect(jsonPath("$.data.stageKey").value("STRUCTURE"))
+                .andExpect(jsonPath("$.data.actionCards").isArray());
 
         String msgBody = "{\"sessionId\":\"" + sessionId + "\",\"content\":\"请解释一下链表是什么\"}";
         mvc.perform(post("/api/tasks/" + taskId + "/messages").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content(msgBody))

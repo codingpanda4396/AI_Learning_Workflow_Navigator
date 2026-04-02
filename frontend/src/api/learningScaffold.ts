@@ -1,4 +1,5 @@
 import { request } from './request'
+import { getTaskScaffold } from './task'
 import type {
   CompleteConversationStageResult,
   CompleteStructureStageResult,
@@ -7,23 +8,13 @@ import type {
   StructureSkeletonResult,
 } from '@/types/scaffoldEngine'
 
+/** 与 GET /api/tasks/{taskId}/scaffold?stage= 一致（须传引擎当前阶段 STAGE_KEY） */
 export async function getLearningScaffoldStage(
   taskId: string,
   sessionId: string,
-  stageKey?: string
+  stageKey: string
 ): Promise<StageScaffold> {
-  if (stageKey == null || stageKey === '') {
-    const { data } = await request.get<StageScaffold>(
-      `/api/tasks/${taskId}/learning-scaffold/stage/current`,
-      { params: { sessionId } }
-    )
-    return data
-  }
-  const { data } = await request.get<StageScaffold>(
-    `/api/tasks/${taskId}/learning-scaffold/stage`,
-    { params: { sessionId, stageKey } }
-  )
-  return data
+  return getTaskScaffold(taskId, sessionId, stageKey)
 }
 
 export async function submitLearningScaffoldAction(

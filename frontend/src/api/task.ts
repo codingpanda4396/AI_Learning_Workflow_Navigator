@@ -4,11 +4,11 @@ import type {
   CurrentTaskGuidanceData,
   CompleteTaskRequest,
   CompleteTaskData,
-  TaskScaffoldResponse,
   TaskMessageResponse,
   SelfExplanationResponse,
   CheckpointResponse,
 } from '@/types/dto'
+import type { StageScaffold } from '@/types/scaffoldEngine'
 
 export async function getCurrentTask(
   sessionId: string
@@ -30,11 +30,12 @@ export async function getCurrentTaskGuidance(
 
 export async function getTaskScaffold(
   taskId: string,
-  sessionId: string
-): Promise<TaskScaffoldResponse> {
-  const { data } = await request.get<TaskScaffoldResponse>(
+  sessionId: string,
+  stage: string
+): Promise<StageScaffold> {
+  const { data } = await request.get<StageScaffold>(
     `/api/tasks/${taskId}/scaffold`,
-    { params: { sessionId } }
+    { params: { sessionId, stage } }
   )
   return data
 }

@@ -28,7 +28,7 @@ class InteractionsCompatTest {
         Cookie authCookie = TestAuthSupport.registerAndLogin(mvc, "compat_user");
 
         String goalBody = """
-                {"rawGoalText":"栈入门","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC"}
+                {"rawGoalText":"DFS 与 BFS 搜索","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC"}
                 """;
         String goalId = objectMapper.readTree(mvc.perform(post("/api/goals").cookie(authCookie)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -59,16 +59,17 @@ class InteractionsCompatTest {
 
         String taskId = objectMapper.readTree(mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
-                .get("data").get("currentTask").get("taskId").asText();
+                .get("data").get("taskId").asText();
 
         String legacyBody = "{\"sessionId\":\"" + sessionId + "\",\"interactionType\":\"GENERIC\",\"contentSummary\":\"我尝试用数组模拟栈，但是 pop 的边界不确定\",\"behaviorSignals\":[\"CONFUSION_SIGNAL\"]}";
         mvc.perform(post("/api/tasks/" + taskId + "/interactions").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content(legacyBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accepted").value(true));
 
-        mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie).param("sessionId", sessionId))
+        mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie)
+                        .param("sessionId", sessionId)
+                        .param("stage", "STRUCTURE"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.recentMessages").isArray())
-                .andExpect(jsonPath("$.data.recentMessages[0].role").value("USER"));
+                .andExpect(jsonPath("$.data.stageKey").value("STRUCTURE"));
     }
 }

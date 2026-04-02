@@ -19,6 +19,7 @@ import navigator.api.dto.scaffold.SubmitLearningScaffoldActionRequest;
 import navigator.api.dto.scaffold.TrainingFeedback;
 import navigator.api.dto.scaffold.TutorResponse;
 import navigator.api.dto.scaffold.ValidationResult;
+import navigator.api.dto.TaskExecutionMetaSnapshot;
 import navigator.application.knowledge.KnowledgePackMetadata;
 import navigator.application.task.TaskExecutionFlowService;
 import navigator.application.task.TaskExecutionPersistenceService;
@@ -98,12 +99,81 @@ public class LearningScaffoldEngineService {
     }
 
     /**
+     * 当前任务元信息（不含阶段 UI 与 LLM）。用于 GET /api/sessions/.../current-task。
+     */
+    /**
+     * 不创建任务运行时、不触发 LLM；若尚无持久化 runtime，则仅返回知识点与空进度。
+     */
+    public TaskExecutionMetaSnapshot resolveTaskExecutionMeta(String sessionId, String taskId) {
+        KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
+        String knowledge = "";
+        if (pack != null) {
+            if (pack.packId() != null && !pack.packId().isBlank()) {
+                knowledge = pack.packId();
+            } else if (pack.knowledgeKey() != null) {
+                knowledge = pack.knowledgeKey();
+            }
+        }
+        TaskExecutionRuntime rt = loadRuntimeOptional(sessionId, taskId);
+        if (rt == null || rt.getScaffold() == null) {
+            return TaskExecutionMetaSnapshot.builder()
+                    .knowledge(knowledge)
+                    .currentStage(null)
+                    .progressMap(Map.of())
+                    .build();
+        }
+        if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
+            return TaskExecutionMetaSnapshot.builder()
+                    .knowledge(knowledge)
+                    .currentStage(null)
+                    .progressMap(Map.of())
+                    .build();
+        }
+        LearningScaffoldEngineState eng = rt.getScaffold().getLearningScaffoldEngineState();
+        if (eng == null) {
+            return TaskExecutionMetaSnapshot.builder()
+                    .knowledge(knowledge)
+                    .currentStage(null)
+                    .progressMap(Map.of())
+                    .build();
+        }
+        normalizeEngineState(eng);
+        return TaskExecutionMetaSnapshot.builder()
+                .knowledge(knowledge)
+                .currentStage(eng.getCurrentStageKey())
+                .progressMap(buildStageProgressMap(eng))
+                .build();
+    }
+
+    private TaskExecutionRuntime loadRuntimeOptional(String sessionId, String taskId) {
+        String key = InMemoryStore.taskRuntimeKey(sessionId, taskId);
+        TaskExecutionRuntime rt = store.getTaskExecutionRuntimes().get(key);
+        if (rt == null) {
+            rt = persistenceService.loadRuntime(sessionId, taskId);
+            if (rt != null) {
+                store.getTaskExecutionRuntimes().put(key, rt);
+            }
+        }
+        return rt;
+    }
+
+    private static Map<String, Boolean> buildStageProgressMap(LearningScaffoldEngineState eng) {
+        List<String> done = eng.getCompletedStageKeys() != null ? eng.getCompletedStageKeys() : List.of();
+        Map<String, Boolean> m = new LinkedHashMap<>();
+        m.put(DfsBfsStructureValidator.STAGE_KEY, done.contains(DfsBfsStructureValidator.STAGE_KEY));
+        m.put(DfsBfsUnderstandingScaffoldDefinition.STAGE_KEY, done.contains(DfsBfsUnderstandingScaffoldDefinition.STAGE_KEY));
+        m.put(DfsBfsTrainingScaffoldDefinition.STAGE_KEY, done.contains(DfsBfsTrainingScaffoldDefinition.STAGE_KEY));
+        m.put(DfsBfsReflectionScaffoldDefinition.STAGE_KEY, done.contains(DfsBfsReflectionScaffoldDefinition.STAGE_KEY));
+        return m;
+    }
+
+    /**
      * 构建当前会话下的脚手架阶段视图（含工作台 LLM 软文案），与 {@link #getStage} 同源，供 action 提交后合并返回以避免重复请求。
      */
     private StageScaffold buildStageScaffoldForSession(String sessionId, String taskId, String stageKeyParam) {
         sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
-        taskExecutionFlowService.getScaffold(sessionId, taskId);
+        taskExecutionFlowService.ensureTaskExecutionRuntimeAndScaffoldDomain(sessionId, taskId);
         KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
         if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
             throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎（需已注册的知识点包）");
@@ -131,7 +201,7 @@ public class LearningScaffoldEngineService {
         String sessionId = request.getSessionId();
         sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
-        taskExecutionFlowService.getScaffold(sessionId, taskId);
+        taskExecutionFlowService.ensureTaskExecutionRuntimeAndScaffoldDomain(sessionId, taskId);
         KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
         if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
             throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎");
@@ -181,7 +251,7 @@ public class LearningScaffoldEngineService {
         String sessionId = request.getSessionId();
         sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
-        taskExecutionFlowService.getScaffold(sessionId, taskId);
+        taskExecutionFlowService.ensureTaskExecutionRuntimeAndScaffoldDomain(sessionId, taskId);
         KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
         if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
             throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎");
@@ -218,7 +288,7 @@ public class LearningScaffoldEngineService {
         String sessionId = request.getSessionId();
         sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
-        taskExecutionFlowService.getScaffold(sessionId, taskId);
+        taskExecutionFlowService.ensureTaskExecutionRuntimeAndScaffoldDomain(sessionId, taskId);
         KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
         if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {
             throw new BusinessException(BusinessErrorCode.INVALID_ARGUMENT, "当前任务未启用学习脚手架引擎");
@@ -292,7 +362,7 @@ public class LearningScaffoldEngineService {
         String sessionId = request.getSessionId();
         sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
-        taskExecutionFlowService.getScaffold(sessionId, taskId);
+        taskExecutionFlowService.ensureTaskExecutionRuntimeAndScaffoldDomain(sessionId, taskId);
 
         KnowledgePackMetadata.PackMeta pack = resolvePackMeta(sessionId);
         if (pack == null || !LearningScaffoldPackRegistry.supportsLearningScaffoldEngine(pack.packId())) {

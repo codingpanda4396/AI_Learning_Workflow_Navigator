@@ -13,8 +13,9 @@ import navigator.api.dto.TaskInteractionRequest;
 import navigator.api.dto.TaskExecutionSummaryData;
 import navigator.api.dto.TaskMessageRequest;
 import navigator.api.dto.TaskMessageResponse;
-import navigator.api.dto.TaskScaffoldResponse;
+import navigator.api.dto.scaffold.StageScaffold;
 import navigator.application.ExecutionApplicationService;
+import navigator.application.scaffold.LearningScaffoldEngineService;
 import navigator.application.task.TaskExecutionFlowService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,18 +31,25 @@ public class TaskController {
 
     private final ExecutionApplicationService executionService;
     private final TaskExecutionFlowService taskExecutionFlowService;
+    private final LearningScaffoldEngineService learningScaffoldEngineService;
 
     public TaskController(ExecutionApplicationService executionService,
-                          TaskExecutionFlowService taskExecutionFlowService) {
+                          TaskExecutionFlowService taskExecutionFlowService,
+                          LearningScaffoldEngineService learningScaffoldEngineService) {
         this.executionService = executionService;
         this.taskExecutionFlowService = taskExecutionFlowService;
+        this.learningScaffoldEngineService = learningScaffoldEngineService;
     }
 
+    /**
+     * 按阶段加载脚手架 UI（含 LLM 软文案）。stage 须与引擎当前阶段一致。
+     */
     @GetMapping("/{taskId}/scaffold")
-    public GlobalResponse<TaskScaffoldResponse> getScaffold(
+    public GlobalResponse<StageScaffold> getScaffold(
             @PathVariable String taskId,
-            @RequestParam String sessionId) {
-        return GlobalResponse.ok(taskExecutionFlowService.getScaffold(sessionId, taskId));
+            @RequestParam String sessionId,
+            @RequestParam String stage) {
+        return GlobalResponse.ok(learningScaffoldEngineService.getStage(sessionId, taskId, stage));
     }
 
     @PostMapping("/{taskId}/messages")

@@ -6,7 +6,7 @@ import type {
   LearnerProfileSnapshot,
   DiagnosisEvidenceSummary,
   PlanPreviewData,
-  CurrentTaskItem,
+  CurrentTaskData,
   ProgressItem,
   LearningReport,
   NextActionDecision,
@@ -61,7 +61,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
   const sessionId = ref<string | null>(getStored(STORAGE_KEYS.sessionId))
   const currentTaskId = ref<string | null>(null)
   const taskSequence = ref<string[]>([])
-  const currentTask = ref<CurrentTaskItem | null>(null)
+  const currentTask = ref<CurrentTaskData | null>(null)
   const progress = ref<ProgressItem | null>(null)
 
   const report = ref<LearningReport | null>(null)

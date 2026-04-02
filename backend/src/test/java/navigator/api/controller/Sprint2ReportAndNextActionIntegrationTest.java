@@ -72,7 +72,7 @@ class Sprint2ReportAndNextActionIntegrationTest {
 
         mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.currentTask.taskId").exists());
+                .andExpect(jsonPath("$.data.taskId").exists());
 
         String completeBody = """
                 {"sessionId":"%s","completionStatus":"COMPLETED","durationMinutes":10,"interactionCount":3,"userSummarySubmitted":true,"detectedIssueTags":["CONCEPT_GAP"]}

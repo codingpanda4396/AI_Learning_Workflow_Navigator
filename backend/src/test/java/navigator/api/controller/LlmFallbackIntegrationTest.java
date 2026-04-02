@@ -69,7 +69,7 @@ class LlmFallbackIntegrationTest {
 
         String taskId = objectMapper.readTree(mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
-                .get("data").get("currentTask").get("taskId").asText();
+                .get("data").get("taskId").asText();
 
         mvc.perform(post("/api/tasks/" + taskId + "/messages").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content(
                         "{\"sessionId\":\"" + sessionId + "\",\"content\":\"请用最小例子解释哈希冲突\"}"))

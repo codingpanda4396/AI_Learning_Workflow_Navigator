@@ -83,12 +83,8 @@ class Sprint3Phase6MainLinkRegressionTest {
 
             mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.currentTask.evaluationRubricSummary").exists())
-                    .andExpect(jsonPath("$.data.currentTask.scaffoldPolicySummary").exists());
-
-            mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie).param("sessionId", sessionId))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.recommendedAskTemplates").isArray());
+                    .andExpect(jsonPath("$.data.taskId").exists())
+                    .andExpect(jsonPath("$.data.progressMap").exists());
 
             String msgResp = mvc.perform(post("/api/tasks/" + taskId + "/messages").cookie(authCookie)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -152,8 +148,8 @@ class Sprint3Phase6MainLinkRegressionTest {
             String sessionId = commitAndGetSessionId(goalId, diagnosisId);
             mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.currentTask.taskId").exists())
-                    .andExpect(jsonPath("$.data.currentTask.completionCriteria").isArray());
+                    .andExpect(jsonPath("$.data.taskId").exists())
+                    .andExpect(jsonPath("$.data.knowledge").exists());
 
             completeAllTasksInSession(sessionId, "{\"sessionId\":\"" + sessionId + "\",\"completionStatus\":\"COMPLETED\",\"durationMinutes\":8,\"interactionCount\":3,\"summaryText\":\"完成当前任务。\",\"learnedFrameworkPoints\":[\"步骤识别\",\"局部修复\"],\"nextPracticeIntent\":\"继续下一题\"}");
         }
@@ -191,9 +187,6 @@ class Sprint3Phase6MainLinkRegressionTest {
             submitDefaultDiagnosis(diagnosisId);
             String sessionId = commitAndGetSessionId(goalId, diagnosisId);
             String taskId = getCurrentTaskId(sessionId);
-
-            mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie).param("sessionId", sessionId))
-                    .andExpect(status().isOk());
 
             mvc.perform(post("/api/tasks/" + taskId + "/messages").cookie(authCookie)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -245,7 +238,7 @@ class Sprint3Phase6MainLinkRegressionTest {
     private String getCurrentTaskId(String sessionId) throws Exception {
         return objectMapper.readTree(mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
-                .get("data").get("currentTask").get("taskId").asText();
+                .get("data").get("taskId").asText();
     }
 
     private void completeRemainingTasks(String firstCompleteResp, String completeBody) throws Exception {

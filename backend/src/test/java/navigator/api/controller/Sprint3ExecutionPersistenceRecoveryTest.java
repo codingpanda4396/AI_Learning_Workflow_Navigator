@@ -30,7 +30,7 @@ class Sprint3ExecutionPersistenceRecoveryTest {
     void scaffoldAndMessagesAreRecoverableAfterInMemoryCleared() throws Exception {
         Cookie authCookie = TestAuthSupport.registerAndLogin(mvc, "recovery_user");
         String goalBody = """
-                {"rawGoalText":"数组入门","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC"}
+                {"rawGoalText":"DFS 与 BFS 搜索入门","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC"}
                 """;
         String goalId = objectMapper.readTree(mvc.perform(post("/api/goals").cookie(authCookie)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -64,11 +64,13 @@ class Sprint3ExecutionPersistenceRecoveryTest {
 
         String taskId = objectMapper.readTree(mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
-                .get("data").get("currentTask").get("taskId").asText();
+                .get("data").get("taskId").asText();
 
-        mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie).param("sessionId", sessionId))
+        mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie)
+                        .param("sessionId", sessionId)
+                        .param("stage", "STRUCTURE"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.executionSnapshot.currentState").value("ORIENT"));
+                .andExpect(jsonPath("$.data.stageKey").value("STRUCTURE"));
 
         mvc.perform(post("/api/tasks/" + taskId + "/messages").cookie(authCookie).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionId\":\"" + sessionId + "\",\"content\":\"数组和链表最大的差异是什么？\"}"))
@@ -77,12 +79,11 @@ class Sprint3ExecutionPersistenceRecoveryTest {
 
         store.getTaskExecutionRuntimes().clear();
 
-        mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie).param("sessionId", sessionId))
+        mvc.perform(get("/api/tasks/" + taskId + "/scaffold").cookie(authCookie)
+                        .param("sessionId", sessionId)
+                        .param("stage", "STRUCTURE"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.executionSnapshot.currentState").value("EXPLORE"))
-                .andExpect(jsonPath("$.data.executionSnapshot.exploreTurnCount").value(1))
-                .andExpect(jsonPath("$.data.recentMessages").isArray())
-                .andExpect(jsonPath("$.data.recentMessages.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+                .andExpect(jsonPath("$.data.stageKey").value("STRUCTURE"));
 
         mvc.perform(post("/api/tasks/" + taskId + "/complete").cookie(authCookie).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionId\":\"" + sessionId + "\",\"completionStatus\":\"COMPLETED\"}"))
