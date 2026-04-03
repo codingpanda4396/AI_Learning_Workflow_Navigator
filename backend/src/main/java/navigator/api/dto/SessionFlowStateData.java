@@ -5,18 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CommitPlanData {
+public class SessionFlowStateData {
     private String sessionId;
-    private String planId;
-    private List<String> taskSequence;
-    private String currentTaskId;
-    private String status;
+    private String sessionStatus;
     private String currentPhase;
-    private String nextRoute;
+    private String currentRoute;
+    private String currentTaskId;
+    private boolean reportReady;
+    private int completedTaskCount;
+    private int totalTaskCount;
 }

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { getSessionFlowState } from '@/api/session'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkflowStore } from '@/stores/workflow'
 
@@ -52,6 +53,38 @@ router.beforeEach(async (to) => {
   if ((step === 'task' || step === 'report') && !store.sessionId) {
     return { name: 'plan' }
   }
+
+  if (store.sessionId && (to.name === 'execution' || to.name === 'task' || to.name === 'taskRun')) {
+    const skipTaskRunRefresh =
+      to.name === 'taskRun' &&
+      typeof to.params.taskId === 'string' &&
+      typeof router.currentRoute.value.params.taskId === 'string' &&
+      to.params.taskId === router.currentRoute.value.params.taskId
+
+    if (!skipTaskRunRefresh) {
+      try {
+        const flow = await getSessionFlowState(store.sessionId)
+        store.currentTaskId = flow.currentTaskId ?? null
+
+        if (flow.reportReady) {
+          return { name: 'report', replace: true }
+        }
+        if (flow.currentTaskId) {
+          const requestedTaskId = typeof to.params.taskId === 'string' ? to.params.taskId : null
+          if (to.name !== 'taskRun' || requestedTaskId !== flow.currentTaskId) {
+            return {
+              name: 'taskRun',
+              params: { taskId: flow.currentTaskId },
+              replace: true,
+            }
+          }
+        }
+      } catch {
+        // Keep existing local fallback if flow-state request fails.
+      }
+    }
+  }
+
   if (to.name === 'task' && store.sessionId && store.currentTaskId) {
     return {
       name: 'taskRun',

@@ -6,6 +6,7 @@ import navigator.api.dto.CurrentTaskData;
 import navigator.api.dto.CurrentTaskGuidanceData;
 import navigator.api.dto.NextActionConfirmData;
 import navigator.api.dto.ReportData;
+import navigator.api.dto.SessionFlowStateData;
 import navigator.application.ReportApplicationService;
 import navigator.application.ExecutionApplicationService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,6 +39,13 @@ public class SessionController {
     public GlobalResponse<CurrentTaskGuidanceData> getCurrentTaskGuidance(@PathVariable String sessionId) {
         CurrentTaskGuidanceData data = executionService.getCurrentTaskGuidance(sessionId);
         if (data == null) return GlobalResponse.notFound("session or current task not found");
+        return GlobalResponse.ok(data);
+    }
+
+    @GetMapping("/{sessionId}/flow-state")
+    public GlobalResponse<SessionFlowStateData> getSessionFlowState(@PathVariable String sessionId) {
+        SessionFlowStateData data = executionService.getSessionFlowState(sessionId);
+        if (data == null) return GlobalResponse.notFound("session not found");
         return GlobalResponse.ok(data);
     }
 

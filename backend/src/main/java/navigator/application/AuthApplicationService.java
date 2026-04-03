@@ -127,23 +127,44 @@ public class AuthApplicationService {
         LearningPlanEntity plan = learningPlanRepository.findBySessionId(session.getId());
         DiagnosisSessionEntity diagnosis = diagnosisSessionRepository.findBySessionId(session.getId());
         List<SessionTaskEntity> tasks = sessionTaskRepository.findBySessionId(session.getId());
+        boolean reportReady = isReportReady(session);
         String currentTaskCode = null;
-        if (tasks != null && !tasks.isEmpty()) {
+        if (!reportReady && tasks != null && !tasks.isEmpty()) {
             int index = session.getCompletedTaskCount() != null ? session.getCompletedTaskCount() : 0;
             if (index >= 0 && index < tasks.size()) {
                 currentTaskCode = tasks.get(index).getTaskCode();
-            } else if (index > 0 && index - 1 < tasks.size()) {
-                currentTaskCode = tasks.get(tasks.size() - 1).getTaskCode();
             }
         }
+        String sessionStatus = resolveFlowStatus(session, reportReady);
         return RecentLearningEntryData.builder()
                 .goalId("goal_" + session.getGoalId())
                 .diagnosisId(diagnosis != null ? "diag_" + diagnosis.getId() : null)
                 .planId(plan != null ? "plan_" + plan.getId() : null)
                 .sessionId("learn_session_" + session.getId())
                 .currentTaskId(currentTaskCode)
-                .sessionStatus(session.getStatus())
+                .sessionStatus(sessionStatus)
                 .build();
+    }
+
+    private boolean isReportReady(LearningSessionEntity session) {
+        int totalTasks = session.getTotalTaskCount() != null ? session.getTotalTaskCount() : 0;
+        int completedTasks = session.getCompletedTaskCount() != null ? session.getCompletedTaskCount() : 0;
+        return "COMPLETED".equals(session.getStatus())
+                || "REPORT_READY".equals(session.getStatus())
+                || (totalTasks > 0 && completedTasks >= totalTasks);
+    }
+
+    private String resolveFlowStatus(LearningSessionEntity session, boolean reportReady) {
+        if (reportReady) {
+            return "REPORT_READY";
+        }
+        if (session.getPlanId() != null) {
+            return "TASK_ACTIVE";
+        }
+        if (session.getDiagnosisSessionId() != null && "DIAGNOSIS_COMPLETED".equals(session.getStatus())) {
+            return "PLAN_ACTIVE";
+        }
+        return "DIAGNOSIS_ACTIVE";
     }
 
     private String normalizeUsername(String username) {

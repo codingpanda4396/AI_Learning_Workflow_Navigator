@@ -1,6 +1,13 @@
 import { request } from './request'
-import type { ReportData, NextActionConfirmData } from '@/types/dto'
+import type { ReportData, NextActionConfirmData, SessionFlowState } from '@/types/dto'
 import type { NextActionTypeType } from '@/types/enums'
+
+export async function getSessionFlowState(sessionId: string): Promise<SessionFlowState> {
+  const { data } = await request.get<SessionFlowState>(
+    `/api/sessions/${sessionId}/flow-state`
+  )
+  return data
+}
 
 export async function getReport(sessionId: string): Promise<ReportData> {
   const { data } = await request.get<ReportData>(

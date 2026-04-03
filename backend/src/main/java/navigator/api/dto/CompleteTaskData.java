@@ -19,6 +19,10 @@ public class CompleteTaskData {
     private boolean nextTaskAvailable;
     private String nextTaskId;
     private SessionProgressItem sessionProgress;
+    private String sessionStatus;
+    private String currentPhase;
+    private String nextRoute;
+    private boolean reportReady;
 
     @Data
     @Builder

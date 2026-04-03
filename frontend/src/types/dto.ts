@@ -213,6 +213,8 @@ export interface CommitPlanData {
   taskSequence: string[]
   currentTaskId: string
   status: string
+  currentPhase?: string
+  nextRoute?: string
 }
 
 // --- 4. 任务执行 ---
@@ -290,6 +292,21 @@ export interface CompleteTaskData {
   nextTaskAvailable: boolean
   nextTaskId?: string
   sessionProgress?: SessionProgressItem
+  sessionStatus?: string
+  currentPhase?: string
+  nextRoute?: string
+  reportReady?: boolean
+}
+
+export interface SessionFlowState {
+  sessionId: string
+  sessionStatus: string
+  currentPhase: string
+  currentRoute: string
+  currentTaskId?: string | null
+  reportReady: boolean
+  completedTaskCount: number
+  totalTaskCount: number
 }
 
 export interface ScaffoldPromptItem {

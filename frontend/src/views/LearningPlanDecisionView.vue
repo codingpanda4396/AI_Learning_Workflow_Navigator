@@ -120,13 +120,18 @@ async function onStartStep() {
     goExecution()
     return
   }
-  if (!store.planId) return
+  const activePlanId = store.planId ?? plan.value?.planId ?? null
+  if (!activePlanId) return
   committing.value = true
   try {
     if (store.sessionId && !store.currentTaskId) {
       store.clearRunState()
+      store.planId = activePlanId
+      if (plan.value) {
+        store.planPreview = plan.value
+      }
     }
-    const data = await commitPlan(store.planId)
+    const data = await commitPlan(activePlanId)
     store.sessionId = data.sessionId
     store.currentTaskId = data.currentTaskId
     store.taskSequence = data.taskSequence ?? []

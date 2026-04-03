@@ -1,0 +1,41 @@
+﻿{
+    "diagnosisId":  "diag_25",
+    "answers":  [
+                    {
+                        "selectedOptions":  [
+                                                "BUILD_FRAMEWORK"
+                                            ],
+                        "questionId":  "q_goal_outcome"
+                    },
+                    {
+                        "selectedOptions":  [
+                                                "BASIC_BUT_FRAGILE"
+                                            ],
+                        "questionId":  "q_foundation_state"
+                    },
+                    {
+                        "selectedOptions":  [
+                                                "CONCEPT_GAP"
+                                            ],
+                        "questionId":  "q_primary_gap"
+                    },
+                    {
+                        "selectedOptions":  [
+                                                "MULTI_POINT"
+                                            ],
+                        "questionId":  "q_scope_of_problem"
+                    },
+                    {
+                        "selectedOptions":  [
+                                                "CONCEPT_FIRST"
+                                            ],
+                        "questionId":  "q_preferred_entry_mode"
+                    },
+                    {
+                        "selectedOptions":  [
+                                                "LOW_RISK"
+                                            ],
+                        "questionId":  "q_execution_risk"
+                    }
+                ]
+}

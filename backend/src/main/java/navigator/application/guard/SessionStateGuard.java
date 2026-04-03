@@ -46,8 +46,9 @@ public class SessionStateGuard {
         entityLookupGuard.requireSession(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
         if (state != null) {
-            if (!"IN_PROGRESS".equals(state.getStatus())) {
-                throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed or session not in progress");
+            if (isReportReady(state.getStatus(), state.getCurrentTaskIndex(),
+                    state.getTaskSequence() != null ? state.getTaskSequence().size() : 0)) {
+                throw new BusinessException(BusinessErrorCode.SESSION_ALREADY_COMPLETED, "session already completed");
             }
             String planId = state.getPlanId();
             if (planId == null) {
@@ -70,8 +71,10 @@ public class SessionStateGuard {
         if (session == null) {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found: " + sessionId);
         }
-        if (!"IN_PROGRESS".equals(session.getStatus())) {
-            throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed or session not in progress");
+        if (isReportReady(session.getStatus(),
+                session.getCompletedTaskCount() != null ? session.getCompletedTaskCount() : 0,
+                session.getTotalTaskCount() != null ? session.getTotalTaskCount() : 0)) {
+            throw new BusinessException(BusinessErrorCode.SESSION_ALREADY_COMPLETED, "session already completed");
         }
         if (session.getPlanId() == null) {
             throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed");
@@ -87,7 +90,8 @@ public class SessionStateGuard {
         entityLookupGuard.requireSession(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
         if (state != null) {
-            if (!"COMPLETED".equals(state.getStatus())) {
+            if (!isReportReady(state.getStatus(), state.getCurrentTaskIndex(),
+                    state.getTaskSequence() != null ? state.getTaskSequence().size() : 0)) {
                 throw new BusinessException(BusinessErrorCode.SESSION_NOT_COMPLETED, "session not completed");
             }
             return;
@@ -96,9 +100,17 @@ public class SessionStateGuard {
         if (session == null) {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found: " + sessionId);
         }
-        if (!"COMPLETED".equals(session.getStatus())) {
+        if (!isReportReady(session.getStatus(),
+                session.getCompletedTaskCount() != null ? session.getCompletedTaskCount() : 0,
+                session.getTotalTaskCount() != null ? session.getTotalTaskCount() : 0)) {
             throw new BusinessException(BusinessErrorCode.SESSION_NOT_COMPLETED, "session not completed");
         }
+    }
+
+    private boolean isReportReady(String rawStatus, int completedTaskCount, int totalTaskCount) {
+        return "COMPLETED".equals(rawStatus)
+                || "REPORT_READY".equals(rawStatus)
+                || (totalTaskCount > 0 && completedTaskCount >= totalTaskCount);
     }
 
     private LearningSessionEntity loadSessionEntity(String sessionId) {

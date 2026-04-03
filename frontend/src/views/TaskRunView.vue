@@ -55,6 +55,7 @@ import LoadingState from '@/components/ui/LoadingState.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import { getErrorMessage } from '@/api/request'
 import { postCompleteConversationStage, postCompleteStructureStage } from '@/api/learningScaffold'
+import { getSessionFlowState } from '@/api/session'
 import { streamAiTutorChat, type AiTutorChatMessagePayload } from '@/api/tutor'
 import { completeTask, getCurrentTask } from '@/api/task'
 import { supportsLearningScaffoldEngine } from '@/constants/learningScaffoldPack'
@@ -573,9 +574,27 @@ async function completeCurrentTaskAndAdvance() {
   task.value = null
   progress.value = null
   resetWorkbenchState()
+  if (result.reportReady || result.nextRoute === '/report') {
+    await router.push('/report')
+    return
+  }
   if (result.nextTaskAvailable && result.nextTaskId) {
     await router.push({ name: 'taskRun', params: { taskId: result.nextTaskId } })
     return
+  }
+  try {
+    const flow = await getSessionFlowState(store.sessionId)
+    if (flow.reportReady) {
+      await router.push('/report')
+      return
+    }
+    if (flow.currentTaskId) {
+      store.currentTaskId = flow.currentTaskId
+      await router.push({ name: 'taskRun', params: { taskId: flow.currentTaskId } })
+      return
+    }
+  } catch {
+    // Fall through to report to keep the closure path moving.
   }
   await router.push('/report')
 }

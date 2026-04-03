@@ -27,7 +27,11 @@ public class TaskProgressGuard {
     public void requireTaskCanComplete(String sessionId, String taskId) {
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
-        if ("COMPLETED".equals(state.getStatus())) {
+        if ("COMPLETED".equals(state.getStatus())
+                || "REPORT_READY".equals(state.getStatus())
+                || (state.getTaskSequence() != null
+                && !state.getTaskSequence().isEmpty()
+                && state.getCurrentTaskIndex() >= state.getTaskSequence().size())) {
             throw new BusinessException(BusinessErrorCode.SESSION_ALREADY_COMPLETED, "session already completed");
         }
         List<String> seq = state.getTaskSequence();

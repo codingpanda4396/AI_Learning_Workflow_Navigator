@@ -15,6 +15,7 @@ import navigator.application.planning.RecommendedEntryBuilder;
 import navigator.application.knowledge.KnowledgePackMetadata;
 import navigator.application.rule.engine.RuleResult;
 import navigator.domain.enums.PlanStatus;
+import navigator.domain.enums.LearningSessionStatus;
 import navigator.domain.enums.RecommendedStrategyCode;
 import navigator.domain.model.ExecutableTaskSpec;
 import navigator.domain.model.LearningPlanPreview;
@@ -237,7 +238,9 @@ public class PlanningApplicationService {
                 .planId(planId)
                 .taskSequence(state.getTaskSequence())
                 .currentTaskId(currentTaskId)
-                .status("IN_PROGRESS")
+                .status(LearningSessionStatus.TASK_ACTIVE.name())
+                .currentPhase("task")
+                .nextRoute(currentTaskId != null ? "/tasks/" + currentTaskId + "/run" : "/execution")
                 .build();
     }
 

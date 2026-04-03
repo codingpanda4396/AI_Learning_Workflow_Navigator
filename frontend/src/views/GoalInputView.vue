@@ -214,6 +214,7 @@ import TransitionOverlay from '@/components/ui/TransitionOverlay.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkflowStore } from '@/stores/workflow'
 import { createGoal } from '@/api/goals'
+import { getSessionFlowState } from '@/api/session'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
 import { GOAL_COPY } from '@/constants/uiCopy'
@@ -286,7 +287,9 @@ const autoStartIntent = computed(() => selectedTopic.value.recommendedIntent ?? 
 const continueLabel = computed(() => {
   const entry = auth.recentLearningEntry
   if (!entry?.sessionId) return ''
-  return entry.sessionStatus === 'COMPLETED' ? GOAL_COPY.continueResult : GOAL_COPY.continueProgress
+  return entry.sessionStatus === 'REPORT_READY' || entry.sessionStatus === 'COMPLETED'
+    ? GOAL_COPY.continueResult
+    : GOAL_COPY.continueProgress
 })
 const selectionSummary = computed(() => `${selectedSubject.value.label} / ${selectedTopic.value.label}`)
 const ctaDisabled = computed(() => !isHomeTopicConfigured(selectedTopicKey.value))
@@ -372,19 +375,46 @@ async function continueLatest() {
   store.diagnosisId = entry.diagnosisId ?? null
   store.planId = entry.planId ?? null
   store.sessionId = entry.sessionId
-  store.currentTaskId = entry.currentTaskId ?? null
+  try {
+    const flow = await getSessionFlowState(entry.sessionId)
+    store.currentTaskId = flow.currentTaskId ?? null
 
-  if (entry.sessionStatus === 'COMPLETED') {
-    await router.push('/report')
-    return
+    if (flow.currentRoute === '/report') {
+      await router.push('/report')
+      return
+    }
+    if (flow.currentTaskId && flow.currentRoute.startsWith('/tasks/')) {
+      await router.push({ name: 'taskRun', params: { taskId: flow.currentTaskId } })
+      return
+    }
+    if (flow.currentRoute === '/execution') {
+      await router.push('/execution')
+      return
+    }
+    if (flow.currentRoute === '/plan') {
+      await router.push('/plan')
+      return
+    }
+    if (flow.currentRoute === '/diagnosis') {
+      await router.push('/diagnosis')
+      return
+    }
+  } catch {
+    store.currentTaskId = entry.currentTaskId ?? null
+    if (entry.sessionStatus === 'REPORT_READY' || entry.sessionStatus === 'COMPLETED') {
+      await router.push('/report')
+      return
+    }
+    if (entry.currentTaskId) {
+      await router.push({ name: 'taskRun', params: { taskId: entry.currentTaskId } })
+      return
+    }
+    if (entry.diagnosisId) {
+      await router.push('/diagnosis')
+      return
+    }
   }
-  if (entry.currentTaskId) {
-    await router.push({ name: 'taskRun', params: { taskId: entry.currentTaskId } })
-    return
-  }
-  if (entry.diagnosisId) {
-    await router.push('/diagnosis')
-  }
+  await router.push('/goal')
 }
 
 async function onSubmit() {

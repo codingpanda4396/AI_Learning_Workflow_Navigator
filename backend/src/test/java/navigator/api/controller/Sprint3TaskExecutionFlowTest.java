@@ -27,7 +27,7 @@ class Sprint3TaskExecutionFlowTest {
     void scaffoldThenMessagesSelfExplainCheckpointComplete() throws Exception {
         Cookie authCookie = TestAuthSupport.registerAndLogin(mvc, "task_flow_user");
         String goalBody = """
-                {"rawGoalText":"DFS 与 BFS 搜索入门","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC"}
+                {"rawGoalText":"DFS 和 BFS 搜索入门","timeBudget":"WITHIN_30_MIN","selfReportedLevel":"BASIC"}
                 """;
         String goalId = objectMapper.readTree(mvc.perform(post("/api/goals").cookie(authCookie)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -70,7 +70,7 @@ class Sprint3TaskExecutionFlowTest {
                 .andExpect(jsonPath("$.data.stageKey").value("STRUCTURE"))
                 .andExpect(jsonPath("$.data.actionCards").isArray());
 
-        String msgBody = "{\"sessionId\":\"" + sessionId + "\",\"content\":\"请解释一下链表是什么\"}";
+        String msgBody = "{\"sessionId\":\"" + sessionId + "\",\"content\":\"请解释一下链表是什么？\"}";
         mvc.perform(post("/api/tasks/" + taskId + "/messages").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content(msgBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskState").value("EXPLORE"))
@@ -79,11 +79,11 @@ class Sprint3TaskExecutionFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.policyVersion").exists());
         mvc.perform(post("/api/tasks/" + taskId + "/messages").cookie(authCookie).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"sessionId\":\"" + sessionId + "\",\"content\":\"能举个最小例子吗\"}"))
+                        .content("{\"sessionId\":\"" + sessionId + "\",\"content\":\"能举个最小例子吗？\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.detectedAction").value("ASK_FOR_EXAMPLE"));
         mvc.perform(post("/api/tasks/" + taskId + "/messages").cookie(authCookie).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"sessionId\":\"" + sessionId + "\",\"content\":\"和数组相比插入操作哪里更快\"}"))
+                        .content("{\"sessionId\":\"" + sessionId + "\",\"content\":\"和数组相比插入操作哪里更快？\"}"))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/tasks/" + taskId + "/execution-summary").cookie(authCookie).param("sessionId", sessionId))
                 .andExpect(status().isOk())
@@ -96,16 +96,27 @@ class Sprint3TaskExecutionFlowTest {
                 .andExpect(jsonPath("$.data.checkpointQuestion").exists());
 
         mvc.perform(post("/api/tasks/" + taskId + "/checkpoint").cookie(authCookie).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"sessionId\":\"" + sessionId + "\",\"answer\":\"链表通过 next 指针连接节点，插入删除只需 O(1) 改指针\"}"))
+                        .content("{\"sessionId\":\"" + sessionId + "\",\"answer\":\"链表通过 next 指针连接节点，插入删除只需 O(1) 改指针。\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.result").value("PASS"));
 
         String completeBody = "{\"sessionId\":\"" + sessionId
                 + "\",\"completionStatus\":\"COMPLETED\",\"durationMinutes\":5,\"interactionCount\":2"
+                + ",\"userSummarySubmitted\":true"
                 + ",\"summaryText\":\"本任务理解了链表节点与指针关系及插入思路。\""
                 + ",\"learnedFrameworkPoints\":[\"节点与 next 指针\",\"插入只需改指针\"]"
-                + ",\"nextPracticeIntent\":\"下一题手写反转链表\"}";
+                + ",\"nextPracticeIntent\":\"下一题手写反转链表\""
+                + ",\"closurePayloadVersion\":\"sprint4-v1\"}";
         mvc.perform(post("/api/tasks/" + taskId + "/complete").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content(completeBody))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reportReady").value(true))
+                .andExpect(jsonPath("$.data.nextTaskAvailable").value(false))
+                .andExpect(jsonPath("$.data.nextRoute").value("/report"));
+
+        mvc.perform(get("/api/sessions/" + sessionId + "/flow-state").cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reportReady").value(true))
+                .andExpect(jsonPath("$.data.currentRoute").value("/report"))
+                .andExpect(jsonPath("$.data.currentTaskId").isEmpty());
     }
 }
