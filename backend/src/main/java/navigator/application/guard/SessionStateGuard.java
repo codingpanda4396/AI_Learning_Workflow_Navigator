@@ -3,12 +3,13 @@ package navigator.application.guard;
 import navigator.api.BusinessErrorCode;
 import navigator.api.BusinessException;
 import navigator.domain.enums.DiagnosisSessionStatus;
+import navigator.domain.enums.LearningSessionStatusSupport;
 import navigator.domain.enums.PlanStatus;
+import navigator.application.session.SessionReadFacade;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.entity.LearningPlanEntity;
 import navigator.infrastructure.persistence.entity.LearningSessionEntity;
 import navigator.infrastructure.persistence.repository.LearningPlanRepository;
-import navigator.infrastructure.persistence.repository.LearningSessionRepository;
 import org.springframework.stereotype.Component;
 
 /**
@@ -19,16 +20,16 @@ public class SessionStateGuard {
 
     private final EntityLookupGuard entityLookupGuard;
     private final InMemoryStore store;
-    private final LearningSessionRepository learningSessionRepository;
+    private final SessionReadFacade sessionReadFacade;
     private final LearningPlanRepository learningPlanRepository;
 
     public SessionStateGuard(EntityLookupGuard entityLookupGuard,
                              InMemoryStore store,
-                             LearningSessionRepository learningSessionRepository,
+                             SessionReadFacade sessionReadFacade,
                              LearningPlanRepository learningPlanRepository) {
         this.entityLookupGuard = entityLookupGuard;
         this.store = store;
-        this.learningSessionRepository = learningSessionRepository;
+        this.sessionReadFacade = sessionReadFacade;
         this.learningPlanRepository = learningPlanRepository;
     }
 
@@ -46,7 +47,7 @@ public class SessionStateGuard {
         entityLookupGuard.requireSession(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
         if (state != null) {
-            if (isReportReady(state.getStatus(), state.getCurrentTaskIndex(),
+            if (LearningSessionStatusSupport.isReportReady(state.getStatus(), state.getCurrentTaskIndex(),
                     state.getTaskSequence() != null ? state.getTaskSequence().size() : 0)) {
                 throw new BusinessException(BusinessErrorCode.SESSION_ALREADY_COMPLETED, "session already completed");
             }
@@ -54,24 +55,18 @@ public class SessionStateGuard {
             if (planId == null) {
                 throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed");
             }
-            PlanStatus planStatus = store.getPlanStatuses().get(planId);
-            if (planStatus == null && extractNumericId(planId) != null) {
-                LearningPlanEntity persistedPlan = learningPlanRepository.findById(extractNumericId(planId));
-                planStatus = persistedPlan != null && persistedPlan.getStatus() != null
-                        ? PlanStatus.valueOf(persistedPlan.getStatus())
-                        : null;
-            }
+            PlanStatus planStatus = sessionReadFacade.resolvePlanStatus(planId);
             if (planStatus != PlanStatus.COMMITTED) {
                 throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed");
             }
             return;
         }
 
-        LearningSessionEntity session = loadSessionEntity(sessionId);
+        LearningSessionEntity session = sessionReadFacade.findLearningSessionEntity(sessionId);
         if (session == null) {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found: " + sessionId);
         }
-        if (isReportReady(session.getStatus(),
+        if (LearningSessionStatusSupport.isReportReady(session.getStatus(),
                 session.getCompletedTaskCount() != null ? session.getCompletedTaskCount() : 0,
                 session.getTotalTaskCount() != null ? session.getTotalTaskCount() : 0)) {
             throw new BusinessException(BusinessErrorCode.SESSION_ALREADY_COMPLETED, "session already completed");
@@ -90,46 +85,20 @@ public class SessionStateGuard {
         entityLookupGuard.requireSession(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
         if (state != null) {
-            if (!isReportReady(state.getStatus(), state.getCurrentTaskIndex(),
+            if (!LearningSessionStatusSupport.isReportReady(state.getStatus(), state.getCurrentTaskIndex(),
                     state.getTaskSequence() != null ? state.getTaskSequence().size() : 0)) {
                 throw new BusinessException(BusinessErrorCode.SESSION_NOT_COMPLETED, "session not completed");
             }
             return;
         }
-        LearningSessionEntity session = loadSessionEntity(sessionId);
+        LearningSessionEntity session = sessionReadFacade.findLearningSessionEntity(sessionId);
         if (session == null) {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found: " + sessionId);
         }
-        if (!isReportReady(session.getStatus(),
+        if (!LearningSessionStatusSupport.isReportReady(session.getStatus(),
                 session.getCompletedTaskCount() != null ? session.getCompletedTaskCount() : 0,
                 session.getTotalTaskCount() != null ? session.getTotalTaskCount() : 0)) {
             throw new BusinessException(BusinessErrorCode.SESSION_NOT_COMPLETED, "session not completed");
-        }
-    }
-
-    private boolean isReportReady(String rawStatus, int completedTaskCount, int totalTaskCount) {
-        return "COMPLETED".equals(rawStatus)
-                || "REPORT_READY".equals(rawStatus)
-                || (totalTaskCount > 0 && completedTaskCount >= totalTaskCount);
-    }
-
-    private LearningSessionEntity loadSessionEntity(String sessionId) {
-        Long sessionDbId = extractNumericId(sessionId);
-        return sessionDbId != null ? learningSessionRepository.findById(sessionDbId) : null;
-    }
-
-    private Long extractNumericId(String id) {
-        if (id == null) {
-            return null;
-        }
-        String digits = id.replaceAll("\\D+", "");
-        if (digits.isEmpty()) {
-            return null;
-        }
-        try {
-            return Long.parseLong(digits);
-        } catch (NumberFormatException ex) {
-            return null;
         }
     }
 }

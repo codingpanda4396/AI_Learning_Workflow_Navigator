@@ -109,7 +109,7 @@ class Sprint1IntegrationTest {
     }
 
     @Test
-    void currentTaskWithoutCommitReturns404BecauseNoSessionYet() throws Exception {
+    void currentTaskWithoutCommitReturns409PlanNotCommitted() throws Exception {
         String goalBody = "{\"rawGoalText\":\"我想搞懂链表\",\"timeBudget\":\"WITHIN_30_MIN\",\"selfReportedLevel\":\"BASIC\"}";
         String goalResp = mvc.perform(post("/api/goals").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content(goalBody)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         String goalId = objectMapper.readTree(goalResp).get("data").get("goalId").asText();
@@ -127,7 +127,7 @@ class Sprint1IntegrationTest {
         mvc.perform(post("/api/learning-plans/preview").cookie(authCookie).contentType(MediaType.APPLICATION_JSON).content("{\"goalId\":\"" + goalId + "\",\"diagnosisId\":\"" + diagnosisId + "\"}")).andExpect(status().isOk());
         String sessionId = objectMapper.readTree(diagResp).get("data").get("sessionId").asText();
         mvc.perform(get("/api/sessions/" + sessionId + "/current-task").cookie(authCookie))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PLAN_NOT_COMMITTED"));
     }
 }

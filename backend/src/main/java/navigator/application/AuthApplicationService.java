@@ -19,6 +19,8 @@ import navigator.infrastructure.persistence.repository.LearningSessionRepository
 import navigator.infrastructure.persistence.repository.SessionTaskRepository;
 import navigator.infrastructure.persistence.repository.UserRepository;
 import navigator.infrastructure.persistence.repository.UserSessionRepository;
+import navigator.domain.enums.LearningSessionStatus;
+import navigator.domain.enums.LearningSessionStatusSupport;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -149,19 +151,17 @@ public class AuthApplicationService {
     private boolean isReportReady(LearningSessionEntity session) {
         int totalTasks = session.getTotalTaskCount() != null ? session.getTotalTaskCount() : 0;
         int completedTasks = session.getCompletedTaskCount() != null ? session.getCompletedTaskCount() : 0;
-        return "COMPLETED".equals(session.getStatus())
-                || "REPORT_READY".equals(session.getStatus())
-                || (totalTasks > 0 && completedTasks >= totalTasks);
+        return LearningSessionStatusSupport.isReportReady(session.getStatus(), completedTasks, totalTasks);
     }
 
     private String resolveFlowStatus(LearningSessionEntity session, boolean reportReady) {
         if (reportReady) {
-            return "REPORT_READY";
+            return LearningSessionStatus.REPORT_READY.name();
         }
         if (session.getPlanId() != null) {
-            return "TASK_ACTIVE";
+            return LearningSessionStatus.TASK_ACTIVE.name();
         }
-        if (session.getDiagnosisSessionId() != null && "DIAGNOSIS_COMPLETED".equals(session.getStatus())) {
+        if (session.getDiagnosisSessionId() != null && LearningSessionStatusSupport.isDiagnosisCompleted(session.getStatus())) {
             return "PLAN_ACTIVE";
         }
         return "DIAGNOSIS_ACTIVE";

@@ -2,6 +2,7 @@ package navigator.application.guard;
 
 import navigator.api.BusinessErrorCode;
 import navigator.api.BusinessException;
+import navigator.domain.enums.LearningSessionStatusSupport;
 import navigator.domain.model.TaskExecutionRecord;
 import navigator.infrastructure.memory.InMemoryStore;
 import org.springframework.stereotype.Component;
@@ -27,8 +28,7 @@ public class TaskProgressGuard {
     public void requireTaskCanComplete(String sessionId, String taskId) {
         entityLookupGuard.requireTaskInSession(sessionId, taskId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
-        if ("COMPLETED".equals(state.getStatus())
-                || "REPORT_READY".equals(state.getStatus())
+        if (LearningSessionStatusSupport.isCompletedOrReportReady(state.getStatus())
                 || (state.getTaskSequence() != null
                 && !state.getTaskSequence().isEmpty()
                 && state.getCurrentTaskIndex() >= state.getTaskSequence().size())) {

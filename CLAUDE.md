@@ -30,10 +30,17 @@ mvn test -Dtest=XXXTest # Run single test class
 backend/
 ├── src/main/java/navigator/
 │   ├── api/              # Controllers, DTOs, GlobalResponse
-│   ├── application/      # Application services
-│   ├── domain/           # Domain models, enums
-│   └── infrastructure/   # Persistence (InMemoryStore)
+│   ├── application/      # Application services, guards, task/scaffold/execution/session subpackages
+│   ├── domain/           # Domain models, enums (e.g. LearningSessionStatusSupport)
+│   └── infrastructure/   # InMemoryStore, JPA, Flyway
 ```
+
+**Execution-related helpers (non-exhaustive):** `SessionReadFacade` merges in-memory plan status with persisted plans; `ExecutionSessionStateService` hydrates session state and resolves task blueprints; `TaskCompletionApplicationService` implements the `completeTask` pipeline; `ExternalIdSupport` parses prefixed string ids (`learn_session_1`, etc.) to numeric keys.
+
+### Frontend types & API
+
+- API base URL: `frontend/src/api/apiBaseUrl.ts` (shared by Axios and SSE); optional env override `VITE_API_BASE`.
+- DTO types: `frontend/src/types/dto/*.ts` by domain, with `types/dto.ts` re-exporting for stable `@/types/dto` imports.
 
 ### Key Controllers
 
@@ -97,7 +104,7 @@ The project includes `.cursor/rules/` with project-specific guidelines. Key prin
 
 ## Important Notes
 
-- No persistent database - uses `InMemoryStore` for in-memory storage
+- Runtime uses `InMemoryStore` for fast session/task state; many flows also read/write JPA entities (H2 in tests). Guards and services may resolve via `SessionReadFacade` to avoid duplicating the two paths.
 - Server runs on port 8080 by default
 - CORS is configured for `/api` endpoints in `WebConfig.java`
 - All API responses follow `GlobalResponse` format: `{ code, message, data }`

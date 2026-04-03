@@ -1,8 +1,9 @@
 import axios, { type AxiosError } from 'axios'
 import type { GlobalResponse } from '@/types/dto'
 import { errorCodeLabels } from '@/types/labels'
+import { getApiBaseUrl } from './apiBaseUrl'
 
-const baseURL = import.meta.env.DEV ? '' : 'http://localhost:8080'
+const baseURL = getApiBaseUrl()
 
 export const request = axios.create({
   baseURL,

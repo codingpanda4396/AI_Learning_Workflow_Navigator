@@ -228,7 +228,7 @@ public class PlanningApplicationService {
         state.setPlanId(planId);
         state.setTaskSequence(taskSequence);
         state.setCurrentTaskIndex(0);
-        state.setStatus("IN_PROGRESS");
+        state.setStatus(LearningSessionStatus.IN_PROGRESS.name());
         store.getSessions().put(sessionId, state);
         materializeTasksToDb(sessionDbId, planDbId, taskSequence);
         materializeExecutableTaskSpecs(sessionId, planEntity, preview, taskSequence);

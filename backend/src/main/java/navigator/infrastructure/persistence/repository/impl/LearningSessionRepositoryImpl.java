@@ -1,5 +1,6 @@
 package navigator.infrastructure.persistence.repository.impl;
 
+import navigator.domain.enums.LearningSessionStatus;
 import navigator.infrastructure.persistence.entity.LearningSessionEntity;
 import navigator.infrastructure.persistence.mapper.LearningSessionMapper;
 import navigator.infrastructure.persistence.repository.LearningSessionRepository;
@@ -27,7 +28,7 @@ public class LearningSessionRepositoryImpl implements LearningSessionRepository 
         entity.setUserId(userId);
         entity.setGoalId(goalId);
         entity.setDiagnosisSessionId(null);
-        entity.setStatus("DIAGNOSIS_READY");
+        entity.setStatus(LearningSessionStatus.DIAGNOSIS_READY.name());
         entity.setCurrentTaskId(null);
         entity.setTotalTaskCount(0);
         entity.setCompletedTaskCount(0);
@@ -76,7 +77,7 @@ public class LearningSessionRepositoryImpl implements LearningSessionRepository 
         if (entity == null) {
             return;
         }
-        entity.setStatus("DIAGNOSIS_COMPLETED");
+        entity.setStatus(LearningSessionStatus.DIAGNOSIS_COMPLETED.name());
         entity.setUpdatedAt(LocalDateTime.now());
         mapper.updateById(entity);
     }
@@ -90,7 +91,7 @@ public class LearningSessionRepositoryImpl implements LearningSessionRepository 
         if (entity == null) {
             return;
         }
-        entity.setStatus("IN_PROGRESS");
+        entity.setStatus(LearningSessionStatus.IN_PROGRESS.name());
         entity.setTotalTaskCount(totalTaskCount);
         entity.setCompletedTaskCount(0);
         entity.setUpdatedAt(LocalDateTime.now());
@@ -126,7 +127,7 @@ public class LearningSessionRepositoryImpl implements LearningSessionRepository 
         if (status != null) {
             entity.setStatus(status);
         }
-        if ("COMPLETED".equals(status)) {
+        if (LearningSessionStatus.COMPLETED.name().equals(status)) {
             entity.setCompletedAt(LocalDateTime.now());
         }
         entity.setUpdatedAt(LocalDateTime.now());

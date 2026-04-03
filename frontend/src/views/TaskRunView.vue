@@ -57,7 +57,7 @@ import { getErrorMessage } from '@/api/request'
 import { postCompleteConversationStage, postCompleteStructureStage } from '@/api/learningScaffold'
 import { getSessionFlowState } from '@/api/session'
 import { streamAiTutorChat, type AiTutorChatMessagePayload } from '@/api/tutor'
-import { completeTask, getCurrentTask } from '@/api/task'
+import { completeTask } from '@/api/task'
 import { supportsLearningScaffoldEngine } from '@/constants/learningScaffoldPack'
 import { TASKRUN_COPY } from '@/constants/uiCopy'
 import {
@@ -73,6 +73,7 @@ import {
 import { showToast } from '@/stores/toast'
 import { useWorkflowStore } from '@/stores/workflow'
 import { useLearningScaffoldEngine } from '@/composables/useLearningScaffoldEngine'
+import { useTaskRunSession } from '@/composables/useTaskRunSession'
 import { buildCompleteTaskPayload } from '@/utils/buildCompleteTaskPayload'
 import type { CurrentTaskData, ProgressItem } from '@/types/dto'
 import type {
@@ -179,6 +180,20 @@ watch(
     if (k) engineStageKeyHint.value = k
   },
 )
+
+const { fetchTask } = useTaskRunSession({
+  route,
+  router,
+  store,
+  scaffoldEngine,
+  task,
+  progress,
+  engineStageKeyHint,
+  taskStartedAt,
+  loading,
+  error,
+  onTaskIdentityChange: resetWorkbenchState,
+})
 
 const scaffoldButtons = computed(() => DFS_BFS_SCAFFOLD_BUTTONS)
 const nextActionLabel = computed(() => DFS_BFS_NEXT_LABELS[currentPhase.value])
@@ -690,55 +705,6 @@ const workbenchVm = computed<ExecutionWorkbenchVm>(() => ({
 const workbenchTopicName = computed(() => {
   return store.planPreview?.knowledgeKey || task.value?.knowledge || '深度优先与广度优先（DFS / BFS）'
 })
-
-async function fetchTask() {
-  if (!store.sessionId) return
-  if (route.name !== 'task' && route.name !== 'taskRun') return
-  const paramId = typeof route.params.taskId === 'string' ? route.params.taskId : null
-  if (task.value?.taskId && paramId && paramId !== task.value.taskId) {
-    resetWorkbenchState()
-  }
-  loading.value = true
-  error.value = null
-  try {
-    const data = await getCurrentTask(store.sessionId)
-    const previousTaskId = task.value?.taskId ?? null
-    const taskChanged = !!previousTaskId && !!data.taskId && data.taskId !== previousTaskId
-
-    if (taskChanged) {
-      resetWorkbenchState()
-    }
-
-    store.currentTask = data
-    store.progress = data.progress
-    task.value = data
-    progress.value = data.progress
-    engineStageKeyHint.value = scaffoldEngine.stage?.stageKey ?? data.currentStage
-    if (taskChanged || !previousTaskId) {
-      taskStartedAt.value = Date.now()
-    }
-
-    if (!data.taskId) {
-      store.currentTaskId = null
-      router.push('/report')
-      return
-    }
-
-    store.currentTaskId = data.taskId
-    const routeTaskId = typeof route.params.taskId === 'string' ? route.params.taskId : ''
-    if (
-      route.name === 'task' ||
-      (route.name === 'taskRun' && routeTaskId && routeTaskId !== data.taskId)
-    ) {
-      router.replace({ name: 'taskRun', params: { taskId: data.taskId } })
-    }
-    ensureConversationState(currentPhase.value)
-  } catch (err) {
-    error.value = getErrorMessage(err)
-  } finally {
-    loading.value = false
-  }
-}
 
 type ConversationSnapshot = {
   messages: ChatMessage[]

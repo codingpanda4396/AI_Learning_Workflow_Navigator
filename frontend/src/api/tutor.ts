@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from './apiBaseUrl'
 import { request } from './request'
 import type { TaskFeedbackResponse } from '@/types/execution'
 
@@ -152,8 +153,7 @@ export async function streamAiTutorChat(
     signal?: AbortSignal
   }
 ): Promise<void> {
-  const baseURL = import.meta.env.DEV ? '' : 'http://localhost:8080'
-  const res = await fetch(`${baseURL}/api/ai-tutor/chat/stream`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/ai-tutor/chat/stream`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

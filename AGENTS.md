@@ -36,6 +36,7 @@ Every page must help the user know:
 - For complex UI refactors, inspect existing structure first, then propose a concise plan, then implement
 - Reuse before creating new abstractions
 - After changes, self-check hierarchy, copy, responsiveness, loading, empty, and error states
+- Task execution page data loading: prefer extending `composables/useTaskRunSession.ts` over duplicating fetch/sync logic in the view
 
 ## Special attention
 The task execution page is the core showcase page.
