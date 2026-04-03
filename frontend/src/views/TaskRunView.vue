@@ -54,7 +54,11 @@ import ErrorState from '@/components/ui/ErrorState.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import { getErrorMessage } from '@/api/request'
-import { postCompleteConversationStage, postCompleteStructureStage } from '@/api/learningScaffold'
+import {
+  postCompleteConversationStage,
+  postCompleteReflectionStage,
+  postCompleteStructureStage,
+} from '@/api/learningScaffold'
 import { streamAiTutorChat, type AiTutorChatMessagePayload } from '@/api/tutor'
 import { completeTask, getCurrentTask } from '@/api/task'
 import { supportsLearningScaffoldEngine } from '@/constants/learningScaffoldPack'
@@ -505,11 +509,16 @@ function buildReflectionSummary() {
 }
 
 async function submitReflectionToBackend() {
-  if (scaffoldEngine.stage?.stageKey !== 'REFLECTION') return
-  const text =
-    `REFLECTION:strategies=${reflectionState.selectedStrategyIds.join(',')};` +
-    `text=${reflectionState.userReflectionText}`
-  await scaffoldEngine.submit(text)
+  if (scaffoldEngine.stage?.stageKey !== 'REFLECTION' || !task.value || !store.sessionId) return
+  const strategyLabels = reflectionState.availableStrategies
+    .filter((item) => reflectionState.selectedStrategyIds.includes(item.id))
+    .map((item) => item.label)
+  await postCompleteReflectionStage(task.value.taskId, {
+    sessionId: store.sessionId,
+    reflectionText: reflectionState.userReflectionText,
+    strategyLabels,
+  })
+  await scaffoldEngine.loadStage({ force: true })
 }
 
 async function completeCurrentTaskAndAdvance() {

@@ -2,6 +2,7 @@ import { request } from './request'
 import { getTaskScaffold, type WorkbenchMode } from './task'
 import type {
   CompleteConversationStageResult,
+  CompleteReflectionStageResult,
   CompleteStructureStageResult,
   LearningScaffoldActionResult,
   StageScaffold,
@@ -64,6 +65,17 @@ export async function postCompleteConversationStage(
 ): Promise<CompleteConversationStageResult> {
   const { data } = await request.post<CompleteConversationStageResult>(
     `/api/tasks/${taskId}/learning-scaffold/conversation/complete`,
+    body
+  )
+  return data
+}
+
+export async function postCompleteReflectionStage(
+  taskId: string,
+  body: { sessionId: string; reflectionText: string; strategyLabels: string[] }
+): Promise<CompleteReflectionStageResult> {
+  const { data } = await request.post<CompleteReflectionStageResult>(
+    `/api/tasks/${taskId}/learning-scaffold/reflection/complete`,
     body
   )
   return data

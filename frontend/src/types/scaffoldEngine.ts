@@ -44,6 +44,13 @@ export interface CompleteConversationStageResult {
   nextActionId: string
 }
 
+export interface CompleteReflectionStageResult {
+  reflectionStageComplete: boolean
+  completedStageKey: string
+  nextStageKey: string | null
+  nextActionId: string
+}
+
 export interface PromptScaffoldBlock {
   id: string
   title: string
