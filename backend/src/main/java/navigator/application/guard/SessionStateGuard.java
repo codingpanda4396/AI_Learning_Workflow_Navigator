@@ -5,6 +5,10 @@ import navigator.api.BusinessException;
 import navigator.domain.enums.DiagnosisSessionStatus;
 import navigator.domain.enums.PlanStatus;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.entity.LearningPlanEntity;
+import navigator.infrastructure.persistence.entity.LearningSessionEntity;
+import navigator.infrastructure.persistence.repository.LearningPlanRepository;
+import navigator.infrastructure.persistence.repository.LearningSessionRepository;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,10 +19,17 @@ public class SessionStateGuard {
 
     private final EntityLookupGuard entityLookupGuard;
     private final InMemoryStore store;
+    private final LearningSessionRepository learningSessionRepository;
+    private final LearningPlanRepository learningPlanRepository;
 
-    public SessionStateGuard(EntityLookupGuard entityLookupGuard, InMemoryStore store) {
+    public SessionStateGuard(EntityLookupGuard entityLookupGuard,
+                             InMemoryStore store,
+                             LearningSessionRepository learningSessionRepository,
+                             LearningPlanRepository learningPlanRepository) {
         this.entityLookupGuard = entityLookupGuard;
         this.store = store;
+        this.learningSessionRepository = learningSessionRepository;
+        this.learningPlanRepository = learningPlanRepository;
     }
 
     /** preview 前：诊断必须已完成。 */
@@ -34,18 +45,39 @@ public class SessionStateGuard {
     public void requireSessionInProgressWithCommittedPlan(String sessionId) {
         entityLookupGuard.requireSession(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
-        if (state == null) {
+        if (state != null) {
+            if (!"IN_PROGRESS".equals(state.getStatus())) {
+                throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed or session not in progress");
+            }
+            String planId = state.getPlanId();
+            if (planId == null) {
+                throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed");
+            }
+            PlanStatus planStatus = store.getPlanStatuses().get(planId);
+            if (planStatus == null && extractNumericId(planId) != null) {
+                LearningPlanEntity persistedPlan = learningPlanRepository.findById(extractNumericId(planId));
+                planStatus = persistedPlan != null && persistedPlan.getStatus() != null
+                        ? PlanStatus.valueOf(persistedPlan.getStatus())
+                        : null;
+            }
+            if (planStatus != PlanStatus.COMMITTED) {
+                throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed");
+            }
+            return;
+        }
+
+        LearningSessionEntity session = loadSessionEntity(sessionId);
+        if (session == null) {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found: " + sessionId);
         }
-        if (!"IN_PROGRESS".equals(state.getStatus())) {
+        if (!"IN_PROGRESS".equals(session.getStatus())) {
             throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed or session not in progress");
         }
-        String planId = state.getPlanId();
-        if (planId == null) {
+        if (session.getPlanId() == null) {
             throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed");
         }
-        PlanStatus planStatus = store.getPlanStatuses().get(planId);
-        if (planStatus != PlanStatus.COMMITTED) {
+        LearningPlanEntity persistedPlan = learningPlanRepository.findById(session.getPlanId());
+        if (persistedPlan == null || !PlanStatus.COMMITTED.name().equals(persistedPlan.getStatus())) {
             throw new BusinessException(BusinessErrorCode.PLAN_NOT_COMMITTED, "plan not committed");
         }
     }
@@ -54,11 +86,38 @@ public class SessionStateGuard {
     public void requireSessionCompletedForReport(String sessionId) {
         entityLookupGuard.requireSession(sessionId);
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
-        if (state == null) {
+        if (state != null) {
+            if (!"COMPLETED".equals(state.getStatus())) {
+                throw new BusinessException(BusinessErrorCode.SESSION_NOT_COMPLETED, "session not completed");
+            }
+            return;
+        }
+        LearningSessionEntity session = loadSessionEntity(sessionId);
+        if (session == null) {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found: " + sessionId);
         }
-        if (!"COMPLETED".equals(state.getStatus())) {
+        if (!"COMPLETED".equals(session.getStatus())) {
             throw new BusinessException(BusinessErrorCode.SESSION_NOT_COMPLETED, "session not completed");
+        }
+    }
+
+    private LearningSessionEntity loadSessionEntity(String sessionId) {
+        Long sessionDbId = extractNumericId(sessionId);
+        return sessionDbId != null ? learningSessionRepository.findById(sessionDbId) : null;
+    }
+
+    private Long extractNumericId(String id) {
+        if (id == null) {
+            return null;
+        }
+        String digits = id.replaceAll("\\D+", "");
+        if (digits.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException ex) {
+            return null;
         }
     }
 }

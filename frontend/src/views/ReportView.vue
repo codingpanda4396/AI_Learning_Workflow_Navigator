@@ -279,7 +279,7 @@ import ErrorState from '@/components/ui/ErrorState.vue'
 import { useWorkflowStore } from '@/stores/workflow'
 import { getReport, confirmNextAction } from '@/api/session'
 import { showToast } from '@/stores/toast'
-import { getErrorMessage } from '@/api/request'
+import { getErrorMessage, type ApiError } from '@/api/request'
 import { resultStatusLabels, nextActionTypeLabels, taskCompletionStatusLabels } from '@/types/labels'
 import type { LearningMethodReview, LearningReport, RecommendedNextStep, TaskHighlight } from '@/types/dto'
 import type { NextActionTypeType } from '@/types/enums'
@@ -345,6 +345,9 @@ const error = ref<string | null>(null)
 const report = ref<LearningReport | null>(null)
 const nextHint = ref('')
 const selectedAction = ref<NextActionTypeType | ''>('')
+const canReuseStoredReport = computed(
+  () => !!store.sessionId && store.report?.sessionId === store.sessionId,
+)
 
 const recommendedAction = computed<RecommendedNextStep | null>(() => {
   if (report.value?.recommendedNextStep) {
@@ -476,10 +479,27 @@ async function fetchReport() {
       selectedAction.value = action
     }
   } catch (err) {
+    const apiError = err as ApiError
+    if (apiError.code === 'SESSION_NOT_COMPLETED') {
+      store.report = null
+      store.nextActionDecision = null
+      report.value = null
+      error.value = null
+      await redirectToCurrentTask()
+      return
+    }
     error.value = getErrorMessage(err)
   } finally {
     loading.value = false
   }
+}
+
+async function redirectToCurrentTask() {
+  if (store.currentTaskId) {
+    await router.replace({ name: 'taskRun', params: { taskId: store.currentTaskId } })
+    return
+  }
+  await router.replace('/task')
 }
 
 async function onConfirm() {
@@ -499,8 +519,13 @@ async function onConfirm() {
 }
 
 onMounted(() => {
-  if (store.report) {
+  nextHint.value = ''
+  selectedAction.value = ''
+  if (canReuseStoredReport.value) {
     report.value = store.report
+  } else {
+    store.report = null
+    store.nextActionDecision = null
   }
   if (!report.value) {
     void fetchReport()

@@ -12,6 +12,7 @@ import navigator.infrastructure.persistence.repository.DiagnosisSessionRepositor
 import navigator.infrastructure.persistence.repository.LearningGoalRepository;
 import navigator.infrastructure.persistence.repository.LearningPlanRepository;
 import navigator.infrastructure.persistence.repository.LearningSessionRepository;
+import navigator.infrastructure.persistence.repository.SessionTaskRepository;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,17 +23,20 @@ public class EntityLookupGuard {
     private final DiagnosisSessionRepository diagnosisSessionRepository;
     private final LearningSessionRepository learningSessionRepository;
     private final LearningPlanRepository learningPlanRepository;
+    private final SessionTaskRepository sessionTaskRepository;
 
     public EntityLookupGuard(InMemoryStore store,
                              LearningGoalRepository learningGoalRepository,
                              DiagnosisSessionRepository diagnosisSessionRepository,
                              LearningSessionRepository learningSessionRepository,
-                             LearningPlanRepository learningPlanRepository) {
+                             LearningPlanRepository learningPlanRepository,
+                             SessionTaskRepository sessionTaskRepository) {
         this.store = store;
         this.learningGoalRepository = learningGoalRepository;
         this.diagnosisSessionRepository = diagnosisSessionRepository;
         this.learningSessionRepository = learningSessionRepository;
         this.learningPlanRepository = learningPlanRepository;
+        this.sessionTaskRepository = sessionTaskRepository;
     }
 
     public void requireGoal(String goalId) {
@@ -103,13 +107,24 @@ public class EntityLookupGuard {
             }
             return;
         }
+        Long sessionDbId = extractNumericId(sessionId);
+        if (sessionDbId != null && sessionTaskRepository.findBySessionIdAndTaskCode(sessionDbId, taskId) != null) {
+            return;
+        }
         throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "task not in session: " + taskId);
     }
 
     public DiagnosisSessionStatus getDiagnosisStatus(String diagnosisId) {
         requireDiagnosisSession(diagnosisId);
         String status = store.getDiagnosisSessionStatuses().get(diagnosisId);
-        return status != null ? DiagnosisSessionStatus.valueOf(status) : null;
+        if (status != null) {
+            return DiagnosisSessionStatus.valueOf(status);
+        }
+        Long dbId = extractNumericId(diagnosisId);
+        DiagnosisSessionEntity entity = dbId != null ? diagnosisSessionRepository.findById(dbId) : null;
+        return entity != null && entity.getStatus() != null
+                ? DiagnosisSessionStatus.valueOf(entity.getStatus())
+                : null;
     }
 
     private Long extractNumericId(String id) {

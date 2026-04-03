@@ -123,6 +123,7 @@ import { createSession, submitDiagnosis } from '@/api/diagnosis'
 import { showToast } from '@/stores/toast'
 import { getErrorMessage } from '@/api/request'
 import {
+  DEFAULT_QUICK_DIAGNOSIS_UI_STATE,
   mapQuickDiagnosisToAnswers,
   type FoundationUiId,
   type BlockerUiId,
@@ -316,29 +317,39 @@ function delay(ms: number) {
   })
 }
 
-async function onSubmit() {
-  if (topicDemoConfig.value) {
-    if (!topicDiag.value) {
-      showToast(DIAGNOSIS_COPY.toastSelectQ1)
-      return
+function fillDiagnosisDefaults(): QuickDiagnosisUiState {
+  const nextState: QuickDiagnosisUiState = {
+    foundation: ui.value.foundation ?? DEFAULT_QUICK_DIAGNOSIS_UI_STATE.foundation,
+    blocker: ui.value.blocker ?? DEFAULT_QUICK_DIAGNOSIS_UI_STATE.blocker,
+    pace: ui.value.pace ?? DEFAULT_QUICK_DIAGNOSIS_UI_STATE.pace,
+  }
+
+  ui.value = nextState
+
+  if (topicDemoConfig.value && !topicDiag.value) {
+    const defaultTopicValue = topicDemoConfig.value.diagnosisQuestion.options[0]?.value ?? null
+    if (defaultTopicValue) {
+      topicDiag.value = defaultTopicValue
+      nextState.foundation = mapTopicDiagnosisToFoundation(topicPackId.value!, defaultTopicValue)
+      ui.value = nextState
     }
-    ui.value.foundation = mapTopicDiagnosisToFoundation(
+  }
+
+  return nextState
+}
+
+async function onSubmit() {
+  const nextState = fillDiagnosisDefaults()
+
+  if (topicDemoConfig.value && topicDiag.value) {
+    nextState.foundation = mapTopicDiagnosisToFoundation(
       topicPackId.value!,
       topicDiag.value
     )
-  } else if (!ui.value.foundation) {
-    showToast(DIAGNOSIS_COPY.toastSelectQ1)
-    return
+    ui.value = nextState
   }
-  if (!ui.value.blocker) {
-    showToast(DIAGNOSIS_COPY.toastSelectQ2)
-    return
-  }
-  if (!ui.value.pace) {
-    showToast(DIAGNOSIS_COPY.toastSelectQ3)
-    return
-  }
-  const ans = mapQuickDiagnosisToAnswers(ui.value)
+
+  const ans = mapQuickDiagnosisToAnswers(nextState)
   if (!ans?.length || !store.diagnosisId) {
     showToast(DIAGNOSIS_COPY.toastSubmitFail)
     return

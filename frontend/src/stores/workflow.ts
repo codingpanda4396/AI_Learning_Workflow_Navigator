@@ -87,10 +87,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     { deep: true }
   )
 
-  function reset() {
-    goalId.value = null
-    structuredGoal.value = null
-    goalContextSnapshot.value = null
+  function clearRunState() {
     diagnosisId.value = null
     learnerProfileSnapshot.value = null
     diagnosisEvidenceSummary.value = null
@@ -103,7 +100,18 @@ export const useWorkflowStore = defineStore('workflow', () => {
     progress.value = null
     report.value = null
     nextActionDecision.value = null
+  }
+
+  function clearForNewGoal() {
+    goalId.value = null
+    structuredGoal.value = null
+    goalContextSnapshot.value = null
+    clearRunState()
     setStored(STORAGE_KEYS.structuredGoal, null)
+  }
+
+  function reset() {
+    clearForNewGoal()
   }
 
   return {
@@ -122,6 +130,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
     progress,
     report,
     nextActionDecision,
+    clearRunState,
+    clearForNewGoal,
     reset,
   }
 })

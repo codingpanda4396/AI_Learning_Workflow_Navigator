@@ -35,8 +35,11 @@ import navigator.domain.model.ExecutableTaskSpec;
 import navigator.domain.model.TutorTurnResult;
 import navigator.domain.policy.tutor.TutorInteractionPolicy;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.entity.SessionTaskEntity;
 import navigator.infrastructure.persistence.entity.TaskCheckpointResultEntity;
 import navigator.infrastructure.persistence.repository.TaskCheckpointResultRepository;
+import navigator.infrastructure.persistence.repository.SessionTaskRepository;
+import navigator.infrastructure.persistence.serde.JsonSerde;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -58,6 +61,8 @@ public class TaskExecutionFlowService {
     private final CompletionEvaluator completionEvaluator;
     private final TaskGuidanceEngine taskGuidanceEngine;
     private final TaskExecutionEvidenceAccumulator evidenceAccumulator;
+    private final SessionTaskRepository sessionTaskRepository;
+    private final JsonSerde jsonSerde;
 
     public TaskExecutionFlowService(InMemoryStore store,
                                     SessionStateGuard sessionStateGuard,
@@ -69,7 +74,9 @@ public class TaskExecutionFlowService {
                                     TaskExecutionContextAssembler contextAssembler,
                                     CompletionEvaluator completionEvaluator,
                                     TaskGuidanceEngine taskGuidanceEngine,
-                                    TaskExecutionEvidenceAccumulator evidenceAccumulator) {
+                                    TaskExecutionEvidenceAccumulator evidenceAccumulator,
+                                    SessionTaskRepository sessionTaskRepository,
+                                    JsonSerde jsonSerde) {
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
         this.entityLookupGuard = entityLookupGuard;
@@ -81,6 +88,8 @@ public class TaskExecutionFlowService {
         this.completionEvaluator = completionEvaluator;
         this.taskGuidanceEngine = taskGuidanceEngine;
         this.evidenceAccumulator = evidenceAccumulator;
+        this.sessionTaskRepository = sessionTaskRepository;
+        this.jsonSerde = jsonSerde;
     }
 
     /**
@@ -471,6 +480,27 @@ public class TaskExecutionFlowService {
                         .orElse(null);
             }
         }
+        Long sessionDbId = extractNumericId(sessionId);
+        SessionTaskEntity persistedTask = sessionDbId != null
+                ? sessionTaskRepository.findBySessionIdAndTaskCode(sessionDbId, taskId)
+                : null;
+        if (persistedTask != null) {
+            if (persistedTask.getTaskSnapshotJson() != null && !persistedTask.getTaskSnapshotJson().isBlank()) {
+                try {
+                    TaskBlueprint hydrated = jsonSerde.fromJson(persistedTask.getTaskSnapshotJson(), TaskBlueprint.class);
+                    if (hydrated != null) {
+                        return hydrated;
+                    }
+                } catch (Exception ignored) {
+                    // Fall through to a minimal blueprint assembled from persisted task fields.
+                }
+            }
+            return TaskBlueprint.builder()
+                    .taskId(taskId)
+                    .title(persistedTask.getTitle())
+                    .goal(persistedTask.getObjective())
+                    .build();
+        }
         return FixedSampleData.taskBlueprints().stream()
                 .filter(t -> t.getTaskId().equals(taskId))
                 .findFirst()
@@ -507,6 +537,21 @@ public class TaskExecutionFlowService {
         }
         TaskExecutionEvidenceAccumulator.ensureSnapshot(rt);
         return rt;
+    }
+
+    private Long extractNumericId(String id) {
+        if (id == null) {
+            return null;
+        }
+        String digits = id.replaceAll("\\D+", "");
+        if (digits.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private static boolean isActiveQuestionType(LearningActionType action) {

@@ -33,7 +33,7 @@
         </div>
         <BottomActionBar
           :primary-label="nextActionLabel"
-          :primary-disabled="!canGoNext"
+          :primary-disabled="currentPhase !== 'reflection' && !canGoNext"
           :primary-loading="nextActionLoading"
           @primary="goNextPhase"
         />
@@ -194,19 +194,15 @@ const currentPhaseBusy = computed(() => {
       return false
   }
 })
-const nextActionLoading = computed(() => advancingPhase.value || currentPhaseBusy.value)
-
-/** 至少完成一轮有效对话：非流式中且已有非空导师回复（进阶由用户决定，不采用 LLM 的 can_proceed） */
-function understandingReadyToLeavePhase(): boolean {
-  return (
-    !understandingState.streaming &&
-    understandingState.messages.some((m) => m.role === 'assistant' && m.content.trim().length > 0)
-  )
-}
+/** REFLECTION：不等待脚手架 loading/submitting，主按钮可随时收口进报告 */
+const nextActionLoading = computed(() => {
+  if (currentPhase.value === 'reflection') {
+    return advancingPhase.value
+  }
+  return advancingPhase.value || currentPhaseBusy.value
+})
 
 /** 演示友好：一句话即可；不依赖导师 XML 中的 can_proceed / final_draft */
-const TRAINING_MIN_USER_CHARS = 4
-
 function lastTrainingUserUtterance(): string {
   for (let i = trainingState.messages.length - 1; i >= 0; i--) {
     const m = trainingState.messages[i]
@@ -223,29 +219,14 @@ function effectiveTrainingFinalDraft(): string {
   return lastTrainingUserUtterance()
 }
 
-function trainingReadyToLeavePhase(): boolean {
-  if (trainingState.streaming) return false
-  const hasAssistant = trainingState.messages.some(
-    (m) => m.role === 'assistant' && m.content.trim().length > 0,
-  )
-  const hasUserOneLiner = trainingState.messages.some(
-    (m) => m.role === 'user' && m.content.trim().length >= TRAINING_MIN_USER_CHARS,
-  )
-  return hasAssistant && hasUserOneLiner
-}
-
 const canGoNext = computed(() => {
   switch (currentPhase.value) {
     case 'structure':
-      return (
-        !latestStructureSubmit.value &&
-        (scaffoldEngine.stage?.structureCanComplete === true ||
-          structureState.completedQuestionIds.length >= structureState.questions.length)
-      )
+      return !latestStructureSubmit.value && !scaffoldEngine.submitting
     case 'understanding':
-      return understandingReadyToLeavePhase()
+      return !understandingState.streaming
     case 'training':
-      return trainingReadyToLeavePhase()
+      return !trainingState.streaming
     case 'reflection':
       return true
     default:
@@ -330,7 +311,22 @@ watch(
 )
 
 async function goNextPhase() {
-  if (!canGoNext.value || !task.value || !store.sessionId) return
+  if (!task.value || !store.sessionId) return
+
+  // REFLECTION：直接收尾并进入报告，不与引擎 stageKey / URL 对齐纠缠
+  if (currentPhase.value === 'reflection') {
+    advancingPhase.value = true
+    try {
+      await completeCurrentTaskAndAdvance()
+    } catch (err) {
+      showToast(getErrorMessage(err))
+    } finally {
+      advancingPhase.value = false
+    }
+    return
+  }
+
+  if (!canGoNext.value) return
   advancingPhase.value = true
   try {
     const enginePhaseBeforeSubmit = resolveEnginePhase()
@@ -340,11 +336,6 @@ async function goNextPhase() {
       }
       await syncRoutePhase(enginePhaseBeforeSubmit)
       ensureConversationState(enginePhaseBeforeSubmit)
-      return
-    }
-
-    if (currentPhase.value === 'reflection') {
-      await completeCurrentTaskAndAdvance()
       return
     }
 
@@ -358,10 +349,7 @@ async function goNextPhase() {
         ensureConversationState(enginePhaseAfterSync)
         return
       }
-      if (scaffoldEngine.stage?.structureCanComplete !== true) {
-        showToast('请先等当前题目的反馈同步完成，再进入下一阶段')
-        return
-      }
+      await autoCompleteStructureForDemo()
       const csr = await postCompleteStructureStage(task.value.taskId, {
         sessionId: store.sessionId,
       })
@@ -440,6 +428,37 @@ function handleStructureNext() {
     structureState.isLocked = false
     structureState.feedback = null
   }
+}
+
+async function autoCompleteStructureForDemo() {
+  for (let index = 0; index < structureState.questions.length; index++) {
+    const question = structureState.questions[index]
+    if (structureState.completedQuestionIds.includes(question.id)) continue
+
+    const optionId = question.correctId || question.options[0]?.id
+    if (!optionId) continue
+
+    structureState.currentQuestionIndex = index
+    structureState.selectedOptionId = optionId
+    structureState.isLocked = true
+    structureState.feedback = null
+    structureState.completedQuestionIds.push(question.id)
+
+    try {
+      await submitStructureSelectionToEngine(question.id, optionId)
+    } catch (err) {
+      structureState.completedQuestionIds = structureState.completedQuestionIds.filter(
+        (id) => id !== question.id,
+      )
+      structureState.selectedOptionId = null
+      structureState.isLocked = false
+      throw err
+    }
+  }
+
+  structureState.currentQuestionIndex = Math.max(0, structureState.questions.length - 1)
+  structureState.selectedOptionId = null
+  structureState.isLocked = false
 }
 
 async function submitStructureSelectionToEngine(questionId: string, optionId: string) {
@@ -543,7 +562,8 @@ async function completeCurrentTaskAndAdvance() {
       }
     : null
 
-  // 「查看学习报告」语义：先收口到报告页；若计划仍有下一任务，仅更新 currentTaskId，供报告/后续入口继续执行
+  store.report = null
+  store.nextActionDecision = null
   if (result.nextTaskAvailable && result.nextTaskId) {
     store.currentTaskId = result.nextTaskId
   } else {
@@ -553,6 +573,10 @@ async function completeCurrentTaskAndAdvance() {
   task.value = null
   progress.value = null
   resetWorkbenchState()
+  if (result.nextTaskAvailable && result.nextTaskId) {
+    await router.push({ name: 'taskRun', params: { taskId: result.nextTaskId } })
+    return
+  }
   await router.push('/report')
 }
 

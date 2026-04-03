@@ -21,7 +21,6 @@ import navigator.application.task.guidance.TaskExecutionEvidenceAccumulator;
 import navigator.domain.model.LearningMethodProfile;
 import navigator.domain.model.TaskBlueprint;
 import navigator.domain.model.TaskExecutionRecord;
-import navigator.domain.model.ExecutableTaskSpec;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.entity.TaskCompletionEntity;
 import navigator.infrastructure.persistence.entity.TaskMethodProfileEntity;
@@ -83,7 +82,7 @@ public class ExecutionApplicationService {
 
     public CurrentTaskData getCurrentTask(String sessionId) {
         sessionStateGuard.requireSessionInProgressWithCommittedPlan(sessionId);
-        InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
+        InMemoryStore.LearningSessionState state = loadSessionState(sessionId);
         if (state == null || state.getTaskSequence() == null) {
             return null;
         }
@@ -93,7 +92,7 @@ public class ExecutionApplicationService {
             return null;
         }
         String taskId = seq.get(idx);
-        TaskBlueprint blueprint = resolveBlueprint(state.getPlanId(), taskId);
+        TaskBlueprint blueprint = resolveBlueprint(sessionId, state.getPlanId(), taskId);
         if (blueprint == null) {
             return null;
         }
@@ -127,8 +126,12 @@ public class ExecutionApplicationService {
         if (rtMerge != null) {
             request.setEvidenceSnapshot(TaskExecutionEvidenceAccumulator.copySnapshot(rtMerge));
         }
-        InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
-        TaskBlueprint blueprint = resolveBlueprint(state.getPlanId(), taskId);
+        InMemoryStore.LearningSessionState state = loadSessionState(sessionId);
+        if (state == null) {
+            throw new navigator.api.BusinessException(navigator.api.BusinessErrorCode.RESOURCE_NOT_FOUND,
+                    "session not found: " + sessionId);
+        }
+        TaskBlueprint blueprint = resolveBlueprint(sessionId, state.getPlanId(), taskId);
         String taskTypeName = blueprint != null && blueprint.getTaskType() != null ? blueprint.getTaskType().name() : "CONCEPT_EXPLAIN";
         TaskExecutionRecord record = TaskExecutionRecord.builder()
                 .taskId(taskId)
@@ -201,6 +204,35 @@ public class ExecutionApplicationService {
         return sessionTask != null ? sessionTask.getId() : null;
     }
 
+    private InMemoryStore.LearningSessionState loadSessionState(String sessionId) {
+        InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
+        if (state != null && state.getTaskSequence() != null && !state.getTaskSequence().isEmpty()) {
+            return state;
+        }
+
+        Long sessionDbId = extractNumericId(sessionId);
+        if (sessionDbId == null) {
+            return state;
+        }
+
+        var sessionEntity = learningSessionRepository.findById(sessionDbId);
+        var sessionTasks = sessionTaskRepository.findBySessionId(sessionDbId);
+        if (sessionEntity == null || sessionTasks == null || sessionTasks.isEmpty()) {
+            return state;
+        }
+
+        InMemoryStore.LearningSessionState hydrated = new InMemoryStore.LearningSessionState();
+        hydrated.setSessionId(sessionId);
+        hydrated.setPlanId(sessionEntity.getPlanId() != null ? "plan_" + sessionEntity.getPlanId() : null);
+        hydrated.setTaskSequence(sessionTasks.stream().map(t -> t.getTaskCode()).toList());
+        hydrated.setCurrentTaskIndex(Math.max(0, sessionEntity.getCompletedTaskCount() != null
+                ? sessionEntity.getCompletedTaskCount()
+                : 0));
+        hydrated.setStatus(sessionEntity.getStatus());
+        store.getSessions().put(sessionId, hydrated);
+        return hydrated;
+    }
+
     private Long extractNumericId(String id) {
         if (id == null) {
             return null;
@@ -231,7 +263,7 @@ public class ExecutionApplicationService {
                 + ", 补救轮次≤" + (policy.getMaxRemedialTurns() != null ? policy.getMaxRemedialTurns() : 2);
     }
 
-    private TaskBlueprint resolveBlueprint(String planId, String taskId) {
+    private TaskBlueprint resolveBlueprint(String sessionId, String planId, String taskId) {
         if (planId != null) {
             LearningPlanPreview plan = store.getPlanPreviews().get(planId);
             if (plan != null && plan.getTasks() != null) {
@@ -239,6 +271,20 @@ public class ExecutionApplicationService {
                         .filter(t -> t.getTaskId().equals(taskId))
                         .findFirst()
                         .orElse(null);
+            }
+        }
+        Long sessionDbId = extractNumericId(sessionId);
+        if (sessionDbId != null) {
+            var sessionTask = sessionTaskRepository.findBySessionIdAndTaskCode(sessionDbId, taskId);
+            if (sessionTask != null && sessionTask.getTaskSnapshotJson() != null && !sessionTask.getTaskSnapshotJson().isBlank()) {
+                try {
+                    TaskBlueprint hydrated = jsonSerde.fromJson(sessionTask.getTaskSnapshotJson(), TaskBlueprint.class);
+                    if (hydrated != null) {
+                        return hydrated;
+                    }
+                } catch (Exception ignored) {
+                    // Fall through to fixed sample lookup.
+                }
             }
         }
         return FixedSampleData.taskBlueprints().stream()

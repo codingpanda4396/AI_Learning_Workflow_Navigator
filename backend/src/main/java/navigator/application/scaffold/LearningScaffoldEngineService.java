@@ -37,6 +37,9 @@ import navigator.domain.model.ScaffoldRuntimeStatus;
 import navigator.domain.model.StructuredLearningGoal;
 import navigator.domain.model.TaskScaffold;
 import navigator.infrastructure.memory.InMemoryStore;
+import navigator.infrastructure.persistence.repository.LearningGoalRepository;
+import navigator.infrastructure.persistence.repository.LearningPlanRepository;
+import navigator.infrastructure.persistence.serde.JsonSerde;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -63,6 +66,9 @@ public class LearningScaffoldEngineService {
     private final ReflectionAssembler reflectionAssembler;
     private final StructureSkeletonComposer structureSkeletonComposer;
     private final StageScaffoldWorkbenchComposer stageScaffoldWorkbenchComposer;
+    private final LearningGoalRepository learningGoalRepository;
+    private final LearningPlanRepository learningPlanRepository;
+    private final JsonSerde jsonSerde;
 
     public LearningScaffoldEngineService(TaskExecutionFlowService taskExecutionFlowService,
                                          InMemoryStore store,
@@ -78,7 +84,10 @@ public class LearningScaffoldEngineService {
                                          ReflectionTutorComposer reflectionTutorComposer,
                                          ReflectionAssembler reflectionAssembler,
                                          StructureSkeletonComposer structureSkeletonComposer,
-                                         StageScaffoldWorkbenchComposer stageScaffoldWorkbenchComposer) {
+                                         StageScaffoldWorkbenchComposer stageScaffoldWorkbenchComposer,
+                                         LearningGoalRepository learningGoalRepository,
+                                         LearningPlanRepository learningPlanRepository,
+                                         JsonSerde jsonSerde) {
         this.taskExecutionFlowService = taskExecutionFlowService;
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
@@ -94,6 +103,9 @@ public class LearningScaffoldEngineService {
         this.reflectionAssembler = reflectionAssembler;
         this.structureSkeletonComposer = structureSkeletonComposer;
         this.stageScaffoldWorkbenchComposer = stageScaffoldWorkbenchComposer;
+        this.learningGoalRepository = learningGoalRepository;
+        this.learningPlanRepository = learningPlanRepository;
+        this.jsonSerde = jsonSerde;
     }
 
     public StageScaffold getStage(String sessionId, String taskId, String stageKeyParam) {
@@ -992,14 +1004,97 @@ public class LearningScaffoldEngineService {
 
     private KnowledgePackMetadata.PackMeta resolvePackMeta(String sessionId) {
         InMemoryStore.LearningSessionState state = store.getSessions().get(sessionId);
-        if (state == null || state.getPlanId() == null) {
+        LearningPlanPreview plan = state != null && state.getPlanId() != null
+                ? store.getPlanPreviews().get(state.getPlanId())
+                : null;
+        if (plan != null && plan.getGoalId() != null) {
+            KnowledgePackMetadata.PackMeta fromGoal = KnowledgePackMetadata.fromGoal(loadGoal(plan.getGoalId()));
+            if (fromGoal != null) {
+                return fromGoal;
+            }
+        }
+
+        Long sessionDbId = extractNumericId(sessionId);
+        var persistedPlan = sessionDbId != null ? learningPlanRepository.findBySessionId(sessionDbId) : null;
+        if (persistedPlan == null) {
             return null;
         }
-        LearningPlanPreview plan = store.getPlanPreviews().get(state.getPlanId());
-        if (plan == null || plan.getGoalId() == null) {
+        KnowledgePackMetadata.PackMeta fromPersistedGoal = KnowledgePackMetadata.fromGoal(loadGoal(persistedPlan.getGoalId()));
+        if (fromPersistedGoal != null) {
+            return fromPersistedGoal;
+        }
+        if (persistedPlan.getPlanSnapshotJson() == null || persistedPlan.getPlanSnapshotJson().isBlank()) {
             return null;
         }
-        StructuredLearningGoal goal = store.getGoals().get(plan.getGoalId());
-        return KnowledgePackMetadata.fromGoal(goal);
+        try {
+            LearningPlanPreview hydrated = jsonSerde.fromJson(persistedPlan.getPlanSnapshotJson(), LearningPlanPreview.class);
+            if (hydrated != null && hydrated.getGoalId() != null) {
+                return KnowledgePackMetadata.fromGoal(loadGoal(hydrated.getGoalId()));
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private StructuredLearningGoal loadGoal(String goalId) {
+        if (goalId == null || goalId.isBlank()) {
+            return null;
+        }
+        StructuredLearningGoal cached = store.getGoals().get(goalId);
+        if (cached != null) {
+            return cached;
+        }
+        return loadGoal(extractNumericId(goalId));
+    }
+
+    private StructuredLearningGoal loadGoal(Long goalDbId) {
+        if (goalDbId == null) {
+            return null;
+        }
+        String goalId = "goal_" + goalDbId;
+        StructuredLearningGoal cached = store.getGoals().get(goalId);
+        if (cached != null) {
+            return cached;
+        }
+        var entity = learningGoalRepository.findById(goalDbId);
+        if (entity == null) {
+            return null;
+        }
+        StructuredLearningGoal restored = null;
+        if (entity.getStructuredGoalJson() != null && !entity.getStructuredGoalJson().isBlank()) {
+            try {
+                restored = jsonSerde.fromJson(entity.getStructuredGoalJson(), StructuredLearningGoal.class);
+            } catch (Exception ignored) {
+                restored = null;
+            }
+        }
+        if (restored == null && entity.getRawGoalText() != null && !entity.getRawGoalText().isBlank()) {
+            restored = StructuredLearningGoal.builder()
+                    .rawGoalText(entity.getRawGoalText())
+                    .normalizedGoalText(entity.getRawGoalText())
+                    .subject(entity.getSubjectHint())
+                    .sourceContext(entity.getSourceContext())
+                    .build();
+        }
+        if (restored != null) {
+            store.getGoals().put(goalId, restored);
+        }
+        return restored;
+    }
+
+    private Long extractNumericId(String id) {
+        if (id == null) {
+            return null;
+        }
+        String digits = id.replaceAll("\\D+", "");
+        if (digits.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 }

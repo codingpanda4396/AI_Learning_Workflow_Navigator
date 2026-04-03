@@ -26,6 +26,7 @@ import navigator.application.task.TaskSpecFromBlueprintConverter;
 import navigator.infrastructure.memory.InMemoryStore;
 import navigator.infrastructure.persistence.entity.LearningPlanEntity;
 import navigator.infrastructure.persistence.entity.SessionTaskEntity;
+import navigator.infrastructure.persistence.repository.DiagnosisSessionRepository;
 import navigator.infrastructure.persistence.repository.LearningPlanRepository;
 import navigator.infrastructure.persistence.repository.LearningSessionRepository;
 import navigator.infrastructure.persistence.repository.SessionTaskRepository;
@@ -45,6 +46,7 @@ public class PlanningApplicationService {
     private final PlanStrategySelector planStrategySelector;
     private final RecommendedEntryBuilder recommendedEntryBuilder;
     private final PlanTemplateFactory planTemplateFactory;
+    private final DiagnosisSessionRepository diagnosisSessionRepository;
     private final LearningPlanRepository learningPlanRepository;
     private final SessionTaskRepository sessionTaskRepository;
     private final LearningSessionRepository learningSessionRepository;
@@ -58,6 +60,7 @@ public class PlanningApplicationService {
                                       PlanStrategySelector planStrategySelector,
                                       RecommendedEntryBuilder recommendedEntryBuilder,
                                       PlanTemplateFactory planTemplateFactory,
+                                      DiagnosisSessionRepository diagnosisSessionRepository,
                                       LearningPlanRepository learningPlanRepository,
                                       SessionTaskRepository sessionTaskRepository,
                                       LearningSessionRepository learningSessionRepository,
@@ -70,6 +73,7 @@ public class PlanningApplicationService {
         this.planStrategySelector = planStrategySelector;
         this.recommendedEntryBuilder = recommendedEntryBuilder;
         this.planTemplateFactory = planTemplateFactory;
+        this.diagnosisSessionRepository = diagnosisSessionRepository;
         this.learningPlanRepository = learningPlanRepository;
         this.sessionTaskRepository = sessionTaskRepository;
         this.learningSessionRepository = learningSessionRepository;
@@ -81,6 +85,14 @@ public class PlanningApplicationService {
         entityLookupGuard.requireGoal(goalId);
         sessionStateGuard.requireDiagnosisCompletedForPreview(diagnosisId);
         String sessionIdStr = store.getDiagnosisToSession().get(diagnosisId);
+        if (sessionIdStr == null) {
+            Long diagnosisDbId = extractNumericId(diagnosisId);
+            var diagnosisEntity = diagnosisDbId != null ? diagnosisSessionRepository.findById(diagnosisDbId) : null;
+            if (diagnosisEntity != null && diagnosisEntity.getSessionId() != null) {
+                sessionIdStr = "learn_session_" + diagnosisEntity.getSessionId();
+                store.getDiagnosisToSession().put(diagnosisId, sessionIdStr);
+            }
+        }
         if (sessionIdStr == null) {
             throw new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND, "session not found for diagnosis: " + diagnosisId);
         }

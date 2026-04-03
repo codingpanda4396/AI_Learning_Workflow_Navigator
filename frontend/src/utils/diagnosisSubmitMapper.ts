@@ -19,6 +19,12 @@ export interface QuickDiagnosisUiState {
   pace: PaceUiId | null
 }
 
+export const DEFAULT_QUICK_DIAGNOSIS_UI_STATE: Required<QuickDiagnosisUiState> = {
+  foundation: 'fu_fuzzy',
+  blocker: 'bk_concept',
+  pace: 'pc_normal',
+}
+
 /** 第 1 题：基础熟悉度 → q_foundation_state */
 const FOUNDATION_TO_CODE: Record<FoundationUiId, string> = {
   fu_none: 'BEGINNER',

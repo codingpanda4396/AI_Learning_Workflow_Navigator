@@ -4,7 +4,7 @@ import type { TaskCompletionStatusType } from '@/types/enums'
 const DEFAULT_NEXT_PRACTICE = '先巩固本任务要点，有需要再继续下一练。'
 
 /**
- * 组装任务完成请求：直接完成模式不传收束字段；脚手架模式传 summaryText 等以满足 TaskClosureValidator。
+ * 组装任务完成请求：直接完成模式不传收束字段；脚手架模式仍带 summary 等便于报告侧展示。
  */
 export function buildCompleteTaskPayload(input: {
   sessionId: string

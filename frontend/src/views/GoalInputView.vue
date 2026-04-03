@@ -367,6 +367,7 @@ async function continueLatest() {
   const entry = auth.recentLearningEntry
   if (!entry?.sessionId) return
 
+  store.clearForNewGoal()
   store.goalId = entry.goalId ?? null
   store.diagnosisId = entry.diagnosisId ?? null
   store.planId = entry.planId ?? null
@@ -399,6 +400,7 @@ async function onSubmit() {
   const started = Date.now()
 
   try {
+    store.clearForNewGoal()
     const payload = buildHomeGoalRequest(selectedTopicKey.value, autoStartIntent.value)
     const data = await createGoal(payload)
     store.goalId = data.goalId

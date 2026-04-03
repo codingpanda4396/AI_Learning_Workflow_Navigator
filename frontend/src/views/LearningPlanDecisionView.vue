@@ -124,10 +124,7 @@ async function onStartStep() {
   committing.value = true
   try {
     if (store.sessionId && !store.currentTaskId) {
-      store.sessionId = null
-      store.currentTask = null
-      store.progress = null
-      store.taskSequence = []
+      store.clearRunState()
     }
     const data = await commitPlan(store.planId)
     store.sessionId = data.sessionId
