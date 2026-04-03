@@ -54,11 +54,7 @@ import ErrorState from '@/components/ui/ErrorState.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 import SecondaryButton from '@/components/ui/SecondaryButton.vue'
 import { getErrorMessage } from '@/api/request'
-import {
-  postCompleteConversationStage,
-  postCompleteReflectionStage,
-  postCompleteStructureStage,
-} from '@/api/learningScaffold'
+import { postCompleteConversationStage, postCompleteStructureStage } from '@/api/learningScaffold'
 import { streamAiTutorChat, type AiTutorChatMessagePayload } from '@/api/tutor'
 import { completeTask, getCurrentTask } from '@/api/task'
 import { supportsLearningScaffoldEngine } from '@/constants/learningScaffoldPack'
@@ -251,7 +247,7 @@ const canGoNext = computed(() => {
     case 'training':
       return trainingReadyToLeavePhase()
     case 'reflection':
-      return reflectionState.selectedStrategyIds.length > 0 || reflectionState.userReflectionText.trim().length > 0
+      return true
     default:
       return false
   }
@@ -348,7 +344,6 @@ async function goNextPhase() {
     }
 
     if (currentPhase.value === 'reflection') {
-      await submitReflectionToBackend()
       await completeCurrentTaskAndAdvance()
       return
     }
@@ -508,19 +503,6 @@ function buildReflectionSummary() {
   reflectionState.confusionPoints = DFS_BFS_CONFUSION_POINTS
 }
 
-async function submitReflectionToBackend() {
-  if (scaffoldEngine.stage?.stageKey !== 'REFLECTION' || !task.value || !store.sessionId) return
-  const strategyLabels = reflectionState.availableStrategies
-    .filter((item) => reflectionState.selectedStrategyIds.includes(item.id))
-    .map((item) => item.label)
-  await postCompleteReflectionStage(task.value.taskId, {
-    sessionId: store.sessionId,
-    reflectionText: reflectionState.userReflectionText,
-    strategyLabels,
-  })
-  await scaffoldEngine.loadStage({ force: true })
-}
-
 async function completeCurrentTaskAndAdvance() {
   if (!task.value || !store.sessionId) return
 
@@ -561,20 +543,16 @@ async function completeCurrentTaskAndAdvance() {
       }
     : null
 
+  // 「查看学习报告」语义：先收口到报告页；若计划仍有下一任务，仅更新 currentTaskId，供报告/后续入口继续执行
   if (result.nextTaskAvailable && result.nextTaskId) {
     store.currentTaskId = result.nextTaskId
-    store.currentTask = null
-    task.value = null
-    progress.value = null
-    resetWorkbenchState()
-    await router.push({ name: 'taskRun', params: { taskId: result.nextTaskId }, query: { phase: 'structure' } })
-    return
+  } else {
+    store.currentTaskId = null
   }
-
-  store.currentTaskId = null
   store.currentTask = null
   task.value = null
   progress.value = null
+  resetWorkbenchState()
   await router.push('/report')
 }
 

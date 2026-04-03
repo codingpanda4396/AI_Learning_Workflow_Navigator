@@ -1,6 +1,7 @@
 package navigator.application;
 
 import navigator.api.dto.CompleteTaskData;
+import navigator.api.dto.CompleteTaskRequest;
 import navigator.api.dto.CurrentTaskData;
 import navigator.api.dto.CurrentTaskGuidanceData;
 import navigator.api.dto.TaskInteractionData;
@@ -12,7 +13,6 @@ import navigator.domain.enums.TaskCompletionStatus;
 import navigator.domain.model.ExecutableTaskSpec;
 import navigator.domain.model.LearningPlanPreview;
 import navigator.application.task.LearningMethodProfileAggregator;
-import navigator.application.task.TaskClosureValidator;
 import navigator.application.scaffold.LearningScaffoldEngineService;
 import navigator.application.task.TaskExecutionFlowService;
 import navigator.application.task.TaskExecutionPersistenceService;
@@ -50,7 +50,6 @@ public class ExecutionApplicationService {
     private final JsonSerde jsonSerde;
     private final TaskExecutionFlowService taskExecutionFlowService;
     private final LearningScaffoldEngineService learningScaffoldEngineService;
-    private final TaskClosureValidator taskClosureValidator;
 
     public ExecutionApplicationService(InMemoryStore store,
                                        SessionStateGuard sessionStateGuard,
@@ -63,8 +62,7 @@ public class ExecutionApplicationService {
                                        TaskExecutionEventIngestService taskExecutionEventIngestService,
                                        JsonSerde jsonSerde,
                                        TaskExecutionFlowService taskExecutionFlowService,
-                                       LearningScaffoldEngineService learningScaffoldEngineService,
-                                       TaskClosureValidator taskClosureValidator) {
+                                       LearningScaffoldEngineService learningScaffoldEngineService) {
         this.store = store;
         this.sessionStateGuard = sessionStateGuard;
         this.taskProgressGuard = taskProgressGuard;
@@ -77,7 +75,6 @@ public class ExecutionApplicationService {
         this.jsonSerde = jsonSerde;
         this.taskExecutionFlowService = taskExecutionFlowService;
         this.learningScaffoldEngineService = learningScaffoldEngineService;
-        this.taskClosureValidator = taskClosureValidator;
     }
 
     public CurrentTaskGuidanceData getCurrentTaskGuidance(String sessionId) {
@@ -119,10 +116,9 @@ public class ExecutionApplicationService {
         return taskExecutionEventIngestService.ingestLegacyInteraction(taskId, request);
     }
 
-    public CompleteTaskData completeTask(String taskId, navigator.api.dto.CompleteTaskRequest request) {
+    public CompleteTaskData completeTask(String taskId, CompleteTaskRequest request) {
         String sessionId = request.getSessionId();
         taskProgressGuard.requireTaskCanComplete(sessionId, taskId);
-        taskClosureValidator.validateIfRuntimeTracked(sessionId, taskId, request);
         String rtKey = InMemoryStore.taskRuntimeKey(sessionId, taskId);
         TaskExecutionRuntime rtMerge = store.getTaskExecutionRuntimes().get(rtKey);
         if (rtMerge == null) {

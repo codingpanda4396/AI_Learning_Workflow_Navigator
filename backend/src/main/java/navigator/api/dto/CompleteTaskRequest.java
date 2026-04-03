@@ -25,7 +25,7 @@ public class CompleteTaskRequest {
     private List<String> behaviorSignals;
     private String learnerReflection;
 
-    /** Sprint 4 收束（脚手架任务必填，由 {@link navigator.application.task.TaskClosureValidator} 校验） */
+    /** Sprint 4 收束字段（写入完成记录；完成接口不再强制校验） */
     private String summaryText;
     private List<String> learnedFrameworkPoints;
     private List<String> unresolvedQuestions;

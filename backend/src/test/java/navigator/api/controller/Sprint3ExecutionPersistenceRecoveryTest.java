@@ -87,7 +87,7 @@ class Sprint3ExecutionPersistenceRecoveryTest {
 
         mvc.perform(post("/api/tasks/" + taskId + "/complete").cookie(authCookie).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionId\":\"" + sessionId + "\",\"completionStatus\":\"COMPLETED\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("TASK_EXECUTION_NOT_READY_FOR_COMPLETE"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sessionProgress").exists());
     }
 }

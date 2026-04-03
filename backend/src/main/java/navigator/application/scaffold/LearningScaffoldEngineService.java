@@ -391,6 +391,19 @@ public class LearningScaffoldEngineService {
                     "请至少勾选一条判断规则，或填写一句话反思。");
         }
 
+        finishReflectionStageWithInputs(sessionId, taskId, rt, eng, reflectionText, labelList);
+
+        return CompleteReflectionStageResult.builder()
+                .reflectionStageComplete(true)
+                .completedStageKey(DfsBfsReflectionScaffoldDefinition.STAGE_KEY)
+                .nextStageKey(null)
+                .nextActionId(eng.getCurrentActionId())
+                .build();
+    }
+
+    private void finishReflectionStageWithInputs(String sessionId, String taskId, TaskExecutionRuntime rt,
+                                                 LearningScaffoldEngineState eng, String reflectionText,
+                                                 List<String> labelList) {
         List<String> order = DfsBfsReflectionScaffoldDefinition.orderedActionIds();
         String[] inputs = buildReflectionWorkbenchInputs(reflectionText, labelList);
         for (int i = 0; i < order.size(); i++) {
@@ -424,13 +437,6 @@ public class LearningScaffoldEngineService {
         rt.getScaffold().setLearningScaffoldEngineState(eng);
         maybeAdvanceTaskStateAfterScaffoldBlock(sessionId, taskId, rt);
         persistenceService.saveRuntime(sessionId, taskId, rt, null, null);
-
-        return CompleteReflectionStageResult.builder()
-                .reflectionStageComplete(true)
-                .completedStageKey(DfsBfsReflectionScaffoldDefinition.STAGE_KEY)
-                .nextStageKey(null)
-                .nextActionId(eng.getCurrentActionId())
-                .build();
     }
 
     private String[] buildReflectionWorkbenchInputs(String reflectionText, List<String> strategyLabels) {

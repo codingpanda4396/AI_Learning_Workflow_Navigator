@@ -34,10 +34,9 @@ public class TaskClosureValidator {
         if (request == null) {
             throw new BusinessException(BusinessErrorCode.TASK_CLOSURE_INCOMPLETE, "缺少任务收束信息");
         }
-        String summary = request.getSummaryText();
-        if (summary == null || summary.trim().length() < MIN_SUMMARY_LEN) {
+        if (effectiveSummaryOrReflectionLength(request) < MIN_SUMMARY_LEN) {
             throw new BusinessException(BusinessErrorCode.TASK_CLOSURE_INCOMPLETE,
-                    "请提交至少 " + MIN_SUMMARY_LEN + " 字的任务总结（summaryText）");
+                    "请提交至少 " + MIN_SUMMARY_LEN + " 字的任务总结（summaryText 与 learnerReflection 取长）");
         }
         List<String> fw = request.getLearnedFrameworkPoints();
         if (fw == null || fw.stream().filter(s -> s != null && !s.isBlank()).count() < MIN_FRAMEWORK_POINTS) {
@@ -49,6 +48,12 @@ public class TaskClosureValidator {
             throw new BusinessException(BusinessErrorCode.TASK_CLOSURE_INCOMPLETE,
                     "请说明下一步准备如何练习（nextPracticeIntent）");
         }
+    }
+
+    private static int effectiveSummaryOrReflectionLength(CompleteTaskRequest request) {
+        String s = request.getSummaryText() != null ? request.getSummaryText().trim() : "";
+        String l = request.getLearnerReflection() != null ? request.getLearnerReflection().trim() : "";
+        return Math.max(s.length(), l.length());
     }
 
     private boolean isRuntimeTracked(String sessionId, String taskId) {
